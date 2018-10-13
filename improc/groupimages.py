@@ -33,8 +33,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-frames', required=True, help='List of the frames to coadd.',
                         nargs=1, dest='frames')
-    parser.add_argument('--output-dir', help='Directory in which to write results.', 
-                        dest='outdir', required=False, default='.')
+    parser.add_argument('--outfile-name', help='Name of file in which to write results.',
+                        dest='outfile_name', required=False, default='coadd')
     parser.add_argument('--associated-frames', required=False, default=None, help='Lists of frames, in '
                         'the same order as input_frames, that should be grouped with the input frames.',
                         dest='associated', nargs='*')
