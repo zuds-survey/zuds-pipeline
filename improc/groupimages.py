@@ -52,9 +52,6 @@ if __name__ == '__main__':
     with open(args.frames[0], 'r') as f:
         framenames = [line.strip() for line in f]
 
-    if not os.path.exists(args.outdir):
-        os.mkdir(args.outdir)
-
     # prune the ones with bad seeing
     frames = []
     inds = []
