@@ -34,7 +34,7 @@ if __name__ == '__main__':
     parser.add_argument('--input-frames', required=True, help='List of the frames to coadd.',
                         nargs=1, dest='frames')
     parser.add_argument('--outfile-name', help='Name of file in which to write results.',
-                        dest='outfile_name', required=False, default='coadd')
+                        dest='outfile', required=False, default='list')
     parser.add_argument('--associated-frames', required=False, default=None, help='Lists of frames, in '
                         'the same order as input_frames, that should be grouped with the input frames.',
                         dest='associated', nargs='*')
@@ -96,23 +96,28 @@ if __name__ == '__main__':
                     myframes.append(im)
                     myinds.append(ind)
 
+            if len(myframes) > 0:
+                make_output('%s.%s' % (dirname, args.outfile), myframes)
+            else:
+                continue
+
             for l in args.associated:
                 with open(l, 'r') as f:
                     aframes = [line.strip() for i, line in enumerate(f) if i in myinds]
                     if len(aframes) != len(myinds):
                         raise ValueError('Length of associated frame list "%s" must be the same '
                                          'as number of input frames.' % l)
-                    myframes.extend(aframes)
+                make_output('%s.%s.%s' % (dirname, l, args.outfile), aframes)
 
-            if len(myframes) > 0:
-                make_output('%s.%s' % (dirname, args.outfile), myframes)
     else:
         # just do one big coadd
+        make_output(args.outfile, frames)
+        
         for l in args.associated:
             with open(l, 'r') as f:
                 aframes = [line.strip() for i, line in enumerate(f) if i in inds]
                 if len(aframes) != len(frames):
                     raise ValueError('Length of associated frame list "%s" must be the same '
                                      'as number of input frames.' % l)
-                frames.extend(aframes)
-        make_output(args.outfile, frames)
+            make_output('%s.%s' % (l, args.outfile), aframes)
+
