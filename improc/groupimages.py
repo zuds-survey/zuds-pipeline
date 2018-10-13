@@ -9,17 +9,6 @@ import glob
 from astropy.io import fits
 
 
-class ReadableDir(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        prospective_dir=values
-        if not os.path.isdir(prospective_dir):
-            raise argparse.ArgumentTypeError("readable_dir:{0} is not a valid path".format(prospective_dir))
-        if os.access(prospective_dir, os.R_OK):
-            setattr(namespace,self.dest,prospective_dir)
-        else:
-            raise argparse.ArgumentTypeError("readable_dir:{0} is not a readable dir".format(prospective_dir))
-
-
 def make_directory(topdir, dirname, framenames, clobber):
     refdir = os.path.join(topdir, dirname)
     if os.path.exists(refdir):
@@ -35,12 +24,17 @@ def make_directory(topdir, dirname, framenames, clobber):
 
 
 def img_in_range(image, range_low, range_high):
-    time = pd.datetime(fits.open(image)[0].header['SHUTOPEN'])
+    time = pd.to_datetime(fits.open(image)[0].header['SHUTOPEN'])
     return range_low <= time < range_high
+
 
 def get_seeing(image):
     seeing = float(fits.open(image)[0].header['SEEING'])
     return seeing
+
+
+def get_date(image):
+    return pd.to_datetime(fits.open(image)[0].header['SHUTOPEN'])
 
 
 if __name__ == '__main__':
@@ -67,6 +61,9 @@ if __name__ == '__main__':
     with open(args.frames[0], 'r') as f:
         framenames = [line.strip() for line in f]
 
+    if not os.path.exists(args.outdir):
+        os.mkdir(args.outdir)
+
     # prune the ones with bad seeing
     frames = []
     inds = []
@@ -76,19 +73,22 @@ if __name__ == '__main__':
             frames.append(img)
             inds.append(i)
         else:
-            warnings.warn('Frame %s has seeing=%0.2f (>%0.2f). '
+            warnings.warn('Frame "%s" has seeing=%0.2f (>%0.2f). '
                           'Skipping...' % (img, seeing, args.max_seeing),
                           UserWarning)
     # make the bins
 
     if args.window_size > 0:
-        mindate, maxdate = args.daterange
+        dates = list(map(get_date, frames))
+        mindate = min(dates)
+        maxdate = max(dates)
+        
         if args.rolling:
             dates = pd.date_range(mindate, maxdate, freq='1D')
             datebins = []
             for i, date in enumerate(dates):
-                if i >= len(dates):
-                    continue
+                if i + args.window_size >= len(dates):
+                    break
                 datebins.append((date, dates[i + args.window_size]))
 
         else:
@@ -96,8 +96,8 @@ if __name__ == '__main__':
             datebins = [(datebins[i], datebins[i + 1]) for i in range(len(datebins) - 1)]
 
         for start, stop in datebins:
-            startstr = start.strftime('%y%m%d')
-            stopstr = stop.strftime('%y%m%d')
+            startstr = start.strftime('%Y%m%d')
+            stopstr = stop.strftime('%Y%m%d')
 
             dirname = '%s-%s' % (startstr, stopstr)
 
@@ -105,19 +105,19 @@ if __name__ == '__main__':
             myinds = []
             for im, ind in zip(frames, inds):
                 if img_in_range(im, start, stop):
-                    myframes.append(img)
+                    myframes.append(im)
                     myinds.append(ind)
 
             for l in args.associated:
                 with open(l, 'r') as f:
                     aframes = [line.strip() for i, line in enumerate(f) if i in myinds]
-                    if len(aframes) != len(frames):
+                    if len(aframes) != len(myinds):
                         raise ValueError('Length of associated frame list "%s" must be the same '
                                          'as number of input frames.' % l)
                     myframes.extend(aframes)
-            
-            make_directory(args.outdir, dirname, myframes, args.clobber)
-            
+
+            if len(myframes) > 0:
+                make_directory(args.outdir, dirname, myframes, args.clobber)
     else:
         # just do one big coadd
         for l in args.associated:
@@ -128,4 +128,3 @@ if __name__ == '__main__':
                                      'as number of input frames.' % l)
                 frames.extend(aframes)
         make_directory(args.outdir, '', frames, args.clobber)
-    
