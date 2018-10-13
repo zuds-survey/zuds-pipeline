@@ -1,26 +1,17 @@
 #!/usr/bin/env python
 
-import shutil, os
+import os
 import pandas as pd
 import argparse
 import warnings
-import glob
 
 from astropy.io import fits
 
 
-def make_directory(topdir, dirname, framenames, clobber):
-    refdir = os.path.join(topdir, dirname)
-    if os.path.exists(refdir):
-        action = 'Overwriting' if clobber else 'Not overwriting'
-        warnings.warn('Directory "%s" already exists. %s...' % (refdir, action), UserWarning)
-        if clobber:
-            shutil.rmtree(refdir)
-            os.mkdir(refdir)
-    else:
-        os.mkdir(refdir)
-    for frame in framenames:
-        shutil.copy(frame, refdir)
+def make_output(outname, framenames):
+    with open(outname, 'w') as f:
+        for frame in framenames:
+            f.write('%s\n' % frame)
 
 
 def img_in_range(image, range_low, range_high):
@@ -117,7 +108,7 @@ if __name__ == '__main__':
                     myframes.extend(aframes)
 
             if len(myframes) > 0:
-                make_directory(args.outdir, dirname, myframes, args.clobber)
+                make_output('%s.%s' % (dirname, args.outfile), myframes)
     else:
         # just do one big coadd
         for l in args.associated:
@@ -127,4 +118,4 @@ if __name__ == '__main__':
                     raise ValueError('Length of associated frame list "%s" must be the same '
                                      'as number of input frames.' % l)
                 frames.extend(aframes)
-        make_directory(args.outdir, '', frames, args.clobber)
+        make_output(args.outfile, frames)
