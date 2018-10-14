@@ -2,7 +2,8 @@
       module ImageMath
 !
 !- Some comments and extra code added by RS 2008/06/17
-!
+!- Adapted by DG for f2py 2018/10/14
+!-
       interface get_med_image
        module procedure get_med_image_in
        module procedure get_med_image_rl

@@ -3,13 +3,7 @@
 import pandas as pd
 import argparse
 import warnings
-
-cdef extern from "gethead.hpp":
-    void readheader(char* fname, char* key, int datatype, void* value) except +
-
-cdef extern from "fitsio.h":
-    int TFLOAT;
-    int TSTRING;
+import ffits
 
 def make_output(outname, framenames):
     with open(outname, 'w') as f:
@@ -18,29 +12,18 @@ def make_output(outname, framenames):
 
 
 def img_in_range(image, range_low, range_high):
-    cdef:
-        char shutopen[100]
-        void* sp = &shutopen
-
-    readheader(image, 'SHUTOPEN', TSTRING, sp)
+    shutopen = ffits.get_header_string(image, 'SHUTOPEN')
     time = pd.to_datetime(shutopen)
     return range_low <= time < range_high
 
 
 def get_seeing(image):
-    cdef:
-        float seeing
-        void* sp = &seeing
-
-    readheader(image, 'SEEING', TFLOAT, sp)
+    seeing = ffits.get_header_real(image, 'SEEING')
     return seeing
 
 
 def get_date(image):
-    cdef:
-        char shutopen[100]
-        void* sp = &shutopen
-    readheader(image, 'SHUTOPEN', TSTRING, sp)
+    shutopen = ffits.get_header_string(image, 'SHUTOPEN')
     return pd.to_datetime(shutopen)
 
 

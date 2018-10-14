@@ -1,4 +1,5 @@
 ! -*- f90 -*-
+! - Adapted by DG for f2py 2018/10/14
       module ImageClass
 !
 !
@@ -176,7 +177,7 @@
       character( len = * ), intent( in     ) :: filename, KEYWORD
       real          , intent( in  out  ) :: var
       character(len=72) , intent( in  out  ) :: comment
-      
+
       integer :: fits
       integer :: rwmode
       integer :: group
@@ -195,6 +196,18 @@
       call ftclos( fits, stat )
       
       end subroutine get_header_rl
+
+      subroutine get_header_real( filename, KEYWORD, var )
+      character( len = * ) :: filename, KEYWORD
+      real          :: var
+      character(len=72) :: comment
+
+!f2py intent(in) filename, KEYWORD
+!f2py intent(out) var
+
+      call get_header_rl( filename, KEYWORD, var, comment )
+
+      end subroutine get_header_real
 !
 !
       subroutine get_header_lg( filename, KEYWORD, var, comment )
@@ -254,25 +267,38 @@
       character( len = * ), intent( in     ) :: filename, KEYWORD
       character( len = 68 ), intent( in out ) :: var
       character( len = 72 ), intent( in out ) :: comment
- 
+
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
       integer :: stat
-     
-      comment = '' 
+
+      comment = ''
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
       stat    = 0
-      
+
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
-      call ftgkys( fits,trim(KEYWORD),var,comment,stat) 
+      call ftgkys( fits,trim(KEYWORD),var,comment,stat)
       call ftclos( fits, stat )
       
       end subroutine get_header_st
+
+      subroutine get_header_string( filename, KEYWORD, var )
+      character( len = * ) :: filename, KEYWORD
+      character( len = 68 ) :: var
+      character( len = 72 ) :: comment
+
+!f2py intent(in) filename, KEYWORD
+!f2py intent(out) var
+
+      call get_header_st( filename, KEYWORD, var, comment )
+
+      end subroutine get_header_string
+
 !
 !
 !

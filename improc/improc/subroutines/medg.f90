@@ -4,7 +4,8 @@
 !- ------------------------
 !- Original by PN
 !- Some comments and mods added by RS 2008/06/26
-!- 
+!- Adapted by DG for f2py 2018/10/14
+!-
       subroutine medg(filenm)
       use ImageClass
       use ImageMath

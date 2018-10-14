@@ -2,14 +2,7 @@
 
 import os
 import numpy as np
-cimport numpy as cnp
-from improc import _fsub # fortran subroutines
-
-cdef extern from "gethead.hpp":
-    void readheader(char* fname, char* key, int datatype, void* value) except +
-
-cdef extern from "fitsio.h":
-    int TFLOAT;
+import ffits
 
 if __name__ == '__main__':
 
@@ -45,18 +38,15 @@ if __name__ == '__main__':
     sexconf = os.path.join(wd, 'config', 'makevariance', 'scamp.sex')
 
     # and a few c variables used below
-    cdef:
-        float zp
-        void* vp = &zp
 
     for frame, mask in zip(frames, masks):
 
-        # get the zeropoint from the subroutines header using C
-        readheader(frame, 'MAGZP', TSTRING, vp)
+        # get the zeropoint from the subroutines header using fortran
+        zp = ffits.imageclass.get_header_real(frame, 'MAGZP')
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
-        _fsub.medg(frame)
+        ffits.medg(frame)
 
         # now get ready to call source extractor
         syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
@@ -69,4 +59,4 @@ if __name__ == '__main__':
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('subroutines', 'weight.subroutines')
-        _fsub.mkivar(frame, mask, chkname, wgtname)
+        ffits.mkivar(frame, mask, chkname, wgtname)

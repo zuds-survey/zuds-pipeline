@@ -1,6 +1,7 @@
 ! -*- f90 -*-
 !- 
-!- File    : test.f
+!- File    : mkivar.f90
+!- Adapted by DG for f2py 2018/10/14
 !- ------------------------
 !- 
       subroutine mkivar(fitsfile, flagfile, rmsfile, ivarfile)
