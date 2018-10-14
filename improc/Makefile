@@ -18,7 +18,7 @@ LIBS := $(shell $(PYTHON) -c "import distutils.sysconfig; print(distutils.syscon
 SYSLIBS :=  $(shell $(PYTHON) -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('SYSLIBS'))")
 
 groupimages: groupimages.o fits/gethead.o
-	$(LINKCC) -o $@ $^ -L$(LIBDIR1) -L$(LIBDIR2) -L$(CFITSLINK) -l$(PYLIB) -lcfitsio $(LIBS) $(SYSLIBS) $(LINKFORSHARED) -lcurl
+	$(LINKCC)  -fPIC -o $@ $^ -Wl,--rpath=/opt/conda/lib -L$(LIBDIR1) -L$(LIBDIR2) -L$(CFITSLINK) -l$(PYLIB) -lcfitsio $(LIBS) $(SYSLIBS) $(LINKFORSHARED) -lcurl
 
 groupimages.o: groupimages.cpp
 	$(CC) -c $^ -I$(INCDIR) -I$(PLATINCDIR) -I$(CFITSDIR)
@@ -33,7 +33,7 @@ all: groupimages
 
 clean:
 	@echo Cleaning Demos/embed
-	@rm -f *~ *.o *.so core core.* *.c groupimages test.output
+	@rm -f *~ *.o *.so core core.* *.c *.cpp groupimages test.output fits/*.o
 
 test: clean all
 	PYTHONHOME=$(PYPREFIX) LD_LIBRARY_PATH=$(LIBDIR1):$$LD_LIBRARY_PATH ./groupimages > test.output
