@@ -4,7 +4,7 @@ import pandas as pd
 import argparse
 import warnings
 
-cdef extern from "gethead.hh":
+cdef extern from "gethead.hpp":
     void readheader(char* fname, char* key, int datatype, void* value) except +
 
 cdef extern from "fitsio.h":
