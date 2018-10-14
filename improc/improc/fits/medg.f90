@@ -5,7 +5,7 @@
 !- Some comments and mods added by RS 2008/06/26
 !- Modified for f2py by DG 2018/10/14
 !-
-program proc
+subroutine proc(filenm)
     use ImageClass
     use ImageMath
 
@@ -20,8 +20,6 @@ program proc
     real :: med, var, zp, see, lmt, pix
     character (len = 120) :: filenm
     character (len = 72) :: comment
-
-    read(*, *) filenm
 
     call get_header(trim(filenm), 'NAXIS1', nc, comment)
     call get_header(trim(filenm), 'NAXIS2', nr, comment)
@@ -45,4 +43,4 @@ program proc
     call put_header(trim(filenm), 'SKYSIG', var, 'Median skysig in cts')
     call put_header(trim(filenm), 'LMT_MG', lmt, '3-sig limiting mag')
 
-end program proc
+end subroutine proc
