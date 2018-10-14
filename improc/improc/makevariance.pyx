@@ -2,9 +2,14 @@
 
 import os
 import numpy as np
-from . import medg
-from . import mkivar
-from . import image
+cimport numpy as cnp
+from improc import _fsub # fortran subroutines
+
+cdef extern from "gethead.hpp":
+    void readheader(char* fname, char* key, int datatype, void* value) except +
+
+cdef extern from "fitsio.h":
+    int TFLOAT;
 
 if __name__ == '__main__':
 
@@ -39,14 +44,19 @@ if __name__ == '__main__':
     wd = os.path.dirname(__file__)
     sexconf = os.path.join(wd, 'config', 'makevariance', 'scamp.sex')
 
+    # and a few c variables used below
+    cdef:
+        float zp
+        void* vp = &zp
+
     for frame, mask in zip(frames, masks):
 
-        # get the zeropoint from the subroutines header using fortran
-        image.ImageClass.get_header_f2py(frame, 'MAGZP', zp, comment)
+        # get the zeropoint from the subroutines header using C
+        readheader(frame, 'MAGZP', TSTRING, vp)
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
-        medg.medg(frame)
+        _fsub.medg(frame)
 
         # now get ready to call source extractor
         syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
@@ -59,6 +69,4 @@ if __name__ == '__main__':
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('subroutines', 'weight.subroutines')
-        mkivar.mkivar(frame, mask, chkname, wgtname)
-
-        # done
+        _fsub.mkivar(frame, mask, chkname, wgtname)
