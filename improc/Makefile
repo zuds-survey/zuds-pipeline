@@ -3,7 +3,7 @@ PYTHON := python
 PYVERSION := $(shell $(PYTHON) -c "import sys; print(sys.version[:3])")
 PYPREFIX := $(shell $(PYTHON) -c "import sys; print(sys.prefix)")
 
-INCDIR := $(shell $(PYTHON) -c "from distutils import sysconfig; print(sysconfig.get_python_inc())")
+INCDIR := $(shell $(PYTHON) -c "from distutils import sysconfig; print(sysconfig.get_python_inc())") 
 CFITSDIR := /cfitsio/include
 CFITSLINK := /cfitsio/lib
 PLATINCDIR := $(shell $(PYTHON) -c "from distutils import sysconfig; print(sysconfig.get_python_inc(plat_specific=True))")
@@ -16,25 +16,22 @@ LINKCC := g++
 LINKFORSHARED := $(shell $(PYTHON) -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('LINKFORSHARED'))")
 LIBS := $(shell $(PYTHON) -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('LIBS'))")
 SYSLIBS :=  $(shell $(PYTHON) -c "import distutils.sysconfig; print(distutils.sysconfig.get_config_var('SYSLIBS'))")
+BUILDDIR := build
 
-groupimages: groupimages.o fits/gethead.o
+groupimages: $(BUILDDIR)/groupimages.o $(BUILDDIR)/gethead.o
 	$(LINKCC)  -fPIC -o $@ $^ -Wl,--rpath=/opt/conda/lib -L$(LIBDIR1) -L$(LIBDIR2) -L$(CFITSLINK) -l$(PYLIB) -lcfitsio $(LIBS) $(SYSLIBS) $(LINKFORSHARED) -lcurl
 
-groupimages.o: groupimages.cpp
-	$(CC) -c $^ -I$(INCDIR) -I$(PLATINCDIR) -I$(CFITSDIR)
+$(BUILDDIR)/groupimages.o: $(BUILDDIR)/groupimages.cpp
+	$(CC) -o $@ -c $^ -I$(INCDIR) -I$(PLATINCDIR) -I$(CFITSDIR) -I./fits/
 
-fits/gethead.o: fits/gethead.cc
-	$(CC) -o $@ -c $^ -I$(INCDIR) -I$(PLATINCDIR) -I$(CFITSDIR)
+$(BUILDDIR)/gethead.o: fits/gethead.cc
+	$(CC) -o $@ -c $^ -I$(INCDIR) -I$(PLATINCDIR) -I$(CFITSDIR) -I./fits/
 
-groupimages.cpp: groupimages.pyx
-	@cython --embed --cplus groupimages.pyx
+$(BUILDDIR)/groupimages.cpp: groupimages.pyx
+	@mkdir -p $(BUILDDIR)
+	@cython --embed --cplus groupimages.pyx -o $@
 
 all: groupimages
 
 clean:
-	@echo Cleaning Demos/embed
-	@rm -f *~ *.o *.so core core.* *.c *.cpp groupimages test.output fits/*.o
-
-test: clean all
-	PYTHONHOME=$(PYPREFIX) LD_LIBRARY_PATH=$(LIBDIR1):$$LD_LIBRARY_PATH ./groupimages > test.output
-	$(PYTHON) assert_equal.py groupimages.output test.output
+	@rm -rf $(BUILDDIR) groupimages
