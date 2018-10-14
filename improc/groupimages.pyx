@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+# cython: c_string_type=str, c_string_encoding=ascii
 
 import pandas as pd
 import argparse
@@ -51,7 +51,7 @@ if __name__ == '__main__':
                         nargs=1, dest='frames')
     parser.add_argument('--outfile-name', help='Name of file in which to write results.',
                         dest='outfile', required=False, default='list')
-    parser.add_argument('--associated-frames', required=False, default=None, help='Lists of frames, in '
+    parser.add_argument('--associated-frames', required=False, default=[], help='Lists of frames, in '
                         'the same order as input_frames, that should be grouped with the input frames.',
                         dest='associated', nargs='*')
     parser.add_argument('--rolling', help='Use a rolling window to group input frames.', default=False,
