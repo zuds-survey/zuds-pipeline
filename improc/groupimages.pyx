@@ -1,12 +1,15 @@
 #!/usr/bin/env python
 
-import os
 import pandas as pd
 import argparse
 import warnings
 
-from astropy.io import fits
+cdef extern from "fits/gethead.hh":
+    void readheader(char* fname, char* key, int datatype, void* value) except +
 
+cdef extern from "fitsio.h":
+    int TFLOAT;
+    int TSTRING;
 
 def make_output(outname, framenames):
     with open(outname, 'w') as f:
@@ -15,17 +18,30 @@ def make_output(outname, framenames):
 
 
 def img_in_range(image, range_low, range_high):
-    time = pd.to_datetime(fits.open(image)[0].header['SHUTOPEN'])
+    cdef:
+        char shutopen[100]
+        void* sp = &shutopen
+
+    readheader(image, 'SHUTOPEN', TSTRING, sp)
+    time = pd.to_datetime(shutopen)
     return range_low <= time < range_high
 
 
 def get_seeing(image):
-    seeing = float(fits.open(image)[0].header['SEEING'])
+    cdef:
+        float seeing
+        void* sp = &seeing
+
+    readheader(image, 'SEEING', TFLOAT, sp)
     return seeing
 
 
 def get_date(image):
-    return pd.to_datetime(fits.open(image)[0].header['SHUTOPEN'])
+    cdef:
+        char shutopen[100]
+        void* sp = &shutopen
+    readheader(image, 'SHUTOPEN', TSTRING, sp)
+    return pd.to_datetime(shutopen)
 
 
 if __name__ == '__main__':
