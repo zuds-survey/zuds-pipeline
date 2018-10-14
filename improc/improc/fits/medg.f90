@@ -45,4 +45,4 @@ program proc
     call put_header(trim(filenm), 'SKYSIG', var, 'Median skysig in cts')
     call put_header(trim(filenm), 'LMT_MG', lmt, '3-sig limiting mag')
 
-    en
+end program proc
