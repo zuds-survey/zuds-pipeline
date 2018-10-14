@@ -41,7 +41,7 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
-        # get the zeropoint from the subroutines header using fortran
+        # get the zeropoint from the ffits header using fortran
         zp = ffits.imageclass.get_header_real(frame, 'MAGZP')
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
@@ -50,13 +50,13 @@ if __name__ == '__main__':
 
         # now get ready to call source extractor
         syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
-        catname = frame.replace('subroutines', 'cat')
-        chkname = frame.replace('subroutines', 'noise.subroutines')
+        catname = frame.replace('fits', 'cat')
+        chkname = frame.replace('fits', 'noise.fits')
         syscall = syscall % (sexconf, catname, chkname, zp, frame)
 
         # do it
         os.system(syscall)
 
         # now make the inverse variance map using fortran
-        wgtname = frame.replace('subroutines', 'weight.subroutines')
+        wgtname = frame.replace('fits', 'weight.fits')
         ffits.mkivar(frame, mask, chkname, wgtname)
