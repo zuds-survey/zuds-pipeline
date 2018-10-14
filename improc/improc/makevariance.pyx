@@ -2,16 +2,18 @@
 
 import os
 import numpy as np
-cimport numpy as np
+cimport numpy as cnp
+from . import medg
+from . import mkivar
 
 
 cdef extern from "gethead.hpp":
     void readheader(char* fname, char* key, int datatype, void* value) except +
 
+
 cdef extern from "fitsio.h":
     int TFLOAT;
     int TSTRING;
-
 
 
 if __name__ == '__main__':
@@ -49,10 +51,29 @@ if __name__ == '__main__':
         float zp
         void* vp = &zp
 
+    # now set up a few pointers to auxiliary files read by sextractor
+    wd = os.path.dirname(__file__)
+    sexconf = os.path.join(wd, 'config', 'makevariance', 'scamp.sex')
+
+
     for frame, mask in zip(frames, masks):
 
         # get the zeropoint from the fits header
         readheader(frame, 'MAGZP', TFLOAT, vp)
 
-        # now call source extractor
+        # calculate some properties of the image (skysig, lmtmag, etc.)
+        # and store them in the header. note: this call is to compiled fortran
+        medg.medg(frame)
+
+        # now get ready to call source extractor
+        syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+        catname = frame.replace('fits', 'cat')
+        chkname = frame.replace('fits', 'noise.fits')
+        syscall = syscall % (sexconf, catname, chkname, zp, frame)
+
+        # do it
+        os.system(syscall)
+
+        # now make the inverse variance map
+
 
