@@ -2,6 +2,10 @@ import os
 import numpy as np
 import ffits
 
+# split an iterable over some processes recursively
+_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
+             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
+
 if __name__ == '__main__':
 
     import argparse
@@ -22,14 +26,17 @@ if __name__ == '__main__':
 
     # distribute the work to each processor
     if rank == 0:
-        frames = np.genfromtxt(args.frames, dtype=None)
-        masks = np.genfromtxt(args.masks, dtype=None)
+        frames = np.genfromtxt(args.frames[0], dtype=None)
+        masks = np.genfromtxt(args.masks[0], dtype=None)
     else:
         frames = None
         masks = None
 
-    frames = comm.scatter(frames, root=0)
-    masks = comm.scatter(masks, root=0)
+    frames = comm.bcast(frames, root=0)
+    masks = comm.bcast(masks, root=0)
+
+    frames = _split(frames, size)[rank]
+    masks = _split(masks, size)[rank]
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
