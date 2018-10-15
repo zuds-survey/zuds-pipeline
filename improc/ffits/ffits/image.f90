@@ -33,27 +33,52 @@
        module procedure get_header_lg
       end interface get_header
 
-      contains
+    contains
 
+
+      subroutine printerror(status)
+
+        integer, intent (inout) :: status
+        character errtext*30,errmessage*80
+          
+        if (status .le. 0)return
+
+        call ftgerr(status,errtext)
+        print *,'FITSIO Error Status =',status,': ',errtext
+        
+
+        call ftgmsg(errmessage)
+        do while (errmessage .ne. ' ')
+           print *,errmessage
+           call ftgmsg(errmessage)
+        end do
+        stop 
+      end subroutine printerror
+        
       subroutine tranhd( inunit, outunit,KEYWORD )
       character( len = * ), intent( in     ) :: KEYWORD
       integer         , intent( in     ) :: inunit, outunit
 
+
       character( len = 80 ) :: COMMENT
       character( len = 68 ) :: stvar
-      integer :: stat
+      integer :: stat 
 
       stat = 0
+      
       call ftgkys( inunit,KEYWORD,stvar,COMMENT,stat)
+
+      if ( stat > 0 )  then
+         call printerror(stat)
+      end if 
 
       if (stat == 202 ) then
         stat = 0
         print *, KEYWORD, ' is empty'
-        call ftpkys( outunit,KEYWORD,'0.0','Empty header',stat) 
+        call ftpkys( outunit,KEYWORD,'0.0','Empty header',stat)
       else
        call ftpkys( inunit,KEYWORD,stvar,COMMENT,stat)
       end if
-
       end subroutine tranhd
 
       subroutine put_header_in( filename, KEYWORD, var, COMMENT )
@@ -65,22 +90,39 @@
       integer :: rwmode
       integer :: group
       integer :: blocksize
-      integer :: stat
+      integer :: stat 
+
+      stat = 0
+
       
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+
 
 
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if 
+      
       if ( present ( COMMENT) ) then
-        call ftpkyj( fits,KEYWORD,var,COMMENT,stat)
+         call ftpkyj( fits,KEYWORD,var,COMMENT,stat)
       else
-        call ftpkyj( fits,KEYWORD,var,'',stat)
+         call ftpkyj( fits,KEYWORD,var,'',stat)
       end if
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
 
       end subroutine put_header_in
 !
@@ -88,27 +130,46 @@
       character( len = * ), intent( in     ) :: filename, KEYWORD
       logical         , intent( in     ) :: var
       character( len = * ), intent( in     ), optional :: COMMENT
+      integer, intent( inout ) :: stat
 
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
       integer :: stat
+
       
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
 
 
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+
+      
       if ( present ( COMMENT) ) then
         call ftpkyl( fits,KEYWORD,var,COMMENT,stat)
       else
         call ftpkyl( fits,KEYWORD,var,'',stat)
+     end if
+
+     if ( stat > 0 )  then
+         call printerror( stat )
       end if
+
+     
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
 
       end subroutine put_header_lg
 !
@@ -123,51 +184,83 @@
       integer :: rwmode
       integer :: group
       integer :: blocksize
-      integer :: stat
       integer :: decimals
+      integer :: stat      
        
 
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
       decimals = -8
+      stat = 0
 
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+
+      
       if ( present ( COMMENT) ) then
         call ftpkye( fits,KEYWORD,var,decimals,COMMENT,stat)
       else
         call ftpkye( fits,KEYWORD,var,decimals,'',stat)
+     end if
+
+      if ( stat > 0 )  then
+         call printerror( stat )
       end if
+     
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
 
       end subroutine put_header_rl
 !
       subroutine put_header_st( filename, KEYWORD, var, COMMENT )
       character( len = * ), intent( in     ) :: filename, KEYWORD, var
       character( len = * ), intent( in     ), optional :: COMMENT
+
       
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
       integer :: stat
-       
+
 
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
 
       call ftopen( fits,trim(filename),rwmode,blocksize,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       if ( present ( COMMENT) ) then
         call ftpkys( fits,KEYWORD,trim(var),COMMENT,stat)
       else
         call ftpkys( fits,KEYWORD,trim(var),'',stat)
+     end if
+
+     if ( stat > 0 )  then
+         call printerror( stat )
       end if
+     
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
 
       end subroutine put_header_st
 !
@@ -178,22 +271,40 @@
       real          , intent( in  out  ) :: var
       character(len=72) , intent( in  out  ) :: comment
 
+
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
       integer :: stat
+
      
       comment = '' 
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
+
       
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
-      call ftgkye( fits,trim(KEYWORD),var,comment,stat) 
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
+      call ftgkye( fits,trim(KEYWORD),var,comment,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       
       end subroutine get_header_rl
 
@@ -202,8 +313,9 @@
       real          :: var
       character(len=72) :: comment
 
-!f2py intent(in) filename, KEYWORD
-!f2py intent(out) var
+      
+      !f2py intent(in) filename, KEYWORD
+      !f2py intent(out) var
 
       call get_header_rl( filename, KEYWORD, var, comment )
 
@@ -214,6 +326,7 @@
       character( len = * ), intent( in     ) :: filename, KEYWORD
       logical           , intent( in  out  ) :: var
       character(len=72) , intent( in  out  ) :: comment
+
       
       integer :: fits
       integer :: rwmode
@@ -226,11 +339,28 @@
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
-      
+      stat = 0
+
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
-      call ftgkyl( fits,trim(KEYWORD),var,comment,stat) 
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+
+      
+      call ftgkyl( fits,trim(KEYWORD),var,comment,stat)
+
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       
       end subroutine get_header_lg
 !
@@ -240,23 +370,41 @@
       character( len = * ), intent( in     ) :: filename, KEYWORD
       integer             , intent( in out ) :: var
       character(len=72)   , intent( in out ) :: comment
+
       
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
       integer :: stat
+
      
       comment = '' 
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
       
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
-      call ftgkyj( fits,trim(KEYWORD),var,comment,stat) 
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+
+      
+      call ftgkyj( fits,trim(KEYWORD),var,comment,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+
       
       end subroutine get_header_in
 !
@@ -268,22 +416,38 @@
       character( len = 68 ), intent( in out ) :: var
       character( len = 72 ), intent( in out ) :: comment
 
+
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
-      integer :: stat
-
+      integer :: stat      
+      
       comment = ''
       fits    = 101             !- unit
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
 
       call ftopen( fits,trim(filename),rwmode, blocksize,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftgkys( fits,trim(KEYWORD),var,comment,stat)
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       
       end subroutine get_header_st
 
@@ -292,8 +456,8 @@
       character( len = 68 ) :: var
       character( len = 72 ) :: comment
 
-!f2py intent(in) filename, KEYWORD
-!f2py intent(out) var
+      !f2py intent(in) filename, KEYWORD
+      !f2py intent(out) var
 
       call get_header_st( filename, KEYWORD, var, comment )
 
@@ -306,15 +470,16 @@
       character( len = * ), intent( in     ) :: filename
       integer          , intent( in     ) :: nc, nr
       integer          , intent( in     ) :: image( nc, nr )
+
       
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
-      integer :: stat
       integer :: naxis
       integer :: bitpix
       integer :: naxes( 2 )
+      integer :: stat
       logical :: simple
       logical :: extend
       
@@ -322,7 +487,7 @@
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
       
       simple = .true.
       bitpix = 16
@@ -331,9 +496,29 @@
       extend = .false.
       
       call ftinit( fits, trim(filename), blocksize, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftphpr( fits, simple, bitpix, naxis, naxes, 0, 1, extend, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftp2dj( fits, group, nc, nc, nr, image, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
 
       end subroutine put_image_in
 !
@@ -343,14 +528,15 @@
       character( len = * ), intent( in     ) :: filename
       integer       , intent( in     ) :: nc, nr
       real          , intent( in     ) :: image( nc, nr )
+
       
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: blocksize
-      integer :: stat
       integer :: naxis
       integer :: bitpix
+      integer :: stat
       integer :: naxes( 2 )
       logical :: simple
       logical :: extend
@@ -359,7 +545,7 @@
       rwmode  = 1               !- rwmode, readwrite
       group   = 0               !- group, 0 for non-grouped
       blocksize = 1             !- eh?
-      stat    = 0
+      stat = 0
       
       simple = .true.
       bitpix = -32
@@ -368,9 +554,30 @@
       extend = .false.
       
       call ftinit( fits, trim(filename), blocksize, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
+      
       call ftphpr( fits, simple, bitpix, naxis, naxes, 0, 1, extend, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftp2de( fits, group, nc, nc, nr, image, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       
       end subroutine put_image_rl
 !
@@ -387,6 +594,7 @@
       integer :: fpixel
       logical :: anyf
       integer :: stat
+
       integer :: nullval
       character( len = 72 ) comment, stpstring
       
@@ -396,18 +604,25 @@
       group   = 0               !- group, 0 for non-grouped
       fpixel  = 0               !- first pixel
       nullval = 0               !- null value to substitute
-      stat    = 0               !- status
+      stat = 0
       
       call ftiopn( fits, trim(filename), rwmode, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+          
       call ftg2dj( fits, group, nullval, nc, nc, nr, image, anyf, stat )
-      call ftclos( fits, stat )
-     
-      stpstring='Null value detected in image '//trim(filename)
-      if( anyf ) then
-        write(0,*) stpstring 
-        stop
+
+      if ( stat > 0 )  then
+         call printerror( stat )
       end if
 
+      call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
       end subroutine get_image_in
 !
 !
@@ -416,13 +631,15 @@
       character( len = * ), intent( in     ) :: filename
       integer          , intent( in     ) :: nc, nr
       integer          , intent( in out ) :: image( nc, nr )
+
       
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: fpixel
-      logical :: anyf
       integer :: stat
+      logical :: anyf
+
       integer :: nullval
       character( len = 72 ) comment
       
@@ -432,11 +649,24 @@
       group   = 0               !- group, 0 for non-grouped
       fpixel  = 0               !- first pixel
       nullval = 0               !- null value to substitute
-      stat    = 0               !- status
+      stat = 0
       
       call ftiopn( fits, trim(filename), rwmode, stat )
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+
+      
       call ftg2dj( fits, group, nullval, nc, nc, nr, image, anyf, stat )
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       
       if( anyf ) then 
         print *, filename, ' 0'
@@ -448,17 +678,18 @@
 !
 !
 !
-      subroutine get_image_rl( filename, image, nc, nr )
+      subroutine get_image_rl( filename, image, nc, nr)
       character( len = * ), intent( in     ) :: filename
       integer       , intent( in     ) :: nc, nr
       real          , intent( in out ) :: image( nc, nr )
+
       
       integer :: fits
       integer :: rwmode
       integer :: group
       integer :: fpixel
-      logical :: anyf
       integer :: stat
+      logical :: anyf
       real :: nullval
       character( len = 72 ) comment, stpstring
       
@@ -467,19 +698,26 @@
       group   = 0               !- group, 0 for non-grouped
       fpixel  = 0               !- first pixel
       nullval = 0.0             !- null value to substitute
-      stat    = 0               !- status
+      stat = 0
 
       call ftiopn( fits, trim(filename), rwmode, stat )
-      call ftg2de( fits, group, nullval, nc, nc, nr, image, anyf, stat )
-      call ftclos( fits, stat )
-     
-      stpstring='Null value detected in image '//trim(filename)
 
-      if( anyf ) then
-        write(0,*) stpstring 
-        stop
+      if ( stat > 0 )  then
+         call printerror( stat )
       end if
 
+      
+      call ftg2de( fits, group, nullval, nc, nc, nr, image, anyf, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
+      call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
       end subroutine get_image_rl
 !
 !
@@ -504,11 +742,26 @@
       group   = 0               !- group, 0 for non-grouped
       fpixel  = 0               !- first pixel
       nullval = 0.0             !- null value to substitute
-      stat    = 0               !- status
+      stat = 0
 
       call ftiopn( fits, trim(filename), rwmode, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftg2de( fits, group, nullval, nc, nc, nr, image, anyf, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
       call ftclos( fits, stat )
+
+      if ( stat > 0 )  then
+         call printerror( stat )
+      end if
+      
      
       if( anyf ) then
         print *, filename,  ' 0' 
