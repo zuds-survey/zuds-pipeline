@@ -6,7 +6,7 @@ import glob
 
 # Create the fortran extension to be compiled as a shared library using f2py
 fort_sources = glob.glob('ffits/*.f90')
-ffits = Extension(name='ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
+ffits = Extension(name='ffits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
                   extra_compile_args=['-w'], extra_f90_compile_args=['-w'])
 
 

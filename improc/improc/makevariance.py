@@ -26,8 +26,8 @@ if __name__ == '__main__':
 
     # distribute the work to each processor
     if rank == 0:
-        frames = np.genfromtxt(args.frames[0], dtype=None)
-        masks = np.genfromtxt(args.masks[0], dtype=None)
+        frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
+        masks = np.genfromtxt(args.masks[0], dtype=None, encoding='ascii')
     else:
         frames = None
         masks = None
@@ -54,7 +54,7 @@ if __name__ == '__main__':
         ffits.medg(frame)
 
         # now get ready to call source extractor
-        syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
         catname = frame.replace('fits', 'cat')
         chkname = frame.replace('fits', 'noise.fits')
         syscall = syscall % (sexconf, catname, chkname, zp, frame)

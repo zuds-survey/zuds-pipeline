@@ -27,6 +27,6 @@ CHECKIMAGE_TYPE  BACKGROUND_RMS # can be NONE, BACKGROUND, BACKGROUND_RMS,
 CHECKIMAGE_NAME  check.fits     # Filename for the check-image
 
 
-PARAMETERS_NAME /project/projectdirs/astro250/glens/scamp.param   # name of the file containing catalog contents
-FILTER_NAME     /project/projectdirs/astro250/glens/default.conv    # name of the file containing the filter
-STARNNW_NAME    /project/projectdirs/astro250/glens/default.nnw     # Neural-Network_Weight table filename
+PARAMETERS_NAME /global/cscratch1/sd/dgold/glens18b/lensgrinder/improc/improc/config/makevariance/scamp.param
+FILTER_NAME     /global/cscratch1/sd/dgold/glens18b/lensgrinder/improc/improc/config/makevariance/default.conv
+STARNNW_NAME    /global/cscratch1/sd/dgold/glens18b/lensgrinder/improc/improc/config/makevariance/default.nnw
