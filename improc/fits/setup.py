@@ -2,12 +2,18 @@ from numpy.distutils.core import setup
 from numpy.distutils.core import Extension
 from numpy.distutils.command.install import install
 import glob
+from Cython.Build import cythonize
 
 
 # Create the fortran extension to be compiled as a shared library using f2py
-fort_sources = glob.glob('ffits/*.f90')
-ffits = Extension(name='ffits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
+fort_sources = glob.glob('fits/*.f90')
+ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
                   extra_compile_args=['-w'], extra_f90_compile_args=['-w'])
+
+c_sources = glob.glob('fits/*.hpp') + glob.glob('fits/*.pyx') + glob.glob('fits/*.cpp')
+cfits = Extension(name='fits._cfits', sources=c_sources, libraries=['cfitsio', 'curl'],
+                  extra_compile_args=['-w'], language='c++')
+cfmod = cythonize(cfits)[0]
 
 
 class InstallCommand(install):
@@ -27,12 +33,14 @@ class InstallCommand(install):
         include_dirs = [d for d in [self.cfitsio_inc] if d]
         ffits.library_dirs = library_dirs
         ffits.include_dirs = include_dirs
+        cfmod.library_dirs = library_dirs
+        cfmod.include_dirs = include_dirs
 
 
-setup(name='ffits',
-      packages=['ffits'],
+setup(name='fits',
+      packages=['fits'],
       version='dev',
-      ext_modules=[ffits],
+      ext_modules=[ffits, cfmod],
       package_data={'improc':['config/*']},
       cmdclass={'install':InstallCommand}
       )
