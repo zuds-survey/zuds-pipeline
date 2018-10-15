@@ -130,8 +130,7 @@
       character( len = * ), intent( in     ) :: filename, KEYWORD
       logical         , intent( in     ) :: var
       character( len = * ), intent( in     ), optional :: COMMENT
-      integer, intent( inout ) :: stat
-
+      
       integer :: fits
       integer :: rwmode
       integer :: group
