@@ -1,5 +1,3 @@
-# cython: c_string_type=str, c_string_encoding=ascii
-
 import pandas as pd
 import argparse
 import warnings
