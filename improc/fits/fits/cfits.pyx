@@ -36,7 +36,7 @@ def update_header_float(fname, key, value):
 
 
 @cython.embedsignature(True)
-def update_header_string(fname, key, value):
+def update_header_int(fname, key, value):
     cdef:
         int i = value;
         void* val = <void *> i
