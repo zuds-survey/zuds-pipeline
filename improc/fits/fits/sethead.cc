@@ -1,9 +1,9 @@
 #include "fitsio.h"
 #include "fitsutil.hh"
-#include "gethead.hh"
+#include "sethead.hh"
 
 
-void readheader(char* fname, char* key, int datatype, void* value){
+void updateheader(char* fname, char* key, int datatype, void* value){
 
     fitsfile *fptr;       /* pointer to the FITS file, defined in fitsio.h */
 
@@ -19,8 +19,9 @@ void readheader(char* fname, char* key, int datatype, void* value){
     if ( fits_movabs_hdu(fptr, 1, &hdutype, &status) )
          printerror( status );
 
-    if ( fits_read_key(fptr, datatype, key, value, comment, &status) )
+    if ( fits_update_key(fptr, datatype, key, value, comment, &status) )
          printerror( status );
 
     return;
 }
+
