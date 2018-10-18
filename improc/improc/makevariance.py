@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import ffits
+import fits
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -46,12 +46,12 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
-        # get the zeropoint from the ffits header using fortran
-        zp = ffits.imageclass.get_header_real(frame, 'MAGZP')
+        # get the zeropoint from the fits header using fortran
+        zp = fits.read_header_float(frame, 'MAGZP')
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
-        ffits.medg(frame)
+        fits.medg(frame)
 
         # now get ready to call source extractor
         syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
@@ -64,4 +64,4 @@ if __name__ == '__main__':
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
-        ffits.mkivar(frame, mask, chkname, wgtname)
+        fits.mkivar(frame, mask, chkname, wgtname)

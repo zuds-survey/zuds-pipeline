@@ -1,4 +1,5 @@
 # cython: c_string_type=str, c_string_encoding=ascii
+import cython
 
 __all__ = ['read_header_string', 'read_header_float', 'read_header_int']
 
@@ -13,6 +14,7 @@ cdef extern from "fitsio.h":
     int TINT
 
 
+@cython.embedsignature(True)
 def read_header_string(fname, key):
     """Read the value of a fits header keyword and return it as a string."""
 
@@ -28,6 +30,7 @@ def read_header_string(fname, key):
     return val
 
 
+@cython.embedsignature(True)
 def read_header_int(fname, key):
     """Read the value of a fits header keyword and return it as a string."""
 
@@ -43,6 +46,7 @@ def read_header_int(fname, key):
     return val
 
 
+@cython.embedsignature(True)
 def read_header_float(fname, key):
     """Read the value of a fits header keyword and return it as a string."""
 

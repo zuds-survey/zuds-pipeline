@@ -10,7 +10,7 @@ fort_sources = glob.glob('fits/*.f90')
 ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
                   extra_compile_args=['-w'], extra_f90_compile_args=['-w'])
 
-c_sources = glob.glob('fits/*.hpp') + glob.glob('fits/*.pyx') + glob.glob('fits/*.cpp')
+c_sources = glob.glob('fits/*.pyx') + glob.glob('fits/*.cc')
 cfits = Extension(name='fits._cfits', sources=c_sources, libraries=['cfitsio', 'curl'],
                   extra_compile_args=['-w'], language='c++')
 cfmod = cythonize(cfits)[0]
@@ -34,7 +34,7 @@ class InstallCommand(install):
         ffits.library_dirs = library_dirs
         ffits.include_dirs = include_dirs
         cfmod.library_dirs = library_dirs
-        cfmod.include_dirs = include_dirs
+        cfmod.include_dirs = include_dirs + ['fits/']
 
 
 setup(name='fits',

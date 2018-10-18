@@ -1,5 +1,5 @@
 #include "fitsio.h"
-#include "gethead.h"
+#include "gethead.hh"
 #include <stdio.h>
 #include <stdexcept>
 using namespace std;
