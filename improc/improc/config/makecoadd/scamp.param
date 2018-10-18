@@ -1,0 +1,60 @@
+#
+#	Parameters needed for SCAMP processing
+#
+
+#
+#	Extra parameters added by JMB
+#
+NUMBER
+MAG_AUTO
+MAGERR_AUTO
+
+#
+# CENTROID_KEYS
+#
+XWIN_IMAGE
+YWIN_IMAGE
+
+#
+# CENTROIDERR_KEYS
+#
+ERRAWIN_IMAGE
+ERRBWIN_IMAGE
+ERRTHETAWIN_IMAGE
+
+#
+# Do I need these?
+#
+ERRA_WORLD
+ERRB_WORLD
+ERRTHETA_WORLD
+X_WORLD # Removing these made the internal astrometric solutions X^2/dof twice as high
+Y_WORLD
+ELONGATION
+AWIN_IMAGE
+BWIN_IMAGE
+FWHM_IMAGE
+#
+# DISTORT_KEYS
+#
+# XWIN_IMAGE
+# YWIN_IMAGE
+
+#
+# PHOTFLUX_KEY
+#
+FLUX_AUTO
+
+#
+# PHOTFLUXERR_KEY
+#
+FLUXERR_AUTO
+
+#
+# Advised additions (not mandatory)
+#
+FLAGS
+FLAGS_WEIGHT
+#IMAFLAGS_ISO
+FLUX_RADIUS
+FLUX_MAX

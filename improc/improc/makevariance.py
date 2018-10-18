@@ -40,9 +40,13 @@ if __name__ == '__main__':
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
-    sexconf = os.path.join(wd, 'config', 'makevariance', 'scamp.sex')
+    confdir = os.path.join(wd, 'config', 'makevariance')
+    sexconf = os.path.join(confdir, 'scamp.sex')
+    nnwname = os.path.join(confdir, 'default.nnw')
+    filtname = os.path.join(confdir, 'default.conv')
+    paramname = os.path.join(confdir, 'default.param')
 
-    # and a few c variables used below
+    clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (paramname, filtname, nnwname)
 
     for frame, mask in zip(frames, masks):
 
@@ -58,6 +62,7 @@ if __name__ == '__main__':
         catname = frame.replace('fits', 'cat')
         chkname = frame.replace('fits', 'noise.fits')
         syscall = syscall % (sexconf, catname, chkname, zp, frame)
+        syscall = ' '.join([syscall, clargs])
 
         # do it
         os.system(syscall)

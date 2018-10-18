@@ -39,7 +39,7 @@ def update_header_float(fname, key, value):
 def update_header_int(fname, key, value):
     cdef:
         int i = value;
-        void* val = <void *> i
+        void* val = <void *> &i
 
     updateheader(fname, key, TINT, val)
 
