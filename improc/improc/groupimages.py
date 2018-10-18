@@ -1,7 +1,8 @@
 import pandas as pd
 import argparse
 import warnings
-import ffits
+import fits
+
 
 def make_output(outname, framenames):
     with open(outname, 'w') as f:
@@ -10,18 +11,18 @@ def make_output(outname, framenames):
 
 
 def img_in_range(image, range_low, range_high):
-    shutopen = ffits.get_header_string(image, 'SHUTOPEN')
+    shutopen = fits.get_header_string(image, 'SHUTOPEN')
     time = pd.to_datetime(shutopen)
     return range_low <= time < range_high
 
 
 def get_seeing(image):
-    seeing = ffits.get_header_real(image, 'SEEING')
+    seeing = fits.get_header_float(image, 'SEEING')
     return seeing
 
 
 def get_date(image):
-    shutopen = ffits.get_header_string(image, 'SHUTOPEN')
+    shutopen = fits.get_header_string(image, 'SHUTOPEN')
     return pd.to_datetime(shutopen)
 
 

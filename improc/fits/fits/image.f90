@@ -307,18 +307,6 @@
       
       end subroutine get_header_rl
 
-      subroutine get_header_real( filename, KEYWORD, var )
-      character( len = * ) :: filename, KEYWORD
-      real          :: var
-      character(len=72) :: comment
-
-      
-      !f2py intent(in) filename, KEYWORD
-      !f2py intent(out) var
-
-      call get_header_rl( filename, KEYWORD, var, comment )
-
-      end subroutine get_header_real
 !
 !
       subroutine get_header_lg( filename, KEYWORD, var, comment )
@@ -449,18 +437,6 @@
       
       
       end subroutine get_header_st
-
-      subroutine get_header_string( filename, KEYWORD, var )
-      character( len = * ) :: filename, KEYWORD
-      character( len = 68 ) :: var
-      character( len = 72 ) :: comment
-
-      !f2py intent(in) filename, KEYWORD
-      !f2py intent(out) var
-
-      call get_header_st( filename, KEYWORD, var, comment )
-
-      end subroutine get_header_string
 
 !
 !
