@@ -8,7 +8,7 @@ from Cython.Build import cythonize
 # Create the fortran extension to be compiled as a shared library using f2py
 fort_sources = glob.glob('fits/*.f90')
 ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
-                  extra_compile_args=['-w'], extra_f90_compile_args=['-w'])
+                  extra_compile_args=['-w', '-O3'], extra_f90_compile_args=['-w', '-O3'])
 
 c_sources = glob.glob('fits/*.pyx') + glob.glob('fits/*.cc')
 cfits = Extension(name='fits._cfits', sources=c_sources, libraries=['cfitsio', 'curl'],
