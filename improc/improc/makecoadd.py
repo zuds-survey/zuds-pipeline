@@ -100,11 +100,11 @@ def make_rms(im, weight):
         band = fits.read_header_string(out, 'FILTER')
 
         if 'r' in band.lower():
-            fits.update_header_string(out, 'FILTER', 'r')
+            fits.update_header(out, 'FILTER', 'r')
         elif 'g' in band.lower():
-            fits.update_header_string(out, 'FILTER', 'g')
+            fits.update_header(out, 'FILTER', 'g')
         elif 'i' in band.lower():
-            fits.update_header_string(out, 'FILTER', 'i')
+            fits.update_header(out, 'FILTER', 'i')
         else:
             raise ValueError('Invalid filter "%s."' % band)
 
@@ -120,6 +120,7 @@ def make_rms(im, weight):
         noise = args.output_basename + '.noise.fits'
         syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
         syscall = syscall % (sexconf, outcat, noise, out)
+        syscall = ' '.join([syscall, clargs])
         os.system(syscall)
 
         # And zeropoint the coadd, putting results in the header
@@ -127,6 +128,14 @@ def make_rms(im, weight):
 
         # Now retrieve the zeropoint
         zp = fits.get_header_float(out, 'MAGZP')
+
+        # redo sextractor
+        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+        syscall = syscall % (sexconf, outcat, noise, zp, out)
+        syscall = ' '.join([syscall, clargs])
+        os.system(syscall)
+
+        make_rms(out, oweight)
 
     else:
         # I'm done

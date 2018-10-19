@@ -220,4 +220,4 @@ if __name__ == '__main__':
         frat = fits.read_header_float(sub, 'KSUM00')
         subzp = 2.5 * np.log10(frat) + refzp
 
-        fits.update_header_float(sub, 'SUBZP', subzp)
+        fits.update_header(sub, 'SUBZP', subzp)
