@@ -1,10 +1,8 @@
 import os
-import psycopg2
 import subprocess
 import numpy as np
-from astropy.io import fits
 
-__all__ = ['zpsee']
+__all__ = ['solve_zeropoint']
 __whatami__ = 'Zeropoint an image by calibrating to PS1.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
@@ -129,6 +127,9 @@ def zpsee(im_or_ims, cat_or_cats, cursor):
     `im_or_ims`) using the Pan-STARRS photometric database (cursor:
     `cursor`)."""
 
+    from astropy.io import fits
+
+
     paths = np.atleast_1d(im_or_ims).tolist()
     catpaths = np.atleast_1d(cat_or_cats).tolist()
 
@@ -187,6 +188,8 @@ def zpsee(im_or_ims, cat_or_cats, cursor):
 
 
 def solve_zeropoint(image, cat):
+
+    import psycopg2
 
     con = psycopg2.connect(dbname='desi', host='***REMOVED***',
                            port=5432, user='***REMOVED***', password='***REMOVED***')

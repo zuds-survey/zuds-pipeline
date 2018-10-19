@@ -1,9 +1,8 @@
-from astropy.io import fits as afits
-
 __all = ['cmbmask']
 
-
 def cmbmask(mask1, mask2, maskout):
+
+    from astropy.io import fits as afits
 
     """Combine two masks and write out the result to a fits file.
 

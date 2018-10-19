@@ -1,5 +1,4 @@
 from .. import fits
-from astropy.io import fits as afits
 import numpy as np
 from numpy.ma import fix_invalid
 
@@ -22,6 +21,8 @@ def make_rms(im, weight):
     with extensions .rms.fits and .weight.fits.
 
     """
+
+    from astropy.io import fits as afits
 
     saturval = fits.read_header_float(im, 'SATURATE')
 
