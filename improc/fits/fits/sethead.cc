@@ -11,13 +11,9 @@ void updateheader(char* fname, char* key, int datatype, void* value){
     char card[FLEN_CARD];   /* standard string lengths defined in fitsioc.h */
     char comment[100];
 
-    if (datatype == TFLOAT){
-        float* myval = (float *)value;
-    } else if ( datatype == TSTRING ) {
-        char** myval = (char**)value;
-    } else if (datatype == TINT) {
-        int* myval = (int *) value;
-    }
+    float* intervalf;
+    char** intervalc;
+    int*   intervali;
 
     status = 0;
 
@@ -27,9 +23,23 @@ void updateheader(char* fname, char* key, int datatype, void* value){
     if ( fits_movabs_hdu(fptr, 1, &hdutype, &status) )
          printerror( status );
 
-    if ( fits_update_key(fptr, datatype, key, myval, comment, &status) )
-         printerror( status );
 
+    if (datatype == TFLOAT){
+        intervalf = (float *)value;
+        if ( fits_update_key(fptr, datatype, key, intervalf, comment, &status) ){
+            printerror( status );
+        }
+    } else if ( datatype == TSTRING ) {
+        intervalc = (char**)value;
+        if ( fits_update_key(fptr, datatype, key, intervalc, comment, &status) ){
+            printerror( status );
+        }
+    } else if (datatype == TINT) {
+        invtervali = (int *) value;
+        if ( fits_update_key(fptr, datatype, key, intervali, comment, &status) ){
+            printerror( status );
+        }
+    }
     return;
 }
 
