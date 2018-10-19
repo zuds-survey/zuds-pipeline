@@ -1,7 +1,7 @@
 import pandas as pd
 import argparse
 import warnings
-import fits
+from imlib import fits
 
 
 def make_output(outname, framenames):
