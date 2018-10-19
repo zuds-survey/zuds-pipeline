@@ -1,3 +1,3 @@
-from . import cmbmask
-from . import rms
-from . import zeropoint
+from .cmbmask import *
+from .rms import *
+from .zeropoint import *

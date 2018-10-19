@@ -2,8 +2,6 @@ import os
 import numpy as np
 from imlib import fits
 from imlib import make_rms, cmbmask
-from numpy.ma import fix_invalid
-from astropy.io import fits as afits
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
