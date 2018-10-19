@@ -1,8 +1,9 @@
 import os
 import numpy as np
+import imlib
 from imlib import fits
 from astropy.io import fits as afits
-from numpy.ma import fix_invalid
+
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -99,7 +100,7 @@ if __name__ == '__main__':
         os.system(syscall)
 
         # And zeropoint the coadd, putting results in the header
-        zplib.solve_zeropoint(out, outcat)
+        imlib.solve_zeropoint(out, outcat)
 
         # Now retrieve the zeropoint
         zp = fits.get_header_float(out, 'MAGZP')
@@ -110,7 +111,7 @@ if __name__ == '__main__':
         syscall = ' '.join([syscall, clargs])
         os.system(syscall)
 
-        make_rms(out, oweight)
+        imlib.make_rms(out, oweight)
 
     else:
         # I'm done

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import fits
+from imlib import fits
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
