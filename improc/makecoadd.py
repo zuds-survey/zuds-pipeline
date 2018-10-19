@@ -1,7 +1,6 @@
 import os
 import numpy as np
-import fits
-import zplib
+from imlib import fits
 from astropy.io import fits as afits
 from numpy.ma import fix_invalid
 
@@ -9,30 +8,6 @@ from numpy.ma import fix_invalid
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
-
-def make_rms(im, weight):
-    """Make the RMS image"""
-    saturval = fits.read_header_float(im, 'SATURATE')
-
-    # make rms map
-    weighthdul = afits.open(weight)
-    weightmap = weighthdul[0].data
-    rawrms = np.sqrt(weightmap**-1)
-    fillrms = np.sqrt(saturval)
-    rms = fix_invalid(rawrms, fill_value=fillrms).data
-
-    rmshdu = afits.PrimaryHDU(rms)
-    rmshdul = afits.HDUList([rmshdu])
-    rmshdul.writeto(weight.replace('weight', 'rms'))
-
-    # make bpm
-    bpm = np.zeros_like(rawrms, dtype='int16')
-    bpm[~np.isfinite(rawrms)] = 256
-
-    bpmhdu = afits.PrimaryHDU(bpm)
-    hdul = afits.HDUList([bpmhdu])
-
-    hdul.writeto(weight.replace('weight', 'bpm'))
 
 if __name__ == '__main__':
 

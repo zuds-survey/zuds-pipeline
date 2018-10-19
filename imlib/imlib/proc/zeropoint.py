@@ -1,5 +1,5 @@
 
-__whatami__ = 'Berkeley Planet 9 search difference imaging pipeline.'
+__whatami__ = 'Zeropoint an image by calibrating to PS1.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
 import os
@@ -21,13 +21,16 @@ logging.basicConfig(format='[%(level)s %(asctime)s]: %(message)s',
                     datefmt='%m/%d/%Y %I:%M:%S %p',
                     level=logging.DEBUG)
 
+
 def _append_config(command, config):
     config = abspath(config)
     command += (' -c %s' % config)
     return command
 
+
 def _coerce(path_or_paths):
     return ' '.join(np.atleast_1d(path_or_paths).tolist())
+
 
 def _execute(cmd):
     """Execute a shell command, log the stdout and stderr, and check
@@ -45,6 +48,7 @@ def _execute(cmd):
 
     return stdout, stderr
 
+
 def pathsplit(path):
     """Return the absolute root of `path`, and the filename of
     `path`."""
@@ -57,12 +61,14 @@ def pathsplit(path):
 
     return (root, fname)
 
+
 def xy2sky(im, x, y):
     """Convert the x and y coordinates on an image to RA, DEC in degrees."""
     command = 'xy2sky -d %s %d %d' % (im, x, y)
     stdout, stderr = _execute(command)
     ra, dec, epoch, x, y = stdout.split()
     return float(ra), float(dec)
+
 
 def parse_sexcat(cat, bin=False):
     """Read a sextractor catalog file (path: `cat`) and return a numpy
@@ -74,6 +80,7 @@ def parse_sexcat(cat, bin=False):
         data = np.genfromtxt(cat, dtype=None)
     return data
 
+
 def parse_sexconf(conf):
     """Read a sextractor configuration file (path: `conf`) and return
     the contents as a dictionary."""
@@ -82,6 +89,7 @@ def parse_sexconf(conf):
         for line in f:
             d.update(dict([line.split()]))
     return d
+
 
 def sex(im, config=None):
     """Run sextractor on an image (path: `im`), using a config file
@@ -95,6 +103,7 @@ def sex(im, config=None):
         command = _append_config(command, config)
     _execute(command)
 
+
 def swarp(im_or_ims, config=None):
     """Run swarp on an image or list of images (path/paths:
     `im_or_ims`), using a config file (path: `config`). If `config` is
@@ -107,6 +116,7 @@ def swarp(im_or_ims, config=None):
         command = _append_config(command, config)
     _execute(command)
 
+
 def scamp(cat_or_cats, config=None):
     """Run scamp on a catalog or list of catalogs (path/paths:
     `cat_or_cats`), using a config file (path: `config`). If `config` is
@@ -118,6 +128,7 @@ def scamp(cat_or_cats, config=None):
     if config is not None:
         command = _append_config(command, config)
     _execute(command)
+
 
 def zpsee(im_or_ims, cat_or_cats, cursor):
     """Compute the median zeropoint of an image or images (path/paths:
