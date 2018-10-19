@@ -44,7 +44,7 @@ if __name__ == '__main__':
     sexconf = os.path.join(confdir, 'scamp.sex')
     nnwname = os.path.join(confdir, 'default.nnw')
     filtname = os.path.join(confdir, 'default.conv')
-    paramname = os.path.join(confdir, 'default.param')
+    paramname = os.path.join(confdir, 'scamp.param')
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (paramname, filtname, nnwname)
 
