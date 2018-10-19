@@ -29,8 +29,13 @@ def make_rms(im, weight):
     # make rms map
     weighthdul = afits.open(weight)
     weightmap = weighthdul[0].data
-    rawrms = np.sqrt(weightmap**-1)
-    fillrms = np.sqrt(saturval)
+
+    # turn off warnings for this - can get some infs and nans but they will be
+    # filled with saturval indicating bad pixels
+    with np.errstate(all='ignore'):
+        rawrms = np.sqrt(weightmap**-1)
+        fillrms = np.sqrt(saturval)
+
     rms = fix_invalid(rawrms, fill_value=fillrms).data
 
     # write it out
