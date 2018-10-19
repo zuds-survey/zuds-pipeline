@@ -6,12 +6,13 @@ from Cython.Build import cythonize
 
 
 # Create the fortran extension to be compiled as a shared library using f2py
-fort_sources = glob.glob('fits/*.f90')
-ffits = Extension(name='imlib.fits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
+fort_sources = glob.glob('imlib/fits/*.f90')
+ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
                   extra_compile_args=['-w', '-O3'], extra_f90_compile_args=['-w', '-O3'])
 
-c_sources = glob.glob('fits/*.pyx') + glob.glob('fits/*.cc')
-cfits = Extension(name='imlib.fits._cfits', sources=c_sources, libraries=['cfitsio', 'curl'],
+# Create the C++ extension to be compiled as a shared library using cython
+c_sources = glob.glob('imlib/fits/*.pyx') + glob.glob('imlib/fits/*.cc')
+cfits = Extension(name='fits._cfits', sources=c_sources, libraries=['cfitsio', 'curl'],
                   extra_compile_args=['-w'], language='c++')
 cfmod = cythonize(cfits)[0]
 
@@ -34,11 +35,12 @@ class InstallCommand(install):
         ffits.library_dirs = library_dirs
         ffits.include_dirs = include_dirs
         cfmod.library_dirs = library_dirs
-        cfmod.include_dirs = include_dirs + ['fits/']
+        cfmod.include_dirs = include_dirs + ['imlib/fits/']
 
 
 setup(name='imlib',
-      packages=['imlib', 'imlib.fits', 'imlib.proc'],
+      ext_package='imlib',
+      packages=['imlib', 'imlib.proc'],
       version='dev',
       ext_modules=[ffits, cfmod],
       cmdclass={'install':InstallCommand}
