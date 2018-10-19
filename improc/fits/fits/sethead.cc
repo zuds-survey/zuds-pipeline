@@ -11,9 +11,9 @@ void updateheader(char* fname, char* key, int datatype, void* value){
     char card[FLEN_CARD];   /* standard string lengths defined in fitsioc.h */
     char comment[100];
 
-    float* intervalf;
-    char** intervalc;
-    int*   intervali;
+    float intervalf;
+    char* intervalc;
+    int   intervali;
 
     status = 0;
 
@@ -25,18 +25,18 @@ void updateheader(char* fname, char* key, int datatype, void* value){
 
 
     if (datatype == TFLOAT){
-        intervalf = (float *)value;
-        if ( fits_update_key(fptr, datatype, key, intervalf, comment, &status) ){
+        intervalf = *(float *)value;
+        if ( fits_update_key(fptr, datatype, key, &intervalf, comment, &status) ){
             printerror( status );
         }
     } else if ( datatype == TSTRING ) {
-        intervalc = (char**)value;
-        if ( fits_update_key(fptr, datatype, key, intervalc, comment, &status) ){
+        intervalc = *(char**)value;
+        if ( fits_update_key(fptr, datatype, key, &intervalc, comment, &status) ){
             printerror( status );
         }
     } else if (datatype == TINT) {
-        intervali = (int *) value;
-        if ( fits_update_key(fptr, datatype, key, intervali, comment, &status) ){
+        intervali = *(int *) value;
+        if ( fits_update_key(fptr, datatype, key, &intervali, comment, &status) ){
             printerror( status );
         }
     }
