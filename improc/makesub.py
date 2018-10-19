@@ -41,6 +41,9 @@ if __name__ == '__main__':
     confdir = os.path.join(wd, 'config', 'makesub')
     scampconfcat = os.path.join(confdir, 'scamp.conf.cat')
     defswarp = os.path.join(confdir, 'default.swarp')
+    defsexref = os.path.join(confdir, 'default.sex.ref')
+    defsexaper = os.path.join(confdir, 'default.sex.aper')
+    defsexsub = os.path.join(confdir, 'default.sex.sub')
 
     for frame in frames:
         refp = os.path.basename(args.template)[:-5]
@@ -127,7 +130,7 @@ if __name__ == '__main__':
 
         seeing = seenew if ntst else seeref
 
-        pixscal = 1.01 # TODO make this more general
+        pixscal = 1.01  # TODO make this more general
         seepix = pixscal * seeing
         r = 2.5 * seepix
         rss = 6. * seepix
@@ -143,7 +146,7 @@ if __name__ == '__main__':
         tu = fits.read_header_float(args.template, 'SATURATE')
         iu = fits.read_header_float(frame, 'SATURATE')
 
-        gain = 1.0 # TODO check this assumption
+        gain = 1.0  # TODO check this assumption
 
         newskysig = tnewskysig * 1.48 / gain
         refskysig = trefskysig * 1.48 / gain
@@ -175,6 +178,7 @@ if __name__ == '__main__':
                    '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f >> %s 2>&1'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy, hotlog)
+        os.system(syscall)
 
         # Calibrate the subtraction
         refzp = fits.read_header_float(sub, 'MAGZP')
@@ -182,3 +186,20 @@ if __name__ == '__main__':
         subzp = 2.5 * np.log10(frat) + refzp
 
         fits.update_header(sub, 'SUBZP', subzp)
+
+        # Make the subtraction catalogs
+
+        # Reference catalog
+        syscall = 'sextractor -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s'
+        syscall = syscall % (defsexref, refzp, refremapcat, refremap)
+        os.system(syscall)
+
+        # Subtraction catalog
+        syscall = 'sextractor -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
+        syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
+        os.system(syscall)
+
+        # Aperture catalog
+        syscall = 'sextractor -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s,%s'
+        syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
+        os.system(syscall)
