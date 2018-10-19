@@ -1,0 +1,1 @@
+void printerror( int status );
