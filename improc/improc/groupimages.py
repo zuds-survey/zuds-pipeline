@@ -11,18 +11,18 @@ def make_output(outname, framenames):
 
 
 def img_in_range(image, range_low, range_high):
-    shutopen = fits.get_header_string(image, 'SHUTOPEN')
+    shutopen = fits.read_header_string(image, 'SHUTOPEN')
     time = pd.to_datetime(shutopen)
     return range_low <= time < range_high
 
 
 def get_seeing(image):
-    seeing = fits.get_header_float(image, 'SEEING')
+    seeing = fits.read_header_float(image, 'SEEING')
     return seeing
 
 
 def get_date(image):
-    shutopen = fits.get_header_string(image, 'SHUTOPEN')
+    shutopen = fits.read_header_string(image, 'SHUTOPEN')
     return pd.to_datetime(shutopen)
 
 
