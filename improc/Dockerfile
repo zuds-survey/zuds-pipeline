@@ -44,3 +44,4 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
 
 RUN echo 'alias sex=sextractor' >> ~/.bashrc
 RUN echo 'alias swarp=SWarp' >> ~/.bashrc
+RUN conda install psycopg2
