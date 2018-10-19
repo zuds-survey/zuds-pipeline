@@ -17,7 +17,7 @@ void updateheader(char* fname, char* key, int datatype, void* value){
 
     status = 0;
 
-    if ( fits_open_file(&fptr, fname, READONLY, &status) )
+    if ( fits_open_file(&fptr, fname, READWRITE, &status) )
          printerror( status );
 
     if ( fits_movabs_hdu(fptr, 1, &hdutype, &status) )
