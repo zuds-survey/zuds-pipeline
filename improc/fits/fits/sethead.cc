@@ -9,7 +9,7 @@ void updateheader(char* fname, char* key, int datatype, void* value){
 
     int status, nkeys, keypos, hdutype, ii, jj;
     char card[FLEN_CARD];   /* standard string lengths defined in fitsioc.h */
-    char comment[100];
+    char* comment = NULL;
 
     float intervalf;
     char* intervalc;
