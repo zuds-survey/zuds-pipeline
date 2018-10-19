@@ -34,43 +34,43 @@ def make_rms(im, weight):
 
     hdul.writeto(weight.replace('weight', 'bpm'))
 
-    if __name__ == '__main__':
+if __name__ == '__main__':
 
-        import argparse
-        from mpi4py import MPI
+    import argparse
+    from mpi4py import MPI
 
-        # set up the inter-rank communication
-        comm = MPI.COMM_WORLD
-        rank = comm.Get_rank()
-        size = comm.Get_size()
+    # set up the inter-rank communication
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
-        # set up the argument parser and parse the arguments
-        parser = argparse.ArgumentParser()
-        parser.add_argument('--output-basename', dest='name', required=True,
-                            help='Basename of output coadd.', nargs=1)
-        parser.add_argument('--input-catalogs', dest='cats', required=True,
-                            help='List of catalogs to use for astrometric alignment.', nargs=1)
-        parser.add_argument('--input-frames', dest='frames', nargs=1, required=True,
-                            help='List of frames to coadd.')
-        args = parser.parse_args()
+    # set up the argument parser and parse the arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--output-basename', dest='name', required=True,
+                        help='Basename of output coadd.', nargs=1)
+    parser.add_argument('--input-catalogs', dest='cats', required=True,
+                        help='List of catalogs to use for astrometric alignment.', nargs=1)
+    parser.add_argument('--input-frames', dest='frames', nargs=1, required=True,
+                        help='List of frames to coadd.')
+    args = parser.parse_args()
 
-        # distribute the work to each processor
-        if rank == 0:
-            frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
-            cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
-        else:
-            frames = None
-            cats = None
+    # distribute the work to each processor
+    if rank == 0:
+        frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
+        cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
+    else:
+        frames = None
+        cats = None
 
-        frames = comm.bcast(frames, root=0)
-        cats = comm.bcast(cats, root=0)
+    frames = comm.bcast(frames, root=0)
+    cats = comm.bcast(cats, root=0)
 
-        frames = _split(frames, size)[rank]
-        cats = _split(cats, size)[rank]
+    frames = _split(frames, size)[rank]
+    cats = _split(cats, size)[rank]
 
-        # now set up a few pointers to auxiliary files read by sextractor
-        wd = os.path.dirname(__file__)
-        confdir = os.path.join(wd, 'config', 'makecoadd')
+    # now set up a few pointers to auxiliary files read by sextractor
+    wd = os.path.dirname(__file__)
+    confdir = os.path.join(wd, 'config', 'makecoadd')
     sexconf = os.path.join(confdir, 'scamp.sex')
     scampparam = os.path.join(confdir, 'scamp.param')
     filtname = os.path.join(confdir, 'default.conv')
