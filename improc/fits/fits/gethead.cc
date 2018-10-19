@@ -22,5 +22,8 @@ void readheader(char* fname, char* key, int datatype, void* value){
     if ( fits_read_key(fptr, datatype, key, value, comment, &status) )
          printerror( status );
 
+    if ( fits_close_file(fptr, &status) )
+         printerror( status );
+
     return;
 }

@@ -40,6 +40,10 @@ void updateheader(char* fname, char* key, int datatype, void* value){
             printerror( status );
         }
     }
+
+    if ( fits_close_file(fptr, &status) )
+         printerror( status );
+
     return;
 }
 
