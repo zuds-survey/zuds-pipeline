@@ -15,69 +15,62 @@ def make_rms(im, weight):
     saturval = fits.read_header_float(im, 'SATURATE')
 
     # make rms map
-    weighthdul = fits.open(weight)
+    weighthdul = afits.open(weight)
     weightmap = weighthdul[0].data
     rawrms = np.sqrt(weightmap**-1)
     fillrms = np.sqrt(saturval)
     rms = fix_invalid(rawrms, fill_value=fillrms).data
 
-    rmshdu = fits.PrimaryHDU(rms)
-    rmshdul = fits.HDUList([rmshdu])
+    rmshdu = afits.PrimaryHDU(rms)
+    rmshdul = afits.HDUList([rmshdu])
     rmshdul.writeto(weight.replace('weight', 'rms'))
 
     # make bpm
     bpm = np.zeros_like(rawrms, dtype='int16')
     bpm[~np.isfinite(rawrms)] = 256
 
-    bpmhdu = fits.PrimaryHDU(bpm)
-    hdul = fits.HDUList([bpmhdu])
+    bpmhdu = afits.PrimaryHDU(bpm)
+    hdul = afits.HDUList([bpmhdu])
 
     hdul.writeto(weight.replace('weight', 'bpm'))
 
+    if __name__ == '__main__':
 
+        import argparse
+        from mpi4py import MPI
 
-if __name__ == '__main__':
+        # set up the inter-rank communication
+        comm = MPI.COMM_WORLD
+        rank = comm.Get_rank()
+        size = comm.Get_size()
 
-    import argparse
-    from mpi4py import MPI
+        # set up the argument parser and parse the arguments
+        parser = argparse.ArgumentParser()
+        parser.add_argument('--output-basename', dest='name', required=True,
+                            help='Basename of output coadd.', nargs=1)
+        parser.add_argument('--input-catalogs', dest='cats', required=True,
+                            help='List of catalogs to use for astrometric alignment.', nargs=1)
+        parser.add_argument('--input-frames', dest='frames', nargs=1, required=True,
+                            help='List of frames to coadd.')
+        args = parser.parse_args()
 
-    # set up the inter-rank communication
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+        # distribute the work to each processor
+        if rank == 0:
+            frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
+            cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
+        else:
+            frames = None
+            cats = None
 
-    # set up the argument parser and parse the arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--output-basename', dest='name', required=True,
-                        help='Basename of output coadd.', nargs=1)
-    parser.add_argument('--input-catalogs', dest='cats', required=True,
-                        help='List of catalogs to use for astrometric alignment.', nargs=1)
-    parser.add_argument('--input-frames', dest='frames', nargs=1, required=True,
-                        help='List of frames to coadd.')
-    args = parser.parse_args()
+        frames = comm.bcast(frames, root=0)
+        cats = comm.bcast(cats, root=0)
 
-    # distribute the work to each processor
-    if rank == 0:
-        frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
-        cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
-    else:
-        frames = None
-        cats = None
+        frames = _split(frames, size)[rank]
+        cats = _split(cats, size)[rank]
 
-    frames = comm.bcast(frames, root=0)
-    cats = comm.bcast(cats, root=0)
-
-    if rank == 0:
-        # save copies of the full lists on root
-        aframes = frames
-        acats = cats
-
-    frames = _split(frames, size)[rank]
-    cats = _split(cats, size)[rank]
-
-    # now set up a few pointers to auxiliary files read by sextractor
-    wd = os.path.dirname(__file__)
-    confdir = os.path.join(wd, 'config', 'makecoadd')
+        # now set up a few pointers to auxiliary files read by sextractor
+        wd = os.path.dirname(__file__)
+        confdir = os.path.join(wd, 'config', 'makecoadd')
     sexconf = os.path.join(confdir, 'scamp.sex')
     scampparam = os.path.join(confdir, 'scamp.param')
     filtname = os.path.join(confdir, 'default.conv')
@@ -135,9 +128,8 @@ if __name__ == '__main__':
         # Now retrieve the zeropoint
         zp = fits.get_header_float(out, 'MAGZP')
 
-
-
-
     else:
         # I'm done
-        MPI.Finalize()
+        pass
+
+    MPI.Finalize()
