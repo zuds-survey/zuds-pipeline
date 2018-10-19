@@ -35,7 +35,7 @@ void updateheader(char* fname, char* key, int datatype, void* value){
             printerror( status );
         }
     } else if (datatype == TINT) {
-        invtervali = (int *) value;
+        intervali = (int *) value;
         if ( fits_update_key(fptr, datatype, key, intervali, comment, &status) ){
             printerror( status );
         }
