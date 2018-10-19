@@ -24,15 +24,15 @@ def update_header(fname, key, value):
         int integer;
         float real;
         void* val;
-    if isinstance(key, str):
+    if isinstance(value, str):
         string = key
         val = &string
         updateheader(fname, key, TSTRING, val)
-    elif isinstance(key, int):
+    elif isinstance(value, int):
         integer = key
         val = &integer
         updateheader(fname, key, TINT, val)
-    elif isinstance(key, float):
+    elif isinstance(value, float):
         real = key
         val = &real
         updateheader(fname, key, TFLOAT, val)
