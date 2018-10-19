@@ -1,13 +1,12 @@
-
-__whatami__ = 'Zeropoint an image by calibrating to PS1.'
-__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
-
 import os
-import logging
 import psycopg2
 import subprocess
 import numpy as np
 from astropy.io import fits
+
+__all__ = ['zpsee']
+__whatami__ = 'Zeropoint an image by calibrating to PS1.'
+__author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
 abspath = os.path.abspath
 
@@ -15,11 +14,6 @@ matchquery = "SELECT id, ra, dec, {flt} " \
     "from dr1.ps1 where q3c_poly_query(ra, dec, "\
     "'{{{ra_ll}, {dec_ll}, {ra_lr}, {dec_lr}, {ra_ur}, {dec_ur}, {ra_ul}, {dec_ul}}}') "\
     " and {flt} > 0.0"
-
-
-logging.basicConfig(format='[%(level)s %(asctime)s]: %(message)s',
-                    datefmt='%m/%d/%Y %I:%M:%S %p',
-                    level=logging.DEBUG)
 
 
 def _append_config(command, config):

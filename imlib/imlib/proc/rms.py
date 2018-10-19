@@ -3,6 +3,8 @@ from astropy.io import fits as afits
 import numpy as np
 from numpy.ma import fix_invalid
 
+__all__ = ['make_rms']
+
 
 def make_rms(im, weight):
     """Make the RMS image and the bad pixel mask.

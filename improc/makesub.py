@@ -1,50 +1,13 @@
 import os
 import numpy as np
-import fits
+from imlib import fits
+from imlib import make_rms, cmbmask
 from numpy.ma import fix_invalid
 from astropy.io import fits as afits
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
-
-
-def make_rms(im, weight):
-    """Make the RMS image"""
-    saturval = fits.read_header_float(im, 'SATURATE')
-
-    # make rms map
-    weighthdul = afits.open(weight)
-    weightmap = weighthdul[0].data
-    rawrms = np.sqrt(weightmap**-1)
-    fillrms = np.sqrt(saturval)
-    rms = fix_invalid(rawrms, fill_value=fillrms).data
-
-    rmshdu = afits.PrimaryHDU(rms)
-    rmshdul = afits.HDUList([rmshdu])
-    rmshdul.writeto(weight.replace('weight', 'rms'))
-
-    # make bpm
-    bpm = np.zeros_like(rawrms, dtype='int16')
-    bpm[~np.isfinite(rawrms)] = 256
-
-    bpmhdu = afits.PrimaryHDU(bpm)
-    hdul = afits.HDUList([bpmhdu])
-
-    hdul.writeto(weight.replace('weight', 'bpm'))
-
-
-def cmbmask(mask1, mask2, maskout):
-
-    d1 = afits.open(mask1)[0].data
-    d2 = afits.open(mask2)[0].data
-
-    # combine the masks
-    d3 = d1 | d2
-
-    outmaskhdu = afits.PrimaryHDU(d3)
-    omhdul = afits.HDUList([outmaskhdu])
-    omhdul.writeto(maskout)
 
 
 if __name__ == '__main__':
