@@ -11,7 +11,7 @@ void updateheader(char* fname, char* key, int datatype, void* value){
     char card[FLEN_CARD];   /* standard string lengths defined in fitsioc.h */
     char comment[10];
 
-    # initialize to empty string to pass blank comment
+    // initialize to empty string to pass blank comment
     comment[0] = '\0';
 
 
