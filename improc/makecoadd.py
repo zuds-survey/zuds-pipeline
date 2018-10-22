@@ -34,6 +34,7 @@ if __name__ == '__main__':
     if rank == 0:
         frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
         cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
+        aframes = frames.copy()
     else:
         frames = None
         cats = None
@@ -66,14 +67,14 @@ if __name__ == '__main__':
     comm.Barrier()
 
     if rank == 0:
-        allims = ' '.join(frames)
+        allims = ' '.join(aframes)
         out = args.output_basename + '.fits'
         oweight = args.output_basename + '.weight.fits'
         syscall = 'SWarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
         os.system(syscall)
 
         # Now postprocess it a little bit
-        band = fits.read_header_string(out, 'FILTER')
+        band = fits.read_header_string(aframes[0], 'FILTER')
 
         if 'r' in band.lower():
             fits.update_header(out, 'FILTER', 'r')
