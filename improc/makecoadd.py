@@ -13,16 +13,10 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
 if __name__ == '__main__':
 
     import argparse
-    from mpi4py import MPI
-
-    # set up the inter-rank communication
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output-basename', dest='output_basename', required=True,
+    parser.add_argument('--output-basename', dest='name', required=True,
                         help='Basename of output coadd.', nargs=1)
     parser.add_argument('--input-catalogs', dest='cats', required=True,
                         help='List of catalogs to use for astrometric alignment.', nargs=1)
@@ -31,19 +25,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     # distribute the work to each processor
-    if rank == 0:
-        frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
-        cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
-        aframes = frames.copy()
-    else:
-        frames = None
-        cats = None
-
-    frames = comm.bcast(frames, root=0)
-    cats = comm.bcast(cats, root=0)
-
-    frames = _split(frames, size)[rank]
-    cats = _split(cats, size)[rank]
+    frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
+    cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -63,60 +46,49 @@ if __name__ == '__main__':
     syscall = 'scamp -c %s %s' % (scampconf, mycats)
     os.system(syscall)
 
-    # Now make the coadd
-    comm.Barrier()
+    allims = ' '.join(frames)
+    out = args.output_basename + '.fits'
+    oweight = args.output_basename + '.weight.fits'
+    syscall = 'SWarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
+    os.system(syscall)
 
-    if rank == 0:
-        allims = ' '.join(aframes)
-        out = args.output_basename[0] + '.fits'
-        oweight = args.output_basename[0] + '.weight.fits'
+    # Now postprocess it a little bit
+    band = fits.read_header_string(frames[0], 'FILTER')
 
-        syscall = 'SWarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
-        os.system(syscall)
-
-        # Now postprocess it a little bit
-        band = fits.read_header_string(aframes[0], 'FILTER')
-
-        if 'r' in band.lower():
-            fits.update_header(out, 'FILTER', 'r')
-        elif 'g' in band.lower():
-            fits.update_header(out, 'FILTER', 'g')
-        elif 'i' in band.lower():
-            fits.update_header(out, 'FILTER', 'i')
-        else:
-            raise ValueError('Invalid filter "%s."' % band)
-
-        # TODO make this more general
-        fits.update_header_float(out, 'PIXSCALE', 1.0)
-
-        # Add the sky back into the image as a constant
-        with afits.open(out, mode='update') as f:
-            f[0].data += 150.
-
-        # Make a new catalog
-        outcat = args.output_basename[0] + '.cat'
-        noise = args.output_basename[0] + '.noise.fits'
-        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
-        syscall = syscall % (sexconf, outcat, noise, out)
-        syscall = ' '.join([syscall, clargs])
-        os.system(syscall)
-
-        # And zeropoint the coadd, putting results in the header
-        imlib.solve_zeropoint(out, outcat)
-
-        # Now retrieve the zeropoint
-        zp = fits.get_header_float(out, 'MAGZP')
-
-        # redo sextractor
-        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
-        syscall = syscall % (sexconf, outcat, noise, zp, out)
-        syscall = ' '.join([syscall, clargs])
-        os.system(syscall)
-
-        imlib.make_rms(out, oweight)
-
+    if 'r' in band.lower():
+        fits.update_header(out, 'FILTER', 'r')
+    elif 'g' in band.lower():
+        fits.update_header(out, 'FILTER', 'g')
+    elif 'i' in band.lower():
+        fits.update_header(out, 'FILTER', 'i')
     else:
-        # I'm done
-        pass
+        raise ValueError('Invalid filter "%s."' % band)
 
-    MPI.Finalize()
+    # TODO make this more general
+    fits.update_header_float(out, 'PIXSCALE', 1.0)
+
+    # Add the sky back into the image as a constant
+    with afits.open(out, mode='update') as f:
+        f[0].data += 150.
+
+    # Make a new catalog
+    outcat = args.output_basename + '.cat'
+    noise = args.output_basename + '.noise.fits'
+    syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
+    syscall = syscall % (sexconf, outcat, noise, out)
+    syscall = ' '.join([syscall, clargs])
+    os.system(syscall)
+
+    # And zeropoint the coadd, putting results in the header
+    imlib.solve_zeropoint(out, outcat)
+
+    # Now retrieve the zeropoint
+    zp = fits.get_header_float(out, 'MAGZP')
+
+    # redo sextractor
+    syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+    syscall = syscall % (sexconf, outcat, noise, zp, out)
+    syscall = ' '.join([syscall, clargs])
+    os.system(syscall)
+
+    imlib.make_rms(out, oweight)
