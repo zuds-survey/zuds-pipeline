@@ -1,4 +1,4 @@
-FROM ubuntu:18.04
+FROM ubuntu:16.04
 
 MAINTAINER Theodore Kisner <tskisner@lbl.gov>
 
@@ -162,10 +162,10 @@ RUN curl -SL https://heasarc.gsfc.nasa.gov/docs/software/ftools/fitsverify/fitsv
 
 # wcslib
 
-RUN curl -SL ftp://ftp.atnf.csiro.au/pub/software/wcslib/wcslib-5.16.tar.bz2 \
-    -o wcslib-5.16.tar.bz2 \
-    && tar xjf wcslib-5.16.tar.bz2 \
-    && cd wcslib-5.16 \
+RUN curl -SL ftp://ftp.atnf.csiro.au/pub/software/wcslib/wcslib-5.20.tar.bz2 \
+    -o wcslib-5.20.tar.bz2 \
+    && tar xjf wcslib-5.20.tar.bz2 \
+    && cd wcslib-5.20 \
     && chmod -R u+w . \
     && patch -p1 < ../rules/patch_wcslib \
     && autoconf \
@@ -189,14 +189,29 @@ RUN curl -SL http://tdc-www.harvard.edu/software/wcstools/wcstools-3.9.5.tar.gz 
     && CC="gcc" CFLAGS="-O3 -fPIC -pthread" \
     CPPFLAGS="-I/usr/include" \
     LDFLAGS="-L/usr/lib" \
-    ./configure  \
-    --disable-fortran \
-    --prefix="/usr" \
+    && make -j 4 all \
+    && cd .. 
+
+ENV PATH=$PATH:/usr/src/desi/wcstools-3.9.5/bin
+
+# Fftw3
+
+
+RUN curl -SL http://www.fftw.org/fftw-3.3.5.tar.gz \
+    -o fftw-3.3.5.tar.gz \
+    && tar xzf fftw-3.3.5.tar.gz \
+    && cd fftw-3.3.5 \
+    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" ./configure --enable-threads  --prefix="/usr" \
+    && make -j 4 && make install \
+    && make clean \
+    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" ./configure --enable-float --enable-threads  --prefix="/usr" \
     && make -j 4 && make install \
     && cd .. \
-    && rm -rf wcstools*
+    && rm -rf fftw*
 
 # Astromatic toolkit pieces
+
+RUN apt-get update && apt-get install -y liblapacke-dev  liblapack3 liblapack-dev libopenblas-base libopenblas-dev  liblapack-dev emacs
 
 RUN curl -SL http://www.astromatic.net/download/sextractor/sextractor-2.19.5.tar.gz \
     -o sextractor-2.19.5.tar.gz \
@@ -205,8 +220,7 @@ RUN curl -SL http://www.astromatic.net/download/sextractor/sextractor-2.19.5.tar
     && patch -p1 < ../rules/patch_sextractor \
     && chmod +x autogen.sh \
     && ./autogen.sh \
-    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" CPPFLAGS="-I" ./configure  \
-    --with-lapacke="-llapack -lopenblas -lm" --prefix="/usr" \
+    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" CPPFLAGS="-I/usr/include" ./configure --with-lapacke="-lm -lblas -llapack -llapacke" --prefix="/usr" \
     && make && make install \
     && cd .. \
     && rm -rf sextractor*
@@ -218,8 +232,7 @@ RUN curl -SL http://www.astromatic.net/download/psfex/psfex-3.17.1.tar.gz \
     && patch -p1 < ../rules/patch_psfex \
     && chmod +x autogen.sh \
     && ./autogen.sh \
-    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" CPPFLAGS="-I" ./configure  \
-    --with-lapacke="-llapack -lopenblas -lm" --prefix="/usr" \
+    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" CPPFLAGS="-I/usr/include" ./configure --with-lapacke="-lm -lblas -llapack -llapacke" --prefix="/usr" \
     && make && make install \
     && cd .. \
     && rm -rf psfex*
@@ -242,8 +255,7 @@ RUN curl -SL http://www.astromatic.net/download/scamp/scamp-2.0.4.tar.gz \
     && patch -p1 < ../rules/patch_scamp \
     && chmod +x autogen.sh \
     && ./autogen.sh \
-    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" CPPFLAGS="-I" ./configure  \
-    --with-lapacke="-llapack -lopenblas -lm" --prefix="/usr" \
+    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" CPPFLAGS="-I/usr/include" ./configure --with-lapacke="-lm -lblas -llapack -llapacke" --prefix="/usr" \
     && make && make install \
     && cd .. \
     && rm -rf scamp*
@@ -260,9 +272,7 @@ RUN curl -SL http://www.astromatic.net/download/swarp/swarp-2.38.0.tar.gz \
     && cd .. \
     && rm -rf swarp*
 
-# Remove the temporary patches
 
-RUN rm -rf ./rules
 
 # Precompile all python modules.  Ignore errors.
 
