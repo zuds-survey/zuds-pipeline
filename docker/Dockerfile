@@ -41,16 +41,8 @@ ENV PYTHONUSERBASE "/tmp"
 RUN curl -SL https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
     -o miniconda.sh \
     && /bin/bash miniconda.sh -b -f -p /usr \
-    && conda config --add channels intel \
-    && conda config --remove channels intel \
     && conda install --copy --yes python=3.6 \
     && rm miniconda.sh \
-    && rm -rf /usr/pkgs/*
-
-ENV ACCEPT_INTEL_PYTHON_EULA yes
-
-RUN conda config --add channels intel \
-    && conda install --copy --yes $(echo intelpython3.6_core | sed -e "s#\.._#_#") \
     && rm -rf /usr/pkgs/*
 
 # Install conda packages.
