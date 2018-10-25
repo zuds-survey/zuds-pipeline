@@ -15,7 +15,7 @@ if __name__ == '__main__':
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output-basename', dest='name', required=True,
+    parser.add_argument('--output-basename', dest='output_basename', required=True,
                         help='Basename of output coadd.', nargs=1)
     parser.add_argument('--input-catalogs', dest='cats', required=True,
                         help='List of catalogs to use for astrometric alignment.', nargs=1)
@@ -46,8 +46,8 @@ if __name__ == '__main__':
     os.system(syscall)
 
     allims = ' '.join(frames)
-    out = args.output_basename + '.fits'
-    oweight = args.output_basename + '.weight.fits'
+    out = args.output_basename[0] + '.fits'
+    oweight = args.output_basename[0] + '.weight.fits'
     syscall = 'SWarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     os.system(syscall)
 
@@ -75,8 +75,8 @@ if __name__ == '__main__':
         f[0].data += 150.
 
     # Make a new catalog
-    outcat = args.output_basename + '.cat'
-    noise = args.output_basename + '.noise.fits'
+    outcat = args.output_basename[0] + '.cat'
+    noise = args.output_basename[0] + '.noise.fits'
     syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
     syscall = syscall % (sexconf, outcat, noise, out)
     syscall = ' '.join([syscall, clargs])
