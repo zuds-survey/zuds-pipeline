@@ -1,7 +1,7 @@
 import pandas as pd
 import argparse
 import warnings
-from imlib import fits
+from astropy.io import fits
 
 
 def make_output(outname, framenames):
@@ -11,18 +11,21 @@ def make_output(outname, framenames):
 
 
 def img_in_range(image, range_low, range_high):
-    shutopen = fits.read_header_string(image, 'SHUTOPEN')
+    with fits.open(image, 'r') as f:
+        shutopen = f[0].header['SHUTOPEN']
     time = pd.to_datetime(shutopen)
     return range_low <= time < range_high
 
 
 def get_seeing(image):
-    seeing = fits.read_header_float(image, 'SEEING')
+    with fits.open(image, 'r') as f:
+        seeing = f[0].header['SEEING']
     return seeing
 
 
 def get_date(image):
-    shutopen = fits.read_header_string(image, 'SHUTOPEN')
+    with fits.open(image, 'r') as f:
+        shutopen = f[0].header['SHUTOPEN']
     return pd.to_datetime(shutopen)
 
 

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from imlib import fits
+from astropy.io import fits
 from imlib import make_rms, cmbmask
 
 # split an iterable over some processes recursively
@@ -35,6 +35,7 @@ if __name__ == '__main__':
 
     frames = comm.bcast(frames, root=0)
     frames = _split(frames, size)[rank]
+    template = args.template[0]
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -45,11 +46,19 @@ if __name__ == '__main__':
     defsexaper = os.path.join(confdir, 'default.sex.aper')
     defsexsub = os.path.join(confdir, 'default.sex.sub')
 
+    # read some header keywords from the template
+    with fits.open(template, 'r') as f:
+        header = f[0].header
+        seeref = header['SEEING']
+        refskybkg = header['MEDSKY']
+        trefskysig = header['SKYSIG']
+        tu = header['SATURATE']
+
     for frame in frames:
-        refp = os.path.basename(args.template)[:-5]
+        refp = os.path.basename(template)[:-5]
         newp = os.path.basename(frame)[:-5]
 
-        refdir = os.path.dirname(args.template)
+        refdir = os.path.dirname(template)
         outdir = os.path.dirname(frame)
 
         subp = '_'.join([newp, refp])
@@ -98,8 +107,21 @@ if __name__ == '__main__':
         fhp.setFormatter(formatter)
 
         hotparlogger.info(sub)
-        hotparlogger.info(args.template)
+        hotparlogger.info(template)
         hotparlogger.info(frame)
+
+
+        # read some keywords from the fits headers
+        with fits.open(frame, 'r') as f:
+            header = f[0].header
+            seenew = header['SEEING']
+            newskybkg = header['MEDSKY']
+            tnewskysig = header['SKYSIG']
+            iu = header['SATURATE']
+            naxis1 = header['NAXIS1']
+            naxis2 = header['NAXIS2']
+            naxis = header['NAXIS']
+            refzp = header['MAGZP']
 
         # Make a catalog from the reference for astrometric matching
         syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s >> %s 2>&1'
@@ -108,13 +130,13 @@ if __name__ == '__main__':
 
         # Merge header files
         with open(refremaphead, 'w') as f:
-            f.writelines([fits.read_header_int(frame, 'NAXIS')])
+            f.writelines(['NAXIS       ' + naxis])
             with open(newhead, 'r') as nh:
                 f.write(nh.read())
 
         # Make the remapped ref
         syscall = 'SWarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s > %s 2&>1'
-        syscall = syscall % (defswarp, args.template, refremap, refremapweight, hotlog)
+        syscall = syscall % (defswarp, template, refremap, refremapweight, hotlog)
         os.system(syscall)
 
         # Make the noise and bpm images
@@ -124,8 +146,6 @@ if __name__ == '__main__':
         cmbmask(refremapmask, newmask, submask)
 
         # Create new and reference noise images
-        seenew = fits.read_header_float(frame, 'SEEING')
-        seeref = fits.read_header_float(args.template, 'SEEING')
         ntst = seenew > seeref
 
         seeing = seenew if ntst else seeref
@@ -136,15 +156,6 @@ if __name__ == '__main__':
         rss = 6. * seepix
 
         hotlogger.info('r and rss %f %f' % (r, rss))
-
-        newskybkg = fits.read_header_float(frame, 'MEDSKY')
-        refskybkg = fits.read_header_float(args.template, 'MEDSKY')
-
-        tnewskysig = fits.read_header_float(frame, 'SKYSIG')
-        trefskysig = fits.read_header_float(args.template, 'SKYSIG')
-
-        tu = fits.read_header_float(args.template, 'SATURATE')
-        iu = fits.read_header_float(frame, 'SATURATE')
 
         gain = 1.0  # TODO check this assumption
 
@@ -158,8 +169,6 @@ if __name__ == '__main__':
         hotlogger.info('refskybkg and newskybkg %f %f' % (refskybkg, newskybkg))
         hotlogger.info('refskysig and newskysig %f %f' % (refskysig, newskysig))
 
-        naxis1 = fits.read_header_int(frame, 'NAXIS1')
-        naxis2 = fits.read_header_int(frame, 'NAXIS2')
 
         nsx = naxis1 / 100.
         nsy = naxis2 / 100.
@@ -181,11 +190,12 @@ if __name__ == '__main__':
         os.system(syscall)
 
         # Calibrate the subtraction
-        refzp = fits.read_header_float(sub, 'MAGZP')
-        frat = fits.read_header_float(sub, 'KSUM00')
-        subzp = 2.5 * np.log10(frat) + refzp
 
-        fits.update_header(sub, 'SUBZP', subzp)
+        with fits.open(sub, mode='update') as f:
+            header = f[0].header
+            frat = header['KSUM00']
+            subzp = 2.5 * np.log10(frat) + refzp
+            header['MAGZP'] = subzp
 
         # Make the subtraction catalogs
 

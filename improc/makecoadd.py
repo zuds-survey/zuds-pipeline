@@ -1,8 +1,7 @@
 import os
 import numpy as np
 import imlib
-from imlib import fits
-from astropy.io import fits as afits
+from astropy.io import fits
 
 
 # split an iterable over some processes recursively
@@ -53,22 +52,26 @@ if __name__ == '__main__':
     os.system(syscall)
 
     # Now postprocess it a little bit
-    band = fits.read_header_string(frames[0], 'FILTER')
+    with fits.open(frames[0], 'r') as f:
+        h0 = f[0].header
+        band = h0['FILTER']
 
-    if 'r' in band.lower():
-        fits.update_header(out, 'FILTER', 'r')
-    elif 'g' in band.lower():
-        fits.update_header(out, 'FILTER', 'g')
-    elif 'i' in band.lower():
-        fits.update_header(out, 'FILTER', 'i')
-    else:
-        raise ValueError('Invalid filter "%s."' % band)
+    with fits.open(out, mode='update') as f:
+        header = f[0].header
 
-    # TODO make this more general
-    fits.update_header_float(out, 'PIXSCALE', 1.0)
+        if 'r' in band.lower():
+            header['FILTER'] = 'r'
+        elif 'g' in band.lower():
+            header['FILTER'] = 'g'
+        elif 'i' in band.lower():
+            header['FILTER'] = 'i'
+        else:
+            raise ValueError('Invalid filter "%s."' % band)
 
-    # Add the sky back into the image as a constant
-    with afits.open(out, mode='update') as f:
+        # TODO make this more general
+        header['PIXSCALE'] = 1.0
+
+        # Add the sky back in as a constant
         f[0].data += 150.
 
     # Make a new catalog
@@ -83,7 +86,8 @@ if __name__ == '__main__':
     imlib.solve_zeropoint(out, outcat)
 
     # Now retrieve the zeropoint
-    zp = fits.get_header_float(out, 'MAGZP')
+    with fits.open(out, 'r') as f:
+        zp = f[0].header['MAGZP']
 
     # redo sextractor
     syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'

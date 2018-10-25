@@ -1,6 +1,7 @@
 import os
 import numpy as np
-from imlib import fits
+from imlib import medg, mkivar
+from astropy.io import fits
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -51,11 +52,12 @@ if __name__ == '__main__':
     for frame, mask in zip(frames, masks):
 
         # get the zeropoint from the fits header using fortran
-        zp = fits.read_header_float(frame, 'MAGZP')
+        with fits.open(frame, 'r') as f:
+            zp = f[0].header['MAGZP']
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
-        fits.medg(frame)
+        medg(frame)
 
         # now get ready to call source extractor
         syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
@@ -69,4 +71,4 @@ if __name__ == '__main__':
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
-        fits.mkivar(frame, mask, chkname, wgtname)
+        mkivar(frame, mask, chkname, wgtname)
