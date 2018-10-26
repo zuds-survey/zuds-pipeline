@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from imlib import medg, mkivar, _execute
+from imlib import medg, mkivar, execute
 from astropy.io import fits
 
 # split an iterable over some processes recursively
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         syscall = ' '.join([syscall, clargs])
 
         # do it
-        stdout, stderr = _execute(syscall)
+        stdout, stderr = execute(syscall)
         logging.info('Rank %d: %s' % (rank, stdout))
 
         # now make the inverse variance map using fortran

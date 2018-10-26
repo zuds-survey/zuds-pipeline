@@ -1,8 +1,10 @@
 import os
 import subprocess
 import numpy as np
+from astropy.io import fits
 
-__all__ = ['solve_zeropoint', '_execute']
+
+__all__ = ['solve_zeropoint', 'execute']
 __whatami__ = 'Zeropoint an image by calibrating to PS1.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
@@ -24,7 +26,7 @@ def _coerce(path_or_paths):
     return ' '.join(np.atleast_1d(path_or_paths).tolist())
 
 
-def _execute(cmd):
+def execute(cmd):
     """Execute a shell command, log the stdout and stderr, and check
     the return code. If the return code is != 0, raise an
     exception."""
@@ -57,7 +59,7 @@ def pathsplit(path):
 def xy2sky(im, x, y):
     """Convert the x and y coordinates on an image to RA, DEC in degrees."""
     command = 'xy2sky -d %s %d %d' % (im, x, y)
-    stdout, stderr = _execute(command)
+    stdout, stderr = execute(command)
     ra, dec, epoch, x, y = stdout.split()
     return float(ra), float(dec)
 
@@ -93,7 +95,7 @@ def sex(im, config=None):
 
     if config is not None:
         command = _append_config(command, config)
-    _execute(command)
+    execute(command)
 
 
 def swarp(im_or_ims, config=None):
@@ -106,7 +108,7 @@ def swarp(im_or_ims, config=None):
 
     if config is not None:
         command = _append_config(command, config)
-    _execute(command)
+    execute(command)
 
 
 def scamp(cat_or_cats, config=None):
@@ -119,7 +121,7 @@ def scamp(cat_or_cats, config=None):
 
     if config is not None:
         command = _append_config(command, config)
-    _execute(command)
+    execute(command)
 
 
 def zpsee(im_or_ims, cat_or_cats, cursor):
