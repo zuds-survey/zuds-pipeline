@@ -284,5 +284,7 @@ RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
 
 # Set the entrypoint and default command
 
+ENV PYTHONPATH /global/cscratch1/sd/dgold/lsn/install/lib/python3.6/site-packages/
+
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["/bin/bash"]
