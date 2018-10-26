@@ -1,4 +1,5 @@
 import os
+import string
 import numpy as np
 from imlib import medg, mkivar, execute
 from astropy.io import fits
@@ -76,7 +77,8 @@ if __name__ == '__main__':
 
         # do it
         stdout, stderr = execute(syscall)
-        logging.info(str(stderr, encoding='ascii'), extra=extra)
+        stderr = str(stderr, encoding='ascii')
+        filtered_string = str(filter(lambda x: x in string.printable, stderr))
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
