@@ -57,7 +57,7 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
-        logging.info('Working image %s' % frame)
+        logging.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
