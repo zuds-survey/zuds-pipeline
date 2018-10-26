@@ -14,14 +14,14 @@ if __name__ == '__main__':
 
     import logging
 
-    FORMAT = '%(asctime)-15s %(clientip)s %(user)-8s %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
-
-
     # set up the inter-rank communication
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+
+    FORMAT = '[Rank %(rank)d %(asctime)-15s]: %(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+    extra = {'rank': rank}
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -74,7 +74,7 @@ if __name__ == '__main__':
 
         # do it
         stdout, stderr = execute(syscall)
-        logging.info('Rank %d: %s' % (rank, stdout))
+        logging.info(str(stderr, encoding='ascii'), extra=extra)
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')

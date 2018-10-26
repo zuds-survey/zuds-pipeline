@@ -33,14 +33,14 @@ def execute(cmd):
 
 
     args = cmd.split()
-    process = subprocess.Popen( args, stdout = subprocess.PIPE, stderr = subprocess.STDOUT )
+    process = subprocess.Popen( args, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
     stdout, stderr = process.communicate()
 
     # check return code
     if process.returncode != 0:
         raise Exception(stderr)
 
-    return stdout, None
+    return stdout, stderr
 
 
 def pathsplit(path):
