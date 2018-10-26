@@ -1,4 +1,4 @@
-from .. import fits
+from pipelib.pipelib import fits
 import numpy as np
 from numpy.ma import fix_invalid
 

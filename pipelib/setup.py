@@ -4,8 +4,8 @@ from numpy.distutils.command.install import install
 import glob
 
 # Create the fortran extension to be compiled as a shared library using f2py
-fort_sources = glob.glob('imlib/fits/*.f90')
-ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio'],
+fort_sources = glob.glob('pipelib/fits/*.f90')
+ffits = Extension(name='_ffits', sources=fort_sources, libraries=['cfitsio'],
                   extra_compile_args=['-w', '-O3'], extra_f90_compile_args=['-w', '-O3'])
 
 class InstallCommand(install):
@@ -27,9 +27,9 @@ class InstallCommand(install):
         ffits.include_dirs = include_dirs
 
 
-setup(name='imlib',
-      ext_package='imlib',
-      packages=['imlib', 'imlib.proc', 'imlib.fits'],
+setup(name='pipelib',
+      ext_package='pipelib',
+      packages=['pipelib', 'pipelib._ffits'],
       version='dev',
       ext_modules=[ffits],
       cmdclass={'install':InstallCommand}

@@ -1,10 +1,9 @@
 import os
-import subprocess
 import numpy as np
 from astropy.io import fits
+from .shellcmd import execute
 
-
-__all__ = ['solve_zeropoint', 'execute']
+__all__ = ['solve_zeropoint']
 __whatami__ = 'Zeropoint an image by calibrating to PS1.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
@@ -14,46 +13,6 @@ matchquery = "SELECT id, ra, dec, {flt} " \
     "from dr1.ps1 where q3c_poly_query(ra, dec, "\
     "'{{{ra_ll}, {dec_ll}, {ra_lr}, {dec_lr}, {ra_ur}, {dec_ur}, {ra_ul}, {dec_ul}}}') "\
     " and {flt} > 0.0"
-
-
-def _append_config(command, config):
-    config = abspath(config)
-    command += (' -c %s' % config)
-    return command
-
-
-def _coerce(path_or_paths):
-    return ' '.join(np.atleast_1d(path_or_paths).tolist())
-
-
-def execute(cmd):
-    """Execute a shell command, log the stdout and stderr, and check
-    the return code. If the return code is != 0, raise an
-    exception."""
-
-
-    args = cmd.split()
-    process = subprocess.Popen( args, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
-    stdout, stderr = process.communicate()
-
-    # check return code
-    if process.returncode != 0:
-        raise Exception(stderr)
-
-    return stdout, stderr
-
-
-def pathsplit(path):
-    """Return the absolute root of `path`, and the filename of
-    `path`."""
-
-    apath = abspath(path)
-    spath = apath.split('/')
-
-    root = '/'.join(spath[:-1])
-    fname = spath[-1]
-
-    return (root, fname)
 
 
 def xy2sky(im, x, y):
@@ -73,55 +32,6 @@ def parse_sexcat(cat, bin=False):
     else:
         data = np.genfromtxt(cat, dtype=None)
     return data
-
-
-def parse_sexconf(conf):
-    """Read a sextractor configuration file (path: `conf`) and return
-    the contents as a dictionary."""
-    d = {}
-    with open(conf, 'r') as f:
-        for line in f:
-            d.update(dict([line.split()]))
-    return d
-
-
-def sex(im, config=None):
-    """Run sextractor on an image (path: `im`), using a config file
-    (path: `config`).  If `config` is None, use the default
-    config."""
-
-    im = abspath(im)
-    command = "sex %s" % im
-
-    if config is not None:
-        command = _append_config(command, config)
-    execute(command)
-
-
-def swarp(im_or_ims, config=None):
-    """Run swarp on an image or list of images (path/paths:
-    `im_or_ims`), using a config file (path: `config`). If `config` is
-    None, use the default config."""
-
-    targetstr = _coerce(im_or_ims)
-    command = "swarp %s" % targetstr
-
-    if config is not None:
-        command = _append_config(command, config)
-    execute(command)
-
-
-def scamp(cat_or_cats, config=None):
-    """Run scamp on a catalog or list of catalogs (path/paths:
-    `cat_or_cats`), using a config file (path: `config`). If `config` is
-    None, use the default config."""
-
-    targetstr = _coerce(cat_or_cats)
-    command = "scamp %s" % targetstr
-
-    if config is not None:
-        command = _append_config(command, config)
-    execute(command)
 
 
 def zpsee(im_or_ims, cat_or_cats, cursor):
