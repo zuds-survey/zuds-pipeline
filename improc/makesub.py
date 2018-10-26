@@ -47,7 +47,7 @@ if __name__ == '__main__':
     defsexsub = os.path.join(confdir, 'default.sex.sub')
 
     # read some header keywords from the template
-    with fits.open(template, 'r') as f:
+    with fits.open(template) as f:
         header = f[0].header
         seeref = header['SEEING']
         refskybkg = header['MEDSKY']
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
 
         # read some keywords from the fits headers
-        with fits.open(frame, 'r') as f:
+        with fits.open(frame) as f:
             header = f[0].header
             seenew = header['SEEING']
             newskybkg = header['MEDSKY']

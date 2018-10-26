@@ -52,7 +52,7 @@ if __name__ == '__main__':
     for frame, mask in zip(frames, masks):
 
         # get the zeropoint from the fits header using fortran
-        with fits.open(frame, 'r') as f:
+        with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
 
         # calculate some properties of the image (skysig, lmtmag, etc.)

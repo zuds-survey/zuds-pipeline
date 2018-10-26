@@ -52,7 +52,7 @@ if __name__ == '__main__':
     os.system(syscall)
 
     # Now postprocess it a little bit
-    with fits.open(frames[0], 'r') as f:
+    with fits.open(frames[0]) as f:
         h0 = f[0].header
         band = h0['FILTER']
 
@@ -86,7 +86,7 @@ if __name__ == '__main__':
     imlib.solve_zeropoint(out, outcat)
 
     # Now retrieve the zeropoint
-    with fits.open(out, 'r') as f:
+    with fits.open(out) as f:
         zp = f[0].header['MAGZP']
 
     # redo sextractor
