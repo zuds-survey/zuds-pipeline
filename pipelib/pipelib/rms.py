@@ -1,4 +1,3 @@
-from pipelib.pipelib import fits
 import numpy as np
 from numpy.ma import fix_invalid
 
@@ -24,7 +23,8 @@ def make_rms(im, weight):
 
     from astropy.io import fits as afits
 
-    saturval = fits.read_header_float(im, 'SATURATE')
+    with afits.open(im) as f:
+        saturval = f[0].header['SATURATE']
 
     # make rms map
     weighthdul = afits.open(weight)
