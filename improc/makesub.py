@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from astropy.io import fits
-from imlib import make_rms, cmbmask
+from pipelib import make_rms, cmbmask
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \

@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import imlib
+import pipelib
 from astropy.io import fits
 
 
@@ -83,7 +83,7 @@ if __name__ == '__main__':
     os.system(syscall)
 
     # And zeropoint the coadd, putting results in the header
-    imlib.solve_zeropoint(out, outcat)
+    pipelib.solve_zeropoint(out, outcat)
 
     # Now retrieve the zeropoint
     with fits.open(out) as f:
@@ -95,4 +95,4 @@ if __name__ == '__main__':
     syscall = ' '.join([syscall, clargs])
     os.system(syscall)
 
-    imlib.make_rms(out, oweight)
+    pipelib.make_rms(out, oweight)
