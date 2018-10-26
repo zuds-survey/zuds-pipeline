@@ -13,7 +13,10 @@ if __name__ == '__main__':
     from mpi4py import MPI
 
     import logging
-    logging.basicConfig()
+
+    FORMAT = '%(asctime)-15s %(clientip)s %(user)-8s %(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+
 
     # set up the inter-rank communication
     comm = MPI.COMM_WORLD
