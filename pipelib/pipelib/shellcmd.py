@@ -20,4 +20,4 @@ def execute(cmd, capture=True):
 
         return stdout, stderr
     else:
-        subprocess.check_call(args.split())
+        subprocess.check_call(cmd.split())
