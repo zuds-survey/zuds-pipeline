@@ -57,6 +57,8 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
+        logging.info('Working image %s' % frame)
+
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
