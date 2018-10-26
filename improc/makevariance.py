@@ -60,7 +60,7 @@ if __name__ == '__main__':
         medg(frame)
 
         # now get ready to call source extractor
-        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+        syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
         catname = frame.replace('fits', 'cat')
         chkname = frame.replace('fits', 'noise.fits')
         syscall = syscall % (sexconf, catname, chkname, zp, frame)
