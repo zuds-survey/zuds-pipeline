@@ -5,7 +5,7 @@ import glob
 
 # Create the fortran extension to be compiled as a shared library using f2py
 fort_sources = glob.glob('imlib/fits/*.f90')
-ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio', 'curl'],
+ffits = Extension(name='fits._ffits', sources=fort_sources, libraries=['cfitsio'],
                   extra_compile_args=['-w', '-O3'], extra_f90_compile_args=['-w', '-O3'])
 
 class InstallCommand(install):
@@ -29,7 +29,7 @@ class InstallCommand(install):
 
 setup(name='imlib',
       ext_package='imlib',
-      packages=['imlib', 'imlib.proc'],
+      packages=['imlib', 'imlib.proc', 'imlib.fits'],
       version='dev',
       ext_modules=[ffits],
       cmdclass={'install':InstallCommand}

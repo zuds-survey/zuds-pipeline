@@ -48,11 +48,11 @@ if __name__ == '__main__':
     allims = ' '.join(frames)
     out = args.output_basename[0] + '.fits'
     oweight = args.output_basename[0] + '.weight.fits'
-    syscall = 'SWarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
+    syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     os.system(syscall)
 
     # Now postprocess it a little bit
-    with fits.open(frames[0], 'r') as f:
+    with fits.open(frames[0]) as f:
         h0 = f[0].header
         band = h0['FILTER']
 
@@ -77,7 +77,7 @@ if __name__ == '__main__':
     # Make a new catalog
     outcat = args.output_basename[0] + '.cat'
     noise = args.output_basename[0] + '.noise.fits'
-    syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
+    syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
     syscall = syscall % (sexconf, outcat, noise, out)
     syscall = ' '.join([syscall, clargs])
     os.system(syscall)
@@ -86,11 +86,11 @@ if __name__ == '__main__':
     imlib.solve_zeropoint(out, outcat)
 
     # Now retrieve the zeropoint
-    with fits.open(out, 'r') as f:
+    with fits.open(out) as f:
         zp = f[0].header['MAGZP']
 
     # redo sextractor
-    syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+    syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
     syscall = syscall % (sexconf, outcat, noise, zp, out)
     syscall = ' '.join([syscall, clargs])
     os.system(syscall)

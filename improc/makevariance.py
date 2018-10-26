@@ -55,7 +55,7 @@ if __name__ == '__main__':
     for frame, mask in zip(frames, masks):
 
         # get the zeropoint from the fits header using fortran
-        with fits.open(frame, 'r') as f:
+        with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
@@ -63,7 +63,7 @@ if __name__ == '__main__':
         medg(frame)
 
         # now get ready to call source extractor
-        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+        syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
         catname = frame.replace('fits', 'cat')
         chkname = frame.replace('fits', 'noise.fits')
         syscall = syscall % (sexconf, catname, chkname, zp, frame)
