@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from astropy.io import fits
-from pipelib import make_rms, cmbmask
+from pipelib import make_rms, cmbmask, execute
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -126,7 +126,7 @@ if __name__ == '__main__':
         # Make a catalog from the reference for astrometric matching
         syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s >> %s 2>&1'
         syscall = syscall % (scampconfcat, refcat, newcat, hotlog)
-        os.system(syscall)
+        execute(syscall)
 
         # Merge header files
         with open(refremaphead, 'w') as f:
@@ -137,7 +137,7 @@ if __name__ == '__main__':
         # Make the remapped ref
         syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s > %s 2&>1'
         syscall = syscall % (defswarp, template, refremap, refremapweight, hotlog)
-        os.system(syscall)
+        execute(syscall)
 
         # Make the noise and bpm images
         make_rms(refremap, refremapweight)
@@ -187,7 +187,7 @@ if __name__ == '__main__':
                    '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f >> %s 2>&1'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy, hotlog)
-        os.system(syscall)
+        execute(syscall)
 
         # Calibrate the subtraction
 
@@ -202,14 +202,14 @@ if __name__ == '__main__':
         # Reference catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexref, refzp, refremapcat, refremap)
-        os.system(syscall)
+        execute(syscall)
 
         # Subtraction catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
-        os.system(syscall)
+        execute(syscall)
 
         # Aperture catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s,%s'
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
-        os.system(syscall)
+        execute(syscall)
