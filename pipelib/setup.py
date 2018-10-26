@@ -29,7 +29,7 @@ class InstallCommand(install):
 
 setup(name='pipelib',
       ext_package='pipelib',
-      packages=['pipelib', 'pipelib._ffits'],
+      packages=['pipelib'],
       version='dev',
       ext_modules=[ffits],
       cmdclass={'install':InstallCommand}
