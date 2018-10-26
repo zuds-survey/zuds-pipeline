@@ -38,7 +38,7 @@
 
       lmt = -2.5*log10(3.0*sqrt(3.14159*see*see)*var*1.48) + zp
 
-      print *, lmt, zp, see, pix
+!-      print *, lmt, zp, see, pix
 
       call put_header(trim(filenm),'MEDSKY',med,'Median sky in cts')
       call put_header(trim(filenm),'SKYSIG',var,'Median skysig in cts')

@@ -1,6 +1,7 @@
 import os
+import string
 import numpy as np
-from imlib import medg, mkivar
+from imlib import medg, mkivar, execute
 from astropy.io import fits
 
 # split an iterable over some processes recursively
@@ -12,10 +13,16 @@ if __name__ == '__main__':
     import argparse
     from mpi4py import MPI
 
+    import logging
+
     # set up the inter-rank communication
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+
+    FORMAT = '[Rank %(rank)d %(asctime)-15s]: %(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+    extra = {'rank': rank}
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -51,8 +58,10 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
+        logging.info('Working image %s' % frame, extra=extra)
+
         # get the zeropoint from the fits header using fortran
-        with fits.open(frame, 'r') as f:
+        with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
@@ -60,14 +69,25 @@ if __name__ == '__main__':
         medg(frame)
 
         # now get ready to call source extractor
-        syscall = 'sextractor -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
+        syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
         catname = frame.replace('fits', 'cat')
         chkname = frame.replace('fits', 'noise.fits')
         syscall = syscall % (sexconf, catname, chkname, zp, frame)
         syscall = ' '.join([syscall, clargs])
 
         # do it
-        os.system(syscall)
+        stdout, stderr = execute(syscall)
+        
+        # parse the results into something legible
+        stderr = str(stderr, encoding='ascii')
+        filtered_string = ''.join(list(filter(lambda x: x in string.printable, stderr)))
+        splf = filtered_string.split('\n')
+        splf = [line for line in splf if '[1M>' not in line]
+        filtered_string = '\n'.join(splf)
+        filtered_string = '\n' + filtered_string.replace('[1A', '')
+        
+        # log it 
+        logging.info(filtered_string, extra=extra)
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')

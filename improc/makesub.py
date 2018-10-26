@@ -47,7 +47,7 @@ if __name__ == '__main__':
     defsexsub = os.path.join(confdir, 'default.sex.sub')
 
     # read some header keywords from the template
-    with fits.open(template, 'r') as f:
+    with fits.open(template) as f:
         header = f[0].header
         seeref = header['SEEING']
         refskybkg = header['MEDSKY']
@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
 
         # read some keywords from the fits headers
-        with fits.open(frame, 'r') as f:
+        with fits.open(frame) as f:
             header = f[0].header
             seenew = header['SEEING']
             newskybkg = header['MEDSKY']
@@ -135,7 +135,7 @@ if __name__ == '__main__':
                 f.write(nh.read())
 
         # Make the remapped ref
-        syscall = 'SWarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s > %s 2&>1'
+        syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s > %s 2&>1'
         syscall = syscall % (defswarp, template, refremap, refremapweight, hotlog)
         os.system(syscall)
 
@@ -200,16 +200,16 @@ if __name__ == '__main__':
         # Make the subtraction catalogs
 
         # Reference catalog
-        syscall = 'sextractor -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s'
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexref, refzp, refremapcat, refremap)
         os.system(syscall)
 
         # Subtraction catalog
-        syscall = 'sextractor -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
         os.system(syscall)
 
         # Aperture catalog
-        syscall = 'sextractor -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s,%s'
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s,%s'
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
         os.system(syscall)
