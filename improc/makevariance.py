@@ -79,6 +79,7 @@ if __name__ == '__main__':
         stdout, stderr = execute(syscall)
         stderr = str(stderr, encoding='ascii')
         filtered_string = str(filter(lambda x: x in string.printable, stderr))
+        logging.info(filtered_string, extra=extra)
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
