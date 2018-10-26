@@ -43,13 +43,13 @@ if __name__ == '__main__':
 
     # First scamp everything
     syscall = 'scamp -c %s %s' % (scampconf, mycats)
-    pipelib.execute(syscall)
+    pipelib.execute(syscall, capture=False)
 
     allims = ' '.join(frames)
     out = args.output_basename[0] + '.fits'
     oweight = args.output_basename[0] + '.weight.fits'
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
-    pipelib.execute(syscall)
+    pipelib.execute(syscall, capture=False)
 
     # Now postprocess it a little bit
     with fits.open(frames[0]) as f:
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
     syscall = syscall % (sexconf, outcat, noise, out)
     syscall = ' '.join([syscall, clargs])
-    pipelib.execute(syscall)
+    pipelib.execute(syscall, capture=False)
 
     # And zeropoint the coadd, putting results in the header
     pipelib.solve_zeropoint(out, outcat)
@@ -93,6 +93,6 @@ if __name__ == '__main__':
     syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
     syscall = syscall % (sexconf, outcat, noise, zp, out)
     syscall = ' '.join([syscall, clargs])
-    pipelib.execute(syscall)
+    pipelib.execute(syscall, capture=False)
 
     pipelib.make_rms(out, oweight)
