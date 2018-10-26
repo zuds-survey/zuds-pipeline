@@ -1,6 +1,6 @@
 import os
 import numpy as np
-from imlib import medg, mkivar
+from imlib import medg, mkivar, _execute
 from astropy.io import fits
 
 # split an iterable over some processes recursively
@@ -11,6 +11,9 @@ if __name__ == '__main__':
 
     import argparse
     from mpi4py import MPI
+
+    import logging
+    logging.basicConfig()
 
     # set up the inter-rank communication
     comm = MPI.COMM_WORLD
@@ -67,7 +70,8 @@ if __name__ == '__main__':
         syscall = ' '.join([syscall, clargs])
 
         # do it
-        os.system(syscall)
+        stdout, stderr = _execute(syscall)
+        logging.info('Rank %d: %s' % (rank, stdout))
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')

@@ -2,7 +2,7 @@ import os
 import subprocess
 import numpy as np
 
-__all__ = ['solve_zeropoint']
+__all__ = ['solve_zeropoint', '_execute']
 __whatami__ = 'Zeropoint an image by calibrating to PS1.'
 __author__ = 'Danny Goldstein <dgold@berkeley.edu>'
 
@@ -31,14 +31,14 @@ def _execute(cmd):
 
 
     args = cmd.split()
-    process = subprocess.Popen( args, stdout = subprocess.PIPE, stderr = subprocess.PIPE )
+    process = subprocess.Popen( args, stdout = subprocess.PIPE, stderr = subprocess.STDOUT )
     stdout, stderr = process.communicate()
 
     # check return code
     if process.returncode != 0:
         raise Exception(stderr)
 
-    return stdout, stderr
+    return stdout, None
 
 
 def pathsplit(path):
