@@ -77,8 +77,16 @@ if __name__ == '__main__':
 
         # do it
         stdout, stderr = execute(syscall)
+        
+        # parse the results into something legible
         stderr = str(stderr, encoding='ascii')
-        filtered_string = str(filter(lambda x: x in string.printable, stderr))
+        filtered_string = ''.join(list(filter(lambda x: x in string.printable, stderr)))
+        splf = filtered_string.split('\n')
+        splf = [line for line in splf if '[1M>' not in line]
+        filtered_string = '\n'.join(splf)
+        filtered_string = '\n' + filtered_string.replace('[1A', '')
+        
+        # log it 
         logging.info(filtered_string, extra=extra)
 
         # now make the inverse variance map using fortran
