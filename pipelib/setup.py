@@ -4,7 +4,7 @@ from numpy.distutils.command.install import install
 import glob
 
 # Create the fortran extension to be compiled as a shared library using f2py
-fort_sources = glob.glob('pipelib/fits/*.f90')
+fort_sources = glob.glob('pipelib/nugent/*.f90')
 ffits = Extension(name='_ffits', sources=fort_sources, libraries=['cfitsio'],
                   extra_compile_args=['-w', '-O3'], extra_f90_compile_args=['-w', '-O3'])
 
