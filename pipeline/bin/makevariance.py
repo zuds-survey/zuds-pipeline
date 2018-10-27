@@ -1,7 +1,7 @@
 import os
 import string
 import numpy as np
-from pipelib import medg, mkivar, execute, make_rms
+from liblg import medg, mkivar, execute, make_rms
 from astropy.io import fits
 
 # split an iterable over some processes recursively

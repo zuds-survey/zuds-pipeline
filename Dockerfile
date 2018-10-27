@@ -100,7 +100,7 @@ RUN apt-get update \
 # Copy all patch files to current working directory
 
 RUN mkdir ./rules
-ADD rules/patch_* ./rules/
+ADD patches/patch_* ./rules/
 
 # Install MPICH 3.2 which is compatible with the external
 # Cray MPICH which is prepended to LD_LIBRARY_PATH as part
@@ -291,6 +291,11 @@ RUN apt-get install -y wget
 RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
+
+ADD pipeline /pipeline
+    
+RUN cd /pipeline/liblg && python setup.py install && \
+    cd -
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["/bin/bash"]
