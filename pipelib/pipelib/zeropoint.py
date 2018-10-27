@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from .shellcmd import execute
+from astropy.io import fits
 
 __all__ = ['solve_zeropoint']
 __whatami__ = 'Zeropoint an image by calibrating to PS1.'
@@ -92,7 +93,6 @@ def zpsee(image, cat, cursor):
 
 def solve_zeropoint(image, cat):
 
-    from astropy.io import fits
     import psycopg2
 
     con = psycopg2.connect(dbname='desi', host='***REMOVED***',
