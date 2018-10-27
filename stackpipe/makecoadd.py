@@ -26,6 +26,8 @@ if __name__ == '__main__':
     # distribute the work to each processor
     frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
     cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
+    frames = np.atleast_1d(frames)
+    cats = np.atleast_1d(cats)
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)

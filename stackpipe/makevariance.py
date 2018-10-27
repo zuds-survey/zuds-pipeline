@@ -36,6 +36,8 @@ if __name__ == '__main__':
     if rank == 0:
         frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
         masks = np.genfromtxt(args.masks[0], dtype=None, encoding='ascii')
+        frames = np.atleast_1d(frames)
+        masks = np.atleast_1d(masks)
     else:
         frames = None
         masks = None
