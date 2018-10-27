@@ -30,6 +30,7 @@ if __name__ == '__main__':
     # distribute the work to each processor
     if rank == 0:
         frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
+        frames = np.atleast_1d(frames)
     else:
         frames = None
 
