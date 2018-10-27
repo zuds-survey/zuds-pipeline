@@ -292,5 +292,7 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
 
+ADD ../pipeline /pipeline
+
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["/bin/bash"]
