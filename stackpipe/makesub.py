@@ -200,7 +200,7 @@ if __name__ == '__main__':
 
         with fits.open(sub, mode='update') as f:
             header = f[0].header
-            frat = header['KSUM00']
+            frat = float(header['KSUM00'])
             subzp = 2.5 * np.log10(frat) + refzp
             header['MAGZP'] = subzp
 
