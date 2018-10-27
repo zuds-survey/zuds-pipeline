@@ -1,6 +1,6 @@
 FROM ubuntu:16.04
 
-MAINTAINER Theodore Kisner <tskisner@lbl.gov>
+MAINTAINER Danny Goldstein <dgold@caltech.edu>
 
 # Use bash
 
