@@ -124,6 +124,13 @@ if __name__ == '__main__':
             naxis = header['NAXIS']
             refzp = header['MAGZP']
 
+            # make the naxis card images
+            hstr = []
+            for card in header.cards:
+                if 'NAXIS' in card.keyword:
+                    hstr.append(card.image)
+            hstr = '\n'.join(hstr) + '\n'
+
         # Make a catalog from the reference for astrometric matching
         syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s'
         syscall = syscall % (scampconfcat, refcat, newcat)
@@ -131,7 +138,7 @@ if __name__ == '__main__':
 
         # Merge header files
         with open(refremaphead, 'w') as f:
-            f.write('NAXIS       %d\n' % naxis)
+            f.write(hstr)
             with open(newhead, 'r') as nh:
                 f.write(nh.read())
 
