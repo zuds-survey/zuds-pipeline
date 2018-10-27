@@ -25,4 +25,4 @@ def cmbmask(mask1, mask2, maskout):
 
     outmaskhdu = afits.PrimaryHDU(d3)
     omhdul = afits.HDUList([outmaskhdu])
-    omhdul.writeto(maskout)
+    omhdul.writeto(maskout, overwrite=True)
