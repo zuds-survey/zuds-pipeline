@@ -3,7 +3,7 @@ import subprocess
 __all__ = ['execute']
 
 
-def execute(cmd, capture=True):
+def execute(cmd, capture=True, shell=False):
     """Execute a shell command, log the stdout and stderr, and check
     the return code. If the return code is != 0, raise an
     exception."""
@@ -11,7 +11,7 @@ def execute(cmd, capture=True):
 
     if capture:
         args = cmd.split()
-        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        process = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=shell)
         stdout, stderr = process.communicate()
 
         # check return code
@@ -20,4 +20,4 @@ def execute(cmd, capture=True):
 
         return stdout, stderr
     else:
-        subprocess.check_call(cmd.split())
+        subprocess.check_call(cmd.split(), shell=shell)

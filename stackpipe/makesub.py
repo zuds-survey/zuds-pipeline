@@ -127,7 +127,7 @@ if __name__ == '__main__':
         # Make a catalog from the reference for astrometric matching
         syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s >> %s 2>&1'
         syscall = syscall % (scampconfcat, refcat, newcat, hotlog)
-        execute(syscall)
+        execute(syscall, shell=True)
 
         # Merge header files
         with open(refremaphead, 'w') as f:
@@ -138,7 +138,7 @@ if __name__ == '__main__':
         # Make the remapped ref
         syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s > %s 2&>1'
         syscall = syscall % (defswarp, template, refremap, refremapweight, hotlog)
-        execute(syscall)
+        execute(syscall, shell=True)
 
         # Make the noise and bpm images
         make_rms(refremap, refremapweight)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
                    '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f >> %s 2>&1'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy, hotlog)
-        execute(syscall)
+        execute(syscall, shell=True)
 
         # Calibrate the subtraction
 
