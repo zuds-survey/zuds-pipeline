@@ -131,7 +131,7 @@ if __name__ == '__main__':
 
         # Merge header files
         with open(refremaphead, 'w') as f:
-            f.writelines(['NAXIS       ' + str(naxis)])
+            f.write('NAXIS       %d\n' % str(naxis))
             with open(newhead, 'r') as nh:
                 f.write(nh.read())
 
