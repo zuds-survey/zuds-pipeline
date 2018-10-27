@@ -96,5 +96,5 @@ if __name__ == '__main__':
     syscall = syscall % (sexconf, outcat, noise, zp, out)
     syscall = ' '.join([syscall, clargs])
     pipelib.execute(syscall, capture=False)
-
     pipelib.make_rms(out, oweight)
+    pipelib.medg(out)
