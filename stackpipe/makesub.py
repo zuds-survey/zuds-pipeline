@@ -125,20 +125,20 @@ if __name__ == '__main__':
             refzp = header['MAGZP']
 
         # Make a catalog from the reference for astrometric matching
-        syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s >> %s 2>&1'
-        syscall = syscall % (scampconfcat, refcat, newcat, hotlog)
-        execute(syscall, shell=True)
+        syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s'
+        syscall = syscall % (scampconfcat, refcat, newcat)
+        execute(syscall)
 
         # Merge header files
         with open(refremaphead, 'w') as f:
-            f.writelines(['NAXIS       ' + naxis])
+            f.writelines(['NAXIS       ' + str(naxis)])
             with open(newhead, 'r') as nh:
                 f.write(nh.read())
 
         # Make the remapped ref
-        syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s > %s 2&>1'
-        syscall = syscall % (defswarp, template, refremap, refremapweight, hotlog)
-        execute(syscall, shell=True)
+        syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s'
+        syscall = syscall % (defswarp, template, refremap, refremapweight)
+        execute(syscall)
 
         # Make the noise and bpm images
         make_rms(refremap, refremapweight)
@@ -170,7 +170,6 @@ if __name__ == '__main__':
         hotlogger.info('refskybkg and newskybkg %f %f' % (refskybkg, newskybkg))
         hotlogger.info('refskysig and newskysig %f %f' % (refskysig, newskysig))
 
-
         nsx = naxis1 / 100.
         nsy = naxis2 / 100.
 
@@ -185,10 +184,10 @@ if __name__ == '__main__':
         hotparlogger.info(str(nsy))
 
         syscall  = 'hotpants -inim %s -hki -n i -c t -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
-                   '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f >> %s 2>&1'
+                   '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
-                             submask, nsx, nsy, hotlog)
-        execute(syscall, shell=True)
+                             submask, nsx, nsy)
+        execute(syscall)
 
         # Calibrate the subtraction
 
