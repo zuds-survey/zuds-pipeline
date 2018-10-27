@@ -41,7 +41,7 @@ def make_rms(im, weight):
     # write it out
     rmshdu = afits.PrimaryHDU(rms)
     rmshdul = afits.HDUList([rmshdu])
-    rmshdul.writeto(weight.replace('weight', 'rms'))
+    rmshdul.writeto(weight.replace('weight', 'rms'), overwrite=True)
 
     # make bpm
     bpm = np.zeros_like(rawrms, dtype='int16')
@@ -51,4 +51,4 @@ def make_rms(im, weight):
     bpmhdu = afits.PrimaryHDU(bpm)
     hdul = afits.HDUList([bpmhdu])
 
-    hdul.writeto(weight.replace('weight', 'bpm'))
+    hdul.writeto(weight.replace('weight', 'bpm'), overwrite=True)
