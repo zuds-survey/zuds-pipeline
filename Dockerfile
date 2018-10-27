@@ -100,7 +100,7 @@ RUN apt-get update \
 # Copy all patch files to current working directory
 
 RUN mkdir ./rules
-ADD rules/patch_* ./rules/
+ADD patches/patch_* ./rules/
 
 # Install MPICH 3.2 which is compatible with the external
 # Cray MPICH which is prepended to LD_LIBRARY_PATH as part
