@@ -127,7 +127,7 @@ if __name__ == '__main__':
         # Make a catalog from the reference for astrometric matching
         syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s'
         syscall = syscall % (scampconfcat, refcat, newcat)
-        execute(syscall)
+        execute(syscall, capture=False)
 
         # Merge header files
         with open(refremaphead, 'w') as f:
@@ -138,7 +138,7 @@ if __name__ == '__main__':
         # Make the remapped ref
         syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s'
         syscall = syscall % (defswarp, template, refremap, refremapweight)
-        execute(syscall)
+        execute(syscall, capture=False)
 
         # Make the noise and bpm images
         make_rms(refremap, refremapweight)
@@ -187,7 +187,7 @@ if __name__ == '__main__':
                    '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
-        execute(syscall)
+        execute(syscall, capture=False)
 
         # Calibrate the subtraction
 
@@ -202,14 +202,14 @@ if __name__ == '__main__':
         # Reference catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexref, refzp, refremapcat, refremap)
-        execute(syscall)
+        execute(syscall, capture=False)
 
         # Subtraction catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
-        execute(syscall)
+        execute(syscall, capture=False)
 
         # Aperture catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s,%s'
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
-        execute(syscall)
+        execute(syscall, capture=False)
