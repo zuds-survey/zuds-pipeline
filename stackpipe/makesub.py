@@ -207,16 +207,16 @@ if __name__ == '__main__':
         # Make the subtraction catalogs
 
         # Reference catalog
-        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s'
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexref, refzp, refremapcat, refremap)
         execute(syscall, capture=False)
 
         # Subtraction catalog
-        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
         execute(syscall, capture=False)
 
         # Aperture catalog
-        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %f -VERBOSE_TYPE QUIET %s,%s'
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -VERBOSE_TYPE QUIET %s,%s'
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
         execute(syscall, capture=False)
