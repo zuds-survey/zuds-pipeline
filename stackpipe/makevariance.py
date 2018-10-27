@@ -1,7 +1,7 @@
 import os
 import string
 import numpy as np
-from pipelib import medg, mkivar, execute
+from pipelib import medg, mkivar, execute, make_rms
 from astropy.io import fits
 
 # split an iterable over some processes recursively
@@ -94,3 +94,6 @@ if __name__ == '__main__':
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
         mkivar(frame, mask, chkname, wgtname)
+
+        # and make the bad pixel masks and rms images
+        make_rms(frame, wgtname)
