@@ -46,6 +46,11 @@ if __name__ == '__main__':
     defsexref = os.path.join(confdir, 'default.sex.ref')
     defsexaper = os.path.join(confdir, 'default.sex.aper')
     defsexsub = os.path.join(confdir, 'default.sex.sub')
+    defparref = os.path.join(confdir, 'default.param.ref')
+    defparaper = os.path.join(confdir, 'default.param.aper')
+    defparsub = os.path.join(confdir, 'default.param.sub')
+    defconv = os.path.join(confdir, 'default.conv')
+    defnnw = os.path.join(confdir, 'default.nnw')
 
     # read some header keywords from the template
     with fits.open(template) as f:
@@ -205,18 +210,22 @@ if __name__ == '__main__':
             header['MAGZP'] = subzp
 
         # Make the subtraction catalogs
+        clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
 
         # Reference catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexref, refzp, refremapcat, refremap)
+        syscall += clargs % defparref
         execute(syscall, capture=False)
 
         # Subtraction catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
+        syscall += clargs % defparsub
         execute(syscall, capture=False)
 
         # Aperture catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -VERBOSE_TYPE QUIET %s,%s'
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
+        syscall += clargs % defparaper
         execute(syscall, capture=False)
