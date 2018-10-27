@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
-    confdir = os.path.join(wd, 'config', 'makecoadd')
+    confdir = os.path.join(wd, '..', 'config', 'makecoadd')
     sexconf = os.path.join(confdir, 'scamp.sex')
     scampparam = os.path.join(confdir, 'scamp.param')
     filtname = os.path.join(confdir, 'default.conv')
