@@ -293,9 +293,10 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
 
 ADD pipeline /pipeline
+ADD daemon /daemon
     
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
 ENTRYPOINT ["/bin/bash", "-c"]
-CMD ["/bin/bash"]
+CMD ["python /daemon/run.py"]
