@@ -4,11 +4,6 @@ import liblg
 from astropy.io import fits
 
 
-# split an iterable over some processes recursively
-_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
-             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
-
-
 if __name__ == '__main__':
 
     import argparse
@@ -18,16 +13,24 @@ if __name__ == '__main__':
     parser.add_argument('--output-basename', dest='output_basename', required=True,
                         help='Basename of output coadd.', nargs=1)
     parser.add_argument('--input-catalogs', dest='cats', required=True,
-                        help='List of catalogs to use for astrometric alignment.', nargs=1)
-    parser.add_argument('--input-frames', dest='frames', nargs=1, required=True,
+                        help='List of catalogs to use for astrometric alignment.', nargs='+')
+    parser.add_argument('--input-frames', dest='frames', nargs='+', required=True,
                         help='List of frames to coadd.')
     args = parser.parse_args()
 
     # distribute the work to each processor
-    frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
-    cats = np.genfromtxt(args.cats[0], dtype=None, encoding='ascii')
-    frames = np.atleast_1d(frames)
-    cats = np.atleast_1d(cats)
+
+    if args.frames[0].startswith('@'):
+        frames = np.genfromtxt(args.frames[0][1:], dtype=None, encoding='ascii')
+        frames = np.atleast_1d(frames)
+    else:
+        frames = args.frames
+
+    if args.cats[0].startswith('@'):
+        cats = np.genfromtxt(args.cats[0][1:], dtype=None, encoding='ascii')
+        cats = np.atleast_1d(cats)
+    else:
+        cats = args.cats
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)

@@ -21,27 +21,37 @@ if __name__ == '__main__':
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--science-frames', dest='sciimg', required=True,
-                        help='List of new images to make subtractions with.', nargs=1)
-    parser.add_argument('--templates', dest='template', nargs=1, required=True,
-                        help='Template to subtract.')
+                        help='Input frames. Prefix with "@" to read from a list.', nargs='+')
+    parser.add_argument('--templates', dest='template', nargs='+', required=True,
+                        help='Templates to subtract. Prefix with "@" to read from a list.')
     args = parser.parse_args()
 
     # distribute the work to each processor
 
-    framelist = args.sciimg[0]
-    templist = args.template[0]
+    if args.sciimg[0].startswith('@'):
+        framelist = args.sciimg[0][1:]
 
-    if rank == 0:
-        frames = np.genfromtxt(framelist, dtype=None, encoding='ascii')
-        templates = np.genfromtxt(templist, dtype=None, encoding='ascii')
-        frames = np.atleast_1d(frames).tolist()
-        templates = np.atleast_1d(templates).tolist()
+        if rank == 0:
+            frames = np.genfromtxt(framelist, dtype=None, encoding='ascii')
+            frames = np.atleast_1d(frames).tolist()
+        else:
+            frames = None
+
+        frames = comm.bcast(frames, root=0)
     else:
-        frames = None
-        templates = None
+        frames = args.sciimg
 
-    frames = comm.bcast(frames, root=0)
-    templates = comm.bcast(templates, root=0)
+    if args.template[0].startswith('@'):
+        templist = args.template[0][1:]
+
+        if rank == 0:
+            templates = np.genfromtxt(templist, dtype=None, encoding='ascii')
+            templates = np.atleast_1d(templates).tolist()
+        else:
+            templates = None
+        templates = comm.bcast(templates, root=0)
+    else:
+        templates = args.template
 
     myframes = _split(frames, size)[rank]
     mytemplates = _split(templates, size)[rank]

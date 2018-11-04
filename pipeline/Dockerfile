@@ -293,10 +293,13 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
 
 ADD pipeline /pipeline
-ADD daemon /daemon
+ADD msgconsumer /daemon
     
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
+
+# for queue monitoring
+RUN pip install pika paramiko
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]
