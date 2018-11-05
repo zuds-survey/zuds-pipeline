@@ -1,8 +1,10 @@
 import os
 import pika
 import time
+import json
 import requests
 import psycopg2
+import datetime
 
 newt_baseurl = 'https://newt.nersc.gov/newt'
 nersc_username = os.getenv('NERSC_USERNAME')
@@ -84,6 +86,64 @@ if __name__ == '__main__':
             if status == 'COMPLETED':
                 uquery += ', TIMEUSE=%s'
                 args.append(data['timeuse'])
+
+                bodyd = json.loads(job_cache[corr_id][2])
+
+                if bodyd['jobtype'] == 'template':
+                    # if the template is done mark it as such
+
+                    query = 'INSERT INTO TEMPLATE (PATH, FILTER, QUADRANT, FIELD, CCDNUM, ' \
+                            'MINDATE, MAXDATE, PIPELINE_SCHEMA_ID, PROCDATE, NIMG) VALUES (' \
+                            '%s, %s, %s, %s, %s, %s, %s ,%s, %s) RETURNING ID'
+
+                    path = bodyd['outfile_name']
+                    band = bodyd['filter']
+                    quadrant = bodyd['quadrant']
+                    field = bodyd['field']
+                    ccdnum = bodyd['ccdnum']
+                    mindate = bodyd['mindate']
+                    maxdate = bodyd['maxdate']
+                    pipeline_schema_id = bodyd['pipeline_schema_id']
+                    procdate = datetime.datetime.utcnow()
+
+                    cursor.execute(query, path, band, quadrant, field, ccdnum, mindate,
+                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids']))
+                    tmplid = cursor.fetchone()[0]
+
+                    # now update the association table
+                    query = 'INSERT INTO TEMPLATEIMAGEASSOC (TEMPLATE_ID, IMAGE_ID) VALUES (%s, %s)'
+                    for imid in bodyd['imids']:
+                        cursor.execute(query, tmplid, imid)
+
+                    connection.commit()
+
+                elif bodyd['jobtype'] == 'coadd':
+
+                    query = 'INSERT INTO COADD (PATH, FILTER, QUADRANT, FIELD, CCDNUM, ' \
+                            'MINDATE, MAXDATE, PIPELINE_SCHEMA_ID, PROCDATE, NIMG) VALUES (' \
+                            '%s, %s, %s, %s, %s, %s, %s ,%s, %s, %s) RETURNING ID'
+
+                    path = bodyd['outfile_name']
+                    band = bodyd['filter']
+                    quadrant = bodyd['quadrant']
+                    field = bodyd['field']
+                    ccdnum = bodyd['ccdnum']
+                    mindate = bodyd['mindate']
+                    maxdate = bodyd['maxdate']
+                    pipeline_schema_id = bodyd['pipeline_schema_id']
+                    procdate = datetime.datetime.utcnow()
+
+                    cursor.execute(query, path, band, quadrant, field, ccdnum, mindate,
+                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids']))
+                    coaddid = cursor.fetchone()[0]
+
+                    # now update the association table
+                    query = 'INSERT INTO COADDIMAGEASSOC (COADD_ID, IMAGE_ID) VALUES (%s, %s)'
+                    for imid in bodyd['imids']:
+                        cursor.execute(query, coaddid, imid)
+
+                    connection.commit()
+
                 del job_cache[corr_id]
 
             elif status == 'FAILED' or status == 'TIMEOUT':

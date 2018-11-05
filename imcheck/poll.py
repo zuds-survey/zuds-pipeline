@@ -18,8 +18,14 @@ ipac_root = 'http://irsa.ipac.caltech.edu/'
 formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{month:s}{day:s}/{fracday:s}' \
           '/ztf_{filefracday:s}_{paddedfield:s}_{filtercode:s}_c{paddedccdid:s}_{imgtypecode:s}_q{qid:d}_sciimg.fits'
 nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/{paddedfield:s}/c{paddedccdid:s}/{qid:d}/{filtercode:s}/{fname:s}'
+nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
+tmp_basename_form = '{paddedfield:s}_c{paddedccdid:s}_{qid:d}_{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
+
+# this is the night id corresponding
+# to the first science observations in the survey
+first_nid = 411
 
 # secrets
 database_uri = os.getenv('DATABASE_URI')
@@ -101,13 +107,6 @@ class IPACQueryManager(object):
                                          filtercode=filtercode,
                                          fname=fname)
 
-            dbq = 'SELECT COUNT(*) FROM IMAGE WHERE PATH=%s'
-            self.cursor.execute(dbq, npath)
-            count = self.cursor.fetchone()[0]
-
-            if count > 0:
-                continue
-
             ipaths.append(tpath)
             npaths.append(npath)
 
@@ -117,12 +116,12 @@ class IPACQueryManager(object):
 
         try:
             self.connection.close()
-        except:
+        except NameError:
             pass
 
         try:
             self.dbc.close()
-        except:
+        except NameError:
             pass
 
         params = pika.ConnectionParameters('msgqueue')
@@ -202,12 +201,12 @@ class IPACQueryManager(object):
         return corr_id
 
     def create_template_image_list(self, field, ccdnum, quadrant, filter):
-        query = 'SELECT ID, PATH FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+        query = 'SELECT ID, PATH, OBSJD FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'AND GOOD=TRUE ORDER BY OBSJD ASC LIMIT %s'
         self.cursor.execute(query, field, ccdnum, quadrant, filter,
                             self.pipeline_schema['template_minimages'])
         result = self.cursor.fetchall()
-        return result
+        return list(zip(*result))
 
     def __call__(self):
 
@@ -260,13 +259,23 @@ class IPACQueryManager(object):
             logging.info(jr['output'])
 
         # now update the database with the new images
-        dbq = 'INSERT INTO IMAGE (PATH, FILTER, QUADRANT, FIELD, CCDNUM, PROGRAMID, OBSJD) VALUES ' \
-              '(%s, %s, %s, %s, %s, %s, %s);'
+        columns = '(PATH,FILTER,QUADRANT,FIELD,CCDNUM,PID,OBSJD,RA,' \
+              'DEC,INFOBITS,RCID,FID,PID,NID,EXPID,ITID,OBSDATE,SEEING,AIRMASS,MOONILLF' \
+              'MOONESB,MAGLIMIT,CRPIX1,CRPIX2,CRVAL1,CRVAL2,CD11,CD12,CD21,CD22,RA1' \
+              'DEC1,RA2,DEC2,RA3,DEC3,RA4,DEC4,IPAC_PUB_DATE,IPAC_GID)'
+
+        dbq = f'INSERT INTO IMAGE {columns} VALUES (%s)'
+        dbq = dbq % ','.join(['%s'] * len(columns.split(',')))
+
+        # programatically access some rows of the table
+        dfkey = [k.lower() for k in columns[1:-1].split(',')][5:]
 
         for (i, row), npath in zip(tab.iterrows(), npaths):
-            self.cursor.execute(dbq, npath, row['filtercode'][1:], int(row['qid']),
-                                int(row['paddedfield']), int(row['paddedccdid']),
-                                row['pid'], row['obsjd'])
+
+            self.cursor.execute(dbq, npath, row['filtercode'][1:],
+                                row['qid'], row['field'], row['ccdid'],
+                                *row[dfkey].tolist())
+
         self.dbc.commit()
 
         # now actually determine the new jobs
@@ -278,7 +287,7 @@ class IPACQueryManager(object):
         for i in range(nvariance_jobs):
 
             batch = npaths[i * variance_batchsize : (i + 1) * variance_batchsize]
-            body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images':batch})
+            body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch})
 
             # send a message to the job submission script telling it to submit the job
             correlation_id = self.relay_job(body)
@@ -290,6 +299,8 @@ class IPACQueryManager(object):
         template_corrids = {}
         for (field, quadrant, band, ccdnum), group in tab.groupby(['paddedfield', 'qid', 'filtercode', 'paddedccdid']):
 
+            ofield, oquadrant, oband, occdnum = field, quadrant, band, ccdnum
+
             # convert into proper values
             field = int(field)
             quadrant = int(quadrant)
@@ -300,17 +311,42 @@ class IPACQueryManager(object):
             if not self.needs_template(field, ccdnum, quadrant, band):
                 continue
 
-            tmplims = self.create_template_image_list(field, ccdnum, quadrant, band)
+            tmplims, tmplids, jds = self.create_template_image_list(field, ccdnum, quadrant, band)
+
+            minjd = np.min(jds)
+            maxjd = np.max(jds)
+
+            mintime = Time(minjd, format='jd', scale='utc')
+            maxtime = Time(maxjd, format='jd', scale='utc')
+
+            mindatestr = mintime.iso.split()[0].replace('-', '')
+            maxdatestr = maxtime.iso.split()[1].replcae('-', '')
 
             # see what jobs need to finish before this one can run
             dependencies = []
-            for id, path in tmplims:
+            for path in tmplims:
                 varcorrid = variance_corrids[path]
                 dependencies.append(varcorrid)
             dependencies = set(dependencies)
 
+            # what will this template be called?
+            tmpbase = tmp_basename_form.format(paddedfield=ofield,
+                                               qid=oquadrant,
+                                               paddedccdid=occdnum,
+                                               filtercode=oband,
+                                               mintime=mindatestr,
+                                               maxtime=maxdatestr)
+
+            outfile_name = nersc_tmpform.format(fname=tmpbase)
+
+
             # now that we have the dependencies we can relay the coadd job for submission
-            body = json.dumps({'dependencies':dependencies, 'jobtype':'coadd', 'images':tmplims})
+            body = json.dumps({'dependencies':dependencies, 'jobtype':'template', 'images':tmplims,
+                               'outfile_name': outfile_name, 'imids': tmplids, 'quadrant': quadrant,
+                               'field': field, 'ccdnum': ccdnum, 'mindate':mindatestr,
+                               'maxdate':maxdatestr, 'filter': band,
+                               'pipeline_schema_id': self.pipeline_schema['schema_id'],
+                               })
             tmpl_corrid = self.relay_job(body)
 
             template_corrids[(field, quadrant, band, ccdnum)] = tmpl_corrid
