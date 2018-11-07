@@ -289,12 +289,12 @@ class IPACQueryManager(object):
         for i, (ipc, npc) in enumerate(spltasks):
 
             icookies = ipac_authenticate()  # get a different cookie for each DTN
-            sessionid = icookies.get('SESSIONID')
+            sessionid = icookies.get('JOSSO_SESSIONID')
 
             # authenticate to nersc
             ncookies = nersc_authenticate()
 
-            download_script = [f'curl {ipath} --create-dirs -o {npath} --cookie "SESSIONID={sessionid}"'
+            download_script = [f'curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"'
                                for ipath, npath in zip(ipc, npc)]
 
             # upload the download script to NERSC

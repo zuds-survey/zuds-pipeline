@@ -10,12 +10,14 @@ services:
     depends_on:
         - "msgqueue"
         - "db"
+        - "nersc-job-submission-service"
 
   nersc-queue-monitor-service:
     build: ./queuemon
     depends_on:
         - "msgqueue"
         - "db"
+        - "nersc-job-submission-service"
 
   nersc-job-submission-service:
     build: ./pipeline

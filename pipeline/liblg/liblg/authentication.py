@@ -12,15 +12,14 @@ ipac_password = os.getenv('IPAC_PASSWORD')
 
 def ipac_authenticate():
     target = os.path.join(ipac_root, 'account', 'signon', 'login.do')
-    payload = {'username': ipac_username,
-               'password': ipac_password}
+    target += f'?josso_cmd=login&josso_username={ipac_username}&josso_password={ipac_password}'
 
-    r = requests.post(target, data=payload)
+    r = requests.get(target)
 
     if r.status_code != 200:
         raise ValueError('Unable to Authenticate')
 
-    if r.cookies.get('SESSIONID') is None:
+    if r.cookies.get('JOSSO_SESSIONID') is None:
         raise ValueError('Unable to login to IPAC - bad credentials')
 
     return r.cookies
