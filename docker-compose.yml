@@ -1,1 +1,16 @@
-version: '2'
+version: '3'
+
+services:
+
+  imcheck-service:
+    build: ./imcheck
+
+  msgqueue:
+    build: ./msgqueue
+
+  queue-monitor-service:
+    build: ./queuemon
+
+  job-submission-service:
+    build: ./pipeline
+

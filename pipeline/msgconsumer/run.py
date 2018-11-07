@@ -13,6 +13,7 @@ slurmd = os.path.join(cwd, '../', 'slurm')
 mkcoadd_cori = os.path.join(slurmd, 'makecoadd_cori.sh')
 mksub_cori = os.path.join(slurmd, 'makesub_cori.sh')
 mkvar_cori = os.path.join(slurmd, 'makevariance_cori.sh')
+mkcoaddsub_cori = os.path.join(slurmd, 'makecoaddsub_cori.sh')
 newt_baseurl = 'https://newt.nersc.gov/newt'
 nersc_username = os.getenv('NERSC_USERNAME')
 nersc_password = os.getenv('NERSC_PASSWORD')
@@ -50,81 +51,6 @@ def authenticate():
     return r.cookies
 
 
-def submit_coadd(images, catalogs, obase, host='cori'):
-
-    # login to nersc
-    cookies = authenticate()
-
-    # create the payload
-    with open(mkcoadd_cori, 'r') as f:
-        contents = f.read()
-    contents = contents.replace('$1', ' '.join(images))
-    contents = contents.replace('$2', ' '.join(catalogs))
-    contents = contents.replace('$3', obase)
-
-    target = os.path.join(newt_baseurl, 'queue', host)
-    payload = {'jobscript': contents}
-
-    logging.info(payload)
-
-    # submit the job
-    r = requests.post(target, data=payload, cookies=cookies)
-
-    # check the return code
-    if r.status_code != 200:
-        raise ValueError('submission did not work')
-
-    return r.json()['jobid']
-
-
-def submit_variance(images, masks, host='cori'):
-
-    # login to nersc
-    cookies = authenticate()
-
-    # create the payload
-    with open(mkvar_cori, 'r') as f:
-        contents = f.read()
-
-    contents = contents.replace('$1', ' '.join(images))
-    contents = contents.replace('$2', ' '.join(masks))
-
-    target = os.path.join(newt_baseurl, 'queue', host)
-    payload = {'jobscript': contents}
-
-    logging.info(payload)
-
-    r = requests.post(target, data=payload, cookies=cookies)
-
-    if r.status_code != 200:
-        raise ValueError('submission did not work')
-
-    return r.json()['jobid']
-
-
-def submit_sub(images, templates, host='cori'):
-
-    #login to nersc
-    cookies = authenticate()
-
-    # create the payload
-    with open(mksub_cori, 'r') as f:
-        contents = f.read()
-
-    contents = contents.replace('$1', ' '.join(images))
-    contents = contents.replace('$2', ' '.join(templates))
-
-    target = os.path.join(newt_baseurl, 'queue', host)
-    payload = {'jobscript': contents}
-
-    logging.info(payload)
-
-    r = requests.post(target, data=payload, cookies=cookies)
-
-    if r.status_code != 200:
-        raise ValueError('submission did not work')
-
-    return r.json()['jobid']
 
 
 class TaskHandler(object):
@@ -138,6 +64,117 @@ class TaskHandler(object):
 
     def close(self):
         self.__del__()
+
+    def resolve_dependencies(self, contents, data):
+        query = 'SELECT DISTINCT NERSC_ID FROM JOB WHERE CORR_ID IN %s'
+        self.cursor.execute(query, list(data['dependencies']))
+        deps = [r[0] for r in self.cursor.fetchall()]
+        deps = ':'.join(deps)
+        contents = contents.format(dlist=deps)
+        return contents
+
+    def submit_coadd(self, images, catalogs, obase, data, host='cori'):
+
+        # login to nersc
+        cookies = authenticate()
+
+        # create the payload
+        with open(mkcoadd_cori, 'r') as f:
+            contents = f.read()
+        contents = contents.replace('$1', ' '.join(images))
+        contents = contents.replace('$2', ' '.join(catalogs))
+        contents = contents.replace('$3', obase)
+        contents = self.resolve_dependencies(contents, data)
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobscript': contents}
+
+        logging.info(payload)
+
+        # submit the job
+        r = requests.post(target, data=payload, cookies=cookies)
+
+        # check the return code
+        if r.status_code != 200:
+            raise ValueError('submission did not work')
+
+        return r.json()['jobid']
+
+    def submit_coaddsub(self, images, catalogs, obase, data, host='cori'):
+
+        # login to nersc
+        cookies = authenticate()
+
+        # create the payload
+        with open(mkcoaddsub_cori, 'r') as f:
+            contents = f.read()
+
+        contents = contents.replace('$1', ' '.join(images))
+        contents = contents.replace('$2', ' '.join(catalogs))
+        contents = contents.replace('$3', obase)
+        contents = self.resolve_dependencies(contents, data)
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobscript': contents}
+
+        logging.info(payload)
+
+        # submit the job
+        r = requests.post(target, data=payload, cookies=cookies)
+
+        # check the return code
+        if r.status_code != 200:
+            raise ValueError('submission did not work')
+
+        return r.json()['jobid']
+
+    def submit_variance(self, images, masks, host='cori'):
+
+        # login to nersc
+        cookies = authenticate()
+
+        # create the payload
+        with open(mkvar_cori, 'r') as f:
+            contents = f.read()
+
+        contents = contents.replace('$1', ' '.join(images))
+        contents = contents.replace('$2', ' '.join(masks))
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobscript': contents}
+
+        logging.info(payload)
+
+        r = requests.post(target, data=payload, cookies=cookies)
+
+        if r.status_code != 200:
+            raise ValueError('submission did not work')
+
+        return r.json()['jobid']
+
+    def submit_sub(self, images, templates, host='cori'):
+
+        # login to nersc
+        cookies = authenticate()
+
+        # create the payload
+        with open(mksub_cori, 'r') as f:
+            contents = f.read()
+
+        contents = contents.replace('$1', ' '.join(images))
+        contents = contents.replace('$2', ' '.join(templates))
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobscript': contents}
+
+        logging.info(payload)
+
+        r = requests.post(target, data=payload, cookies=cookies)
+
+        if r.status_code != 200:
+            raise ValueError('submission did not work')
+
+        return r.json()['jobid']
 
     def _reconnect(self):
 
@@ -180,22 +217,22 @@ class TaskHandler(object):
 
             new_images = data['images']
             new_masks = [p.replace('sciimg', 'mskimg') for p in new_images]
-            submit_func = submit_variance
+            submit_func = self.submit_variance
             args = (new_images, new_masks, host)
 
-        elif data['jobtype'] == 'coadd':
+        elif data['jobtype'] == 'template':
 
             images = data['images']
             catalogs = [p.replace('fits', 'cat') for p in images]
-            submit_func = submit_coadd
+            submit_func = self.submit_coadd
             coadd_name = data['outfile_name']
             args = (images, catalogs, coadd_name, host)
 
-        elif data['jobtype'] == 'sub':
+        elif data['jobtype'] == 'coaddsub':
 
             images = data['images']
             templates = data['templates']
-            submit_func = submit_sub
+            submit_func = self.submit_coaddsub
             args = (images, templates, host)
 
         else:

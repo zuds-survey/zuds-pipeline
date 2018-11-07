@@ -8,7 +8,7 @@
 #SBATCH --partition=realtime
 #SBATCH --mail-user=dgold@berkeley.edu
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
-#SBATCH --dependency={dlist:s}
+#SBATCH --dependency=afterok:{dlist:s}
 
 frames=$1
 cats=$2
