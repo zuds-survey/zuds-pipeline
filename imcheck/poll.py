@@ -15,6 +15,7 @@ import numpy as np
 import pandas as pd
 from ztfquery import query as zq
 from astropy.time import Time
+from pika.exceptions import ConnectionClosed
 
 
 ipac_root = 'http://irsa.ipac.caltech.edu/'
@@ -37,7 +38,7 @@ ndtn = 4
 
 # secrets
 #database_uri = os.getenv('DATABASE_URI')
-database_uri = 'ztfcoadd_admin@db'
+database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 ipac_username = os.getenv('IPAC_USERNAME')
 ipac_password = os.getenv('IPAC_PASSWORD')
 nersc_username = os.getenv('NERSC_USERNAME')
@@ -132,42 +133,60 @@ class IPACQueryManager(object):
 
         try:
             self.connection.close()
-        except NameError:
+        except AttributeError:
             pass
 
         try:
             self.dbc.close()
-        except NameError:
+        except AttributeError:
             pass
 
-        params = pika.ConnectionParameters('msgqueue')
-        self.connection = pika.BlockingConnection(params)
+        while True:
+            try:
+                params = pika.ConnectionParameters('msgqueue')
+                self.connection = pika.BlockingConnection(params)
+            except ConnectionClosed:
+                pass
+            else:
+                break
 
         # set up the work queue and the dead letter exchange for delayed requeueing
 
         job_channel = self.connection.channel()
+        delay_channel = self.connection.channel()
+
+        delay_channel.exchange_declare(exchange='jobs-retry',
+                                       exchange_type='direct')
+        job_channel.exchange_declare(exchange_type='direct',
+                                     exchange='jobs')
+
         job_channel.queue_declare(queue='jobs', arguments={
             'x-dead-letter-exchange': 'jobs-retry',
         })
-        job_channel.exchange_declare(exchange_type='direct',
-                                 exchange='jobs',
-                                 queue='jobs')
+        job_channel.queue_bind(queue='jobs',
+                               exchange='jobs')
 
-        delay_channel = self.connection.channel()
         delay_channel.queue_declare(queue='jobs-retry', arguments={
             'x-message-ttl': 300000,  # wait five minutes
             'x-dead-letter-exchange': 'jobs',
         })
-        delay_channel.exchange_declare(exchange='jobs-retry',
-                                       exchange_type='direct',
-                                       queue='jobs-retry')
+        delay_channel.queue_bind(exchange='jobs-retry',
+                                 queue='jobs-retry')
 
         # cache the channels
         self.job_channel = job_channel
         self.delay_channel = delay_channel
 
         # connect to the database
-        self.dbc = psycopg2.connect(database_uri)
+
+        while True:
+            try:
+                self.dbc = psycopg2.connect(database_uri)
+            except psycopg2.DatabaseError:
+                pass
+            else:
+                break
+
         self.cursor = self.dbc.cursor()
 
     def list_current_template_images(self, field, ccdnum, quadrant, filter):
@@ -175,7 +194,7 @@ class IPACQueryManager(object):
         # list images that are in the template
         tquery = 'SELECT ID FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                  'AND PIPELINE_SCHEMA_ID=%s'
-        self.cursor.execute(tquery, filter, quadrant, field, ccdnum, self.pipeline_schema['schema_id'])
+        self.cursor.execute(tquery, (filter, quadrant, field, ccdnum, self.pipeline_schema['schema_id']))
         result = self.cursor.fetchall()
 
         if len(result) == 0:
@@ -185,14 +204,14 @@ class IPACQueryManager(object):
             tid = result[0][0]
             iquery = 'SELECT I.PATH FROM  TEMPLATEIMAGEASSOC TA JOIN IMAGE I ON TA.IMAGE_ID = I.ID ' \
                      'WHERE TA.TEMPLATE_ID=%s'
-            self.cursor.execute(iquery, tid)
+            self.cursor.execute(iquery, (tid,))
             images = [r[0] for r in self.cursor.fetchall()]
             return images
 
     def needs_template(self, field, ccdnum, quadrant, filter):
         query = 'SELECT COUNT(*) FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'AND PIPELINE_SCHEMA_ID=%s'
-        self.cursor.execute(query, field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id'])
+        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
         result = self.cursor.fetchall()[0][0]
 
         # return true if there is no template
@@ -211,7 +230,7 @@ class IPACQueryManager(object):
 
         # also write its existence to the database
         query = 'INSERT INTO JOB (CORR_ID, JOBTYPE) VALUES (%s, %s)'
-        self.cursor.execute(query, corrprop, jobtype)
+        self.cursor.execute(query, (corrprop, jobtype))
         self.dbc.commit()
 
         return corr_id
@@ -220,8 +239,8 @@ class IPACQueryManager(object):
         query = 'SELECT ID, PATH, OBSJD, HASVARIANCE FROM IMAGE WHERE FIELD=%s AND ' \
                 'CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'AND GOOD=TRUE ORDER BY OBSJD ASC LIMIT %s'
-        self.cursor.execute(query, field, ccdnum, quadrant, filter,
-                            self.pipeline_schema['template_minimages'])
+        self.cursor.execute(query, (field, ccdnum, quadrant, filter,
+                            self.pipeline_schema['template_minimages']))
         result = self.cursor.fetchall()
         return list(zip(*result))
 
@@ -354,9 +373,9 @@ class IPACQueryManager(object):
         dfkey = [k.lower() for k in columns[1:-1].split(',')][5:]
 
         for (i, row), npath in zip(metatable.iterrows(), npaths):
-            self.cursor.execute(dbq, npath, row['filtercode'][1:],
-                                row['qid'], row['field'], row['ccdid'],
-                                *row[dfkey].tolist())
+            self.cursor.execute(dbq, ((npath, row['filtercode'][1:],
+                                row['qid'], row['field'], row['ccdid']) +
+                                tuple(row[dfkey].tolist())))
 
         self.dbc.commit()
 
@@ -456,7 +475,7 @@ class IPACQueryManager(object):
 
         query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%S AND FILTER=%s ' \
                 'AND PIPELINE_SCHEMA_ID=%s'
-        self.cursor.execute(query, field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id'])
+        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
         result = self.cursor.fetchall()
 
         if len(result) == 0:
@@ -488,11 +507,11 @@ class IPACQueryManager(object):
 
         query = 'SELECT ID FROM COADD WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'ORDER BY PROC_DATE DESC LIMIT 1'
-        self.cursor.execute(query, field, ccdnum, quadrant, band, binl, binr)
+        self.cursor.execute(query, (field, ccdnum, quadrant, band, binl, binr))
         cid = self.cursor.fetchone()[0]
 
         query = 'SELECT IMAGE_ID FROM COADDIMAGEASSOC WHERE COADD_ID=%s'
-        self.cursor.execute(query, cid)
+        self.cursor.execute(query, (cid,))
         imids = [p[0] for p in self.cursor.fetchall()]
 
         # now see what should be in the coadd
@@ -507,7 +526,7 @@ class IPACQueryManager(object):
     def get_latest_template(self, field, ccdnum, quadrant, filter):
         query = 'SELECT ID, PATH FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s ' \
                 'AND QUADRANT=%s AND FILTER=%s ORDER BY PROCDATE DESC'
-        self.cursor.execute(query, field, ccdnum, quadrant, filter)
+        self.cursor.execute(query, (field, ccdnum, quadrant, filter))
         id, path = self.cursor.fetchone()
         return id, path
 

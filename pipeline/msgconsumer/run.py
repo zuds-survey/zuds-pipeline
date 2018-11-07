@@ -20,7 +20,8 @@ newt_baseurl = 'https://newt.nersc.gov/newt'
 nersc_username = os.getenv('NERSC_USERNAME')
 nersc_password = os.getenv('NERSC_PASSWORD')
 #database_uri = os.getenv('DATABASE_URI')
-database_uri = 'ztfcoadd_admin@db'
+database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
+
 
 
 def is_up(host):
@@ -70,7 +71,7 @@ class TaskHandler(object):
 
     def resolve_dependencies(self, contents, data):
         query = 'SELECT DISTINCT NERSC_ID FROM JOB WHERE CORR_ID IN %s'
-        self.cursor.execute(query, list(data['dependencies']))
+        self.cursor.execute(query, (list(data['dependencies']),))
         deps = [r[0] for r in self.cursor.fetchall()]
         deps = ':'.join(deps)
         contents = contents.format(dlist=deps)
@@ -212,7 +213,7 @@ class TaskHandler(object):
             # before attempting to be resubmitted
 
             query = 'UPDATE JOB SET STATUS=%s, NERSC_ID=NULL WHERE CORR_ID = %s;'
-            self.cursor.execute(query, 'DEAD_LETTER', properties.correlation_id)
+            self.cursor.execute(query, ('DEAD_LETTER', properties.correlation_id))
 
             return ch.basic_reject(method.delivery_tag, requeue=False)
 
@@ -247,12 +248,13 @@ class TaskHandler(object):
         except ValueError as e:
             logging.info(e.message)
             query = 'UPDATE JOB SET STATUS=%s, NERSC_ID=NULL WHERE CORR_ID = %s;'
-            self.cursor.execute(query, 'DEAD_LETTER', properties.correlation_id)
+            self.cursor.execute(query, ('DEAD_LETTER', properties.correlation_id))
             ch.basic_reject(method.delivery_tag, requeue=False)  # try again in 10
 
         else:
             query = 'UPDATE JOB SET NERSC_ID = %s, STATUS=%s, SUBMIT_TIME=%s, SYSTEM=%s WHERE CORR_ID = %s;'
-            self.cursor.execute(query, jobid, 'PENDING', datetime.datetime.now(), host, properties.correlation_id)
+            self.cursor.execute(query, (jobid, 'PENDING', datetime.datetime.now(),
+                                        host, properties.correlation_id))
             ch.basic_ack(method.delivery_tag)
             self.pub_channel.basic_publish(exchange='',
                                            routing_key='monitor',
@@ -276,7 +278,6 @@ if __name__ == '__main__':
             break
 
     channel = connection.channel()
-    channel.queue_declare(queue='jobs')
 
     # consume stuff from the queue
     handler = TaskHandler()

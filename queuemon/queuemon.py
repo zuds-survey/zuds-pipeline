@@ -5,12 +5,13 @@ import json
 import requests
 import psycopg2
 import datetime
+from pika.exceptions import ConnectionClosed
 
 newt_baseurl = 'https://newt.nersc.gov/newt'
 nersc_username = os.getenv('NERSC_USERNAME')
 nersc_password = os.getenv('NERSC_PASSWORD')
 #database_uri = os.getenv('DATABASE_URI')
-database_uri = 'ztfcoadd_admin@db'
+database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 
 
 def authenticate():
@@ -43,12 +44,26 @@ def fetch_new_messages(ch):
 
 if __name__ == '__main__':
 
-    cparams = pika.ConnectionParameters('msgqueue')
-    pcon = pika.BlockingConnection(cparams)
+    while True:
+        try:
+            cparams = pika.ConnectionParameters('msgqueue')
+            pcon = pika.BlockingConnection(cparams)
+        except ConnectionClosed:
+            pass
+        else:
+            break
+
     channel = pcon.channel()
     channel.queue_declare(queue='monitor')
 
-    connection = psycopg2.connect(database_uri)
+    while True:
+        try:
+            connection = psycopg2.connect(database_uri)
+        except psycopg2.DatabaseError:
+            pass
+        else:
+            break
+
     cursor = connection.cursor()
 
     ncookies = authenticate()
@@ -65,7 +80,7 @@ if __name__ == '__main__':
         for message in new_messages:
             job_cache[message[1].properties.correlation_id] = message
 
-        cursor.execute(query, 'PENDING', 'RUNNING')
+        cursor.execute(query, ('PENDING', 'RUNNING'))
         active_jobs = cursor.fetchall()
 
         for corr_id, nersc_id, machine, status in active_jobs:
@@ -107,14 +122,14 @@ if __name__ == '__main__':
                     pipeline_schema_id = bodyd['pipeline_schema_id']
                     procdate = datetime.datetime.utcnow()
 
-                    cursor.execute(query, path, band, quadrant, field, ccdnum, mindate,
-                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids']))
+                    cursor.execute(query, (path, band, quadrant, field, ccdnum, mindate,
+                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids'])))
                     tmplid = cursor.fetchone()[0]
 
                     # now update the association table
                     query = 'INSERT INTO TEMPLATEIMAGEASSOC (TEMPLATE_ID, IMAGE_ID) VALUES (%s, %s)'
                     for imid in bodyd['imids']:
-                        cursor.execute(query, tmplid, imid)
+                        cursor.execute(query, (tmplid, imid))
 
                     connection.commit()
 
@@ -134,14 +149,14 @@ if __name__ == '__main__':
                     pipeline_schema_id = bodyd['pipeline_schema_id']
                     procdate = datetime.datetime.utcnow()
 
-                    cursor.execute(query, path, band, quadrant, field, ccdnum, mindate,
-                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids']))
+                    cursor.execute(query, (path, band, quadrant, field, ccdnum, mindate,
+                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids'])))
                     coaddid = cursor.fetchone()[0]
 
                     # now update the association table
                     query = 'INSERT INTO COADDIMAGEASSOC (COADD_ID, IMAGE_ID) VALUES (%s, %s)'
                     for imid in bodyd['imids']:
-                        cursor.execute(query, coaddid, imid)
+                        cursor.execute(query, (coaddid, imid))
 
                     connection.commit()
 
@@ -158,7 +173,7 @@ if __name__ == '__main__':
             args.append(corr_id)
 
             # need to do this before sending the message
-            cursor.execute(uquery, *args)
+            cursor.execute(uquery, tuple(args))
             connection.commit()
 
             if resubmit:
