@@ -9,7 +9,8 @@ import datetime
 newt_baseurl = 'https://newt.nersc.gov/newt'
 nersc_username = os.getenv('NERSC_USERNAME')
 nersc_password = os.getenv('NERSC_PASSWORD')
-database_uri = os.getenv('DATABASE_URI')
+#database_uri = os.getenv('DATABASE_URI')
+database_uri = 'ztfcoadd_admin@db'
 
 
 def authenticate():

@@ -6,3 +6,5 @@ RUN conda install psycopg2
 
 ADD queuemon.py /queuemon.py
 
+CMD ["python", "/queuemon.py"]
+

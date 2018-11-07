@@ -36,7 +36,8 @@ ipac_query_window = 30  # days
 ndtn = 4
 
 # secrets
-database_uri = os.getenv('DATABASE_URI')
+#database_uri = os.getenv('DATABASE_URI')
+database_uri = 'ztfcoadd_admin@db'
 ipac_username = os.getenv('IPAC_USERNAME')
 ipac_password = os.getenv('IPAC_PASSWORD')
 nersc_username = os.getenv('NERSC_USERNAME')

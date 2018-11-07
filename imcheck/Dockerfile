@@ -6,3 +6,5 @@ RUN pip install pika  schedule grequests ztfquery pandas numpy astropy
 
 ADD poll.py /poll.py
 
+CMD ["python", "/poll.py"]
+
