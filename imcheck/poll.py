@@ -42,8 +42,6 @@ ndtn = 4
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 ipac_username = os.getenv('IPAC_USERNAME')
 ipac_password = os.getenv('IPAC_PASSWORD')
-nersc_username = os.getenv('NERSC_USERNAME')
-nersc_password = os.getenv('NERSC_PASSWORD')
 
 
 # recursively partition an iterable into subgroups (py3 compatible)
