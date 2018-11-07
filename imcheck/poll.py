@@ -8,11 +8,14 @@ import schedule
 import logging
 import uuid
 import json
+import grequests  # for asynchronous requests
+
 
 import numpy as np
 import pandas as pd
-from ztfquery import query
+from ztfquery import query as zq
 from astropy.time import Time
+
 
 ipac_root = 'http://irsa.ipac.caltech.edu/'
 formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{month:s}{day:s}/{fracday:s}' \
@@ -22,10 +25,15 @@ nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
 tmp_basename_form = '{paddedfield:s}_c{paddedccdid:s}_{qid:d}_{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
+date_start = datetime.date(2018, 2, 16)
 
 # this is the night id corresponding
-# to the first science observations in the survey
+# to the first science observation in the survey
 first_nid = 411
+ipac_query_window = 30  # days
+
+# number of data transfer nodes to use to pull new data
+ndtn = 4
 
 # secrets
 database_uri = os.getenv('DATABASE_URI')
@@ -33,6 +41,11 @@ ipac_username = os.getenv('IPAC_USERNAME')
 ipac_password = os.getenv('IPAC_PASSWORD')
 nersc_username = os.getenv('NERSC_USERNAME')
 nersc_password = os.getenv('NERSC_PASSWORD')
+
+
+# recursively partition an iterable into subgroups (py3 compatible)
+_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
+    _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
 def ipac_authenticate():
@@ -67,8 +80,10 @@ class IPACQueryManager(object):
 
     def __init__(self, pipeline_schema):
         self.pipeline_schema = pipeline_schema
-        self.response = None
         self._refresh_connections()
+
+    def __del__(self):
+        self.dbc.close()
 
     def _generate_paths(self, df):
 
@@ -110,7 +125,7 @@ class IPACQueryManager(object):
             ipaths.append(tpath)
             npaths.append(npath)
 
-        return ipaths, npaths
+        return np.asarray(ipaths), np.asarray(npaths)
 
     def _refresh_connections(self):
 
@@ -201,68 +216,135 @@ class IPACQueryManager(object):
         return corr_id
 
     def create_template_image_list(self, field, ccdnum, quadrant, filter):
-        query = 'SELECT ID, PATH, OBSJD FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+        query = 'SELECT ID, PATH, OBSJD, HASVARIANCE FROM IMAGE WHERE FIELD=%s AND ' \
+                'CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'AND GOOD=TRUE ORDER BY OBSJD ASC LIMIT %s'
         self.cursor.execute(query, field, ccdnum, quadrant, filter,
                             self.pipeline_schema['template_minimages'])
         result = self.cursor.fetchall()
         return list(zip(*result))
 
-    def __call__(self):
+    def retrieve_new_image_paths_and_metadata(self):
 
-        # refresh our connections
-        self._refresh_connections()
-
-        # authenticate to the various places
-        icookies = ipac_authenticate()
-        ncookies = nersc_authenticate()
-
-        # query for the new images by getting everything after 5pm pacific time (midnight UTC)
-        # from the previous day
+        # query ipac and return the images that are in its database but not in ours
 
         td = datetime.date.today()
-        dt = datetime.datetime(td.year, td.month, td.day, 0, 0, 0)
-        at = Time(dt)
-        jd = at.jd
+        zquery = zq.ZTFQuery()
 
-        zquery = query.ZTFQuery()
-        zquery.load_metadata(sql_query='obsjd>=%f' % jd, auth=[ipac_username, ipac_password])
-        tab = zquery.metatable
+        # need to go one month at a time to avoid overloading the ipac server
+        ndays = (td - date_start).days
+        curnid = first_nid + ndays
+
+        nids = list(range(first_nid, curnid, ipac_query_window))
+
+        if nids[-1] < curnid:
+            nids.append(nids[-1] + ipac_query_window)
+
+        # these are the r/l limits of each group in the nid-partitioned queries
+        nidbins = []
+        for i, n in enumerate(nids[:-1]):
+            right = nids[i + 1]
+            nidbins.append([n, right])
+
+        for i, (left, right) in enumerate(nidbins[1:]):
+            nidbins[i][0] = left + 1
+
+        tab = []
+        for left, right in nidbins:
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d' % (left, right),
+                                 auth=[ipac_username, ipac_password])
+            df = zquery.metatable
+            tab.append(df)
+
+        # this is a table with the metadata of all the ZTF images that IPAC has
+        tab = pd.concat(tab)
+
+        # here are all their paths
         ipaths, npaths = self._generate_paths(tab)
 
-        sessionid = icookies.get('sessionid')
-        download_script = [f'curl {ipath} --create-dirs -o {npath} --cookie "SESSIONID={sessionid}"'
-                           for ipath, npath in zip(ipaths, npaths)]
-        download_script = '\n'.join(download_script)
+        # now we need to prune it down to just the ones that we don't have
 
-        # upload the download script to NERSC
-        path = f'/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{jd}.sh'
-        target = os.path.join(newt_baseurl, 'file', 'dtn02', f'{path}')
+        # first get all the paths that we have
+        query = 'SELECT PATH FROM IMAGE'
+        self.cursor.execute(query)
+        result = [p[0] for p in self.cursor.fetchall()]
 
-        requests.put(target, data=download_script, cookies=ncookies)
+        # now calculate the ones we dont have
+        new = np.setdiff1d(npaths, result, assume_unique=True)
 
-        # now run it
-        target = os.path.join(newt_baseurl, 'command', 'dtn02')
-        payload = {'executable': f'/bin/bash {path}', 'loginenv':True}
-        r = requests.post(target, data=payload, cookies=ncookies)
-        jr = r.json()
+        # get rid of this for memory purposes
+        del result
+
+        # get the indices of the new images
+        inds = np.argwhere(npaths[:, None] == new[None, :])
+        inds = np.sum(inds, axis=0)[:, 0]
+
+        # get the ipac paths
+        ipaths = ipaths[inds]
+
+        # now return
+        return ipaths, new, tab.iloc[inds]
+
+    def download_images(self, npaths, ipaths):
+
+        # with the paths generated now we can make the download commands
+        tasks = list(zip(ipaths, npaths))
+
+        # first we must partition the tasks into separate iterables for each dtn
+        spltasks = _split(tasks, ndtn)
+
+        # store the asynchronous http requests here
+        async_requests = []
+        for i, (ipc, npc) in enumerate(spltasks):
+
+            icookies = ipac_authenticate()  # get a different cookie for each DTN
+            sessionid = icookies.get('sessionid')
+
+            # authenticate to nersc
+            ncookies = nersc_authenticate()
+
+            download_script = [f'curl {ipath} --create-dirs -o {npath} --cookie "SESSIONID={sessionid}"'
+                               for ipath, npath in zip(ipc, npc)]
+
+            # upload the download script to NERSC
+
+            download_script = '\n'.join(download_script)
+            path = f'/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{jd}_{i+1}.sh'
+            target = os.path.join(newt_baseurl, 'file', f'dtn{i+1:02d}', f'{path}')
+            requests.put(target, data=download_script, cookies=ncookies)
+
+            # now prepare the arguments of the multithreaded call to make the download
+            target = os.path.join(newt_baseurl, 'command', f'dtn{i+1:02d}')
+            payload = {'executable': f'/bin/bash {path}', 'loginenv':True}
+
+            # now call the download asynchronously using grequests
+            request = grequests.post(target, data=payload, cookies=ncookies)
+            async_requests.append(request)
+
+        # this directs all the DTNs to execute their downloads
+        responses = grequests.map(async_requests)
 
         # check that everything worked as expected
+        for r in responses:
 
-        if r.status_code != 200:
-            raise RuntimeError('Error contacting NEWT')
+            if r.status_code != 200:
+                raise RuntimeError('Error contacting NEWT')
 
-        if jr['status'] == 'ERROR':
-            error = jr['error']
-            raise RuntimeError(f'Error on dtn02: {error}')
-        else:
-            logging.info(jr['output'])
+            jr = r.json()
+
+            if jr['status'] == 'ERROR':
+                error = jr['error']
+                raise RuntimeError(f'Error on dtn02: {error}')
+            else:
+                logging.info(jr['output'])
+
+    def update_database_with_new_images(self, npaths, metatable):
 
         # now update the database with the new images
         columns = '(PATH,FILTER,QUADRANT,FIELD,CCDNUM,PID,OBSJD,RA,' \
-              'DEC,INFOBITS,RCID,FID,PID,NID,EXPID,ITID,OBSDATE,SEEING,AIRMASS,MOONILLF' \
-              'MOONESB,MAGLIMIT,CRPIX1,CRPIX2,CRVAL1,CRVAL2,CD11,CD12,CD21,CD22,RA1' \
-              'DEC1,RA2,DEC2,RA3,DEC3,RA4,DEC4,IPAC_PUB_DATE,IPAC_GID)'
+                  'DEC,INFOBITS,RCID,FID,PID,NID,EXPID,ITID,OBSDATE,SEEING,AIRMASS,MOONILLF' \
+                  'MOONESB,MAGLIMIT,CRPIX1,CRPIX2,CRVAL1,CRVAL2,CD11,CD12,CD21,CD22,RA1' \
+                  'DEC1,RA2,DEC2,RA3,DEC3,RA4,DEC4,IPAC_PUB_DATE,IPAC_GID)'
 
         dbq = f'INSERT INTO IMAGE {columns} VALUES (%s)'
         dbq = dbq % ','.join(['%s'] * len(columns.split(',')))
@@ -270,23 +352,22 @@ class IPACQueryManager(object):
         # programatically access some rows of the table
         dfkey = [k.lower() for k in columns[1:-1].split(',')][5:]
 
-        for (i, row), npath in zip(tab.iterrows(), npaths):
-
+        for (i, row), npath in zip(metatable.iterrows(), npaths):
             self.cursor.execute(dbq, npath, row['filtercode'][1:],
                                 row['qid'], row['field'], row['ccdid'],
                                 *row[dfkey].tolist())
 
         self.dbc.commit()
 
-        # now actually determine the new jobs
-
+    def determine_and_relay_variance_jobs(self, npaths):
         # everything needs variance. submit batches of 1024
 
         variance_corrids = {}
+
         nvariance_jobs = len(npaths) // variance_batchsize + (1 if len(npaths) % variance_batchsize > 0 else 0)
         for i in range(nvariance_jobs):
 
-            batch = npaths[i * variance_batchsize : (i + 1) * variance_batchsize]
+            batch = npaths[i * variance_batchsize:(i + 1) * variance_batchsize]
             body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch})
 
             # send a message to the job submission script telling it to submit the job
@@ -295,9 +376,16 @@ class IPACQueryManager(object):
             for path in batch:
                 variance_corrids[path] = correlation_id
 
+        return variance_corrids
+
+    def determine_and_relay_template_jobs(self, variance_corrids, metatable):
+
         # check to see if new templates are needed
         template_corrids = {}
-        for (field, quadrant, band, ccdnum), group in tab.groupby(['paddedfield', 'qid', 'filtercode', 'paddedccdid']):
+        for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
+                                                                         'qid',
+                                                                         'filtercode',
+                                                                         'ccdid']):
 
             ofield, oquadrant, oband, occdnum = field, quadrant, band, ccdnum
 
@@ -311,7 +399,7 @@ class IPACQueryManager(object):
             if not self.needs_template(field, ccdnum, quadrant, band):
                 continue
 
-            tmplims, tmplids, jds = self.create_template_image_list(field, ccdnum, quadrant, band)
+            tmplims, tmplids, jds, hasvar = self.create_template_image_list(field, ccdnum, quadrant, band)
 
             minjd = np.min(jds)
             maxjd = np.max(jds)
@@ -320,13 +408,23 @@ class IPACQueryManager(object):
             maxtime = Time(maxjd, format='jd', scale='utc')
 
             mindatestr = mintime.iso.split()[0].replace('-', '')
-            maxdatestr = maxtime.iso.split()[1].replcae('-', '')
+            maxdatestr = maxtime.iso.split()[1].replace('-', '')
 
             # see what jobs need to finish before this one can run
             dependencies = []
-            for path in tmplims:
-                varcorrid = variance_corrids[path]
-                dependencies.append(varcorrid)
+            remake_variance = []
+            for path, hv in zip(tmplims, hasvar):
+                if not hv:
+                    if path in variance_corrids:
+                        varcorrid = variance_corrids[path]
+                        dependencies.append(varcorrid)
+                    else:
+                        remake_variance.append(path)
+
+            if len(remake_variance) > 0:
+                moredeps = self.determine_and_relay_variance_jobs(remake_variance)
+                dependencies.extend(moredeps.values())
+
             dependencies = set(dependencies)
 
             # what will this template be called?
@@ -339,7 +437,6 @@ class IPACQueryManager(object):
 
             outfile_name = nersc_tmpform.format(fname=tmpbase)
 
-
             # now that we have the dependencies we can relay the coadd job for submission
             body = json.dumps({'dependencies':dependencies, 'jobtype':'template', 'images':tmplims,
                                'outfile_name': outfile_name, 'imids': tmplids, 'quadrant': quadrant,
@@ -348,12 +445,9 @@ class IPACQueryManager(object):
                                'pipeline_schema_id': self.pipeline_schema['schema_id'],
                                })
             tmpl_corrid = self.relay_job(body)
+            template_corrids[(field, quadrant, band, ccdnum)] = (tmpl_corrid, outfile_name)
 
-            template_corrids[(field, quadrant, band, ccdnum)] = tmpl_corrid
-
-        # check to see if new coadds and subtractions are needed
-
-        # first get all the images
+        return template_corrids
 
     def make_coadd_bins(self, field, ccdnum, quadrant, filter):
 
@@ -381,7 +475,7 @@ class IPACQueryManager(object):
 
         else:
             binedges = pd.date_range(startsci, pd.to_datetime(datetime.datetime.today()),
-                                 freq=f'{self.pipeline_schema["scicoadd_window_size"]}')
+                                     freq=f'{self.pipeline_schema["scicoadd_window_size"]}')
 
             bins = []
             for i, lbin in enumerate(binedges[:-1]):
@@ -389,8 +483,112 @@ class IPACQueryManager(object):
 
         return bins
 
-    def __del__(self):
-        self.dbc.close()
+    def evaluate_coadd_and_sub(self, field, ccdnum, quadrant, band, binl, binr):
+
+        query = 'SELECT ID FROM COADD WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                'ORDER BY PROC_DATE DESC LIMIT 1'
+        self.cursor.execute(query, field, ccdnum, quadrant, band, binl, binr)
+        cid = self.cursor.fetchone()[0]
+
+        query = 'SELECT IMAGE_ID FROM COADDIMAGEASSOC WHERE COADD_ID=%s'
+        self.cursor.execute(query, cid)
+        imids = [p[0] for p in self.cursor.fetchall()]
+
+        # now see what should be in the coadd
+        query = 'SELECT ID, PATH, HAS_VARIANCE FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                'AND GOOD=TRUE'
+        self.cursor.exceute(query, field, ccdnum, quadrant, band)
+        oughtids, oughtpaths, hasvar = list(zip(*self.cursor.fetchall()))
+        diff = np.setxor1d(oughtids, imids, assume_unique=True)
+
+        return len(diff) > 0, oughtids, oughtpaths, hasvar
+
+    def get_latest_template(self, field, ccdnum, quadrant, filter):
+        query = 'SELECT ID, PATH FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s ' \
+                'AND QUADRANT=%s AND FILTER=%s ORDER BY PROCDATE DESC'
+        self.cursor.execute(query, field, ccdnum, quadrant, filter)
+        id, path = self.cursor.fetchone()
+        return id, path
+
+    def determine_and_relay_coaddsub_jobs(self, variance_corrids, template_corrids, metatable):
+
+        for (field, ccdnum, quadrant, filter), group in metatable.groupby(['field', 'ccdid',
+                                                                           'qid', 'filtercode']):
+
+            # convert into proper values
+            field = int(field)
+            quadrant = int(quadrant)
+            band = filter[1:]
+            ccdnum = int(ccdnum)
+
+            # get the bins
+            bins = self.make_coadd_bins(field, ccdnum, quadrant, band)
+
+            for bin in bins:
+                runjob, ids, paths, hasvar = self.evaluate_coadd_and_sub(field, ccdnum, quadrant, band, *bin)
+
+                if runjob:
+
+                    dependencies = []
+                    if (field, quadrant, band, ccdnum) in template_corrids:
+                        corrid, tmplpath = template_corrids[(field, quadrant, band, ccdnum)]
+                        dependencies.append(corrid)
+                    else:
+                        _, tmplpath = self.get_latest_template(field, ccdnum, quadrant, filter)
+
+                    # build up dependencies
+
+                    dependencies = []
+                    remake_variance = []
+                    for path, hv in zip(paths, hasvar):
+                        if not hv:
+                            if path in variance_corrids:
+                                varcorrid = variance_corrids[path]
+                                dependencies.append(varcorrid)
+                            else:
+                                remake_variance.append(path)
+
+                    if len(remake_variance) > 0:
+
+                        moredeps = self.determine_and_relay_variance_jobs(remake_variance)
+                        dependencies.extend(moredeps.values())
+
+                    dependencies = set(dependencies)
+
+                    data = {'jobtype': 'coaddsub', 'field': field, 'ccdnum': ccdnum,
+                            'quadrant': quadrant, 'mindate': bin[0], 'maxdate': bin[1],
+                            'images': paths, 'template': tmplpath, 'filter':band,
+                            'pipeline_schema_id': self.pipeline_schema['schema_id'],
+                            'dependencies': dependencies}
+
+                    body = json.dumps(data)
+                    self.relay_job(body)
+
+
+    def __call__(self):
+
+        # refresh our connections
+        self._refresh_connections()
+
+        # get the new image paths and metadata
+        npaths, ipaths, metatable = self.retrieve_new_image_paths_and_metadata()
+
+        # download the images
+        self.download_images(npaths, ipaths)
+
+        # update the database with the new images that were downloaded
+        self.update_database_with_new_images(npaths, metatable)
+
+        # now actually determine the new jobs
+
+        # batch dispatch variance map making
+        variance_corrids = self.determine_and_relay_variance_jobs(npaths)
+
+        # then make any new templates that are needed
+        template_corrids = self.determine_and_relay_template_jobs(variance_corrids, metatable)
+
+        # finally coadd the science frames and make the corresponding subtractions
+        self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
 
 
 if __name__ == '__main__':
