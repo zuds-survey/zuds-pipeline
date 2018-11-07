@@ -1,8 +1,7 @@
-FROM continuumio/miniconda3
+FROM pipeline
 MAINTAINER Danny Goldstein <dgold@caltech.edu>
 
-RUN pip install pika astropy
-RUN conda install psycopg2
+RUN pip install pika
 
 ADD queuemon.py /queuemon.py
 

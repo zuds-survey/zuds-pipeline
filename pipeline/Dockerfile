@@ -299,7 +299,11 @@ RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
 # for queue monitoring
-RUN pip install pika paramiko
+RUN pip install pika
+ENV IPAC_USERNAME dgold@berkeley.edu
+ENV IPAC_PASSWORD ***REMOVED***
+ENV NERSC_USERNAME dgold
+ENV NERSC_PASSWORD ***REMOVED***
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]

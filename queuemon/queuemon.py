@@ -6,26 +6,11 @@ import requests
 import psycopg2
 import datetime
 from pika.exceptions import ConnectionClosed
+from liblg import nersc_authenticate
 
 newt_baseurl = 'https://newt.nersc.gov/newt'
-nersc_username = os.getenv('NERSC_USERNAME')
-nersc_password = os.getenv('NERSC_PASSWORD')
 #database_uri = os.getenv('DATABASE_URI')
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
-
-
-def authenticate():
-
-    target = os.path.join(newt_baseurl, 'login')
-    payload = {'username':nersc_username,
-               'password':nersc_password}
-
-    r = requests.post(target, data=payload)
-
-    if r.status_code != 200:
-        raise ValueError('Unable to Authenticate')
-
-    return r.cookies
 
 
 def fetch_new_messages(ch):
@@ -66,7 +51,7 @@ if __name__ == '__main__':
 
     cursor = connection.cursor()
 
-    ncookies = authenticate()
+    ncookies = nersc_authenticate()
 
     query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s;"
     uquery = 'UPDATE JOB SET STATUS=%s'

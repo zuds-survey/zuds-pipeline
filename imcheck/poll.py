@@ -16,6 +16,7 @@ import pandas as pd
 from ztfquery import query as zq
 from astropy.time import Time
 from pika.exceptions import ConnectionClosed
+from liblg import ipac_authenticate, nersc_authenticate
 
 
 ipac_root = 'http://irsa.ipac.caltech.edu/'
@@ -48,34 +49,6 @@ nersc_password = os.getenv('NERSC_PASSWORD')
 # recursively partition an iterable into subgroups (py3 compatible)
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
     _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
-
-
-def ipac_authenticate():
-
-    target = os.path.join(ipac_root, 'account', 'signon', 'login.do')
-    payload = {'username': ipac_username,
-               'password': ipac_password}
-
-    r = requests.post(target, data=payload)
-
-    if r.status_code != 200:
-        raise ValueError('Unable to Authenticate')
-
-    return r.cookies
-
-
-def nersc_authenticate():
-
-    target = os.path.join(newt_baseurl, 'login')
-    payload = {'username':nersc_username,
-               'password':nersc_password}
-
-    r = requests.post(target, data=payload)
-
-    if r.status_code != 200:
-        raise ValueError('Unable to Authenticate')
-
-    return r.cookies
 
 
 class IPACQueryManager(object):
@@ -318,7 +291,7 @@ class IPACQueryManager(object):
         for i, (ipc, npc) in enumerate(spltasks):
 
             icookies = ipac_authenticate()  # get a different cookie for each DTN
-            sessionid = icookies.get('sessionid')
+            sessionid = icookies.get('SESSIONID')
 
             # authenticate to nersc
             ncookies = nersc_authenticate()

@@ -28,4 +28,4 @@ services:
 
   db:
     build: ./q3cpsql
-    
+    command: [postgres, -c, 'log_statement=all']

@@ -7,6 +7,7 @@ import logging
 import json
 
 from pika.exceptions import ConnectionClosed
+from liblg import nersc_authenticate
 
 
 # some constants
@@ -17,8 +18,7 @@ mksub_cori = os.path.join(slurmd, 'makesub_cori.sh')
 mkvar_cori = os.path.join(slurmd, 'makevariance_cori.sh')
 mkcoaddsub_cori = os.path.join(slurmd, 'makecoaddsub_cori.sh')
 newt_baseurl = 'https://newt.nersc.gov/newt'
-nersc_username = os.getenv('NERSC_USERNAME')
-nersc_password = os.getenv('NERSC_PASSWORD')
+
 #database_uri = os.getenv('DATABASE_URI')
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 
@@ -40,19 +40,6 @@ def is_up(host):
     j = r.json()
     return j['status'] == 'up'
 
-
-def authenticate():
-
-    target = os.path.join(newt_baseurl, 'login')
-    payload = {'username':nersc_username,
-               'password':nersc_password}
-
-    r = requests.post(target, data=payload)
-
-    if r.status_code != 200:
-        raise ValueError('Unable to Authenticate')
-
-    return r.cookies
 
 
 
@@ -80,7 +67,7 @@ class TaskHandler(object):
     def submit_coadd(self, images, catalogs, obase, data, host='cori'):
 
         # login to nersc
-        cookies = authenticate()
+        cookies = nersc_authenticate()
 
         # create the payload
         with open(mkcoadd_cori, 'r') as f:
@@ -107,7 +94,7 @@ class TaskHandler(object):
     def submit_coaddsub(self, images, catalogs, obase, data, host='cori'):
 
         # login to nersc
-        cookies = authenticate()
+        cookies = nersc_authenticate()
 
         # create the payload
         with open(mkcoaddsub_cori, 'r') as f:
@@ -135,7 +122,7 @@ class TaskHandler(object):
     def submit_variance(self, images, masks, host='cori'):
 
         # login to nersc
-        cookies = authenticate()
+        cookies = nersc_authenticate()
 
         # create the payload
         with open(mkvar_cori, 'r') as f:
@@ -159,7 +146,7 @@ class TaskHandler(object):
     def submit_sub(self, images, templates, host='cori'):
 
         # login to nersc
-        cookies = authenticate()
+        cookies = nersc_authenticate()
 
         # create the payload
         with open(mksub_cori, 'r') as f:
