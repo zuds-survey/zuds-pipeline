@@ -10,12 +10,17 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency={dlist:s}
 
-frames=$1
-cats=$2
-obase=$3
 
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-shifter python /lensgrinder/pipeline/bin/makecoadd.py --input-frames=${frames} --input-catalogs=${cats} \
+news=$1
+ref=$2
+cats=$3
+obase=$4
+
+shifter python /lensgrinder/pipeline/bin/makecoadd.py --input-frames=${news} --input-catalogs=${cats} \
                --output-basename=${obase}
+
+srun -n 64 shifter python /lensgrinder/pipeline/bin/makesub.py --science-images=${obase}.fits \
+               --templates=${ref}.fits
