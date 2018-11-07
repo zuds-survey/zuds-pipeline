@@ -6,6 +6,8 @@ import datetime
 import logging
 import json
 
+from pika.exceptions import ConnectionClosed
+
 
 # some constants
 cwd = os.path.basename(__file__)
@@ -267,14 +269,12 @@ if __name__ == '__main__':
         try:
             cparams = pika.ConnectionParameters('msgqueue')
             connection = pika.BlockingConnection(cparams)
-        except pika.exceptions.ConnectionClosed:
+        except ConnectionClosed:
             pass
         else:
             break
 
-
     channel = connection.channel()
-
     channel.queue_declare(queue='jobs')
 
     # consume stuff from the queue
