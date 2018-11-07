@@ -263,8 +263,16 @@ class TaskHandler(object):
 if __name__ == '__main__':
 
     # set up a connection to the message queue
-    cparams = pika.ConnectionParameters('msgqueue')
-    connection = pika.BlockingConnection(cparams)
+    while True:
+        try:
+            cparams = pika.ConnectionParameters('msgqueue')
+            connection = pika.BlockingConnection(cparams)
+        except pika.exceptions.ConnectionClosed:
+            pass
+        else:
+            break
+
+
     channel = connection.channel()
 
     channel.queue_declare(queue='jobs')

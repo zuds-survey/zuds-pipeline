@@ -2,15 +2,22 @@ version: '3'
 
 services:
 
-  imcheck-service:
-    build: ./imcheck
-
   msgqueue:
     build: ./msgqueue
 
+  imcheck-service:
+    build: ./imcheck
+    depends_on:
+        - "msgqueue"
+
   queue-monitor-service:
     build: ./queuemon
+    depends_on:
+        - "msgqueue"
 
   job-submission-service:
     build: ./pipeline
+    depends_on:
+        - "msgqueue"
 
+  
