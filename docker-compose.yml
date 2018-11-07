@@ -5,19 +5,24 @@ services:
   msgqueue:
     build: ./msgqueue
 
-  imcheck-service:
+  ipac-poll-and-pull-service:
     build: ./imcheck
     depends_on:
         - "msgqueue"
 
-  queue-monitor-service:
+  nersc-queue-monitor-service:
     build: ./queuemon
     depends_on:
         - "msgqueue"
 
-  job-submission-service:
+  nersc-job-submission-service:
     build: ./pipeline
     depends_on:
         - "msgqueue"
+    volumes:
+        - ./pipeline/msgconsumer:/daemon
+        - ./pipeline:/pipeline
 
-  
+  db:
+    build: ./q3cpsql
+    
