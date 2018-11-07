@@ -10,3 +10,5 @@ EOSQL
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "ztfcoadd" <<-EOSQL
 CREATE EXTENSION q3c;
 EOSQL
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "ztfcoadd" -f /docker-entrypoint-initdb.d/createdb.psql
