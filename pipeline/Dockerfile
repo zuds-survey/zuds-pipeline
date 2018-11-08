@@ -306,6 +306,7 @@ ENV NERSC_USERNAME dgold
 ENV NERSC_PASSWORD ***REMOVED***
 
 RUN conda install astropy=3
+RUN pip install paramiko
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]

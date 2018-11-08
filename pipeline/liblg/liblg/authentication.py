@@ -5,16 +5,16 @@ newt_baseurl = 'https://newt.nersc.gov/newt'
 nersc_username = os.getenv('NERSC_USERNAME')
 nersc_password = os.getenv('NERSC_PASSWORD')
 
-ipac_root = 'http://irsa.ipac.caltech.edu/'
+ipac_root = 'https://irsa.ipac.caltech.edu/'
 ipac_username = os.getenv('IPAC_USERNAME')
 ipac_password = os.getenv('IPAC_PASSWORD')
 
 
 def ipac_authenticate():
     target = os.path.join(ipac_root, 'account', 'signon', 'login.do')
-    target += f'?josso_cmd=login&josso_username={ipac_username}&josso_password={ipac_password}'
 
-    r = requests.get(target)
+    r = requests.post(target, data={'josso_username':ipac_username, 'josso_password':ipac_password,
+                                    'josso_cmd': 'login'})
 
     if r.status_code != 200:
         raise ValueError('Unable to Authenticate')

@@ -1,4 +1,5 @@
 import os
+import sys
 import pika
 import time
 import datetime
@@ -8,7 +9,8 @@ import schedule
 import logging
 import uuid
 import json
-import grequests  # for asynchronous requests
+import paramiko
+import threading
 
 
 import numpy as np
@@ -16,18 +18,20 @@ import pandas as pd
 from ztfquery import query as zq
 from astropy.time import Time
 from pika.exceptions import ConnectionClosed
-from liblg import ipac_authenticate, nersc_authenticate
+from liblg import ipac_authenticate, nersc_authenticate, nersc_username, nersc_password
 
 
-ipac_root = 'http://irsa.ipac.caltech.edu/'
+ipac_root = 'https://irsa.ipac.caltech.edu/'
 formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{month:s}{day:s}/{fracday:s}' \
           '/ztf_{filefracday:s}_{paddedfield:s}_{filtercode:s}_c{paddedccdid:s}_{imgtypecode:s}_q{qid:d}_sciimg.fits'
-nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/{paddedfield:s}/c{paddedccdid:s}/{qid:d}/{filtercode:s}/{fname:s}'
+nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/science_frames/{paddedfield:s}/c{paddedccdid:s}/' \
+                '{qid:d}/{filtercode:s}/{fname:s}'
 nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
 tmp_basename_form = '{paddedfield:s}_c{paddedccdid:s}_{qid:d}_{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
 date_start = datetime.date(2018, 2, 16)
+n_concurrent_requests = 50
 
 # this is the night id corresponding
 # to the first science observation in the survey
@@ -43,16 +47,37 @@ database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 ipac_username = os.getenv('IPAC_USERNAME')
 ipac_password = os.getenv('IPAC_PASSWORD')
 
+outlock = threading.Lock()
+
 
 # recursively partition an iterable into subgroups (py3 compatible)
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
     _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
+# make this a static method for threading purposes
+def execute_download_on_dtn(self, download_script_npath, host):
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect(host, username=nersc_username, password=nersc_password)
+    stdin, stdout, stderr = ssh.exec_command(f'/bin/bash {download_script_npath}')
+    exitcode = stdout.channel.recv_exit_status()
+    outlines = stdout.readlines()
+    errlines = stderr.readlines()
+
+    if exitcode != 0:
+        raise RuntimeError(errlines)
+
+    with outlock:
+        self.logger.info(outlines)
+        self.logger.info(errlines)
+
+
 class IPACQueryManager(object):
 
-    def __init__(self, pipeline_schema):
+    def __init__(self, pipeline_schema, logger):
         self.pipeline_schema = pipeline_schema
+        self.logger = logger
         self._refresh_connections()
 
     def __del__(self):
@@ -201,7 +226,7 @@ class IPACQueryManager(object):
 
         # also write its existence to the database
         query = 'INSERT INTO JOB (CORR_ID, JOBTYPE) VALUES (%s, %s)'
-        self.cursor.execute(query, (corrprop, jobtype))
+        self.cursor.execute(query, (corr_id, jobtype))
         self.dbc.commit()
 
         return corr_id
@@ -238,11 +263,13 @@ class IPACQueryManager(object):
             nidbins.append([n, right])
 
         for i, (left, right) in enumerate(nidbins[1:]):
-            nidbins[i][0] = left + 1
+            nidbins[i + 1][0] = left + 1
 
         tab = []
+        self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d' % (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID=1 AND '
+                                           'QID=1 AND FILTERCODE=\'zg\'' % (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -267,8 +294,8 @@ class IPACQueryManager(object):
         del result
 
         # get the indices of the new images
-        inds = np.argwhere(npaths[:, None] == new[None, :])
-        inds = np.sum(inds, axis=0)[:, 0]
+        inds = np.argwhere(npaths[:, None] == new[None, :])[:, 0]
+        self.logger.info(f'Inds are: {inds}')
 
         # get the ipac paths
         ipaths = ipaths[inds]
@@ -284,9 +311,17 @@ class IPACQueryManager(object):
         # first we must partition the tasks into separate iterables for each dtn
         spltasks = _split(tasks, ndtn)
 
+        # use this to name download scripts
+        td = datetime.date.today()
+        dt = datetime.datetime(td.year, td.month, td.day, 0, 0, 0)
+        at = Time(dt)
+        jd = at.jd
+
         # store the asynchronous http requests here
-        async_requests = []
-        for i, (ipc, npc) in enumerate(spltasks):
+        threads = []
+        for i, l in enumerate(spltasks):
+
+            ipc, npc = list(zip(*l))
 
             icookies = ipac_authenticate()  # get a different cookie for each DTN
             sessionid = icookies.get('JOSSO_SESSIONID')
@@ -300,42 +335,27 @@ class IPACQueryManager(object):
             # upload the download script to NERSC
 
             download_script = '\n'.join(download_script)
-            path = f'/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{jd}_{i+1}.sh'
-            target = os.path.join(newt_baseurl, 'file', f'dtn{i+1:02d}', f'{path}')
+            path = f'global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{jd}_{i+1}.sh'
+            host = f'dtn{i+1:02d}'
+            target = os.path.join(newt_baseurl, 'file', host, f'{path}')
             requests.put(target, data=download_script, cookies=ncookies)
 
             # now prepare the arguments of the multithreaded call to make the download
-            target = os.path.join(newt_baseurl, 'command', f'dtn{i+1:02d}')
-            payload = {'executable': f'/bin/bash {path}', 'loginenv':True}
+            host = f'{host}.nersc.gov'
+            thread = threading.Thread(target=execute_download_on_dtn, args=(self, f'/{path}', host))
+            thread.start()
+            threads.append(thread)
 
-            # now call the download asynchronously using grequests
-            request = grequests.post(target, data=payload, cookies=ncookies)
-            async_requests.append(request)
-
-        # this directs all the DTNs to execute their downloads
-        responses = grequests.map(async_requests)
-
-        # check that everything worked as expected
-        for r in responses:
-
-            if r.status_code != 200:
-                raise RuntimeError('Error contacting NEWT')
-
-            jr = r.json()
-
-            if jr['status'] == 'ERROR':
-                error = jr['error']
-                raise RuntimeError(f'Error on dtn02: {error}')
-            else:
-                logging.info(jr['output'])
+        for thread in threads:
+            thread.join()
 
     def update_database_with_new_images(self, npaths, metatable):
 
         # now update the database with the new images
         columns = '(PATH,FILTER,QUADRANT,FIELD,CCDNUM,PID,OBSJD,RA,' \
-                  'DEC,INFOBITS,RCID,FID,PID,NID,EXPID,ITID,OBSDATE,SEEING,AIRMASS,MOONILLF' \
-                  'MOONESB,MAGLIMIT,CRPIX1,CRPIX2,CRVAL1,CRVAL2,CD11,CD12,CD21,CD22,RA1' \
-                  'DEC1,RA2,DEC2,RA3,DEC3,RA4,DEC4,IPAC_PUB_DATE,IPAC_GID)'
+                  'DEC,INFOBITS,RCID,FID,NID,EXPID,ITID,OBSDATE,SEEING,AIRMASS,MOONILLF,' \
+                  'MOONESB,MAGLIMIT,CRPIX1,CRPIX2,CRVAL1,CRVAL2,CD11,CD12,CD21,CD22,RA1,' \
+                  'DEC1,RA2,DEC2,RA3,DEC3,RA4,DEC4,IPAC_GID)'
 
         dbq = f'INSERT INTO IMAGE {columns} VALUES (%s)'
         dbq = dbq % ','.join(['%s'] * len(columns.split(',')))
@@ -359,7 +379,7 @@ class IPACQueryManager(object):
         for i in range(nvariance_jobs):
 
             batch = npaths[i * variance_batchsize:(i + 1) * variance_batchsize]
-            body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch})
+            body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch.tolist()})
 
             # send a message to the job submission script telling it to submit the job
             correlation_id = self.relay_job(body)
@@ -555,16 +575,24 @@ class IPACQueryManager(object):
                     body = json.dumps(data)
                     self.relay_job(body)
 
-
     def __call__(self):
+
+        self.logger.info('Reconnecting to database and message queue...')
 
         # refresh our connections
         self._refresh_connections()
 
+        self.logger.info('Connection successful.')
+
+        self.logger.info('Retrieving new image paths and metadata...')
         # get the new image paths and metadata
-        npaths, ipaths, metatable = self.retrieve_new_image_paths_and_metadata()
+        ipaths, npaths, metatable = self.retrieve_new_image_paths_and_metadata()
+        self.logger.info(f'{len(npaths)} new images found.')
+        self.logger.info(f'New images are: {npaths}')
+        self.logger.debug(f'Metatable is: {metatable}')
 
         # download the images
+        self.logger.info('Beginning image download...')
         self.download_images(npaths, ipaths)
 
         # update the database with the new images that were downloaded
@@ -589,8 +617,17 @@ if __name__ == '__main__':
 
     schemas = [glsn_schema]
 
+    logger = logging.getLogger('poll')
+    logger.setLevel(logging.INFO)
+    ch = logging.StreamHandler(sys.stdout)
+    logger.addHandler(ch)
+
     for s in schemas:
-        manager = IPACQueryManager(s)
+        manager = IPACQueryManager(s, logger)
+        manager()
+
+
+    """
         schedule.every().day.at("06:00").do(manager)
 
     try:
@@ -599,3 +636,4 @@ if __name__ == '__main__':
             time.sleep(600.)  # check every 10 minutes whether to run the job
     except KeyboardInterrupt:
         pass
+    """
