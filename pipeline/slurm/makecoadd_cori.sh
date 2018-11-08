@@ -10,9 +10,9 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:{dlist:s}
 
-frames=$1
-cats=$2
-obase=$3
+frames="$1"
+cats="$2"
+obase="$3"
 
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1

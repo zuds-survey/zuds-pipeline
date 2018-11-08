@@ -27,7 +27,7 @@ formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{mon
 nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/science_frames/{paddedfield:s}/c{paddedccdid:s}/' \
                 '{qid:d}/{filtercode:s}/{fname:s}'
 nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
-tmp_basename_form = '{paddedfield:s}_c{paddedccdid:s}_{qid:d}_{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
+tmp_basename_form = '{paddedfield:06d}_c{paddedccdid:s}_{qid:d}_{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
 date_start = datetime.date(2018, 2, 16)
@@ -331,6 +331,8 @@ class IPACQueryManager(object):
 
             download_script = [f'curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"'
                                for ipath, npath in zip(ipc, npc)]
+            mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
+            download_script.extend(mask_download_script)
 
             # upload the download script to NERSC
 
@@ -379,7 +381,11 @@ class IPACQueryManager(object):
         for i in range(nvariance_jobs):
 
             batch = npaths[i * variance_batchsize:(i + 1) * variance_batchsize]
-            body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch.tolist()})
+
+            if isinstance(batch, np.ndarray):
+                batch = batch.tolist()
+
+            body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch})
 
             # send a message to the job submission script telling it to submit the job
             correlation_id = self.relay_job(body)

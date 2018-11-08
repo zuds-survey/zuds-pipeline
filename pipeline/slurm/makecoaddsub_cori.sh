@@ -14,9 +14,9 @@
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-news=$1
-cats=$2
-obase=$3
+news="$1"
+cats="$2"
+obase="$3"
 
 shifter python /lensgrinder/pipeline/bin/makecoadd.py --input-frames=${news} --input-catalogs=${cats} \
                --output-basename=${obase}

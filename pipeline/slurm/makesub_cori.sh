@@ -10,8 +10,8 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:{dlist:s}
 
-news=$1
-template=$2
+news="$1"
+template="$2"
 
 
 srun -n 64 shifter python /lensgrinder/pipeline/bin/makesub.py --science-images=${news} --templates=${refs}

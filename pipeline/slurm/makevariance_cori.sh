@@ -9,7 +9,7 @@
 #SBATCH --mail-user=dgold@berkeley.edu
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 
-news=$1
-masks=$2
+news="$1"
+masks="$2"
 srun -n 64 shifter python /lensgrinder/pipeline/bin/makevariance.py --input-frames=${news} --mask-frames=${masks}
 

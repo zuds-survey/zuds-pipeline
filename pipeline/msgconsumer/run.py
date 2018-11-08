@@ -1,4 +1,5 @@
 import os
+import sys
 import pika
 import psycopg2
 import requests
@@ -11,7 +12,7 @@ from liblg import nersc_authenticate
 
 
 # some constants
-cwd = os.path.basename(__file__)
+cwd = os.path.dirname(__file__)
 slurmd = os.path.join(cwd, '../', 'slurm')
 mkcoadd_cori = os.path.join(slurmd, 'makecoadd_cori.sh')
 mksub_cori = os.path.join(slurmd, 'makesub_cori.sh')
@@ -21,7 +22,6 @@ newt_baseurl = 'https://newt.nersc.gov/newt'
 
 #database_uri = os.getenv('DATABASE_URI')
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
-
 
 
 def is_up(host):
@@ -41,13 +41,11 @@ def is_up(host):
     return j['status'] == 'up'
 
 
-
-
-
 class TaskHandler(object):
 
-    def __init__(self):
+    def __init__(self, logger):
         self._reconnect()
+        self.logger = logger
 
     def __del__(self):
         self.connection.close()
@@ -80,7 +78,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'queue', host)
         payload = {'jobscript': contents}
 
-        logging.info(payload)
+        self.logger.info(payload)
 
         # submit the job
         r = requests.post(target, data=payload, cookies=cookies)
@@ -108,7 +106,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'queue', host)
         payload = {'jobscript': contents}
 
-        logging.info(payload)
+        self.logger.info(payload)
 
         # submit the job
         r = requests.post(target, data=payload, cookies=cookies)
@@ -134,7 +132,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'queue', host)
         payload = {'jobscript': contents}
 
-        logging.info(payload)
+        self.logger.info(payload)
 
         r = requests.post(target, data=payload, cookies=cookies)
 
@@ -158,7 +156,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'queue', host)
         payload = {'jobscript': contents}
 
-        logging.info(payload)
+        self.logger.info(payload)
 
         r = requests.post(target, data=payload, cookies=cookies)
 
@@ -266,8 +264,14 @@ if __name__ == '__main__':
 
     channel = connection.channel()
 
+
+    logger = logging.getLogger('run')
+    logger.setLevel(logging.INFO)
+    ch = logging.StreamHandler(sys.stdout)
+    logger.addHandler(ch)
+
     # consume stuff from the queue
-    handler = TaskHandler()
+    handler = TaskHandler(logger)
     channel.basic_qos(prefetch_count=1)
     channel.basic_consume(handler, queue='jobs')
     channel.start_consuming()

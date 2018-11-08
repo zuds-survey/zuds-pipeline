@@ -293,7 +293,9 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
 
 ADD . /pipeline
-#ADD msgconsumer /daemon
+ADD msgconsumer /daemon
+ADD slurm /slurm
+ADD config /config
     
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
