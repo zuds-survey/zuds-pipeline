@@ -8,6 +8,15 @@ from astropy.io import fits
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
+
+def _read_clargs(val):
+    if val[0].startswith('@'):
+        # then its a list
+        val = np.genfromtxt(val[0][1:], dtype=None, encoding='ascii')
+        val = np.atleast_1d(val)
+    return np.asarray(val)
+
+
 if __name__ == '__main__':
 
     import argparse
@@ -27,17 +36,15 @@ if __name__ == '__main__':
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-frames', dest='frames', required=True,
-                        help='List of frames to make variance maps for.', nargs=1)
-    parser.add_argument('--input-masks', dest='masks', nargs=1, required=True,
-                        help='List of masks corresponding to input frames.')
+                        help='Frames to make variance maps for. Prefix with "@" to read from a list.', nargs='+')
+    parser.add_argument('--input-masks', dest='masks', nargs='+', required=True,
+                        help='Masks corresponding to input frames. Prefix with "@" to read from a list.')
     args = parser.parse_args()
 
     # distribute the work to each processor
     if rank == 0:
-        frames = np.genfromtxt(args.frames[0], dtype=None, encoding='ascii')
-        masks = np.genfromtxt(args.masks[0], dtype=None, encoding='ascii')
-        frames = np.atleast_1d(frames)
-        masks = np.atleast_1d(masks)
+        frames = _read_clargs(args.frames)
+        masks = _read_clargs(args.masks)
     else:
         frames = None
         masks = None

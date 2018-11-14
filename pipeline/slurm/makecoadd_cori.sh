@@ -9,6 +9,7 @@
 #SBATCH --mail-user=dgold@berkeley.edu
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:{dlist:s}
+#SBATCH -C haswell
 
 frames="$1"
 cats="$2"

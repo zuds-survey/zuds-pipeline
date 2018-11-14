@@ -8,6 +8,8 @@
 #SBATCH --partition=realtime
 #SBATCH --mail-user=dgold@berkeley.edu
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
+#SBATCH --exclusive
+#SBATCH -C haswell
 
 news="$1"
 masks="$2"
