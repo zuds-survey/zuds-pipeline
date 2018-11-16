@@ -77,6 +77,8 @@ if __name__ == '__main__':
         # and store them in the header. note: this call is to compiled fortran
         medg(frame)
 
+
+
         # now get ready to call source extractor
         syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
         catname = frame.replace('fits', 'cat')

@@ -10,6 +10,7 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --exclusive
 #SBATCH -C haswell
+#SBATCH --volume/global/homes/d/dgold:/home/desi
 
 news="$1"
 masks="$2"

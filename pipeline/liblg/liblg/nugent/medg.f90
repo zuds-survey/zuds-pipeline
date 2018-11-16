@@ -19,7 +19,7 @@
       integer :: nc, nr, i, j, stat
       real, allocatable :: image(:,:) 
       real :: med, var, zp, see, lmt, pix
-      character (len = 120) :: filenm
+      character (len = 700) :: filenm
       character (len = 72) :: comment
 
       call get_header(trim(filenm),'NAXIS1',nc,comment)

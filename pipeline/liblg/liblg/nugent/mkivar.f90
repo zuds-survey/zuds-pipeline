@@ -18,7 +18,7 @@
       integer, allocatable :: flag(:,:)
       real, allocatable :: image(:, :), rms(:, :), ivar(:,:)
       real :: sat
-      character(len=120) :: fitsfile, flagfile, rmsfile, ivarfile 
+      character(len=700) :: fitsfile, flagfile, rmsfile, ivarfile
       character(len = 72) :: comment
 
       call get_header(trim(fitsfile),'NAXIS1',nc,comment)
