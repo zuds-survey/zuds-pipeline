@@ -11,6 +11,7 @@
 #SBATCH --dependency=afterok:{dlist:s}
 #SBATCH --exclusive
 #SBATCH -C haswell
+#SBATCH --volume/global/homes/d/dgold:/home/desi
 
 news="$1"
 template="$2"

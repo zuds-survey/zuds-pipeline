@@ -11,7 +11,7 @@
 #SBATCH --dependency=afterok:{dlist:s}
 #SBATCH --exclusive
 #SBATCH -C haswell
-
+#SBATCH --volume/global/homes/d/dgold:/home/desi
 
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1

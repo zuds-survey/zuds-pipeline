@@ -10,6 +10,8 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:{dlist:s}
 #SBATCH -C haswell
+#SBATCH --exclusive
+#SBATCH --volume/global/homes/d/dgold:/home/desi
 
 frames="$1"
 cats="$2"
