@@ -27,7 +27,8 @@ formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{mon
 nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/science_frames/{paddedfield:s}/c{paddedccdid:s}/' \
                 '{qid:d}/{filtercode:s}/{fname:s}'
 nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
-tmp_basename_form = '{paddedfield:06d}_c{paddedccdid:s}_{qid:d}_{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
+tmp_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_' \
+                    '{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
 date_start = datetime.date(2018, 2, 16)
@@ -69,8 +70,7 @@ def execute_download_on_dtn(self, download_script_npath, host):
         raise RuntimeError(errlines)
 
     with outlock:
-        self.logger.info(outlines)
-        self.logger.info(errlines)
+        self.logger.info(f'Download complete on {host}.')
 
 
 class IPACQueryManager(object):
@@ -442,15 +442,15 @@ class IPACQueryManager(object):
                 moredeps = self.determine_and_relay_variance_jobs(remake_variance)
                 dependencies.extend(moredeps.values())
 
-            dependencies = set(dependencies)
+            dependencies = list(set(dependencies))
 
             # what will this template be called?
-            tmpbase = tmp_basename_form.format(paddedfield=ofield,
+            tmpbase = tmp_basename_form.format(paddedfield=field,
                                                qid=oquadrant,
-                                               paddedccdid=occdnum,
+                                               paddedccdid=ccdnum,
                                                filtercode=oband,
-                                               mintime=mindatestr,
-                                               maxtime=maxdatestr)
+                                               mindate=mindatestr,
+                                               maxdate=maxdatestr)
 
             outfile_name = nersc_tmpform.format(fname=tmpbase)
 
@@ -470,7 +470,7 @@ class IPACQueryManager(object):
 
         self._refresh_connections()
 
-        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%S AND FILTER=%s ' \
+        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'AND PIPELINE_SCHEMA_ID=%s'
         self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
         result = self.cursor.fetchall()
@@ -570,7 +570,7 @@ class IPACQueryManager(object):
                         moredeps = self.determine_and_relay_variance_jobs(remake_variance)
                         dependencies.extend(moredeps.values())
 
-                    dependencies = set(dependencies)
+                    dependencies = list(set(dependencies))
 
                     data = {'jobtype': 'coaddsub', 'field': field, 'ccdnum': ccdnum,
                             'quadrant': quadrant, 'mindate': bin[0], 'maxdate': bin[1],
@@ -597,23 +597,24 @@ class IPACQueryManager(object):
         self.logger.info(f'New images are: {npaths}')
         self.logger.debug(f'Metatable is: {metatable}')
 
-        # download the images
-        self.logger.info('Beginning image download...')
-        self.download_images(npaths, ipaths)
+        if len(npaths) > 0:
+            # download the images
+            self.logger.info('Beginning image download...')
+            self.download_images(npaths, ipaths)
 
-        # update the database with the new images that were downloaded
-        self.update_database_with_new_images(npaths, metatable)
+            # update the database with the new images that were downloaded
+            self.update_database_with_new_images(npaths, metatable)
 
-        # now actually determine the new jobs
+            # now actually determine the new jobs
 
-        # batch dispatch variance map making
-        variance_corrids = self.determine_and_relay_variance_jobs(npaths)
+            # batch dispatch variance map making
+            variance_corrids = self.determine_and_relay_variance_jobs(npaths)
 
-        # then make any new templates that are needed
-        template_corrids = self.determine_and_relay_template_jobs(variance_corrids, metatable)
+            # then make any new templates that are needed
+            template_corrids = self.determine_and_relay_template_jobs(variance_corrids, metatable)
 
-        # finally coadd the science frames and make the corresponding subtractions
-        self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
+            # finally coadd the science frames and make the corresponding subtractions
+            self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
 
 
 if __name__ == '__main__':

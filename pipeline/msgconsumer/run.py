@@ -6,6 +6,7 @@ import requests
 import datetime
 import logging
 import json
+import uuid
 
 from pika.exceptions import ConnectionClosed
 from liblg import nersc_authenticate
@@ -62,7 +63,7 @@ class TaskHandler(object):
         contents = contents.format(dlist=deps)
         return contents
 
-    def submit_coadd(self, images, catalogs, obase, data, host='cori'):
+    def submit_coadd(self, images, catalogs, obase, data, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -85,11 +86,11 @@ class TaskHandler(object):
 
         # check the return code
         if r.status_code != 200:
-            raise ValueError('submission did not work')
+            raise ValueError(r.content)
 
         return r.json()['jobid']
 
-    def submit_coaddsub(self, images, catalogs, obase, data, host='cori'):
+    def submit_coaddsub(self, images, catalogs, obase, data, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -108,16 +109,15 @@ class TaskHandler(object):
 
         self.logger.info(payload)
 
-        # submit the job
         r = requests.post(target, data=payload, cookies=cookies)
 
         # check the return code
         if r.status_code != 200:
-            raise ValueError('submission did not work')
+            raise ValueError(r.content)
 
         return r.json()['jobid']
 
-    def submit_variance(self, images, masks, host='cori'):
+    def submit_variance(self, images, masks, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -126,22 +126,32 @@ class TaskHandler(object):
         with open(mkvar_cori, 'r') as f:
             contents = f.read()
 
-        contents = contents.replace('$1', ' '.join(images))
-        contents = contents.replace('$2', ' '.join(masks))
+        contents = contents.replace('$1', '\n'.join(images))
+        contents = contents.replace('$2', '\n'.join(masks))
+
+        if scriptname is None:
+            scriptname = f'{uuid.uuid4().hex}.sh'
+
+        # first upload the job script to scratch
+        path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
+        target = os.path.join(newt_baseurl, 'file', host, path)
+
+        contents = contents.replace('$3', f'/{os.path.dirname(path)}')
+
+        requests.put(target, data=contents, cookies=cookies)
 
         target = os.path.join(newt_baseurl, 'queue', host)
-        payload = {'jobscript': contents}
-
+        payload = {'jobfile': f'/{path}'}
         self.logger.info(payload)
 
         r = requests.post(target, data=payload, cookies=cookies)
 
         if r.status_code != 200:
-            raise ValueError('submission did not work')
+            raise ValueError(r.content)
 
         return r.json()['jobid']
 
-    def submit_sub(self, images, templates, host='cori'):
+    def submit_sub(self, images, templates, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -161,7 +171,7 @@ class TaskHandler(object):
         r = requests.post(target, data=payload, cookies=cookies)
 
         if r.status_code != 200:
-            raise ValueError('submission did not work')
+            raise ValueError(r.content)
 
         return r.json()['jobid']
 
@@ -202,12 +212,14 @@ class TaskHandler(object):
 
             return ch.basic_reject(method.delivery_tag, requeue=False)
 
+        scriptname = f'{properties.correlation_id}.sh'
+
         if data['jobtype'] == 'variance':
 
             new_images = data['images']
             new_masks = [p.replace('sciimg', 'mskimg') for p in new_images]
             submit_func = self.submit_variance
-            args = (new_images, new_masks, host)
+            args = (new_images, new_masks, host, scriptname)
 
         elif data['jobtype'] == 'template':
 
@@ -215,14 +227,14 @@ class TaskHandler(object):
             catalogs = [p.replace('fits', 'cat') for p in images]
             submit_func = self.submit_coadd
             coadd_name = data['outfile_name']
-            args = (images, catalogs, coadd_name, host)
+            args = (images, catalogs, coadd_name, host, scriptname)
 
         elif data['jobtype'] == 'coaddsub':
 
             images = data['images']
             templates = data['templates']
             submit_func = self.submit_coaddsub
-            args = (images, templates, host)
+            args = (images, templates, host, scriptname)
 
         else:
             raise ValueError('invalid task type')
@@ -237,6 +249,8 @@ class TaskHandler(object):
             ch.basic_reject(method.delivery_tag, requeue=False)  # try again in 10
 
         else:
+            self.logger.info(f'Submitted {data["jobtype"]} job {properties.correlation_id} to {host} with '
+                             f'queue ID {jobid}.')
             query = 'UPDATE JOB SET NERSC_ID = %s, STATUS=%s, SUBMIT_TIME=%s, SYSTEM=%s WHERE CORR_ID = %s;'
             self.cursor.execute(query, (jobid, 'PENDING', datetime.datetime.now(),
                                         host, properties.correlation_id))
@@ -247,7 +261,6 @@ class TaskHandler(object):
                                            body=body)
 
         self.connection.commit()
-
 
 
 if __name__ == '__main__':
@@ -264,7 +277,6 @@ if __name__ == '__main__':
 
     channel = connection.channel()
 
-
     logger = logging.getLogger('run')
     logger.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
@@ -273,5 +285,16 @@ if __name__ == '__main__':
     # consume stuff from the queue
     handler = TaskHandler(logger)
     channel.basic_qos(prefetch_count=1)
-    channel.basic_consume(handler, queue='jobs')
+
+    # try to connect
+    while True:
+        try:
+            channel.basic_consume(handler, queue='jobs')
+        except pika.exceptions.ChannelClosed:
+            pass
+        else:
+            break
+
+    logger.info('Connected to rabbitmq')
+
     channel.start_consuming()

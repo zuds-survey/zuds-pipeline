@@ -292,13 +292,6 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
 
-ADD . /pipeline
-ADD msgconsumer /daemon
-ADD slurm /slurm
-ADD config /config
-    
-RUN cd /pipeline/liblg && python setup.py install && \
-    cd -
 
 # for queue monitoring
 RUN pip install pika
@@ -309,6 +302,14 @@ ENV NERSC_PASSWORD ***REMOVED***
 
 RUN conda install astropy=3
 RUN pip install paramiko
+
+ADD . /pipeline
+ADD msgconsumer /daemon
+ADD slurm /slurm
+ADD config /config
+    
+RUN cd /pipeline/liblg && python setup.py install && \
+    cd -
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]
