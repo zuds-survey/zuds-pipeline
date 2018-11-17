@@ -22,12 +22,16 @@ if __name__ == '__main__':
     import argparse
     from mpi4py import MPI
 
+    import logging
+
     # set up the inter-rank communication
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    logstr = '[Rank {rank}]: {message}'
+    FORMAT = '[Rank %(rank)d %(asctime)-15s]: %(message)s'
+    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+    extra = {'rank': rank}
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -63,7 +67,7 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
-        print(logstr.format(message='Working image %s' % frame, rank=rank), flush=True)
+        logging.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
@@ -91,8 +95,8 @@ if __name__ == '__main__':
         filtered_string = '\n'.join(splf)
         filtered_string = '\n' + filtered_string.replace('[1A', '')
         
-        # log it
-        print(logstr.format(message=filtered_string, rank=rank), flush=True)
+        # log it 
+        logging.info(filtered_string, extra=extra)
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
