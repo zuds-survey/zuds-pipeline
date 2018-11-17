@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
-        print(logstr.format(message='Working image %s' % frame, rank=rank))
+        print(logstr.format(message='Working image %s' % frame, rank=rank), flush=True)
 
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
@@ -92,7 +92,7 @@ if __name__ == '__main__':
         filtered_string = '\n' + filtered_string.replace('[1A', '')
         
         # log it
-        print(logstr.format(message=filtered_string, rank=rank))
+        print(logstr.format(message=filtered_string, rank=rank), flush=True)
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
