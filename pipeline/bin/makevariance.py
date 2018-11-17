@@ -22,16 +22,12 @@ if __name__ == '__main__':
     import argparse
     from mpi4py import MPI
 
-    import logging
-
     # set up the inter-rank communication
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    FORMAT = '[Rank %(rank)d %(asctime)-15s]: %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
-    extra = {'rank': rank}
+    logstr = '[Rank %d]: %(message)s'
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -67,7 +63,7 @@ if __name__ == '__main__':
 
     for frame, mask in zip(frames, masks):
 
-        logging.info('Working image %s' % frame, extra=extra)
+        print(logstr.format(message='Working image %s' % frame, rank=rank))
 
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
@@ -76,8 +72,6 @@ if __name__ == '__main__':
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
         medg(frame)
-
-
 
         # now get ready to call source extractor
         syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
@@ -97,8 +91,8 @@ if __name__ == '__main__':
         filtered_string = '\n'.join(splf)
         filtered_string = '\n' + filtered_string.replace('[1A', '')
         
-        # log it 
-        logging.info(filtered_string, extra=extra)
+        # log it
+        print(logstr.format(message=filtered_string, rank=rank))
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
