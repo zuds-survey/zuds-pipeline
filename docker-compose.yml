@@ -11,6 +11,8 @@ services:
         - "msgqueue"
         - "db"
         - "nersc-job-submission-service"
+    stdin_open: true
+    tty: true
 
   nersc-queue-monitor-service:
     build: ./queuemon
@@ -30,4 +32,4 @@ services:
 
   db:
     build: ./q3cpsql
-    command: [postgres, -c, 'log_statement=all']
+#    command: [postgres, -c, 'log_statement=all']

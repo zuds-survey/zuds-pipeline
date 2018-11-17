@@ -12,6 +12,7 @@
 #SBATCH -C haswell
 #SBATCH --exclusive
 #SBATCH --volume/global/homes/d/dgold:/home/desi
+#SBATCH -o $4/slurm-%A.out
 
 frames="$1"
 cats="$2"
@@ -20,5 +21,5 @@ obase="$3"
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-shifter python /lensgrinder/pipeline/bin/makecoadd.py --input-frames=${frames} --input-catalogs=${cats} \
-               --output-basename=${obase}
+shifter python /lensgrinder/pipeline/bin/makecoadd.py --input-frames ${frames} --input-catalogs ${cats} \
+               --output-basename ${obase}

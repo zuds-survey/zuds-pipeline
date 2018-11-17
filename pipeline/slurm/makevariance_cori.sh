@@ -18,5 +18,5 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 news="$1"
 masks="$2"
-srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames=${news} --input-masks=${masks}
+srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames ${news} --input-masks ${masks}
 

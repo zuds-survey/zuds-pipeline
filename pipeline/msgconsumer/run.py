@@ -76,15 +76,21 @@ class TaskHandler(object):
         contents = contents.replace('$3', obase)
         contents = self.resolve_dependencies(contents, data)
 
-        target = os.path.join(newt_baseurl, 'queue', host)
-        payload = {'jobscript': contents}
+        if scriptname is None:
+            scriptname = f'{uuid.uuid4().hex}.sh'
 
+            # first upload the job script to scratch
+        path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
+        target = os.path.join(newt_baseurl, 'file', host, path)
+        contents = contents.replace('$4', f'/{os.path.dirname(path)}')
+        requests.put(target, data=contents, cookies=cookies)
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobfile': f'/{path}'}
         self.logger.info(payload)
 
-        # submit the job
         r = requests.post(target, data=payload, cookies=cookies)
 
-        # check the return code
         if r.status_code != 200:
             raise ValueError(r.content)
 
@@ -104,9 +110,17 @@ class TaskHandler(object):
         contents = contents.replace('$3', obase)
         contents = self.resolve_dependencies(contents, data)
 
-        target = os.path.join(newt_baseurl, 'queue', host)
-        payload = {'jobscript': contents}
+        if scriptname is None:
+            scriptname = f'{uuid.uuid4().hex}.sh'
 
+            # first upload the job script to scratch
+        path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
+        target = os.path.join(newt_baseurl, 'file', host, path)
+        contents = contents.replace('$4', f'/{os.path.dirname(path)}')
+        requests.put(target, data=contents, cookies=cookies)
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobfile': f'/{path}'}
         self.logger.info(payload)
 
         r = requests.post(target, data=payload, cookies=cookies)
@@ -132,7 +146,7 @@ class TaskHandler(object):
         if scriptname is None:
             scriptname = f'{uuid.uuid4().hex}.sh'
 
-        # first upload the job script to scratch
+            # first upload the job script to scratch
         path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
         target = os.path.join(newt_baseurl, 'file', host, path)
 
@@ -227,14 +241,15 @@ class TaskHandler(object):
             catalogs = [p.replace('fits', 'cat') for p in images]
             submit_func = self.submit_coadd
             coadd_name = data['outfile_name']
-            args = (images, catalogs, coadd_name, host, scriptname)
+            args = (images, catalogs, coadd_name[:-5], data, host, scriptname)
 
         elif data['jobtype'] == 'coaddsub':
 
             images = data['images']
-            templates = data['templates']
+            cats = [p.replace('.fits', '.cat') for p in images]
+            obase = data['outfile_name'][:-5]
             submit_func = self.submit_coaddsub
-            args = (images, templates, host, scriptname)
+            args = (images, cats, obase, data, host, scriptname)
 
         else:
             raise ValueError('invalid task type')

@@ -63,7 +63,7 @@ if __name__ == '__main__':
         new_messages = fetch_new_messages(channel)
 
         for message in new_messages:
-            job_cache[message[1].properties.correlation_id] = message
+            job_cache[message[1].correlation_id] = message
 
         cursor.execute(query, ('PENDING', 'RUNNING'))
         active_jobs = cursor.fetchall()

@@ -27,8 +27,12 @@ formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{mon
 nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/science_frames/{paddedfield:s}/c{paddedccdid:s}/' \
                 '{qid:d}/{filtercode:s}/{fname:s}'
 nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
+
 tmp_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_' \
                     '{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
+coadd_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_{filtercode:s}' \
+                      '_{mindate:s}_{maxdate:s}_ztf_coadd.fits'
+
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
 date_start = datetime.date(2018, 2, 16)
@@ -378,6 +382,11 @@ class IPACQueryManager(object):
         variance_corrids = {}
 
         nvariance_jobs = len(npaths) // variance_batchsize + (1 if len(npaths) % variance_batchsize > 0 else 0)
+
+        self.logger.debug(f'npaths is {npaths}')
+        self.logger.debug(f'length of npaths is {len(npaths)}')
+        self.logger.debug(f'nvariance_jobs is {nvariance_jobs}')
+
         for i in range(nvariance_jobs):
 
             batch = npaths[i * variance_batchsize:(i + 1) * variance_batchsize]
@@ -385,6 +394,7 @@ class IPACQueryManager(object):
             if isinstance(batch, np.ndarray):
                 batch = batch.tolist()
 
+            self.logger.info(f'New batch: {batch}')
             body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch})
 
             # send a message to the job submission script telling it to submit the job
@@ -416,7 +426,7 @@ class IPACQueryManager(object):
             if not self.needs_template(field, ccdnum, quadrant, band):
                 continue
 
-            tmplims, tmplids, jds, hasvar = self.create_template_image_list(field, ccdnum, quadrant, band)
+            tmplids, tmplims, jds, hasvar = self.create_template_image_list(field, ccdnum, quadrant, band)
 
             minjd = np.min(jds)
             maxjd = np.max(jds)
@@ -455,30 +465,36 @@ class IPACQueryManager(object):
             outfile_name = nersc_tmpform.format(fname=tmpbase)
 
             # now that we have the dependencies we can relay the coadd job for submission
-            body = json.dumps({'dependencies':dependencies, 'jobtype':'template', 'images':tmplims,
-                               'outfile_name': outfile_name, 'imids': tmplids, 'quadrant': quadrant,
-                               'field': field, 'ccdnum': ccdnum, 'mindate':mindatestr,
-                               'maxdate':maxdatestr, 'filter': band,
-                               'pipeline_schema_id': self.pipeline_schema['schema_id'],
-                               })
+            tmpl_data = {'dependencies':dependencies, 'jobtype':'template', 'images':tmplims,
+                         'outfile_name': outfile_name, 'imids': tmplids, 'quadrant': quadrant,
+                         'field': field, 'ccdnum': ccdnum, 'mindate':mindatestr,
+                         'maxdate':maxdatestr, 'filter': band,
+                         'pipeline_schema_id': self.pipeline_schema['schema_id']}
+
+            body = json.dumps(tmpl_data)
             tmpl_corrid = self.relay_job(body)
-            template_corrids[(field, quadrant, band, ccdnum)] = (tmpl_corrid, outfile_name)
+            template_corrids[(field, quadrant, band, ccdnum)] = (tmpl_corrid, tmpl_data)
 
         return template_corrids
 
-    def make_coadd_bins(self, field, ccdnum, quadrant, filter):
+    def make_coadd_bins(self, field, ccdnum, quadrant, filter, maxdate=None):
 
         self._refresh_connections()
 
-        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
-                'AND PIPELINE_SCHEMA_ID=%s'
-        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
-        result = self.cursor.fetchall()
 
-        if len(result) == 0:
-            raise ValueError('No template -- can\'t make coadd bins')
+        if maxdate is None:
+            query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                    'AND PIPELINE_SCHEMA_ID=%s'
+            self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
+            result = self.cursor.fetchall()
 
-        date = result[0][0]
+            if len(result) == 0:
+                raise ValueError('No template queued or on disk -- can\'t make coadd bins')
+            date = result[0][0]
+
+        else:
+            date = maxdate
+
         startsci = pd.to_datetime(date) + pd.Timedelta(self.pipeline_schema['template_science_minsep_days'],
                                                        unit='d')
 
@@ -492,7 +508,7 @@ class IPACQueryManager(object):
 
         else:
             binedges = pd.date_range(startsci, pd.to_datetime(datetime.datetime.today()),
-                                     freq=f'{self.pipeline_schema["scicoadd_window_size"]}')
+                                     freq=f'{self.pipeline_schema["scicoadd_window_size"]}D')
 
             bins = []
             for i, lbin in enumerate(binedges[:-1]):
@@ -538,20 +554,23 @@ class IPACQueryManager(object):
             band = filter[1:]
             ccdnum = int(ccdnum)
 
+            dependencies = []
+            if (field, quadrant, band, ccdnum) in template_corrids:
+                corrid, tmplbody = template_corrids[(field, quadrant, band, ccdnum)]
+                tmplpath = tmplbody['outfile_name']
+                maxdate = pd.to_datetime(tmplbody['maxdate'])
+                dependencies.append(corrid)
+            else:
+                _, tmplpath = self.get_latest_template(field, ccdnum, quadrant, band)
+                maxdate = None
+
             # get the bins
-            bins = self.make_coadd_bins(field, ccdnum, quadrant, band)
+            bins = self.make_coadd_bins(field, ccdnum, quadrant, band, maxdate=maxdate)
 
             for bin in bins:
                 runjob, ids, paths, hasvar = self.evaluate_coadd_and_sub(field, ccdnum, quadrant, band, *bin)
 
                 if runjob:
-
-                    dependencies = []
-                    if (field, quadrant, band, ccdnum) in template_corrids:
-                        corrid, tmplpath = template_corrids[(field, quadrant, band, ccdnum)]
-                        dependencies.append(corrid)
-                    else:
-                        _, tmplpath = self.get_latest_template(field, ccdnum, quadrant, filter)
 
                     # build up dependencies
 
@@ -572,11 +591,20 @@ class IPACQueryManager(object):
 
                     dependencies = list(set(dependencies))
 
+                    outfile_name = coadd_basename_form.format(
+                        paddedfield=field,
+                        paddedccdid=ccdnum,
+                        qid=quadrant,
+                        filtercode=filter,
+                        mindate=bin[0],
+                        maxdate=bin[1],
+                    )
+
                     data = {'jobtype': 'coaddsub', 'field': field, 'ccdnum': ccdnum,
                             'quadrant': quadrant, 'mindate': bin[0], 'maxdate': bin[1],
                             'images': paths, 'template': tmplpath, 'filter':band,
                             'pipeline_schema_id': self.pipeline_schema['schema_id'],
-                            'dependencies': dependencies}
+                            'dependencies': dependencies, 'outfile_name': outfile_name}
 
                     body = json.dumps(data)
                     self.relay_job(body)
@@ -625,7 +653,7 @@ if __name__ == '__main__':
     schemas = [glsn_schema]
 
     logger = logging.getLogger('poll')
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.DEBUG)
     ch = logging.StreamHandler(sys.stdout)
     logger.addHandler(ch)
 

@@ -6,3 +6,4 @@ RUN pip install schedule grequests ztfquery
 ADD poll.py /poll.py
 
 ENTRYPOINT ["python", "/poll.py"]
+#ENTRYPOINT ["ipython"]
