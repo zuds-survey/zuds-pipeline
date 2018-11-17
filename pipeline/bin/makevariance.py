@@ -27,7 +27,7 @@ if __name__ == '__main__':
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    logstr = '[Rank %d]: %(message)s'
+    logstr = '[Rank {rank}]: {message}'
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
