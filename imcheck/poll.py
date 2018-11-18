@@ -522,7 +522,11 @@ class IPACQueryManager(object):
         query = 'SELECT ID, PATH, HASVARIANCE FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                 'AND GOOD=TRUE AND OBSDATE BETWEEN %s AND %s'
         self.cursor.execute(query, (field, ccdnum, quadrant, band, binl, binr))
-        oughtids, oughtpaths, hasvar = list(zip(*self.cursor.fetchall()))
+        result = self.cursor.fetchall()
+        if len(result) == 0:
+            return False, [], [], []
+        else:
+            oughtids, oughtpaths, hasvar = list(zip(*result))
 
         # see what is in the coadd
         query = 'SELECT ID FROM COADD WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
@@ -644,7 +648,7 @@ class IPACQueryManager(object):
 
         if len(npaths) > 0:
             # download the images
-            self.logger.info('Beginning image download...')
+            self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
             self.download_images(npaths, ipaths)
 
             # update the database with the new images that were downloaded

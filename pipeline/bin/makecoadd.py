@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import liblg
+import uuid
 from astropy.io import fits
 
 
@@ -53,7 +54,13 @@ if __name__ == '__main__':
     allims = ' '.join(frames)
     out = args.output_basename[0] + '.fits'
     oweight = args.output_basename[0] + '.weight.fits'
+
+    # put all swarp temp files into a random dir
+    swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
+    os.makedirs(swarp_rundir)
+
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
+    syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
     liblg.execute(syscall, capture=False)
 
     # Now postprocess it a little bit

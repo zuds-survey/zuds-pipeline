@@ -13,6 +13,14 @@ newt_baseurl = 'https://newt.nersc.gov/newt'
 #database_uri = os.getenv('DATABASE_URI')
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 
+_status_dict ={
+    'R':'RUNNING',
+    'PD': 'PENDING',
+    'F': 'FAILED',
+    'TO': 'TIMEOUT',
+    'CD': 'COMPLETED'
+}
+
 
 def fetch_new_messages(ch):
 
@@ -70,12 +78,15 @@ if __name__ == '__main__':
 
         for corr_id, nersc_id, machine, status in active_jobs:
 
+            # database inserts dashes for some reason
+            corr_id = corr_id.replace('-', '')
+
             uquery = 'UPDATE JOB SET STATUS=%s'
             target = os.path.join(newt_baseurl, 'queue', f'{machine}', f'{nersc_id}', 'sacct')
             r = requests.get(target, cookies=ncookies)
 
             data = r.json()
-            current_status = data['status'].upper()
+            current_status = _status_dict[data['status'].upper()]
             args = []
             resubmit = False
 
@@ -85,7 +96,7 @@ if __name__ == '__main__':
             else:
                 args.append(status)
 
-            if status == 'COMPLETED':
+            if current_status == 'COMPLETED':
                 uquery += ', TIMEUSE=%s'
                 args.append(data['timeuse'])
 
@@ -148,7 +159,7 @@ if __name__ == '__main__':
 
                 del job_cache[corr_id]
 
-            elif status == 'FAILED' or status == 'TIMEOUT':
+            elif current_status == 'FAILED' or current_status == 'TIMEOUT':
                 # resubmit
                 resubmit = True
                 args[0] = 'UNSUBMITTED'

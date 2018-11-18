@@ -2,6 +2,7 @@ import os
 import numpy as np
 from astropy.io import fits
 from liblg import make_rms, cmbmask, execute
+import uuid
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -165,9 +166,15 @@ if __name__ == '__main__':
             with open(newhead, 'r') as nh:
                 f.write(nh.read())
 
+        # put all swarp temp files into a random dir
+        swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
+        os.makedirs(swarp_rundir)
+
         # Make the remapped ref
         syscall = 'swarp -c %s %s -SUBTRACT_BACK N -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s'
         syscall = syscall % (defswarp, template, refremap, refremapweight)
+        syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
+
         execute(syscall, capture=False)
 
         # Make the noise and bpm images
