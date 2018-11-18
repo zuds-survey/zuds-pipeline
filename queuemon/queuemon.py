@@ -7,6 +7,7 @@ import psycopg2
 import datetime
 from pika.exceptions import ConnectionClosed
 from liblg import nersc_authenticate
+import pandas as pd
 
 newt_baseurl = 'https://newt.nersc.gov/newt'
 #database_uri = os.getenv('DATABASE_URI')
@@ -54,7 +55,6 @@ if __name__ == '__main__':
     ncookies = nersc_authenticate()
 
     query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s;"
-    uquery = 'UPDATE JOB SET STATUS=%s'
 
     job_cache = {}
 
@@ -70,6 +70,7 @@ if __name__ == '__main__':
 
         for corr_id, nersc_id, machine, status in active_jobs:
 
+            uquery = 'UPDATE JOB SET STATUS=%s'
             target = os.path.join(newt_baseurl, 'queue', f'{machine}', f'{nersc_id}', 'sacct')
             r = requests.get(target, cookies=ncookies)
 
@@ -102,8 +103,8 @@ if __name__ == '__main__':
                     quadrant = bodyd['quadrant']
                     field = bodyd['field']
                     ccdnum = bodyd['ccdnum']
-                    mindate = bodyd['mindate']
-                    maxdate = bodyd['maxdate']
+                    mindate = pd.to_datetime(bodyd['mindate']).to_pydatetime()
+                    maxdate = pd.to_datetime(bodyd['maxdate']).to_pydatetime()
                     pipeline_schema_id = bodyd['pipeline_schema_id']
                     procdate = datetime.datetime.utcnow()
 
@@ -154,7 +155,7 @@ if __name__ == '__main__':
                 body = job_cache[corr_id][2]
                 del job_cache[corr_id]
 
-            uquery += ' WHERE CORR_ID = %s;'
+            uquery += ' WHERE CORR_ID = %s'
             args.append(corr_id)
 
             # need to do this before sending the message

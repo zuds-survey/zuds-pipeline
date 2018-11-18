@@ -57,10 +57,10 @@ class TaskHandler(object):
 
     def resolve_dependencies(self, contents, data):
         query = 'SELECT DISTINCT NERSC_ID FROM JOB WHERE CORR_ID IN %s'
-        self.cursor.execute(query, (list(data['dependencies']),))
-        deps = [r[0] for r in self.cursor.fetchall()]
+        self.cursor.execute(query, (tuple(data['dependencies']),))
+        deps = [str(r[0]) for r in self.cursor.fetchall()]
         deps = ':'.join(deps)
-        contents = contents.format(dlist=deps)
+        contents = contents.replace('DLIST', deps)
         return contents
 
     def submit_coadd(self, images, catalogs, obase, data, host='cori', scriptname=None):
@@ -83,6 +83,7 @@ class TaskHandler(object):
         path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
+        contents = contents.replace('$5', f'coadd_{scriptname.replace(".sh","")}')
         requests.put(target, data=contents, cookies=cookies)
 
         target = os.path.join(newt_baseurl, 'queue', host)
@@ -96,7 +97,8 @@ class TaskHandler(object):
 
         return r.json()['jobid']
 
-    def submit_coaddsub(self, images, catalogs, obase, data, host='cori', scriptname=None):
+    def submit_coaddsub(self, images, catalogs, obase, template,
+                        data, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -108,6 +110,7 @@ class TaskHandler(object):
         contents = contents.replace('$1', ' '.join(images))
         contents = contents.replace('$2', ' '.join(catalogs))
         contents = contents.replace('$3', obase)
+        contents = contents.replace('$6', template)
         contents = self.resolve_dependencies(contents, data)
 
         if scriptname is None:
@@ -117,6 +120,7 @@ class TaskHandler(object):
         path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
+        contents = contents.replace('$5', f'coaddsub_{scriptname.replace(".sh","")}')
         requests.put(target, data=contents, cookies=cookies)
 
         target = os.path.join(newt_baseurl, 'queue', host)
@@ -151,6 +155,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'file', host, path)
 
         contents = contents.replace('$3', f'/{os.path.dirname(path)}')
+        contents = contents.replace('$4', f'variance_{scriptname.replace(".sh","")}')
 
         requests.put(target, data=contents, cookies=cookies)
 
@@ -246,10 +251,11 @@ class TaskHandler(object):
         elif data['jobtype'] == 'coaddsub':
 
             images = data['images']
+            template = data['template']
             cats = [p.replace('.fits', '.cat') for p in images]
             obase = data['outfile_name'][:-5]
             submit_func = self.submit_coaddsub
-            args = (images, cats, obase, data, host, scriptname)
+            args = (images, cats, obase, template, data, host, scriptname)
 
         else:
             raise ValueError('invalid task type')

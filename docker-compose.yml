@@ -21,6 +21,10 @@ services:
         - "db"
         - "nersc-job-submission-service"
 
+    stdin_open: true
+    tty: true
+
+
   nersc-job-submission-service:
     build: ./pipeline
     depends_on:

@@ -11,10 +11,10 @@
 #SBATCH --dependency=afterok:{dlist:s}
 #SBATCH --exclusive
 #SBATCH -C haswell
-#SBATCH --volume/global/homes/d/dgold:/home/desi
+#SBATCH --volume=/global/homes/d/dgold:/home/desi
 
 news="$1"
 template="$2"
 
 
-srun -n 64 shifter python /lensgrinder/pipeline/bin/makesub.py --science-images=${news} --templates=${refs}
+srun -n 64 shifter python /pipeline/bin/makesub.py --science-images=${news} --templates=${refs}

@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH -N 1
-#SBATCH -J diffem
+#SBATCH -J $4
 #SBATCH -t 00:30:00
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***

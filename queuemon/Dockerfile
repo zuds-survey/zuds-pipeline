@@ -4,4 +4,5 @@ MAINTAINER Danny Goldstein <dgold@caltech.edu>
 ADD queuemon.py /queuemon.py
 
 ENTRYPOINT ["python", "/queuemon.py"]
+#ENTRYPOINT ["ipython"]
 

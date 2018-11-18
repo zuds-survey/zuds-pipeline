@@ -28,6 +28,7 @@ nersc_formula = '/global/cscratch1/sd/dgold/ztfcoadd/science_frames/{paddedfield
                 '{qid:d}/{filtercode:s}/{fname:s}'
 nersc_tmpform = '/global/cscratch1/sd/dgold/ztfcoadd/templates/{fname:s}'
 
+
 tmp_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_' \
                     '{filtercode:s}_{mindate:s}_{maxdate:s}_ztf_deepref.fits'
 coadd_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_{filtercode:s}' \
@@ -435,7 +436,7 @@ class IPACQueryManager(object):
             maxtime = Time(maxjd, format='jd', scale='utc')
 
             mindatestr = mintime.iso.split()[0].replace('-', '')
-            maxdatestr = maxtime.iso.split()[1].replace('-', '')
+            maxdatestr = maxtime.iso.split()[0].replace('-', '')
 
             # see what jobs need to finish before this one can run
             dependencies = []
@@ -481,7 +482,6 @@ class IPACQueryManager(object):
 
         self._refresh_connections()
 
-
         if maxdate is None:
             query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
                     'AND PIPELINE_SCHEMA_ID=%s'
@@ -518,20 +518,26 @@ class IPACQueryManager(object):
 
     def evaluate_coadd_and_sub(self, field, ccdnum, quadrant, band, binl, binr):
 
-        query = 'SELECT ID FROM COADD WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
-                'ORDER BY PROC_DATE DESC LIMIT 1'
+        # see what should be in the coadd
+        query = 'SELECT ID, PATH, HASVARIANCE FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                'AND GOOD=TRUE AND OBSDATE BETWEEN %s AND %s'
         self.cursor.execute(query, (field, ccdnum, quadrant, band, binl, binr))
-        cid = self.cursor.fetchone()[0]
+        oughtids, oughtpaths, hasvar = list(zip(*self.cursor.fetchall()))
+
+        # see what is in the coadd
+        query = 'SELECT ID FROM COADD WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                'AND MINDATE=%s AND MAXDATE=%s ORDER BY PROCDATE DESC LIMIT 1'
+        self.cursor.execute(query, (field, ccdnum, quadrant, band, binl, binr))
+
+        try:
+            cid = self.cursor.fetchone()[0]
+        except TypeError:  # there is no previous coadd
+            return True, oughtids, oughtpaths, hasvar
 
         query = 'SELECT IMAGE_ID FROM COADDIMAGEASSOC WHERE COADD_ID=%s'
         self.cursor.execute(query, (cid,))
         imids = [p[0] for p in self.cursor.fetchall()]
 
-        # now see what should be in the coadd
-        query = 'SELECT ID, PATH, HAS_VARIANCE FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
-                'AND GOOD=TRUE'
-        self.cursor.exceute(query, field, ccdnum, quadrant, band)
-        oughtids, oughtpaths, hasvar = list(zip(*self.cursor.fetchall()))
         diff = np.setxor1d(oughtids, imids, assume_unique=True)
 
         return len(diff) > 0, oughtids, oughtpaths, hasvar
@@ -574,37 +580,49 @@ class IPACQueryManager(object):
 
                     # build up dependencies
 
-                    dependencies = []
+                    my_dependencies = []
                     remake_variance = []
                     for path, hv in zip(paths, hasvar):
                         if not hv:
                             if path in variance_corrids:
                                 varcorrid = variance_corrids[path]
-                                dependencies.append(varcorrid)
+                                my_dependencies.append(varcorrid)
                             else:
                                 remake_variance.append(path)
 
                     if len(remake_variance) > 0:
 
                         moredeps = self.determine_and_relay_variance_jobs(remake_variance)
-                        dependencies.extend(moredeps.values())
+                        my_dependencies.extend(moredeps.values())
 
-                    dependencies = list(set(dependencies))
+                    my_dependencies = list(set(my_dependencies))
+                    my_dependencies.extend(dependencies)
+
+                    mindatestr = bin[0].strftime('%Y%m%d')
+                    maxdatestr = bin[1].strftime('%Y%m%d')
 
                     outfile_name = coadd_basename_form.format(
                         paddedfield=field,
                         paddedccdid=ccdnum,
                         qid=quadrant,
                         filtercode=filter,
-                        mindate=bin[0],
-                        maxdate=bin[1],
+                        mindate=mindatestr,
+                        maxdate=maxdatestr,
+                    )
+
+                    outfile_name = nersc_formula.format(
+                        paddedfield='%06d' % field,
+                        paddedccdid='%02d' % ccdnum,
+                        qid=quadrant,
+                        filtercode=filter,
+                        fname=outfile_name
                     )
 
                     data = {'jobtype': 'coaddsub', 'field': field, 'ccdnum': ccdnum,
-                            'quadrant': quadrant, 'mindate': bin[0], 'maxdate': bin[1],
+                            'quadrant': quadrant, 'mindate': mindatestr, 'maxdate': maxdatestr,
                             'images': paths, 'template': tmplpath, 'filter':band,
                             'pipeline_schema_id': self.pipeline_schema['schema_id'],
-                            'dependencies': dependencies, 'outfile_name': outfile_name}
+                            'dependencies': my_dependencies, 'outfile_name': outfile_name}
 
                     body = json.dumps(data)
                     self.relay_job(body)
@@ -622,7 +640,6 @@ class IPACQueryManager(object):
         # get the new image paths and metadata
         ipaths, npaths, metatable = self.retrieve_new_image_paths_and_metadata()
         self.logger.info(f'{len(npaths)} new images found.')
-        self.logger.info(f'New images are: {npaths}')
         self.logger.debug(f'Metatable is: {metatable}')
 
         if len(npaths) > 0:
