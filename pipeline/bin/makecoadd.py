@@ -48,7 +48,12 @@ if __name__ == '__main__':
     mycats = ' '.join(cats)
 
     # First scamp everything
+    # make a random dir for the output catalogs
+    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
+    os.makedirs(scamp_outpath)
+
     syscall = 'scamp -c %s %s' % (scampconf, mycats)
+    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
     liblg.execute(syscall, capture=False)
 
     allims = ' '.join(frames)

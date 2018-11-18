@@ -249,6 +249,9 @@ class IPACQueryManager(object):
 
         # query ipac and return the images that are in its database but not in ours
 
+        # refresh our connections
+        self._refresh_connections()
+
         td = datetime.date.today()
         zquery = zq.ZTFQuery()
 
@@ -274,7 +277,7 @@ class IPACQueryManager(object):
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
             zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID=1 AND '
-                                           'QID=1 AND FILTERCODE=\'zg\'' % (left, right),
+                                           'QID=1' % (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -309,6 +312,9 @@ class IPACQueryManager(object):
         return ipaths, new, tab.iloc[inds]
 
     def download_images(self, npaths, ipaths):
+
+        # refresh our connections
+        self._refresh_connections()
 
         # with the paths generated now we can make the download commands
         tasks = list(zip(ipaths, npaths))
@@ -358,6 +364,9 @@ class IPACQueryManager(object):
 
     def update_database_with_new_images(self, npaths, metatable):
 
+        # refresh our connections
+        self._refresh_connections()
+
         # now update the database with the new images
         columns = '(PATH,FILTER,QUADRANT,FIELD,CCDNUM,PID,OBSJD,RA,' \
                   'DEC,INFOBITS,RCID,FID,NID,EXPID,ITID,OBSDATE,SEEING,AIRMASS,MOONILLF,' \
@@ -379,6 +388,9 @@ class IPACQueryManager(object):
 
     def determine_and_relay_variance_jobs(self, npaths):
         # everything needs variance. submit batches of 1024
+
+        # refresh our connections
+        self._refresh_connections()
 
         variance_corrids = {}
 
@@ -407,6 +419,10 @@ class IPACQueryManager(object):
         return variance_corrids
 
     def determine_and_relay_template_jobs(self, variance_corrids, metatable):
+
+        # refresh our connections
+        self._refresh_connections()
+
 
         # check to see if new templates are needed
         template_corrids = {}
@@ -555,6 +571,9 @@ class IPACQueryManager(object):
 
     def determine_and_relay_coaddsub_jobs(self, variance_corrids, template_corrids, metatable):
 
+        # refresh our connections
+        self._refresh_connections()
+
         for (field, ccdnum, quadrant, filter), group in metatable.groupby(['field', 'ccdid',
                                                                            'qid', 'filtercode']):
 
@@ -634,10 +653,6 @@ class IPACQueryManager(object):
     def __call__(self):
 
         self.logger.info('Reconnecting to database and message queue...')
-
-        # refresh our connections
-        self._refresh_connections()
-
         self.logger.info('Connection successful.')
 
         self.logger.info('Retrieving new image paths and metadata...')

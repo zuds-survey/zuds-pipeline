@@ -6,7 +6,7 @@
 #SBATCH -A ***REMOVED***
 #SBATCH --mail-type=ALL
 #SBATCH --partition=realtime
-#SBATCH --mail-user=dgold@berkeley.edu
+#SBATCH --mail-user=ztfcoadd@gmail.com
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:DLIST
 #SBATCH -C haswell
