@@ -247,7 +247,7 @@ if __name__ == '__main__':
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
         syscall += clargs % defparsub
-        syscall += f' -FLAG_IMAGE {badpix}'
+        syscall += f' -FLAG_IMAGE {submask}'
         print(syscall)
         execute(syscall, capture=False)
 
