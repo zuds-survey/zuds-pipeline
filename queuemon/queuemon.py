@@ -14,11 +14,12 @@ newt_baseurl = 'https://newt.nersc.gov/newt'
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 
 _status_dict ={
-    'R':'RUNNING',
+    'R': 'RUNNING',
     'PD': 'PENDING',
     'F': 'FAILED',
     'TO': 'TIMEOUT',
-    'CD': 'COMPLETED'
+    'CD': 'COMPLETED',
+    'CA': 'CANCELLED'
 }
 
 
@@ -62,7 +63,8 @@ if __name__ == '__main__':
 
     ncookies = nersc_authenticate()
 
-    query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s;"
+    query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s " \
+            "ORDER BY SUBMIT_TIME DESC LIMIT 1000"  # the 'order by' is important because it ensures correct resub order
 
     job_cache = {}
 
@@ -74,7 +76,7 @@ if __name__ == '__main__':
             job_cache[message[1].correlation_id] = message
 
         cursor.execute(query, ('PENDING', 'RUNNING'))
-        active_jobs = cursor.fetchall()
+        active_jobs = cursor.fetchall()[::-1]  # want the latest jobs, in ascending order (hence the [::-1])
 
         for corr_id, nersc_id, machine, status in active_jobs:
 
@@ -94,12 +96,11 @@ if __name__ == '__main__':
                 continue
 
             else:
-                args.append(status)
+                args.append(current_status)
 
             if current_status == 'COMPLETED':
                 uquery += ', TIMEUSE=%s'
                 args.append(data['timeuse'])
-
                 bodyd = json.loads(job_cache[corr_id][2])
 
                 if bodyd['jobtype'] == 'template':
@@ -107,7 +108,7 @@ if __name__ == '__main__':
 
                     query = 'INSERT INTO TEMPLATE (PATH, FILTER, QUADRANT, FIELD, CCDNUM, ' \
                             'MINDATE, MAXDATE, PIPELINE_SCHEMA_ID, PROCDATE, NIMG) VALUES (' \
-                            '%s, %s, %s, %s, %s, %s, %s ,%s, %s) RETURNING ID'
+                            '%s, %s, %s, %s, %s, %s, %s ,%s, %s, %s) RETURNING ID'
 
                     path = bodyd['outfile_name']
                     band = bodyd['filter']
@@ -130,7 +131,7 @@ if __name__ == '__main__':
 
                     connection.commit()
 
-                elif bodyd['jobtype'] == 'coadd':
+                elif bodyd['jobtype'] == 'coaddsub':
 
                     query = 'INSERT INTO COADD (PATH, FILTER, QUADRANT, FIELD, CCDNUM, ' \
                             'MINDATE, MAXDATE, PIPELINE_SCHEMA_ID, PROCDATE, NIMG) VALUES (' \
@@ -141,8 +142,8 @@ if __name__ == '__main__':
                     quadrant = bodyd['quadrant']
                     field = bodyd['field']
                     ccdnum = bodyd['ccdnum']
-                    mindate = bodyd['mindate']
-                    maxdate = bodyd['maxdate']
+                    mindate = pd.to_datetime(bodyd['mindate']).to_pydatetime()
+                    maxdate = pd.to_datetime(bodyd['maxdate']).to_pydatetime()
                     pipeline_schema_id = bodyd['pipeline_schema_id']
                     procdate = datetime.datetime.utcnow()
 
@@ -155,11 +156,14 @@ if __name__ == '__main__':
                     for imid in bodyd['imids']:
                         cursor.execute(query, (coaddid, imid))
 
+                    # now do the subtraction
+
+
                     connection.commit()
 
                 del job_cache[corr_id]
 
-            elif current_status == 'FAILED' or current_status == 'TIMEOUT':
+            elif current_status in ['FAILED', 'TIMEOUT', 'CANCELLED']:
                 # resubmit
                 resubmit = True
                 args[0] = 'UNSUBMITTED'

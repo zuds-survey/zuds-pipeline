@@ -384,6 +384,9 @@ class IPACQueryManager(object):
                                 row['qid'], row['field'], row['ccdid']) +
                                 tuple(row[dfkey].tolist())))
 
+        query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0'
+        self.cursor.execute(query)
+
         self.dbc.commit()
 
     def determine_and_relay_variance_jobs(self, npaths):
@@ -423,7 +426,6 @@ class IPACQueryManager(object):
         # refresh our connections
         self._refresh_connections()
 
-
         # check to see if new templates are needed
         template_corrids = {}
         for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
@@ -444,6 +446,10 @@ class IPACQueryManager(object):
                 continue
 
             tmplids, tmplims, jds, hasvar = self.create_template_image_list(field, ccdnum, quadrant, band)
+
+            if len(tmplids) < self.pipeline_schema['template_minimages']:
+                # not enough images to make a template -- try again some other time
+                continue
 
             minjd = np.min(jds)
             maxjd = np.max(jds)
@@ -563,11 +569,15 @@ class IPACQueryManager(object):
         return len(diff) > 0, oughtids, oughtpaths, hasvar
 
     def get_latest_template(self, field, ccdnum, quadrant, filter):
-        query = 'SELECT ID, PATH FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s ' \
+        query = 'SELECT PATH FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s ' \
                 'AND QUADRANT=%s AND FILTER=%s ORDER BY PROCDATE DESC'
         self.cursor.execute(query, (field, ccdnum, quadrant, filter))
-        id, path = self.cursor.fetchone()
-        return id, path
+
+        pathtup = self.cursor.fetchone()
+        try:
+            return pathtup[0]
+        except TypeError:  # it's none
+            return None
 
     def determine_and_relay_coaddsub_jobs(self, variance_corrids, template_corrids, metatable):
 
@@ -590,65 +600,66 @@ class IPACQueryManager(object):
                 maxdate = pd.to_datetime(tmplbody['maxdate'])
                 dependencies.append(corrid)
             else:
-                _, tmplpath = self.get_latest_template(field, ccdnum, quadrant, band)
+                tmplpath = self.get_latest_template(field, ccdnum, quadrant, band)
                 maxdate = None
 
-            # get the bins
-            bins = self.make_coadd_bins(field, ccdnum, quadrant, band, maxdate=maxdate)
+            if tmplpath is not None:
+                # get the bins
+                bins = self.make_coadd_bins(field, ccdnum, quadrant, band, maxdate=maxdate)
 
-            for bin in bins:
-                runjob, ids, paths, hasvar = self.evaluate_coadd_and_sub(field, ccdnum, quadrant, band, *bin)
+                for bin in bins:
+                    runjob, ids, paths, hasvar = self.evaluate_coadd_and_sub(field, ccdnum, quadrant, band, *bin)
 
-                if runjob:
+                    if runjob:
 
-                    # build up dependencies
+                        # build up dependencies
 
-                    my_dependencies = []
-                    remake_variance = []
-                    for path, hv in zip(paths, hasvar):
-                        if not hv:
-                            if path in variance_corrids:
-                                varcorrid = variance_corrids[path]
-                                my_dependencies.append(varcorrid)
-                            else:
-                                remake_variance.append(path)
+                        my_dependencies = []
+                        remake_variance = []
+                        for path, hv in zip(paths, hasvar):
+                            if not hv:
+                                if path in variance_corrids:
+                                    varcorrid = variance_corrids[path]
+                                    my_dependencies.append(varcorrid)
+                                else:
+                                    remake_variance.append(path)
 
-                    if len(remake_variance) > 0:
+                        if len(remake_variance) > 0:
 
-                        moredeps = self.determine_and_relay_variance_jobs(remake_variance)
-                        my_dependencies.extend(moredeps.values())
+                            moredeps = self.determine_and_relay_variance_jobs(remake_variance)
+                            my_dependencies.extend(moredeps.values())
 
-                    my_dependencies = list(set(my_dependencies))
-                    my_dependencies.extend(dependencies)
+                        my_dependencies = list(set(my_dependencies))
+                        my_dependencies.extend(dependencies)
 
-                    mindatestr = bin[0].strftime('%Y%m%d')
-                    maxdatestr = bin[1].strftime('%Y%m%d')
+                        mindatestr = bin[0].strftime('%Y%m%d')
+                        maxdatestr = bin[1].strftime('%Y%m%d')
 
-                    outfile_name = coadd_basename_form.format(
-                        paddedfield=field,
-                        paddedccdid=ccdnum,
-                        qid=quadrant,
-                        filtercode=filter,
-                        mindate=mindatestr,
-                        maxdate=maxdatestr,
-                    )
+                        outfile_name = coadd_basename_form.format(
+                            paddedfield=field,
+                            paddedccdid=ccdnum,
+                            qid=quadrant,
+                            filtercode=filter,
+                            mindate=mindatestr,
+                            maxdate=maxdatestr,
+                        )
 
-                    outfile_name = nersc_formula.format(
-                        paddedfield='%06d' % field,
-                        paddedccdid='%02d' % ccdnum,
-                        qid=quadrant,
-                        filtercode=filter,
-                        fname=outfile_name
-                    )
+                        outfile_name = nersc_formula.format(
+                            paddedfield='%06d' % field,
+                            paddedccdid='%02d' % ccdnum,
+                            qid=quadrant,
+                            filtercode=filter,
+                            fname=outfile_name
+                        )
 
-                    data = {'jobtype': 'coaddsub', 'field': field, 'ccdnum': ccdnum,
-                            'quadrant': quadrant, 'mindate': mindatestr, 'maxdate': maxdatestr,
-                            'images': paths, 'template': tmplpath, 'filter':band,
-                            'pipeline_schema_id': self.pipeline_schema['schema_id'],
-                            'dependencies': my_dependencies, 'outfile_name': outfile_name}
+                        data = {'jobtype': 'coaddsub', 'field': field, 'ccdnum': ccdnum,
+                                'quadrant': quadrant, 'mindate': mindatestr, 'maxdate': maxdatestr,
+                                'images': paths, 'template': tmplpath, 'filter':band,
+                                'pipeline_schema_id': self.pipeline_schema['schema_id'],
+                                'dependencies': my_dependencies, 'outfile_name': outfile_name}
 
-                    body = json.dumps(data)
-                    self.relay_job(body)
+                        body = json.dumps(data)
+                        self.relay_job(body)
 
     def __call__(self):
 
@@ -689,7 +700,7 @@ if __name__ == '__main__':
     schemas = [glsn_schema]
 
     logger = logging.getLogger('poll')
-    logger.setLevel(logging.DEBUG)
+    logger.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
     logger.addHandler(ch)
 
