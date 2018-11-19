@@ -87,6 +87,7 @@ class IPACQueryManager(object):
 
     def __del__(self):
         self.dbc.close()
+        self.connection.close()
 
     def _generate_paths(self, df):
 
@@ -656,7 +657,8 @@ class IPACQueryManager(object):
                                 'quadrant': quadrant, 'mindate': mindatestr, 'maxdate': maxdatestr,
                                 'images': paths, 'template': tmplpath, 'filter':band,
                                 'pipeline_schema_id': self.pipeline_schema['schema_id'],
-                                'dependencies': my_dependencies, 'outfile_name': outfile_name}
+                                'dependencies': my_dependencies, 'outfile_name': outfile_name,
+                                'imids': ids}
 
                         body = json.dumps(data)
                         self.relay_job(body)
@@ -690,6 +692,7 @@ class IPACQueryManager(object):
 
             # finally coadd the science frames and make the corresponding subtractions
             self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
+            self.__del__()
 
 
 if __name__ == '__main__':

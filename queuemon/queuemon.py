@@ -60,15 +60,13 @@ if __name__ == '__main__':
             break
 
     cursor = connection.cursor()
-
     ncookies = nersc_authenticate()
-
-    query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s " \
-            "ORDER BY SUBMIT_TIME DESC LIMIT 1000"  # the 'order by' is important because it ensures correct resub order
-
     job_cache = {}
 
     while True:
+
+        query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s " \
+                "ORDER BY SUBMIT_TIME DESC LIMIT 1000"  # the 'order by' is important - ensures correct resub order
 
         new_messages = fetch_new_messages(channel)
 
@@ -88,6 +86,7 @@ if __name__ == '__main__':
             r = requests.get(target, cookies=ncookies)
 
             data = r.json()
+
             current_status = _status_dict[data['status'].upper()]
             args = []
             resubmit = False

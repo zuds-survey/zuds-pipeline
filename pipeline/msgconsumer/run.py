@@ -56,9 +56,11 @@ class TaskHandler(object):
         self.__del__()
 
     def resolve_dependencies(self, contents, data):
-        query = 'SELECT DISTINCT NERSC_ID FROM JOB WHERE CORR_ID IN %s'
-        self.cursor.execute(query, (tuple(data['dependencies']),))
-        deps = [str(r[0]) for r in self.cursor.fetchall()]
+        query = 'SELECT MAX(NERSC_ID) FROM JOB WHERE CORR_ID=%s'
+        deps = []
+        for dep in data['dependencies']:
+            self.cursor.execute(query, (dep,))
+            deps.append(str(self.cursor.fetchone()[0]))
         deps = ':'.join(deps)
         contents = contents.replace('DLIST', deps)
         return contents
@@ -200,6 +202,8 @@ class TaskHandler(object):
             self.close()
         except AttributeError:
             pass
+        except ConnectionClosed:
+            pass
 
         # keep a connection open to the database
         self.connection = psycopg2.connect(database_uri)
@@ -315,7 +319,5 @@ if __name__ == '__main__':
             pass
         else:
             break
-
-    logger.info('Connected to rabbitmq')
 
     channel.start_consuming()
