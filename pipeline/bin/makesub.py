@@ -248,6 +248,7 @@ if __name__ == '__main__':
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
         syscall += clargs % defparsub
         syscall += f' -FLAG_IMAGE {badpix}'
+        print(syscall)
         execute(syscall, capture=False)
 
         # Aperture catalog
