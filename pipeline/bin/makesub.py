@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from astropy.io import fits
-from liblg import make_rms, cmbmask, execute
+from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
 
 # split an iterable over some processes recursively
@@ -111,6 +111,7 @@ if __name__ == '__main__':
         submask = os.path.join(outdir, 'sub.%s.bpm.fits' % subp)
         apercat = os.path.join(outdir, 'ref.%s.remap.ap.cat' % subp)
         badpix = os.path.join(outdir, 'sub.%s.bpix' % subp)
+        subrms = os.path.join(outdir, 'sub.%s.rms.fits' % subp)
 
         sub = os.path.join(outdir, 'sub.%s.fits' % subp)
         tmpnew = os.path.join(outdir, 'new.%s.fits' % subp)
@@ -182,6 +183,9 @@ if __name__ == '__main__':
 
         # Add the masks together to make the supermask
         cmbmask(refremapmask, newmask, submask)
+
+        # Add the sub and new rms together in quadrature
+        cmbrms(refremapnoise, newnoise, subrms)
 
         # Create new and reference noise images
         ntst = seenew > seeref
