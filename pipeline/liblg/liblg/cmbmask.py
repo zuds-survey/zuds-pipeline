@@ -32,17 +32,17 @@ def cmbmask(mask1, mask2, maskout):
 def cmbrms(rms1, rms2, rmsout):
     from astropy.io import fits as afits
 
-    """Combine two masks and write out the result to a fits file.
+    """Combine two rms images and write out the result to a fits file.
 
 
     Arguments
     ---------
 
-    mask1: Path to the first mask
+    mask1: Path to the first rms image
 
-    mask2: Path to the second mask
+    mask2: Path to the second rms image
 
-    maskout: Path to the output mask
+    maskout: Path to the output rms image
     """
 
     d1 = afits.open(rms1)[0].data
