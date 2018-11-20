@@ -34,6 +34,9 @@ tmp_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_' \
 coadd_basename_form = '{paddedfield:06d}_c{paddedccdid:02d}_{qid:d}_{filtercode:s}' \
                       '_{mindate:s}_{maxdate:s}_ztf_coadd.fits'
 
+manifest = '/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/.manifest'
+lockfile = '/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/.lockfile'
+
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
 date_start = datetime.date(2018, 2, 16)
@@ -277,8 +280,8 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID=1 AND '
-                                           'QID=1' % (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID = 1 '
+                                           'and QID=1' % (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -288,6 +291,8 @@ class IPACQueryManager(object):
 
         # here are all their paths
         ipaths, npaths = self._generate_paths(tab)
+
+        tab['npath'] = npaths
 
         # now we need to prune it down to just the ones that we don't have
 
@@ -329,6 +334,12 @@ class IPACQueryManager(object):
         at = Time(dt)
         jd = at.jd
 
+        # reset the manifest
+        ncookies = nersc_authenticate()
+        target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}'
+        payload = b''
+        requests.put(target, data=payload, cookies=ncookies)
+
         # store the asynchronous http requests here
         threads = []
         for i, l in enumerate(spltasks):
@@ -341,7 +352,8 @@ class IPACQueryManager(object):
             # authenticate to nersc
             ncookies = nersc_authenticate()
 
-            download_script = [f'curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"'
+            download_script = [f'if curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"; then'
+                               f'\n( flock -x 200; echo {npath} >> {manifest} ) 200> {lockfile}; fi'
                                for ipath, npath in zip(ipc, npc)]
             mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
             download_script.extend(mask_download_script)
@@ -363,6 +375,11 @@ class IPACQueryManager(object):
         for thread in threads:
             thread.join()
 
+        target = f'{newt_baseurl}/file/{host}/{manifest[1:]}?view=read'
+        r = requests.get(target, cookies=ncookies)
+
+        return list(filter(lambda s: 'msk' not in s, r.content.decode('utf-8').split('\n')))
+
     def update_database_with_new_images(self, npaths, metatable):
 
         # refresh our connections
@@ -382,13 +399,14 @@ class IPACQueryManager(object):
 
         for (i, row), npath in zip(metatable.iterrows(), npaths):
             self.cursor.execute(dbq, ((npath, row['filtercode'][1:],
-                                row['qid'], row['field'], row['ccdid']) +
-                                tuple(row[dfkey].tolist())))
+                                    row['qid'], row['field'], row['ccdid']) +
+                                    tuple(row[dfkey].tolist())))
 
         query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0'
         self.cursor.execute(query)
 
         self.dbc.commit()
+
 
     def determine_and_relay_variance_jobs(self, npaths):
         # everything needs variance. submit batches of 1024
@@ -663,6 +681,15 @@ class IPACQueryManager(object):
                         body = json.dumps(data)
                         self.relay_job(body)
 
+    def prune_metatable(self, npaths, metatable):
+
+        inds = []
+
+        for i, (_, row) in enumerate(metatable.iterrows()):
+            if row['npath'] in npaths:
+                inds.append(i)
+        return metatable.iloc[inds]
+
     def __call__(self):
 
         self.logger.info('Reconnecting to database and message queue...')
@@ -677,7 +704,9 @@ class IPACQueryManager(object):
         if len(npaths) > 0:
             # download the images
             self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            self.download_images(npaths, ipaths)
+            npaths = self.download_images(npaths, ipaths)
+
+            metatable = self.prune_metatable(npaths, metatable)
 
             # update the database with the new images that were downloaded
             self.update_database_with_new_images(npaths, metatable)
