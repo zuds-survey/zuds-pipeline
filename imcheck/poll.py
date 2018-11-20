@@ -5,7 +5,7 @@ import time
 import datetime
 import psycopg2
 import requests
-import schedule
+#import schedule
 import logging
 import uuid
 import json
@@ -280,8 +280,7 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID = 1 '
-                                           'and QID=1' % (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID = 1 '% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -317,6 +316,13 @@ class IPACQueryManager(object):
         # now return
         return ipaths, new, tab.iloc[inds]
 
+    def reset_manifest(self):
+        # reset the manifest
+        ncookies = nersc_authenticate()
+        target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}'
+        payload = b''
+        requests.put(target, data=payload, cookies=ncookies)
+
     def download_images(self, npaths, ipaths):
 
         # refresh our connections
@@ -334,11 +340,6 @@ class IPACQueryManager(object):
         at = Time(dt)
         jd = at.jd
 
-        # reset the manifest
-        ncookies = nersc_authenticate()
-        target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}'
-        payload = b''
-        requests.put(target, data=payload, cookies=ncookies)
 
         # store the asynchronous http requests here
         threads = []
@@ -375,10 +376,12 @@ class IPACQueryManager(object):
         for thread in threads:
             thread.join()
 
-        target = f'{newt_baseurl}/file/{host}/{manifest[1:]}?view=read'
+    def read_manifest(self):
+        ncookies = nersc_authenticate()
+        target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
         r = requests.get(target, cookies=ncookies)
-
         return list(filter(lambda s: 'msk' not in s, r.content.decode('utf-8').split('\n')))
+
 
     def update_database_with_new_images(self, npaths, metatable):
 
@@ -704,8 +707,10 @@ class IPACQueryManager(object):
         if len(npaths) > 0:
             # download the images
             self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            npaths = self.download_images(npaths, ipaths)
+            #self.reset_manifest()
+            #self.download_images(npaths, ipaths)
 
+            npaths = self.read_manifest()
             metatable = self.prune_metatable(npaths, metatable)
 
             # update the database with the new images that were downloaded

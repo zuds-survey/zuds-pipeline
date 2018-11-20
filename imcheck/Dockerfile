@@ -1,7 +1,7 @@
 FROM lensgrinder_nersc-job-submission-service
 MAINTAINER Danny Goldstein <dgold@caltech.edu>
 
-RUN pip install schedule grequests ztfquery
+RUN pip install ztfquery # schedule
 
 ADD poll.py /poll.py
 
