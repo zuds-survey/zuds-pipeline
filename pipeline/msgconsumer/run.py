@@ -206,27 +206,24 @@ class TaskHandler(object):
             pass
 
         # keep a connection open to the database
-
         while True:
             try:
                 self.connection = psycopg2.connect(database_uri)
             except psycopg2.DatabaseError:
                 pass
             else:
+                self.cursor = self.connection.cursor()
                 break
 
+        cparams = pika.ConnectionParameters('msgqueue')
         while True:
             try:
-                self.cursor = self.connection.cursor()
+                self.msgconnection = pika.BlockingConnection(cparams)
             except ConnectionClosed:
                 pass
             else:
+                self.pub_channel = self.msgconnection.channel()
                 break
-
-
-        cparams = pika.ConnectionParameters('msgqueue')
-        self.msgconnection = pika.BlockingConnection(cparams)
-        self.pub_channel = self.msgconnection.channel()
 
     def __call__(self, ch, method, properties, body):
 
