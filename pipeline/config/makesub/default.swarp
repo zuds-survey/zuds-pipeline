@@ -109,7 +109,7 @@ VERBOSE_TYPE           NORMAL          # QUIET,LOG,NORMAL, or FULL
 NNODES                 1               # Number of nodes (for clusters)
 NODE_INDEX             0               # Node index (for clusters)
 
-NTHREADS               0               # Number of simultaneous threads for
+NTHREADS               1               # Number of simultaneous threads for
                                        # the SMP version of SWarp
                                        # 0 = automatic
 NOPENFILES_MAX         512             # Maximum number of files opened by SWarp

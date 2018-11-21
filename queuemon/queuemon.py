@@ -43,18 +43,6 @@ if __name__ == '__main__':
 
     while True:
         try:
-            cparams = pika.ConnectionParameters('msgqueue')
-            pcon = pika.BlockingConnection(cparams)
-        except ConnectionClosed:
-            pass
-        else:
-            break
-
-    channel = pcon.channel()
-    channel.queue_declare(queue='monitor')
-
-    while True:
-        try:
             connection = psycopg2.connect(database_uri)
         except psycopg2.DatabaseError:
             pass
@@ -69,6 +57,18 @@ if __name__ == '__main__':
 
         query = "SELECT CORR_ID, NERSC_ID, SYSTEM, STATUS FROM JOB WHERE STATUS=%s OR STATUS=%s " \
                 "ORDER BY SUBMIT_TIME DESC LIMIT 1000"  # the 'order by' is important - ensures correct resub order
+
+        while True:
+            try:
+                cparams = pika.ConnectionParameters('msgqueue')
+                pcon = pika.BlockingConnection(cparams)
+            except ConnectionClosed:
+                pass
+            else:
+                break
+
+        channel = pcon.channel()
+        channel.queue_declare(queue='monitor')
 
         new_messages = fetch_new_messages(channel)
 
@@ -199,4 +199,5 @@ if __name__ == '__main__':
                                           correlation_id=corr_id
                                       ))
 
+        pcon.close()
         time.sleep(10.)  # only check every ten seconds

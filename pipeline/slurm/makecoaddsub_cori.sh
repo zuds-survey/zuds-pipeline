@@ -9,7 +9,6 @@
 #SBATCH --mail-user=ztfcoadd@gmail.com
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:DLIST
-#SBATCH --exclusive
 #SBATCH -C haswell
 #SBATCH --volume=/global/homes/d/dgold:/home/desi
 #SBATCH -o $4/slurm-%A.out
@@ -27,5 +26,5 @@ cd /global/cscratch1/sd/dgold/ztfcoadd/job_scripts
 shifter python /pipeline/bin/makecoadd.py --input-frames ${news} --input-catalogs ${cats} \
                --output-basename=${obase}
 
-srun -n 64 shifter python /pipeline/bin/makesub.py --science-frames ${obase}.fits \
+shifter python /pipeline/bin/makesub.py --science-frames ${obase}.fits \
                --templates ${template}

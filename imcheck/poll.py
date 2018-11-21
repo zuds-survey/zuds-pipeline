@@ -39,6 +39,7 @@ lockfile = '/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/.lockfile'
 
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
+sub_batchsize = 64
 date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 
@@ -291,8 +292,6 @@ class IPACQueryManager(object):
         # here are all their paths
         ipaths, npaths = self._generate_paths(tab)
 
-        tab['npath'] = npaths
-
         # now we need to prune it down to just the ones that we don't have
 
         # first get all the paths that we have
@@ -380,8 +379,7 @@ class IPACQueryManager(object):
         ncookies = nersc_authenticate()
         target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
         r = requests.get(target, cookies=ncookies)
-        return list(filter(lambda s: 'msk' not in s, r.content.decode('utf-8').split('\n')))
-
+        return list(filter(lambda s: 'msk' not in s, r.content.decode('utf-8').strip().split('\n')))
 
     def update_database_with_new_images(self, npaths, metatable):
 
@@ -410,7 +408,6 @@ class IPACQueryManager(object):
 
         self.dbc.commit()
 
-
     def determine_and_relay_variance_jobs(self, npaths):
         # everything needs variance. submit batches of 1024
 
@@ -421,10 +418,6 @@ class IPACQueryManager(object):
 
         nvariance_jobs = len(npaths) // variance_batchsize + (1 if len(npaths) % variance_batchsize > 0 else 0)
 
-        self.logger.debug(f'npaths is {npaths}')
-        self.logger.debug(f'length of npaths is {len(npaths)}')
-        self.logger.debug(f'nvariance_jobs is {nvariance_jobs}')
-
         for i in range(nvariance_jobs):
 
             batch = npaths[i * variance_batchsize:(i + 1) * variance_batchsize]
@@ -432,7 +425,6 @@ class IPACQueryManager(object):
             if isinstance(batch, np.ndarray):
                 batch = batch.tolist()
 
-            self.logger.info(f'New batch: {batch}')
             body = json.dumps({'jobtype':'variance', 'dependencies':None, 'images': batch})
 
             # send a message to the job submission script telling it to submit the job
@@ -450,6 +442,7 @@ class IPACQueryManager(object):
 
         # check to see if new templates are needed
         template_corrids = {}
+
         for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
                                                                          'qid',
                                                                          'filtercode',
@@ -606,6 +599,8 @@ class IPACQueryManager(object):
         # refresh our connections
         self._refresh_connections()
 
+        batch = []
+
         for (field, ccdnum, quadrant, filter), group in metatable.groupby(['field', 'ccdid',
                                                                            'qid', 'filtercode']):
 
@@ -684,13 +679,13 @@ class IPACQueryManager(object):
                         body = json.dumps(data)
                         self.relay_job(body)
 
-    def prune_metatable(self, npaths, metatable):
+    def prune_metatable(self, old_npaths, new_npaths, metatable):
 
         inds = []
-
-        for i, path in enumerate(npaths):
-            if path in metatable['npath']:
-                inds.append(i)
+        olist = old_npaths.tolist()
+        for path in new_npaths:
+            index = olist.index(path)
+            inds.append(index)
         return metatable.iloc[inds]
 
     def __call__(self):
@@ -710,8 +705,9 @@ class IPACQueryManager(object):
             #self.reset_manifest()
             #self.download_images(npaths, ipaths)
 
-            npaths = self.read_manifest()
-            metatable = self.prune_metatable(npaths, metatable)
+            new_npaths = self.read_manifest()
+            metatable = self.prune_metatable(npaths, new_npaths, metatable)
+            npaths = new_npaths
 
             # update the database with the new images that were downloaded
             self.update_database_with_new_images(npaths, metatable)
