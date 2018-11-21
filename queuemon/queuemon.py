@@ -23,6 +23,8 @@ _status_dict ={
 }
 
 
+NTRIES = 10
+
 def fetch_new_messages(ch):
 
     result = []
@@ -83,9 +85,22 @@ if __name__ == '__main__':
 
             uquery = 'UPDATE JOB SET STATUS=%s'
             target = os.path.join(newt_baseurl, 'queue', f'{machine}', f'{nersc_id}', 'sacct')
-            r = requests.get(target, cookies=ncookies)
 
-            data = r.json()
+            data = {}
+            for _ in range(NTRIES):
+                r = requests.get(target, cookies=ncookies)
+                try:
+                    data = r.json()
+                except json.JSONDecodeError:
+                    continue  # try it again ... sometimes NEWT returns a bad response on repeated queries
+                else:
+                    if data['status'].upper() == 'ERROR':
+                        continue  # again, try it again....
+                    else:
+                        break
+
+            if data == {}:
+                raise requests.HTTPError(f'Could not get a good response from sacct after {NTRIES} tries')
 
             current_status = _status_dict[data['status'].upper()]
             args = []

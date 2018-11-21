@@ -688,8 +688,8 @@ class IPACQueryManager(object):
 
         inds = []
 
-        for i, (_, row) in enumerate(metatable.iterrows()):
-            if row['npath'] in npaths:
+        for i, path in enumerate(npaths):
+            if path in metatable['npath']:
                 inds.append(i)
         return metatable.iloc[inds]
 
