@@ -119,7 +119,10 @@ class TaskHandler(object):
 
         # consolidate dependencies
 
-        data = {'dependencies': list(set([j['dependencies'] for j in jobs]))}
+        alldeps = []
+        for j in jobs:
+            alldeps.extend(j['dependencies'])
+        data = {'dependencies': list(set(alldeps))}
         contents = self.resolve_dependencies(contents, data)
 
         # command to run a single sub
