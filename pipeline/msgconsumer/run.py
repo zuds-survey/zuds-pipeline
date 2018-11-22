@@ -99,8 +99,7 @@ class TaskHandler(object):
 
         return r.json()['jobid']
 
-    def submit_coaddsub(self, images, catalogs, obase, template,
-                        data, host='cori', scriptname=None):
+    def submit_coaddsub(self, jobs, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -109,20 +108,32 @@ class TaskHandler(object):
         with open(mkcoaddsub_cori, 'r') as f:
             contents = f.read()
 
-        contents = contents.replace('$1', ' '.join(images))
-        contents = contents.replace('$2', ' '.join(catalogs))
-        contents = contents.replace('$3', obase)
-        contents = contents.replace('$6', template)
-        contents = self.resolve_dependencies(contents, data)
-
         if scriptname is None:
             scriptname = f'{uuid.uuid4().hex}.sh'
 
-            # first upload the job script to scratch
+        # first upload the job script to scratch
         path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
         contents = contents.replace('$5', f'coaddsub_{scriptname.replace(".sh","")}')
+
+        # consolidate dependencies
+
+        data = {'dependencies': list(set([j['dependencies'] for j in jobs]))}
+        contents = self.resolve_dependencies(contents, data)
+
+        # command to run a single sub
+
+        for job in jobs:
+
+            imstr = '\n'.join(job['images'])
+            catstr = '\n'.join([i.replace('fits', 'cat') for i in job['images']])
+            ob = job['outfile_name'][:-5]
+            tmp = job['template']
+            runcmd = f"bash /slurm/single_coaddsub.sh {imstr} {catstr} {ob} {tmp} &"
+            contents += f'\n{runcmd}'
+        contents += '\n'
+
         requests.put(target, data=contents, cookies=cookies)
 
         target = os.path.join(newt_baseurl, 'queue', host)
@@ -266,12 +277,9 @@ class TaskHandler(object):
 
         elif data['jobtype'] == 'coaddsub':
 
-            images = data['images']
-            template = data['template']
-            cats = [p.replace('.fits', '.cat') for p in images]
-            obase = data['outfile_name'][:-5]
+            jobs = data['jobs']
             submit_func = self.submit_coaddsub
-            args = (images, cats, obase, template, data, host, scriptname)
+            args = (jobs, host, scriptname)
 
         else:
             raise ValueError('invalid task type')

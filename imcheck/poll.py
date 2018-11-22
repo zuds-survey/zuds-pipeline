@@ -676,8 +676,18 @@ class IPACQueryManager(object):
                                 'dependencies': my_dependencies, 'outfile_name': outfile_name,
                                 'imids': ids}
 
-                        body = json.dumps(data)
-                        self.relay_job(body)
+                        batch.append(data)
+
+                        if len(batch) == sub_batchsize:
+                            packet = {'jobtype': 'coaddsub', 'jobs': batch}
+                            body = json.dumps(packet)
+                            self.relay_job(body)
+                            batch = []
+
+        if len(batch) > 0:
+            packet = {'jobtype': 'coaddsub', 'jobs': batch}
+            body = json.dumps(packet)
+            self.relay_job(body)
 
     def prune_metatable(self, old_npaths, new_npaths, metatable):
 
