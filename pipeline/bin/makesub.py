@@ -13,11 +13,9 @@ if __name__ == '__main__':
 
     import argparse
     import logging
-    from mpi4py import MPI
 
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+    rank = 0
+    size = 1
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -38,7 +36,6 @@ if __name__ == '__main__':
         else:
             frames = None
 
-        frames = comm.bcast(frames, root=0)
     else:
         frames = args.sciimg
 
@@ -50,7 +47,6 @@ if __name__ == '__main__':
             templates = np.atleast_1d(templates).tolist()
         else:
             templates = None
-        templates = comm.bcast(templates, root=0)
     else:
         templates = args.template
 

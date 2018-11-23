@@ -135,7 +135,7 @@ class TaskHandler(object):
             tmp = job['template']
             runcmd = f"shifter bash /slurm/single_coaddsub.sh {imstr} {catstr} {ob} {tmp} &"
             contents += f'\n{runcmd}'
-        contents += '\n'
+        contents += '\nwait\n'
 
         requests.put(target, data=contents, cookies=cookies)
 
