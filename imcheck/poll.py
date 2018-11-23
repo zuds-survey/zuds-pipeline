@@ -42,6 +42,7 @@ variance_batchsize = 1024
 sub_batchsize = 32
 date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
+coadd_minframes = 3
 
 # this is the night id corresponding
 # to the first science observation in the survey
@@ -573,7 +574,7 @@ class IPACQueryManager(object):
         try:
             cid = self.cursor.fetchone()[0]
         except TypeError:  # there is no previous coadd
-            return True, oughtids, oughtpaths, hasvar
+            return len(oughtids) >= coadd_minframes, oughtids, oughtpaths, hasvar
 
         query = 'SELECT IMAGE_ID FROM COADDIMAGEASSOC WHERE COADD_ID=%s'
         self.cursor.execute(query, (cid,))
@@ -581,7 +582,7 @@ class IPACQueryManager(object):
 
         diff = np.setxor1d(oughtids, imids, assume_unique=True)
 
-        return len(diff) > 0 and len(oughtids) >= 3, oughtids, oughtpaths, hasvar
+        return len(diff) > 0 and len(oughtids) >= coadd_minframes, oughtids, oughtpaths, hasvar
 
     def get_latest_template(self, field, ccdnum, quadrant, filter):
         query = 'SELECT PATH FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s ' \
