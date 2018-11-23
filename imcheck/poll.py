@@ -581,7 +581,7 @@ class IPACQueryManager(object):
 
         diff = np.setxor1d(oughtids, imids, assume_unique=True)
 
-        return len(diff) > 0, oughtids, oughtpaths, hasvar
+        return len(diff) > 0 and len(oughtids) >= 3, oughtids, oughtpaths, hasvar
 
     def get_latest_template(self, field, ccdnum, quadrant, filter):
         query = 'SELECT PATH FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s ' \
