@@ -153,7 +153,7 @@ if __name__ == '__main__':
             hstr = '\n'.join(hstr) + '\n'
 
         # Make a catalog from the reference for astrometric matching
-        syscall = 'scamp -c %s -ASTREFCAT_NAME %s %s'
+        syscall = 'scamp -c %s -ASTREFCAT_NAME %s -NTHREADS 1 %s'
         syscall = syscall % (scampconfcat, refcat, newcat)
         execute(syscall, capture=False)
 
