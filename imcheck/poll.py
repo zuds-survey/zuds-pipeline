@@ -282,7 +282,7 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID = 1 '% (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792 and CCDID < 5 '% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -713,8 +713,8 @@ class IPACQueryManager(object):
         if len(npaths) > 0:
             # download the images
             self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            #self.reset_manifest()
-            #self.download_images(npaths, ipaths)
+            self.reset_manifest()
+            self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
             metatable = self.prune_metatable(npaths, new_npaths, metatable)
