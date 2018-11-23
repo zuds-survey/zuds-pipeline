@@ -12,6 +12,7 @@
 #SBATCH -C haswell
 #SBATCH --volume=/global/homes/d/dgold:/home/desi
 #SBATCH -o $4/slurm-%A.out
+#SBATCH --exclusive
 
 
 export OMP_NUM_THREADS=1
