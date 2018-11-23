@@ -8,7 +8,7 @@ template="$4"
 cd /global/cscratch1/sd/dgold/ztfcoadd/job_scripts
 
 python /pipeline/bin/makecoadd.py --input-frames ${news} --input-catalogs ${cats} \
-               --output-basename=${obase}
+               --output-basename=${obase} --nothreads
 
 python /pipeline/bin/makesub.py --science-frames ${obase}.fits \
                --templates ${template}

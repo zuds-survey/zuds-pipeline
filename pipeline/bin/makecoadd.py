@@ -17,6 +17,8 @@ if __name__ == '__main__':
                         help='List of catalogs to use for astrometric alignment.', nargs='+')
     parser.add_argument('--input-frames', dest='frames', nargs='+', required=True,
                         help='List of frames to coadd.')
+    parser.add_argument('--nothreads', dest='nothreads', action='store_true', default=False,
+                        help='Run astromatic software with only one thread.')
     args = parser.parse_args()
 
     # distribute the work to each processor
@@ -54,6 +56,8 @@ if __name__ == '__main__':
 
     syscall = 'scamp -c %s %s' % (scampconf, mycats)
     syscall += f' -REFOUT_CATPATH {scamp_outpath}'
+    if args.nothreads:
+        syscall += ' -NTHREADS 1'
     liblg.execute(syscall, capture=False)
 
     allims = ' '.join(frames)
@@ -66,6 +70,8 @@ if __name__ == '__main__':
 
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
+    if args.nothreads:
+        syscall += ' -NTHREADS 1'
     liblg.execute(syscall, capture=False)
 
     # Now postprocess it a little bit
