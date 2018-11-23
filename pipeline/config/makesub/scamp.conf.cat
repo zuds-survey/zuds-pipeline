@@ -134,6 +134,6 @@ HEADER_SUFFIX          .head           # Filename extension for OUTPUT headers
 HEADER_TYPE            NORMAL          # NORMAL or FOCAL_PLANE
 VERBOSE_TYPE           NORMAL          # QUIET, NORMAL, LOG or FULL
 WRITE_XML              N               # Write XML file (Y/N)?
-NTHREADS               1               # Number of simultaneous threads for
+NTHREADS               2               # Number of simultaneous threads for
                                        # the SMP version of SCAMP
                                        # 0 = automatic

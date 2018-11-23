@@ -39,7 +39,7 @@ lockfile = '/global/cscratch1/sd/dgold/ztfcoadd/download_scripts/.lockfile'
 
 newt_baseurl = 'https://newt.nersc.gov/newt'
 variance_batchsize = 1024
-sub_batchsize = 64
+sub_batchsize = 32
 date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 

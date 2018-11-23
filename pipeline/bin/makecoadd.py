@@ -57,7 +57,7 @@ if __name__ == '__main__':
     syscall = 'scamp -c %s %s' % (scampconf, mycats)
     syscall += f' -REFOUT_CATPATH {scamp_outpath}'
     if args.nothreads:
-        syscall += ' -NTHREADS 1'
+        syscall += ' -NTHREADS 2'
     liblg.execute(syscall, capture=False)
 
     allims = ' '.join(frames)
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
     if args.nothreads:
-        syscall += ' -NTHREADS 1'
+        syscall += ' -NTHREADS 2'
     liblg.execute(syscall, capture=False)
 
     # Now postprocess it a little bit
