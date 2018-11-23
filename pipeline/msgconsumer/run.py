@@ -133,7 +133,7 @@ class TaskHandler(object):
             catstr = '\n'.join([i.replace('fits', 'cat') for i in job['images']])
             ob = job['outfile_name'][:-5]
             tmp = job['template']
-            runcmd = f"shifter bash /slurm/single_coaddsub.sh {imstr} {catstr} {ob} {tmp} &"
+            runcmd = f'shifter bash /slurm/single_coaddsub.sh "{imstr}" "{catstr}" "{ob}" "{tmp}" &'
             contents += f'\n{runcmd}'
         contents += '\nwait\n'
 
