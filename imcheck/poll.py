@@ -83,7 +83,8 @@ def execute_download_on_dtn(self, download_script_lines, host):
 
         download_script = '\n'.join(download_script_lines[i * img_batchsize : (i + 1) * img_batchsize])
         path = f'global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{host}_{now}.sh'
-        target = os.path.join(newt_baseurl, 'file', host, f'{path}')
+        path = path.replace(' ', '_')
+        target = os.path.join(newt_baseurl, 'file', host, path)
         requests.put(target, data=download_script, cookies=ncookies)
 
         download_script_npath = f'/{path}'
