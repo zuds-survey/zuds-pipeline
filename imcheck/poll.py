@@ -378,10 +378,10 @@ class IPACQueryManager(object):
             random.shuffle(download_script)
 
             # upload the download script to NERSC
-            host = f'{host}.nersc.gov'
+            host = f'dtn{i+1:02d}.nersc.gov'
 
             # make the multithreaded call to do the download
-            thread = threading.Thread(target=execute_download_on_dtn, args=(self, f'/{path}', host))
+            thread = threading.Thread(target=execute_download_on_dtn, args=(self, download_script, host))
             thread.start()
             threads.append(thread)
 
