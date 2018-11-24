@@ -71,7 +71,7 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
 def execute_download_on_dtn(self, download_script_lines, host):
 
     n_transactions = len(download_script_lines) // img_batchsize + \
-                     0 if len(download_script_lines) % img_batchsize == 0 else 1
+                     (0 if len(download_script_lines) % img_batchsize == 0 else 1)
 
     # authenticate to nersc
     ncookies = nersc_authenticate()
