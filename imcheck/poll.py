@@ -1,7 +1,6 @@
 import os
 import sys
 import pika
-import time
 import datetime
 import psycopg2
 import requests
@@ -11,6 +10,7 @@ import uuid
 import json
 import paramiko
 import threading
+import random
 
 
 import numpy as np
@@ -43,6 +43,7 @@ sub_batchsize = 32
 date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 coadd_minframes = 3
+img_batchsize = 1024
 
 # this is the night id corresponding
 # to the first science observation in the survey
@@ -67,17 +68,37 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
 
 
 # make this a static method for threading purposes
-def execute_download_on_dtn(self, download_script_npath, host):
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(host, username=nersc_username, password=nersc_password)
-    stdin, stdout, stderr = ssh.exec_command(f'/bin/bash {download_script_npath}')
-    exitcode = stdout.channel.recv_exit_status()
-    outlines = stdout.readlines()
-    errlines = stderr.readlines()
+def execute_download_on_dtn(self, download_script_lines, host):
 
-    if exitcode != 0:
-        raise RuntimeError(errlines)
+    n_transactions = len(download_script_lines) // img_batchsize + \
+                     0 if len(download_script_lines) % img_batchsize == 0 else 1
+
+    # authenticate to nersc
+    ncookies = nersc_authenticate()
+
+    for i in range(n_transactions):
+
+        # label the download
+        now = datetime.datetime.utcnow()
+
+        download_script = '\n'.join(download_script_lines[i * img_batchsize : (i + 1) * img_batchsize])
+        path = f'global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{host}_{now}.sh'
+        target = os.path.join(newt_baseurl, 'file', host, f'{path}')
+        requests.put(target, data=download_script, cookies=ncookies)
+
+        download_script_npath = f'/{path}'
+
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(host, username=nersc_username, password=nersc_password)
+        stdin, stdout, stderr = ssh.exec_command(f'/bin/bash {download_script_npath}')
+        exitcode = stdout.channel.recv_exit_status()
+        errlines = stderr.readlines()
+
+        if exitcode != 0:
+            raise RuntimeError(errlines)
+
+        ssh.close()
 
     with outlock:
         self.logger.info(f'Download complete on {host}.')
@@ -340,7 +361,6 @@ class IPACQueryManager(object):
         at = Time(dt)
         jd = at.jd
 
-
         # store the asynchronous http requests here
         threads = []
         for i, l in enumerate(spltasks):
@@ -350,25 +370,17 @@ class IPACQueryManager(object):
             icookies = ipac_authenticate()  # get a different cookie for each DTN
             sessionid = icookies.get('JOSSO_SESSIONID')
 
-            # authenticate to nersc
-            ncookies = nersc_authenticate()
-
             download_script = [f'if curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"; then'
                                f'\n( flock -x 200; echo {npath} >> {manifest} ) 200> {lockfile}; fi'
                                for ipath, npath in zip(ipc, npc)]
             mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
             download_script.extend(mask_download_script)
+            random.shuffle(download_script)
 
             # upload the download script to NERSC
-
-            download_script = '\n'.join(download_script)
-            path = f'global/cscratch1/sd/dgold/ztfcoadd/download_scripts/{jd}_{i+1}.sh'
-            host = f'dtn{i+1:02d}'
-            target = os.path.join(newt_baseurl, 'file', host, f'{path}')
-            requests.put(target, data=download_script, cookies=ncookies)
-
-            # now prepare the arguments of the multithreaded call to make the download
             host = f'{host}.nersc.gov'
+
+            # make the multithreaded call to do the download
             thread = threading.Thread(target=execute_download_on_dtn, args=(self, f'/{path}', host))
             thread.start()
             threads.append(thread)
