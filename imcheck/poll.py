@@ -378,6 +378,8 @@ class IPACQueryManager(object):
             download_script.extend(mask_download_script)
             random.shuffle(download_script)
 
+            print(len(download_script))
+
             # upload the download script to NERSC
             host = f'dtn{i+1:02d}.nersc.gov'
 
