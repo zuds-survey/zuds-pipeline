@@ -44,6 +44,7 @@ date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 coadd_minframes = 3
 img_batchsize = 1024
+template_batchsize = 16
 
 # this is the night id corresponding
 # to the first science observation in the survey
@@ -459,6 +460,8 @@ class IPACQueryManager(object):
         # check to see if new templates are needed
         template_corrids = {}
 
+        batch = []
+
         for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
                                                                          'qid',
                                                                          'filtercode',
@@ -525,9 +528,22 @@ class IPACQueryManager(object):
                          'maxdate':maxdatestr, 'filter': band,
                          'pipeline_schema_id': self.pipeline_schema['schema_id']}
 
-            body = json.dumps(tmpl_data)
+            batch.append(tmpl_data)
+
+            if len(batch) == template_batchsize:
+                payload = {'jobtype': 'template', 'jobs': batch}
+                body = json.dumps(payload)
+                tmpl_corrid = self.relay_job(body)
+                for d in batch:
+                    template_corrids[(d['field'], d['quadrant'], d['band'], d['ccdnum'])] = (tmpl_corrid, d)
+                batch = []
+
+        if len(batch) > 0:
+            payload = {'jobtype': 'template', 'jobs': batch}
+            body = json.dumps(payload)
             tmpl_corrid = self.relay_job(body)
-            template_corrids[(field, quadrant, band, ccdnum)] = (tmpl_corrid, tmpl_data)
+            for d in batch:
+                template_corrids[(d['field'], d['quadrant'], d['band'], d['ccdnum'])] = (tmpl_corrid, d)
 
         return template_corrids
 

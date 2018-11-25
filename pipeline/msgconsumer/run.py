@@ -65,7 +65,7 @@ class TaskHandler(object):
         contents = contents.replace('DLIST', deps)
         return contents
 
-    def submit_coadd(self, images, catalogs, obase, data, host='cori', scriptname=None):
+    def submit_coadd(self, jobs, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -73,19 +73,32 @@ class TaskHandler(object):
         # create the payload
         with open(mkcoadd_cori, 'r') as f:
             contents = f.read()
-        contents = contents.replace('$1', ' '.join(images))
-        contents = contents.replace('$2', ' '.join(catalogs))
-        contents = contents.replace('$3', obase)
-        contents = self.resolve_dependencies(contents, data)
 
         if scriptname is None:
             scriptname = f'{uuid.uuid4().hex}.sh'
 
-            # first upload the job script to scratch
+        # consolidate dependencies
+        alldeps = []
+        for j in jobs:
+            alldeps.extend(j['dependencies'])
+        data = {'dependencies': list(set(alldeps))}
+        contents = self.resolve_dependencies(contents, data)
+
+        # first upload the job script to scratch
         path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
         contents = contents.replace('$5', f'coadd_{scriptname.replace(".sh","")}')
+
+        for job in jobs:
+            imstr = '\n'.join(job['images'])
+            catstr = '\n'.join([i.replace('fits', 'cat') for i in job['images']])
+            ob = job['outfile_name'][:-5]
+            runcmd = f'shifter /pipeline/bin/makecoadd.py --input-frames {imstr} --input-catalogs {catstr} \
+               --output-basename {ob}'
+            contents += f'\n{runcmd}'
+        contents += '\nwait\n'
+
         requests.put(target, data=contents, cookies=cookies)
 
         target = os.path.join(newt_baseurl, 'queue', host)
@@ -128,7 +141,6 @@ class TaskHandler(object):
         # command to run a single sub
 
         for job in jobs:
-
             imstr = '\n'.join(job['images'])
             catstr = '\n'.join([i.replace('fits', 'cat') for i in job['images']])
             ob = job['outfile_name'][:-5]
@@ -177,30 +189,6 @@ class TaskHandler(object):
 
         target = os.path.join(newt_baseurl, 'queue', host)
         payload = {'jobfile': f'/{path}'}
-        self.logger.info(payload)
-
-        r = requests.post(target, data=payload, cookies=cookies)
-
-        if r.status_code != 200:
-            raise ValueError(r.content)
-
-        return r.json()['jobid']
-
-    def submit_sub(self, images, templates, host='cori', scriptname=None):
-
-        # login to nersc
-        cookies = nersc_authenticate()
-
-        # create the payload
-        with open(mksub_cori, 'r') as f:
-            contents = f.read()
-
-        contents = contents.replace('$1', ' '.join(images))
-        contents = contents.replace('$2', ' '.join(templates))
-
-        target = os.path.join(newt_baseurl, 'queue', host)
-        payload = {'jobscript': contents}
-
         self.logger.info(payload)
 
         r = requests.post(target, data=payload, cookies=cookies)
@@ -272,11 +260,10 @@ class TaskHandler(object):
 
         elif data['jobtype'] == 'template':
 
-            images = data['images']
-            catalogs = [p.replace('fits', 'cat') for p in images]
+            jobs = data['jobs']
             submit_func = self.submit_coadd
-            coadd_name = data['outfile_name']
-            args = (images, catalogs, coadd_name[:-5], data, host, scriptname)
+            #coadd_name = data['outfile_name']
+            args = (jobs, host, scriptname)
 
         elif data['jobtype'] == 'coaddsub':
 
