@@ -10,6 +10,9 @@ cd /global/cscratch1/sd/dgold/ztfcoadd/job_scripts
 python /pipeline/bin/makecoadd.py --input-frames ${news} --input-catalogs ${cats} \
                --output-basename=${obase} --nothreads
 
+if $?; then
+
 python /pipeline/bin/makesub.py --science-frames ${obase}.fits \
                --templates ${template}
 
+fi
