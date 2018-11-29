@@ -311,5 +311,8 @@ ADD config /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
+# install galsim
+RUN pip install galsim
+
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]
