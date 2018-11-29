@@ -24,7 +24,7 @@ class Fake(object):
         with fits.open(impath) as hdul:
             wcs = WCS(hdul[0].header)
 
-        return wcs.wcs_world2pix([(self.ra, self.dec)], 1)
+        return wcs.wcs_world2pix([(self.ra, self.dec)], 1)[0]
 
     def galsim_image(self, rng, sigma, magzpt, wcs_image=None):
 
