@@ -238,9 +238,25 @@ if __name__ == '__main__':
     liblg.make_rms(out, oweight)
     liblg.medg(out)
 
-    with fits.open(out, mode='update') as f, fits.open(frames[0]) as ff:
-        cards = [c for c in ff[0].header.cards if ('FAKE' in c.keyword and
-                                                   ('RA' in c.keyword or
-                                                    'DC' in c.keyword or
-                                                    'MG' in c.keyword))]
-        f[0].header.update(cards)
+    if args.nfakes > 0:
+        with fits.open(out, mode='update') as f, fits.open(frames[0]) as ff, open(out.replace('fits', 'reg'), 'w') as o:
+            cards = [c for c in ff[0].header.cards if ('FAKE' in c.keyword and
+                                                       ('RA' in c.keyword or
+                                                        'DC' in c.keyword or
+                                                        'MG' in c.keyword))]
+            wcs = WCS(f[0].header)
+            f[0].header.update(cards)
+
+            # make the region file
+            hdr = f[0].header
+
+            o.write("""# Region file format: DS9 version 4.1
+global color=green dashlist=8 3 width=1 font="helvetica 10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 de\
+lete=1 include=1 source=1
+physical
+""")
+
+            for i, fake in enumerate(fakes):
+                x, y = fake.xy(wcs)
+                hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = x, y
+                o.write(f'circle({x},{y},10) # width=2 color=red\n')
