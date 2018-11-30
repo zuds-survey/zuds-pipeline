@@ -142,8 +142,8 @@ if __name__ == '__main__':
         fakeminra = minra + 0.15 * rarange
         fakemaxra = minra + 0.85 * rarange
 
-        fakemindec = mindec + 0.15 * rarange
-        fakemaxdec = mindec + 0.85 * rarange
+        fakemindec = mindec + 0.15 * decrange
+        fakemaxdec = mindec + 0.85 * decrange
 
         fakes = []
 
