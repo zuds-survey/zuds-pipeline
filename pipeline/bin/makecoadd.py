@@ -50,7 +50,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
 
     for fake in fakes:
         obj = fake.galsim_object(sigma, zp, wcs)
-        obj.drawImage(image=im)
+        img = obj.drawImage()
 
     # add poisson noise for the objects only
     noise = galsim.PoissonNoise(rng)
