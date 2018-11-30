@@ -6,6 +6,7 @@ import time
 from astropy.io import fits
 from astropy.wcs import WCS
 import galsim
+from makevariance import make_variance
 
 
 #TODO: Delete this
@@ -159,8 +160,9 @@ if __name__ == '__main__':
             outim = frame.replace('.fits', '.fake.fits')
             add_fakes_to_image(frame, outim, fakes, seed=SEED)
 
+        masks = [f.replace('sciimg','mskimg') for f in frames]
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
-
+        make_variance(frames, masks)
 
     # First scamp everything
     # make a random dir for the output catalogs
