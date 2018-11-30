@@ -46,7 +46,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
 
     # cache the imarr for noise purposes
     imarr = im.array.copy()
-    im.array = 0
+    im.array[:, :] = 0
 
     for fake in fakes:
         obj = fake.galsim_object(sigma, zp, wcs)
@@ -55,7 +55,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
     # add poisson noise for the objects only
     noise = galsim.PoissonNoise(rng)
     im.addNoise(noise)
-    im.array += imarr
+    im.array[:, :] = im.array + imarr
 
     galsim.fits.write(im, file_name=outim)
 
