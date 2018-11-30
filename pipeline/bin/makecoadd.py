@@ -163,9 +163,11 @@ if __name__ == '__main__':
 
         masks = [f.replace('sciimg','mskimg') for f in frames]
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
+        cats = [f.replace('.fits', '.cat') for f in frames]
         logger = logging.getLogger('fakevar')
         logger.setLevel(logging.DEBUG)
         make_variance(frames, masks, logger)
+
 
     # First scamp everything
     # make a random dir for the output catalogs
