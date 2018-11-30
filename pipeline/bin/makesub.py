@@ -294,3 +294,4 @@ physical
                 subheader[f'FAKE{i:02d}Y'] = y
 
                 o.write(f'circle({x},{y},10) # width=2 color=red\n')
+                o.write(f'text({x},{y+8}  # text={{mag={mag:.2f}}}\n')
