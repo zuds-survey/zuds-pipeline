@@ -1,8 +1,11 @@
 import os
 import numpy as np
 from astropy.io import fits
+from astropy.wcs import WCS
 from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
+
+from makecoadd import Fake
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -257,3 +260,36 @@ if __name__ == '__main__':
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
         syscall += clargs % defparaper
         execute(syscall, capture=False)
+
+        # put fake info in header and region file if there are any fakes
+        with fits.open(frame) as f, fits.open(sub, mode='update') as fsub, open(sub.replace('fits','reg'), 'w') as o:
+            hdr = f[0].header
+            wcs = WCS(hdr)
+            fakecards = [c for c in hdr.cards if 'FAKE' in c.keyword and 'X' not in c.keyword and 'Y' not in c.keyword]
+            fakekws = [c.keyword for c in fakecards]
+
+            try:
+                maxn = max(set(map(int, [kw[4:-2] for kw in fakekws]))) + 1
+            except ValueError:
+                maxn = 0
+
+            subheader = fsub[0].header
+            subheader.update(fakecards)
+
+            # make the region files
+            o.write("""# Region file format: DS9 version 4.1
+global color=green dashlist=8 3 width=1 font="helvetica 10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 \
+delete=1 include=1 source=1
+physical
+""")
+
+            for i in range(maxn):
+                ra = hdr[f'FAKE{i:02d}RA']
+                dec = hdr[f'FAKE{i:02d}DC']
+                mag = hdr[f'FAKE{i:02d}MG']
+                fake = Fake(ra, dec, mag)
+                x, y = fake.xy(wcs)
+                subheader[f'FAKE{i:02d}X'] = x
+                subheader[f'FAKE{i:02d}Y'] = y
+
+                o.write(f'circle({x},{y},10) # width=2 color=red\n')
