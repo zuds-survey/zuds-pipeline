@@ -262,7 +262,8 @@ if __name__ == '__main__':
         execute(syscall, capture=False)
 
         # put fake info in header and region file if there are any fakes
-        with fits.open(frame) as f, fits.open(sub, mode='update') as fsub, open(sub.replace('fits','reg'), 'w') as o:
+        with fits.open(frame) as f, fits.open(sub, mode='update') as fsub, \
+                open(sub.replace('fits','fake.reg'), 'w') as o:
             hdr = f[0].header
             wcs = WCS(hdr)
             fakecards = [c for c in hdr.cards if 'FAKE' in c.keyword and 'X' not in c.keyword and 'Y' not in c.keyword]
