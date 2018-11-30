@@ -23,10 +23,9 @@ class Fake(object):
         # Return xy pixel coordinates of fake on image
         return wcs.wcs_world2pix([(self.ra, self.dec)], 1)[0]
 
-    def galsim_object(self, sigma, magzpt, wcs):
+    def galsim_object(self, sigma, magzpt):
         flux = 10**(-0.4 * (self.mag - magzpt))
         obj = galsim.Gaussian(sigma=sigma).withFlux(flux)
-        obj = obj.shift(*self.xy(wcs))
         return obj
 
 
@@ -44,18 +43,14 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
         zp = f[0].header['MAGZP']
         wcs = WCS(f[0].header)
 
-    # cache the imarr for noise purposes
-    imarr = im.array.copy()
-    im.array[:, :] = 0
-
     for fake in fakes:
-        obj = fake.galsim_object(sigma, zp, wcs)
+        obj = fake.galsim_object(sigma, zp)
         img = obj.drawImage()
-
-    # add poisson noise for the objects only
-    noise = galsim.PoissonNoise(rng)
-    im.addNoise(noise)
-    im.array[:, :] = im.array + imarr
+        noise = galsim.PoissonNoise(rng)
+        img.addNoise(noise)
+        img.setCenter(fake.xy(wcs))
+        bounds = img.bounds()
+        im[bounds] = im[bounds] + img
 
     galsim.fits.write(im, file_name=outim)
 
