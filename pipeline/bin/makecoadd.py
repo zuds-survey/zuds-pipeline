@@ -110,7 +110,6 @@ if __name__ == '__main__':
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
-    mycats = ' '.join(cats)
 
     # TODO: Delete this
     rng = np.random.RandomState(SEED)
@@ -168,6 +167,7 @@ if __name__ == '__main__':
         logger.setLevel(logging.DEBUG)
         make_variance(frames, masks, logger)
 
+    mycats = ' '.join(cats)
 
     # First scamp everything
     # make a random dir for the output catalogs
