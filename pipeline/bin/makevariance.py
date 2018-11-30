@@ -19,7 +19,7 @@ def _read_clargs(val):
     return np.asarray(val)
 
 
-def make_variance(frames, masks):
+def make_variance(frames, masks, logger=None, extra={}):
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -32,7 +32,9 @@ def make_variance(frames, masks):
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (paramname, filtname, nnwname)
 
     for frame, mask in zip(frames, masks):
-        logging.info('Working image %s' % frame, extra=extra)
+
+        if logger is not None:
+            logger.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
@@ -61,7 +63,8 @@ def make_variance(frames, masks):
         filtered_string = '\n' + filtered_string.replace('[1A', '')
 
         # log it
-        logging.info(filtered_string, extra=extra)
+        if logger is not None:
+            logger.info(filtered_string, extra=extra)
 
         # now make the inverse variance map using fortran
         wgtname = frame.replace('fits', 'weight.fits')
@@ -84,7 +87,9 @@ if __name__ == '__main__':
     size = comm.Get_size()
 
     FORMAT = '[Rank %(rank)d %(asctime)-15s]: %(message)s'
-    logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+    logger = logging.getLogger('main')
+    logger.setLevel(logging.DEBUG)
+    fmter = logging.Formatter(fmt=FORMAT)
     extra = {'rank': rank}
 
     # set up the argument parser and parse the arguments
@@ -109,4 +114,4 @@ if __name__ == '__main__':
     frames = _split(frames, size)[rank]
     masks = _split(masks, size)[rank]
 
-    make_variance(frames, masks)
+    make_variance(frames, masks, logger, extra=extra)

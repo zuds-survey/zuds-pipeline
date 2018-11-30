@@ -7,6 +7,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import galsim
 from makevariance import make_variance
+import logging
 
 
 #TODO: Delete this
@@ -162,7 +163,9 @@ if __name__ == '__main__':
 
         masks = [f.replace('sciimg','mskimg') for f in frames]
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
-        make_variance(frames, masks)
+        logger = logging.getLogger('fakevar')
+        logger.setLevel(logging.DEBUG)
+        make_variance(frames, masks, logger)
 
     # First scamp everything
     # make a random dir for the output catalogs
