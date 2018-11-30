@@ -38,7 +38,8 @@ class Fake(object):
 
             image.setCenter(self.xy(wcs_image))
             with fits.open(wcs_image) as hdul:
-                gwcs = galsim.AstropyWCS(header=hdul[0].header)
+                wcs = WCS(hdul[0].header)
+                gwcs = galsim.AstropyWCS(wcs=wcs)
                 image.wcs = gwcs
 
         return image
