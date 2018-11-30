@@ -237,3 +237,10 @@ if __name__ == '__main__':
     liblg.execute(syscall, capture=False)
     liblg.make_rms(out, oweight)
     liblg.medg(out)
+
+    with fits.open(out, mode='update') as f, fits.open(frames[0]) as ff:
+        cards = [c for c in ff[0].header.cards if ('FAKE' in c.keyword and
+                                                   ('RA' in c.keyword or
+                                                    'DC' in c.keyword or
+                                                    'MG' in c.keyword))]
+        f[0].header.update(cards)
