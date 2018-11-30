@@ -19,30 +19,15 @@ class Fake(object):
         self.dec = dec
         self.mag = mag
 
-    def xy(self, impath):
+    def xy(self, wcs):
         # Return xy pixel coordinates of fake on image
-        with fits.open(impath) as hdul:
-            wcs = WCS(hdul[0].header)
-
         return wcs.wcs_world2pix([(self.ra, self.dec)], 1)[0]
 
-    def galsim_image(self, rng, sigma, magzpt, wcs_image=None):
-
+    def galsim_object(self, sigma, magzpt, wcs):
         flux = 10**(-0.4 * (self.mag - magzpt))
-        object = galsim.Gaussian(sigma=sigma).withFlux(flux)
-        noise = galsim.PoissonNoise(rng)
-        image = object.drawImage()
-        image.addNoise(noise)
-
-        if wcs_image is not None:
-
-            image.setCenter(self.xy(wcs_image))
-            with fits.open(wcs_image) as hdul:
-                wcs = WCS(hdul[0].header)
-                gwcs = galsim.AstropyWCS(wcs=wcs)
-                image.wcs = gwcs
-
-        return image
+        obj = galsim.Gaussian(sigma=sigma).withFlux(flux)
+        obj = obj.shift(*self.xy(wcs))
+        return obj
 
 
 def add_fakes_to_image(inim, outim, fakes, seed=None):
@@ -57,9 +42,20 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
         seeing = f[0].header['SEEING']
         sigma = seeing / 2.355
         zp = f[0].header['MAGZP']
+        wcs = WCS(f[0].header)
+
+    # cache the imarr for noise purposes
+    imarr = im.array.copy()
+    im.array = 0
 
     for fake in fakes:
-        im += fake.galsim_image(rng, sigma, zp, wcs_image=inim)
+        obj = fake.galsim_object(sigma, zp, wcs)
+        obj.drawImage(image=im)
+
+    # add poisson noise for the objects only
+    noise = galsim.PoissonNoise(rng)
+    im.addNoise(noise)
+    im.array += imarr
 
     galsim.fits.write(im, file_name=outim)
 
