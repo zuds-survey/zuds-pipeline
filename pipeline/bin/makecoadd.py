@@ -49,7 +49,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
         noise = galsim.PoissonNoise(rng)
         img.addNoise(noise)
         img.setCenter(fake.xy(wcs))
-        bounds = img.bounds()
+        bounds = img.bounds
         im[bounds] = im[bounds] + img
 
     galsim.fits.write(im, file_name=outim)
