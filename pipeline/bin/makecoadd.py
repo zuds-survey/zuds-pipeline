@@ -61,7 +61,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
         for i, fake in enumerate(fakes):
             hdr[f'FAKE{i:02d}RA'] = fake.ra
             hdr[f'FAKE{i:02d}DC'] = fake.dec
-            hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = fake.xy(outim)
+            hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = fake.xy(wcs)
             hdr[f'FAKE{i:02d}MG'] = fake.mag
 
 
