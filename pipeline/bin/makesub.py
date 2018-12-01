@@ -12,49 +12,7 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
-if __name__ == '__main__':
-
-    import argparse
-    import logging
-
-    rank = 0
-    size = 1
-
-    # set up the argument parser and parse the arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--science-frames', dest='sciimg', required=True,
-                        help='Input frames. Prefix with "@" to read from a list.', nargs='+')
-    parser.add_argument('--templates', dest='template', nargs='+', required=True,
-                        help='Templates to subtract. Prefix with "@" to read from a list.')
-    args = parser.parse_args()
-
-    # distribute the work to each processor
-
-    if args.sciimg[0].startswith('@'):
-        framelist = args.sciimg[0][1:]
-
-        if rank == 0:
-            frames = np.genfromtxt(framelist, dtype=None, encoding='ascii')
-            frames = np.atleast_1d(frames).tolist()
-        else:
-            frames = None
-
-    else:
-        frames = args.sciimg
-
-    if args.template[0].startswith('@'):
-        templist = args.template[0][1:]
-
-        if rank == 0:
-            templates = np.genfromtxt(templist, dtype=None, encoding='ascii')
-            templates = np.atleast_1d(templates).tolist()
-        else:
-            templates = None
-    else:
-        templates = args.template
-
-    myframes = _split(frames, size)[rank]
-    mytemplates = _split(templates, size)[rank]
+def make_sub(myframes, mytemplates):
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -224,8 +182,8 @@ if __name__ == '__main__':
         hotparlogger.info(str(nsx))
         hotparlogger.info(str(nsy))
 
-        syscall  = 'hotpants -inim %s -hki -n i -c t -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
-                   '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
+        syscall = 'hotpants -inim %s -hki -n i -c t -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
+                  '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
         execute(syscall, capture=False)
@@ -262,8 +220,7 @@ if __name__ == '__main__':
         execute(syscall, capture=False)
 
         # put fake info in header and region file if there are any fakes
-        with fits.open(frame) as f, fits.open(sub, mode='update') as fsub, \
-                open(sub.replace('fits','fake.reg'), 'w') as o:
+        with fits.open(frame) as f, fits.open(sub, mode='update') as fsub:
             hdr = f[0].header
             wcs = WCS(hdr)
             fakecards = [c for c in hdr.cards if 'FAKE' in c.keyword and 'X' not in c.keyword and 'Y' not in c.keyword]
@@ -274,24 +231,76 @@ if __name__ == '__main__':
             except ValueError:
                 maxn = 0
 
-            subheader = fsub[0].header
-            subheader.update(fakecards)
+            if maxn > 0:
+                subheader = fsub[0].header
+                subheader.update(fakecards)
 
-            # make the region files
-            o.write("""# Region file format: DS9 version 4.1
-global color=green dashlist=8 3 width=1 font="helvetica 10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 \
-delete=1 include=1 source=1
-physical
-""")
+                with open(sub.replace('fits', 'fake.reg'), 'w') as o:
 
-            for i in range(maxn):
-                ra = hdr[f'FAKE{i:02d}RA']
-                dec = hdr[f'FAKE{i:02d}DC']
-                mag = hdr[f'FAKE{i:02d}MG']
-                fake = Fake(ra, dec, mag)
-                x, y = fake.xy(wcs)
-                subheader[f'FAKE{i:02d}X'] = x
-                subheader[f'FAKE{i:02d}Y'] = y
+                    # make the region files
+                    o.write("""# Region file format: DS9 version 4.1
+    global color=green dashlist=8 3 width=1 font="helvetica 10 normal" \
+    select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 \
+    delete=1 include=1 source=1
+    physical
+    """)
 
-                o.write(f'circle({x},{y},10) # width=2 color=red\n')
-                o.write(f'text({x},{y+8}  # text={{mag={mag:.2f}}}\n')
+                    for i in range(maxn):
+                        ra = hdr[f'FAKE{i:02d}RA']
+                        dec = hdr[f'FAKE{i:02d}DC']
+                        mag = hdr[f'FAKE{i:02d}MG']
+                        fake = Fake(ra, dec, mag)
+                        x, y = fake.xy(wcs)
+                        subheader[f'FAKE{i:02d}X'] = x
+                        subheader[f'FAKE{i:02d}Y'] = y
+
+                        o.write(f'circle({x},{y},10) # width=2 color=red\n')
+                        o.write(f'text({x},{y+8}  # text={{mag={mag:.2f}}}\n')
+
+
+if __name__ == '__main__':
+
+    import argparse
+    import logging
+
+    rank = 0
+    size = 1
+
+    # set up the argument parser and parse the arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--science-frames', dest='sciimg', required=True,
+                        help='Input frames. Prefix with "@" to read from a list.', nargs='+')
+    parser.add_argument('--templates', dest='template', nargs='+', required=True,
+                        help='Templates to subtract. Prefix with "@" to read from a list.')
+    args = parser.parse_args()
+
+    # distribute the work to each processor
+
+    if args.sciimg[0].startswith('@'):
+        framelist = args.sciimg[0][1:]
+
+        if rank == 0:
+            frames = np.genfromtxt(framelist, dtype=None, encoding='ascii')
+            frames = np.atleast_1d(frames).tolist()
+        else:
+            frames = None
+
+    else:
+        frames = args.sciimg
+
+    if args.template[0].startswith('@'):
+        templist = args.template[0][1:]
+
+        if rank == 0:
+            templates = np.genfromtxt(templist, dtype=None, encoding='ascii')
+            templates = np.atleast_1d(templates).tolist()
+        else:
+            templates = None
+    else:
+        templates = args.template
+
+    myframes = _split(frames, size)[rank]
+    mytemplates = _split(templates, size)[rank]
+
+    make_sub(myframes, mytemplates)
+
