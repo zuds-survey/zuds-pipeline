@@ -271,7 +271,7 @@ RUN curl -SL http://www.astromatic.net/download/swarp/swarp-2.38.0.tar.gz \
 RUN python -m compileall -f "/usr/lib/python3.6/site-packages"; exit 0
 
 # Create a fake home directory so that packages can create
-# config files if needed
+# astromatic files if needed
 
 RUN mkdir /home/desi
 RUN mkdir /home/desi/.astropy
@@ -306,7 +306,7 @@ RUN pip install paramiko
 ADD . /pipeline
 ADD msgconsumer /daemon
 ADD slurm /slurm
-ADD config /config
+ADD astromatic /config
     
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
