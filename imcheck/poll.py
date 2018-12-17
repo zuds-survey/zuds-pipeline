@@ -305,7 +305,7 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=792'% (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=847 AND CCDID=2 AND QID=3'% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -535,7 +535,7 @@ class IPACQueryManager(object):
                 body = json.dumps(payload)
                 tmpl_corrid = self.relay_job(body)
                 for d in batch:
-                    template_corrids[(d['field'], d['quadrant'], d['band'], d['ccdnum'])] = (tmpl_corrid, d)
+                    template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
                 batch = []
 
         if len(batch) > 0:
@@ -543,7 +543,7 @@ class IPACQueryManager(object):
             body = json.dumps(payload)
             tmpl_corrid = self.relay_job(body)
             for d in batch:
-                template_corrids[(d['field'], d['quadrant'], d['band'], d['ccdnum'])] = (tmpl_corrid, d)
+                template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
 
         return template_corrids
 
