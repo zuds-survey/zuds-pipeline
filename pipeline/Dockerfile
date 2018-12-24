@@ -303,6 +303,10 @@ ENV NERSC_PASSWORD ***REMOVED***
 RUN conda install astropy=3
 RUN pip install paramiko
 
+# install galsim
+RUN conda install galsim -c conda-forge
+
+
 ADD . /pipeline
 ADD msgconsumer /daemon
 ADD slurm /slurm
@@ -311,8 +315,6 @@ ADD astromatic /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
-# install galsim
-RUN conda install galsim -c conda-forge
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]
