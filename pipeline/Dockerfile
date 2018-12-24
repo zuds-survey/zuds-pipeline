@@ -306,6 +306,17 @@ RUN pip install paramiko
 # install galsim
 RUN conda install galsim -c conda-forge
 
+RUN apt-get install -y  libcurl4-openssl-dev libatlas-base-dev
+RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
+    -o scamp-2.6.7.tar.gz \
+    && tar xzf scamp-2.6.7.tar.gz \
+    && cd scamp-2.6.7 \
+    && chmod +x autogen.sh \
+    && ./autogen.sh \
+    && ./configure \
+    && make && make install \
+    && cd .. \
+    && rm -rf scamp*
 
 ADD . /pipeline
 ADD msgconsumer /daemon
