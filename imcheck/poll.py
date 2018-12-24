@@ -535,7 +535,7 @@ class IPACQueryManager(object):
                 body = json.dumps(payload)
                 tmpl_corrid = self.relay_job(body)
                 for d in batch:
-                    template_corrids[(d['field'], d['quadrant'], d['band'], d['ccdnum'])] = (tmpl_corrid, d)
+                    template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
                 batch = []
 
         if len(batch) > 0:
@@ -543,7 +543,7 @@ class IPACQueryManager(object):
             body = json.dumps(payload)
             tmpl_corrid = self.relay_job(body)
             for d in batch:
-                template_corrids[(d['field'], d['quadrant'], d['band'], d['ccdnum'])] = (tmpl_corrid, d)
+                template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
 
         return template_corrids
 

@@ -312,7 +312,7 @@ RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
 # install galsim
-RUN pip install galsim
+RUN conda install galsim -c conda-forge
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]

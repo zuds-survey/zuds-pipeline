@@ -94,9 +94,9 @@ class TaskHandler(object):
             imstr = '\n'.join(job['images'])
             catstr = '\n'.join([i.replace('fits', 'cat') for i in job['images']])
             ob = job['outfile_name'][:-5]
-            runcmd = f'shifter /pipeline/bin/makecoadd.py --input-frames {imstr} --input-catalogs {catstr} \
-               --output-basename {ob}'
-            contents += f'\n{runcmd}'
+            runcmd = f'shifter /pipeline/bin/makecoadd.py --input-frames "{imstr}" --input-catalogs "{catstr}" \
+               --output-basename "{ob}"'
+            contents += f'\n{runcmd} &'
         contents += '\nwait\n'
 
         requests.put(target, data=contents, cookies=cookies)
