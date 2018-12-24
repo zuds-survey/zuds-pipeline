@@ -91,11 +91,11 @@ class TaskHandler(object):
         contents = contents.replace('$5', f'coadd_{scriptname.replace(".sh","")}')
 
         for job in jobs:
-            imstr = '\n'.join(job['images'])
-            catstr = '\n'.join([i.replace('fits', 'cat') for i in job['images']])
+            imstr = ' '.join(job['images'])
+            catstr = ' '.join([i.replace('fits', 'cat') for i in job['images']])
             ob = job['outfile_name'][:-5]
-            runcmd = f'shifter python /pipeline/bin/makecoadd.py --input-frames "{imstr}" --input-catalogs "{catstr}" \
-               --output-basename "{ob}"'
+            runcmd = f'shifter python /pipeline/bin/makecoadd.py --input-frames {imstr} --input-catalogs {catstr} \
+               --output-basename {ob}'
             contents += f'\n{runcmd} &'
         contents += '\nwait\n'
 
