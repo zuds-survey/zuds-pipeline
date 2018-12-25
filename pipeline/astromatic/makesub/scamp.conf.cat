@@ -87,7 +87,7 @@ ASTR_IMAFLAGSMASK      0x0             # Astrometry rejection mask on IMAFLAGS
 #---------------------------- Photometric solution ----------------------------
 
 SOLVE_PHOTOM           N               # Compute photometric solution (Y/N) ?
-MAGZERO_OUT            22.5             # Magnitude zero-point(s) in output
+MAGZERO_OUT            27.5             # Magnitude zero-point(s) in output
 MAGZERO_INTERR         0.01            # Internal mag.zero-point accuracy
 MAGZERO_REFERR         0.03            # Photom.field mag.zero-point accuracy
 PHOTINSTRU_KEY         FILTER          # FITS keyword(s) defining the photom.
