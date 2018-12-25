@@ -10,7 +10,7 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --exclusive
 #SBATCH -C haswell
-#SBATCH --volume=/global/homes/d/dgold:/home/desi
+#SBATCH --volume=/global/homes/d/dgold:/home/desi;/global/cscratch1/sd/dgold/lensgrinder/pipeline/astromatic:/config
 #SBATCH -o $3/slurm-%A.out
 
 export OMP_NUM_THREADS=1
