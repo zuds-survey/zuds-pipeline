@@ -124,24 +124,25 @@ if __name__ == '__main__':
                             'MINDATE, MAXDATE, PIPELINE_SCHEMA_ID, PROCDATE, NIMG) VALUES (' \
                             '%s, %s, %s, %s, %s, %s, %s ,%s, %s, %s) RETURNING ID'
 
-                    path = bodyd['outfile_name']
-                    band = bodyd['filter']
-                    quadrant = bodyd['quadrant']
-                    field = bodyd['field']
-                    ccdnum = bodyd['ccdnum']
-                    mindate = pd.to_datetime(bodyd['mindate']).to_pydatetime()
-                    maxdate = pd.to_datetime(bodyd['maxdate']).to_pydatetime()
-                    pipeline_schema_id = bodyd['pipeline_schema_id']
-                    procdate = datetime.datetime.utcnow()
+                    for job in bodyd['jobs']:
+                        path = job['outfile_name']
+                        band = job['filter']
+                        quadrant = job['quadrant']
+                        field = job['field']
+                        ccdnum = job['ccdnum']
+                        mindate = pd.to_datetime(job['mindate']).to_pydatetime()
+                        maxdate = pd.to_datetime(job['maxdate']).to_pydatetime()
+                        pipeline_schema_id = job['pipeline_schema_id']
+                        procdate = datetime.datetime.utcnow()
 
-                    cursor.execute(query, (path, band, quadrant, field, ccdnum, mindate,
-                                   maxdate, pipeline_schema_id, procdate, len(bodyd['imids'])))
-                    tmplid = cursor.fetchone()[0]
+                        cursor.execute(query, (path, band, quadrant, field, ccdnum, mindate,
+                                       maxdate, pipeline_schema_id, procdate, len(job['imids'])))
+                        tmplid = cursor.fetchone()[0]
 
-                    # now update the association table
-                    query = 'INSERT INTO TEMPLATEIMAGEASSOC (TEMPLATE_ID, IMAGE_ID) VALUES (%s, %s)'
-                    for imid in bodyd['imids']:
-                        cursor.execute(query, (tmplid, imid))
+                        # now update the association table
+                        query = 'INSERT INTO TEMPLATEIMAGEASSOC (TEMPLATE_ID, IMAGE_ID) VALUES (%s, %s)'
+                        for imid in job['imids']:
+                            cursor.execute(query, (tmplid, imid))
 
                     connection.commit()
 
