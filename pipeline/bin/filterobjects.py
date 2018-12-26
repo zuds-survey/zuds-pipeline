@@ -113,7 +113,7 @@ def filter_sexcat(cat):
 
     with fits.open(img) as hdu:
         imdata = hdu[0].data
-        imsig = 1.48 * np.abs(imdata - np.median(imdata))
+        imsig = 1.48 * np.median(np.abs(imdata - np.median(imdata)))
         immed = np.median(imdata)
         for row in table:
 
