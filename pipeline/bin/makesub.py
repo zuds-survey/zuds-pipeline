@@ -5,6 +5,7 @@ from astropy.wcs import WCS
 from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
 
+from filterobjects import filter_sexcat
 from makecoadd import Fake
 
 # split an iterable over some processes recursively
@@ -219,6 +220,12 @@ def make_sub(myframes, mytemplates):
         syscall += clargs % defparaper
         execute(syscall, capture=False)
 
+        # now filter objects
+        filter_sexcat(subcat)
+
+        # publish to marshal
+
+
         # put fake info in header and region file if there are any fakes
         with fits.open(frame) as f, fits.open(sub, mode='update') as fsub:
             hdr = f[0].header
@@ -256,6 +263,7 @@ def make_sub(myframes, mytemplates):
 
                         o.write(f'circle({x},{y},10) # width=2 color=red\n')
                         o.write(f'text({x},{y+8}  # text={{mag={mag:.2f}}}\n')
+
 
 
 if __name__ == '__main__':
@@ -303,4 +311,7 @@ if __name__ == '__main__':
     mytemplates = _split(templates, size)[rank]
 
     make_sub(myframes, mytemplates)
+
+
+
 

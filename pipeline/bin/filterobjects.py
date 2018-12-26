@@ -199,12 +199,6 @@ def filter_sexcat(cat):
 
 if __name__ == '__main__':
 
-    from mpi4py import MPI
-
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
-
     from argparse import ArgumentParser
     parser = ArgumentParser()
     parser.add_argument('cat', help='the catalog to read in')
