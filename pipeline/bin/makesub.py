@@ -207,8 +207,8 @@ def make_sub(myframes, mytemplates):
         execute(syscall, capture=False)
 
         # Subtraction catalog
-        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s'
-        syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub)
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s -WEIGHT_IMAGE %s -WEIGHT_TYPE MAP_RMS'
+        syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub, subrms)
         syscall += clargs % defparsub
         syscall += f' -FLAG_IMAGE {submask}'
         print(syscall)
