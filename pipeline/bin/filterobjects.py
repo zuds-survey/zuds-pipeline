@@ -136,7 +136,6 @@ def filter_sexcat(cat):
                 if nbad >= 3:
                     row['GOODCUT'] = 0.
 
-    table = table[table['GOODCUT'] > 0]
     table.write(cat.replace('cat', 'cat.out.fits'), format='fits', overwrite=True)
 
     f = open(reg, "w+")
