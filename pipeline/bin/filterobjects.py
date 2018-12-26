@@ -11,7 +11,7 @@ from photutils import aperture_photometry
 
 from scipy.optimize import minimize
 
-CUTSIZE = 51 # pixels
+CUTSIZE = 11 # pixels
 
 
 # split an iterable over some processes recursively
@@ -109,78 +109,34 @@ def filter_sexcat(cat):
     table['GOODCUT'][np.where(table['FLUX_BEST'] / table['FLUXERR_BEST'] < 5)] = 0
     print('Number of candidates after s/n > 5 cut: ', np.sum(table['GOODCUT']))
 
-    """
+    # cut on anything with more than 3 10 sigma negative pixels in a 10x10 box
 
-    chisqs = []
-    values = []
+    with fits.open(img) as hdu:
+        imdata = hdu[0].data
+        imsig = 1.48 * np.abs(imdata - np.median(imdata))
+        immed = np.median(imdata)
+        for row in table:
 
-    imdata = hdu_img[0].data
-    rmsdata = hdu_rms[0].data
+            if row['GOODCUT'] > 0.0 :
 
-    for row in table:
+                xsex = np.round(row['X_IMAGE']).astype(int)
+                ysex = np.round(row['Y_IMAGE']).astype(int)
 
-        if row['GOODCUT'] > 0.0 :
+                xsex += -1
+                ysex += -1
 
-            xsex = np.round(row['X_IMAGE']).astype(int)
-            ysex = np.round(row['Y_IMAGE']).astype(int)
+                yslice = slice(ysex - CUTSIZE // 2, ysex + CUTSIZE // 2)
+                xslice = slice(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2)
 
+                imcutout = imdata[yslice, xslice]
 
-            xsex += -1
-            ysex += -1
+                sigim = (imcutout - immed) / imsig
+                nbad = len(np.argwhere(sigim < -10))
 
-            yslice = slice(ysex - CUTSIZE // 2, ysex + CUTSIZE // 2)
-            xslice = slice(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2)
+                if nbad >= 3:
+                    row['GOODCUT'] = 0.
 
-            imcutout = imdata[yslice, xslice]
-            rmscutout = rmsdata[yslice, xslice]
-
-            lbflx = 1.5*rmscutout.min()
-            gsflx = imcutout.max()
-
-            y, x = np.meshgrid(np.arange(ysex - CUTSIZE // 2, ysex + CUTSIZE // 2),
-                               np.arange(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2))
-
-            def chi_squared(parameters):
-
-                A, x0, y0, sigx = parameters
-                yarg = (y - y0) * (y - y0)
-                xarg = (x - x0) * (x - x0)
-                arg = (yarg + xarg)/sigx**2
-                yth = A * np.exp(-arg)
-                ressig = (yth - imcutout) / rmscutout
-                chisq = np.sum(ressig * ressig)
-
-                return chisq
-
-            guess = [gsflx,  row['X_IMAGE'], row['Y_IMAGE'], see/2.355]
-
-            fitres = minimize(chi_squared, tuple(guess), method='L-BFGS-B',
-                              bounds=[
-                                  (lbflx, ubflx),
-                                  (guess[1] - 0.5, guess[1] + 0.5),
-                                  (guess[2] - 0.5, guess[2] + 0.5),
-                                  (guess[3] * 0.70, guess[3] * 2.00),
-                              ])
-            chisq_opt = fitres.fun
-            optimal_values = fitres.x
-            chisqs.append(chisq_opt)
-            values.append(optimal_values)
-
-        else:
-
-            chisqs.append(1000.0*(CUTSIZE**2 - 1))
-            values.append([0.0, 0.0, 0.0, 0.0])
-
-    redchisq = Column(np.asarray(chisqs) / (CUTSIZE**2 - 4))
-    table.add_column(redchisq, name='REDCHISQ')
-
-    #table['GOODCUT'][np.where(table['REDCHISQ'] > 1.2)] = 0
-    #print('Number of candidates after chisq cut: ', np.sum(table['GOODCUT']))
-
-    for i, value  in enumerate(['A', 'x0', 'y0', 'sigx']):
-         table[value] = [ov[i] for ov in values]
-    """
-
+    table = table[table['GOODCUT'] > 0]
     table.write(cat.replace('cat', 'cat.out.fits'), format='fits', overwrite=True)
 
     f = open(reg, "w+")
