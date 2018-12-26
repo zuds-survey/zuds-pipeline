@@ -61,7 +61,7 @@ CROSSID_RADIUS         2.0             # Cross-id initial radius (arcsec)
 #---------------------------- Astrometric solution ----------------------------
 
 SOLVE_ASTROM           Y               # Compute astrometric solution (Y/N) ?
-PROJECTION_TYPE        SAME            # SAME, TPV or TAN
+PROJECTION_TYPE        TPV            # SAME, TPV or TAN
 ASTRINSTRU_KEY         FILTER   # FITS keyword(s) defining the astrom
 STABILITY_TYPE         INSTRUMENT      # EXPOSURE, PRE-DISTORTED or INSTRUMENT
 CENTROID_KEYS          XWIN_IMAGE,YWIN_IMAGE # Cat. parameters for centroiding
