@@ -125,8 +125,8 @@ def filter_sexcat(cat):
                 xsex += -1
                 ysex += -1
 
-                yslice = slice(ysex - CUTSIZE // 2, ysex + CUTSIZE // 2)
-                xslice = slice(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2)
+                yslice = slice(ysex - CUTSIZE // 2, ysex + CUTSIZE // 2 + 1)
+                xslice = slice(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2 + 1)
 
                 imcutout = imdata[yslice, xslice]
 
@@ -144,7 +144,9 @@ def filter_sexcat(cat):
                 if nbad >= 1:
                     row['GOODCUT'] = 0.
 
-                bsum = sigim[sigim < 0].sum()
+                midcoord = CUTSIZE // 2
+                tinyim = sigim[midcoord - 2:midcoord + 3, midcoord - 2: midcoord + 3]
+                bsum = tinyim[tinyim < 0].sum()
                 if bsum < -6.:
                     row['GOODCUT'] = 0.
 
