@@ -131,7 +131,19 @@ def filter_sexcat(cat):
                 imcutout = imdata[yslice, xslice]
 
                 sigim = (imcutout - immed) / imsig
+
+                neg5 = np.argwhere(sigim < -5.)
+                for r, c in neg5:
+                    yneg = ysex - CUTSIZE // 2 + r
+                    xneg = xsex - CUTSIZE // 2 + c
+                    cutaround = imdata[yneg - 1:yneg + 2, xneg - 1, xneg + 2]
+                    if (((cutaround - immed) / imsig) > 10).any():
+                        row['GOODCUT'] = 0.
+                        break
+
+                """
                 nbad = len(np.argwhere(sigim < -10))
+
 
                 if nbad >= 3:
                     row['GOODCUT'] = 0.
@@ -149,8 +161,7 @@ def filter_sexcat(cat):
                 for g in gradient:
                     if (g < -1.).any():
                         row['GOODCUT'] = 0.
-
-
+                """
 
     table.write(cat.replace('cat', 'cat.out.fits'), format='fits', overwrite=True)
 
