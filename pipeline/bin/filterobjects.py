@@ -147,7 +147,7 @@ def filter_sexcat(cat):
                 midcoord = CUTSIZE // 2
                 tinyim = sigim[midcoord - 2:midcoord + 3, midcoord - 2: midcoord + 3]
                 bsum = tinyim[tinyim < 0].sum()
-                if bsum < -6.:
+                if bsum < -18.5:
                     row['GOODCUT'] = 0.
 
 
