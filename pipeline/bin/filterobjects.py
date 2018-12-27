@@ -140,6 +140,10 @@ def filter_sexcat(cat):
                 if nbad >= 5:
                     row['GOODCUT'] = 0.
 
+                nbad = len(np.argwhere(sigim < -20))
+                if nbad >= 1:
+                    row['GOODCUT'] = 0.
+
 
     table.write(cat.replace('cat', 'cat.out.fits'), format='fits', overwrite=True)
 
