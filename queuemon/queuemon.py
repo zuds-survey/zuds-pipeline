@@ -124,6 +124,9 @@ if __name__ == '__main__':
                             'MINDATE, MAXDATE, PIPELINE_SCHEMA_ID, PROCDATE, NIMG) VALUES (' \
                             '%s, %s, %s, %s, %s, %s, %s ,%s, %s, %s) RETURNING ID'
 
+                    # now update the association table
+                    tmpquery = 'INSERT INTO TEMPLATEIMAGEASSOC (TEMPLATE_ID, IMAGE_ID) VALUES (%s, %s)'
+
                     for job in bodyd['jobs']:
                         path = job['outfile_name']
                         band = job['filter']
@@ -139,10 +142,8 @@ if __name__ == '__main__':
                                        maxdate, pipeline_schema_id, procdate, len(job['imids'])))
                         tmplid = cursor.fetchone()[0]
 
-                        # now update the association table
-                        query = 'INSERT INTO TEMPLATEIMAGEASSOC (TEMPLATE_ID, IMAGE_ID) VALUES (%s, %s)'
                         for imid in job['imids']:
-                            cursor.execute(query, (tmplid, imid))
+                            cursor.execute(tmpquery, (tmplid, imid))
 
                     connection.commit()
 
