@@ -117,7 +117,7 @@ def filter_sexcat(cat):
         immed = np.median(imdata)
         for row in table:
 
-            if row['GOODCUT'] > 0.0 :
+            if row['GOODCUT'] > 0.0:
 
                 xsex = np.round(row['X_IMAGE']).astype(int)
                 ysex = np.round(row['Y_IMAGE']).astype(int)
@@ -142,6 +142,10 @@ def filter_sexcat(cat):
 
                 nbad = len(np.argwhere(sigim < -20))
                 if nbad >= 1:
+                    row['GOODCUT'] = 0.
+
+                bsum = sigim[sigim < 0].sum()
+                if bsum < -6.:
                     row['GOODCUT'] = 0.
 
 
