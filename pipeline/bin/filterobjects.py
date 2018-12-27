@@ -144,11 +144,12 @@ def filter_sexcat(cat):
                 if nbad >= 1:
                     row['GOODCUT'] = 0.
 
-                midcoord = CUTSIZE // 2
-                tinyim = sigim[midcoord - 2:midcoord + 3, midcoord - 2: midcoord + 3]
-                bsum = tinyim[tinyim < 0].sum()
-                if bsum < -18.5:
-                    row['GOODCUT'] = 0.
+                normcutout = imcutout / imcutout.max()
+                gradient = np.gradient(normcutout)
+                for g in gradient:
+                    if (g < -1.).any():
+                        row['GOODCUT'] = 0.
+
 
 
     table.write(cat.replace('cat', 'cat.out.fits'), format='fits', overwrite=True)
