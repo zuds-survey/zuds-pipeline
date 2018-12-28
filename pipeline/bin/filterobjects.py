@@ -142,7 +142,7 @@ def filter_sexcat(cat):
                     yneg = r + 1
                     xneg = c + 1
                     cutaround = sigbig[yneg - 1:yneg + 2, xneg - 1:xneg + 2]
-                    if (((cutaround - immed) / imsig) > 5).any():
+                    if (cutaround > 5).any():
                         row['GOODCUT'] = 0.
                         break
 
