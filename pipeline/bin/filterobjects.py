@@ -129,7 +129,7 @@ def filter_sexcat(cat):
                 xslice = slice(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2 + 1)
 
                 ybig = slice(ysex - CUTSIZE // 2 - 1, ysex + CUTSIZE // 2 + 2)
-                xbig = slice(ysex - CUTSIZE // 2 - 1, ysex + CUTSIZE // 2 + 2)
+                xbig = slice(xsex - CUTSIZE // 2 - 1, xsex + CUTSIZE // 2 + 2)
 
                 imcutout = imdata[yslice, xslice]
                 bigcut = imdata[ybig, xbig]
