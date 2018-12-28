@@ -128,15 +128,20 @@ def filter_sexcat(cat):
                 yslice = slice(ysex - CUTSIZE // 2, ysex + CUTSIZE // 2 + 1)
                 xslice = slice(xsex - CUTSIZE // 2, xsex + CUTSIZE // 2 + 1)
 
+                ybig = slice(ysex - CUTSIZE // 2 - 1, ysex + CUTSIZE // 2 + 2)
+                xbig = slice(ysex - CUTSIZE // 2 - 1, ysex + CUTSIZE // 2 + 2)
+
                 imcutout = imdata[yslice, xslice]
+                bigcut = imdata[ybig, xbig]
 
                 sigim = (imcutout - immed) / imsig
+                sigbig = (bigcut - immed) / imsig
 
                 neg5 = np.argwhere(sigim < -5.)
                 for r, c in neg5:
-                    yneg = ysex - CUTSIZE // 2 + r
-                    xneg = xsex - CUTSIZE // 2 + c
-                    cutaround = imdata[yneg - 1:yneg + 2, xneg - 1, xneg + 2]
+                    yneg = r + 1
+                    xneg = c + 1
+                    cutaround = sigbig[yneg - 1:yneg + 2, xneg - 1:xneg + 2]
                     if (((cutaround - immed) / imsig) > 10).any():
                         row['GOODCUT'] = 0.
                         break
