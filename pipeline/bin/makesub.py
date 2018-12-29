@@ -214,6 +214,9 @@ def make_sub(myframes, mytemplates):
         print(syscall)
         execute(syscall, capture=False)
 
+        with fits.open(subcat, mode='update') as sc, fits.open(sub) as s:
+            sc.append(fits.BinTableHDU(header=s[0].header))
+
         # Aperture catalog
         syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -VERBOSE_TYPE QUIET %s,%s'
         syscall = syscall % (defsexaper, refzp, apercat, sub, refremap)
