@@ -17,7 +17,7 @@ from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
                               Source, Spectrum, Telescope, Thumbnail, User,
                               Token)
 
-__all__ = ['publish_to_marshal']
+__all__ = ['load_catalog']
 
 
 CUTOUT_SIZE = 51  # pix
@@ -94,9 +94,9 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
     with status("Loading in photometry"):
 
-        with fits.open(catpath) as f:
+        with fits.open(catpath) as f, fits.open(newpath) as new:
             data = f[1].data
-            imheader = f[2].header
+            imheader = new[0].header
 
         gooddata = data[data['GOODCUT'] == 1]
 
@@ -110,7 +110,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
             dec = row['Y_WORLD']
             mag = row['MAG_BEST']
             e_mag = row['MAGERR_BEST']
-            obsmjd = imheader['MJD-OBS']
+            obsmjd = imheader['MJDEFF']
             obsjd = Time(obsmjd, format='mjd', scale='utc').jd
             filter = imheader['FILTER']
 
