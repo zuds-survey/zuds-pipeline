@@ -318,10 +318,10 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
     && cd .. \
     && rm -rf scamp*
 
-RUN cd $HOME && git clone https://github.com/dannygoldstein/skyportal.git \
+RUN cd / && git clone https://github.com/dannygoldstein/skyportal.git \
     && cd skyportal && git checkout phot-update && cd -
-ADD patches/skyportal.yaml $HOME/skyportal/config.yaml
-ENV PYTHONPATH $PYTHONPATH:$HOME/skyportal
+ADD patches/skyportal.yaml /skyportal/config.yaml
+ENV PYTHONPATH $PYTHONPATH:/skyportal
 
 ENV DB_FTP_ENPOINT ***REMOVED***
 ENV DB_FTP_DIR /scratch/danny/stamps
