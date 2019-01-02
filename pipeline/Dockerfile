@@ -320,9 +320,12 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
 
 
 RUN apt-get install -y libpq-dev supervisor nginx nodejs postgresql-client npm
-RUN cd / && git clone https://github.com/dannygoldstein/skyportal.git \
-    && cd skyportal && git checkout phot-update  && cd baselayer && git submodule update --init --remote &&\
-    cd - && make -C baselayer paths && make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle && cd $HOME
+RUN apt-get install -y curl build-essential software-properties-common && \
+    curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
+    apt-get update && \
+    apt-get -y upgrade && \cd / && git clone https://github.com/dannygoldstein/skyportal.git \
+    && cd skyportal && git checkout phot-update && cd - && cd baselayer && git submodule update --init --remote &&\
+    make -C baselayer paths && make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
 ADD patches/skyportal.yaml /skyportal/config.yaml
 ENV PYTHONPATH $PYTHONPATH:/skyportal
 
