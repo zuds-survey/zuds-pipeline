@@ -324,7 +324,7 @@ RUN apt-get install -y curl build-essential software-properties-common && \
     apt-get -y upgrade && \cd / && git clone https://github.com/dannygoldstein/skyportal.git \
     && cd skyportal && git checkout phot-update && cd - && cd baselayer && git submodule update --init --remote &&\
     make -C baselayer paths && make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
-ADD patches/skyportal.yaml /skyportal/config.yaml
+ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
 ENV PYTHONPATH $PYTHONPATH:/skyportal
 
 ENV DB_FTP_ENPOINT ***REMOVED***
