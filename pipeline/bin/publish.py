@@ -3,18 +3,32 @@ import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
 import scipy.misc
-from uuid import uuid4
 from astropy.time import Time
 from datetime import date
+from ftplib import FTP
+import os
+from pathlib import Path
 
+from baselayer.app.env import load_env
+from baselayer.app.model_util import status
+
+from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
+                              Instrument, Group, GroupUser, Photometry, Role,
+                              Source, Spectrum, Telescope, Thumbnail, User,
+                              Token)
 
 __all__ = ['publish_to_marshal']
 
 
-CUTOUT_SIZE = 201  # pix
-SEARCH_RADIUS = 2. / 3600. # 2 arcsec
+CUTOUT_SIZE = 51  # pix
+SEARCH_RADIUS = 2. / 3600.  # 2 arcsec
+DB_FTP_DIR = os.getenv('DB_FTP_DIR')
+DB_FTP_ENDPOINT = os.getenv('DB_FTP_ENDPOINT')
+DB_FTP_USERNAME = os.getenv('DB_FTP_USERNAME')
+DB_FTP_PASSWORD = os.getenv('DB_FTP_PASSWORD')
 
 lookup = dict(zip(range(0, 25), 'abcdefghijklmnopqrstuvwxyz'))
+
 
 def num_to_alpha(num):
     updates = []
@@ -25,7 +39,8 @@ def num_to_alpha(num):
 
     return ''.join(updates)
 
-class Object(object):
+
+class Detection(object):
 
     def __init__(self, ra, dec, mag, magerr, mjd, filter, locdict):
 
@@ -51,8 +66,8 @@ class Object(object):
 
                 stamp = np.zeros((CUTOUT_SIZE, CUTOUT_SIZE))
 
-                xind = np.arange(xp - CUTOUT_SIZE // 2, xp + CUTOUT_SIZE // 2, dtype=int)
-                yind = np.arange(yp - CUTOUT_SIZE // 2, yp + CUTOUT_SIZE // 2, dtype=int)
+                xind = np.arange(xp - CUTOUT_SIZE // 2, xp + CUTOUT_SIZE // 2 + 1, dtype=int)
+                yind = np.arange(yp - CUTOUT_SIZE // 2, yp + CUTOUT_SIZE // 2 + 1, dtype=int)
 
                 for m, i in enumerate(xind):
                     if i < 0 or i >= f[0].header['NAXIS1']:
@@ -62,94 +77,98 @@ class Object(object):
                             continue
                         stamp[n, m] = f[0].section[j, i]
 
-                name = f'/stamps/{objname}.{key}.jpg'
+                name = f'/stamps/{objname}.{key}.png'
                 scipy.misc.imsave(name, stamp)
-                stamps[f'{key}file'] = (f'{objname}.{key}.jpg', open(name, 'rb'), 'image/jpeg')
+                stamps[f'{key}file'] = (f'{objname}.{key}.png', open(name, 'rb'), 'image/png')
 
         return stamps
 
 
-def publish_to_marshal(object, username, password, cursor):
+def load_catalog(catpath, refpath, newpath, subpath):
+    """Insert test data"""
+    env, cfg = load_env()
+    basedir = Path(os.path.dirname(__file__))/'..'
 
-    # insert the object into the database
-    objquery = 'INSERT INTO OBJECT (RA, DEC, FILTER, MAG, MAG_ERR, MJD) VALUES ' \
-               '(%s, %s, %s, %s, %s, %s) RETURNING ID'
-    cursor.execute(objquery, (object.ra, object.dec, object.filter, object.mag, object.magerr,
-                              object.mjd))
-    objid = cursor.fetchall()[0][0]
+    with status(f"Connecting to database {cfg['database']['database']}"):
+        init_db(**cfg['database'])
 
-    # now see if the object should be associated with a candidate
-    assocquery = 'SELECT NAME FROM CANDIDATE WHERE Q3C_RADIAL_QUERY(RA, DEC, %s, %s, %s)'
-    cursor.execute(assocquery, (object.ra, object.dec, SEARCH_RADIUS))
-    result = cursor.fetchall()
+    with status("Loading in photometry"):
 
-    if len(result) == 0:
-        # we need to make a new candidate - get the name of the latest candidate
-        query = 'SELECT MAX(NAME) FROM CANDIDATE'
-        cursor.execute(query)
-        result = cursor.fetchall()[0][0]
+        with fits.open(catpath) as f:
+            data = f[1].data
+            imheader = f[2].header
 
-        # get the current number
-        seqquery = "SELECT nextval('namenum')"
-        cursor.execute(seqquery)
-        num = cursor.fetchone()[0]
-        #name = 'abce'
-        name = 'DG' + str(date.today().year)[2:] + num_to_alpha(num)
+        gooddata = data[data['GOODCUT'] == 1]
 
-        # insert the candidate into the db
-        query = 'INSERT INTO CANDIDATE (NAME, RA, DEC) VALUES (%s, %s, %s)'
-        cursor.execute(query, (name, object.ra, object.dec))
-        cursor.connection.commit()
+        p48 = DBSession().query(Instrument).filter('p48' in Instrument.name).first()
+        photpoints = []
+        triplets = []
 
-        endpoint = 'http://skipper.caltech.edu:8080/cgi-bin/growth/add_source_atel.cgi'
-        stamps = object.make_stamps(name)
-        payload = {'name': name, 'ra': object.ra, 'dec': object.dec, 'sciencepids': '60', 'commit':'yes'}
-        r = requests.post(endpoint, data=payload, auth=(username, password), files=stamps)
+        for row in gooddata:
 
-        if r.status_code == 200:
-            print('Upload successful')
-        else:
-            raise ValueError(f'Upload of candidate unsuccessful')
+            ra = row['X_WORLD']
+            dec = row['Y_WORLD']
+            mag = row['MAG_BEST']
+            e_mag = row['MAGERR_BEST']
+            obsmjd = imheader['MJD-OBS']
+            obsjd = Time(obsmjd, format='mjd', scale='utc').jd
+            filter = imheader['FILTER']
 
-    else:
-        name = result[0][0]
+            photpoint = Photometry(instrument=p48, ra=ra, dec=dec, mag=mag,
+                                   e_mag=e_mag, jd=obsjd, filter=filter)
+            photpoints.append(photpoint)
 
-    namequery = 'SELECT ID FROM CANDIDATE WHERE NAME=%s'
-    cursor.execute(namequery, (name,))
-    candid = cursor.fetchone()[0]
+            # do stamps
+            detection = Detection(ra, dec, mag, e_mag, obsmjd, filter,
+                                  {'ref':refpath, 'new': newpath, 'sub':subpath})
 
-    upquery = 'INSERT INTO ASSOC (OBJECT_ID, CANDIDATE_ID) VALUES (%s, %s)'
-    cursor.execute(upquery, (objid, candid))
+            stamps = detection.make_stamps(photpoint.id)
+            triplets.append(stamps)
 
-    # now upload the phot - first scrape the marhsal for the sourceid
-    r = requests.get('http://skipper.caltech.edu:8080/cgi-bin/growth/view_source.cgi', params={'name': name},
-                     auth=(username, password))
-    html = r.content
-    marshalid = int(html.decode('ascii').split('?sourceid=')[1].split('&')[0])
+        DBSession().add_all(photpoints)
 
-    photendpoint = f'http://skipper.caltech.edu:8080/cgi-bin/growth/edit_phot.cgi?sourceid={marshalid}'
+    with status("Uploading stamps"):
+        with FTP(DB_FTP_ENDPOINT, user=DB_FTP_USERNAME, passwd=DB_FTP_PASSWORD) as ftp:
+            ftp.cwd(DB_FTP_DIR)
+            for triplet, photpoint in zip(triplets, photpoints):
+                for key in triplet:
+                    f = triplet[key]
+                    ftp.put(f)
+                    remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
+                    thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
+                                      file_uri=remotename, public_url=os.path.join('/', remotename))
+                    DBSession().add(thumb)
 
-    jd = Time(object.mjd, format='mjd', scale='utc').jd
 
-    # construct the json to add
-    payload = {'commit':'yes',
-               'id':"-1",
-               'programid':"-1",
-               'instrumentid':"2",
-               'ra': object.ra,
-               'dec': object.dec,
-               'era': 0.,
-               'edec': 0.,
-               'jd': jd,
-               'exptime':'-1',
-               'filter':object.filter.lower(),
-               'magpsf': object.mag,
-               'sigmamagpsf': object.magerr,
-               'limmag': '-1',
-               'issub': 'yes',
-               'refsys': 'AB',
-               'observer': '-1',
-               'reducedby': '-1'}
+    with status('Grouping detections into sources'):
+        srcquery = 'SELECT ID FROM SOURCES WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 2.)'
+        detquery = 'SELECT ID FROM PHOTOMETRY WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 2.) AND ' \
+                   'ID != :id'
+        for point in photpoints:
+            result = DBSession().execute(srcquery, {'ra': point.ra, 'dec': point.dec}).fetchall()
+            if len(result) > 0:
+                source = Source.query.get(result[0]['id'])
+                point.source = source
 
-    r = requests.post(photendpoint, data=payload, auth=(username, password))
-    print('photometry upload ' + ('succesful' if r.status_code == 200 else 'unsuccessful'))
+                # update source RA and DEC
+                source.ra = np.median([p.ra for p in source.photometry])
+                source.dec = np.median([p.dec for p in source.photometry])
+
+
+            else:
+                result = DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
+                                                        'id': point.id}).fetchall()
+                if len(result) > 0:
+                    # create a new source
+                    points = list(Photometry.query.get(result['id'])) + [point]
+                    ra = np.median([p.ra for p in points])
+                    dec = np.median([p.dec for p in points])
+
+                    seqquery = "SELECT nextval('namenum')"
+                    num = DBSession().execute(seqquery).fetchone()[0]
+                    name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
+                    s = Source(id=name, ra=ra, dec=dec)
+                    DBSession.add(s)
+                    s.add_linked_thumbnails()
+
+    DBSession().commit()
