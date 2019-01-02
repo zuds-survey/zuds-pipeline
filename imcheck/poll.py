@@ -44,7 +44,7 @@ date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 coadd_minframes = 3
 img_batchsize = 1024
-template_batchsize = 16
+template_batchsize = 4
 
 # this is the night id corresponding
 # to the first science observation in the survey
