@@ -1,0 +1,7 @@
+database:
+    database: skyportal
+    host: ***REMOVED***
+    port: 7777
+    user: skyportal
+    password:
+

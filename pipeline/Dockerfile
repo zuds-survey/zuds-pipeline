@@ -171,18 +171,18 @@ RUN curl -SL ftp://ftp.atnf.csiro.au/pub/software/wcslib/wcslib-5.20.tar.bz2 \
     && cd .. \
     && rm -rf wcslib*
 
-# wcstools 
+# wcstools
 
 RUN curl -SL http://tdc-www.harvard.edu/software/wcstools/wcstools-3.9.5.tar.gz \
     -o wcstools-3.9.5.tar.gz \
-    && tar xzf wcstools-3.9.5.tar.gz \ 
+    && tar xzf wcstools-3.9.5.tar.gz \
     && cd wcstools-3.9.5 \
     && chmod -R u+w . \
     && CC="gcc" CFLAGS="-O3 -fPIC -pthread" \
     CPPFLAGS="-I/usr/include" \
     LDFLAGS="-L/usr/lib" \
     && make -j 4 all \
-    && cd .. 
+    && cd ..
 
 ENV PATH=$PATH:/usr/src/desi/wcstools-3.9.5/bin
 
@@ -285,8 +285,8 @@ RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
 # Set the entrypoint and default command
 
 ENV PYTHONPATH /global/cscratch1/sd/dgold/lsn/install/lib/python3.6/site-packages/
-    
-RUN apt-get install -y wget    
+
+RUN apt-get install -y wget
 
 RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
@@ -318,11 +318,16 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
     && cd .. \
     && rm -rf scamp*
 
+RUN cd $HOME && git clone https://github.com/dannygoldstein/skyportal.git \
+    && cd skyportal && git checkout phot-update && cd -
+ADD patches/skyportal.yaml $HOME/skyportal/config.yaml
+ENV PYTHONPATH $PYTHONPATH:$HOME/skyportal
+
 ADD . /pipeline
 ADD msgconsumer /daemon
 ADD slurm /slurm
 ADD astromatic /config
-    
+
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
