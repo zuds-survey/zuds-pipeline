@@ -323,6 +323,11 @@ RUN cd $HOME && git clone https://github.com/dannygoldstein/skyportal.git \
 ADD patches/skyportal.yaml $HOME/skyportal/config.yaml
 ENV PYTHONPATH $PYTHONPATH:$HOME/skyportal
 
+ENV DB_FTP_ENPOINT ***REMOVED***
+ENV DB_FTP_DIR /scratch/danny/stamps
+ENV DB_FTP_USERNAME danny
+ENV DB_FTP_PASSWORD 6BJ6l71KS0ie7eCevIKEUUlD
+
 ADD . /pipeline
 ADD msgconsumer /daemon
 ADD slurm /slurm
