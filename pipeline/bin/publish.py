@@ -5,7 +5,7 @@ from astropy.wcs import WCS
 import scipy.misc
 from astropy.time import Time
 from datetime import date
-from ftplib import FTP
+import paramiko
 import os
 from pathlib import Path
 
@@ -79,7 +79,7 @@ class Detection(object):
 
                 name = f'/stamps/{objname}.{key}.png'
                 scipy.misc.imsave(name, stamp)
-                stamps[f'{key}file'] = (f'{objname}.{key}.png', open(name, 'rb'), 'image/png')
+                stamps[f'{key}file'] = f'{objname}.{key}.png'
 
         return stamps
 
@@ -100,7 +100,18 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
         gooddata = data[data['GOODCUT'] == 1]
 
-        p48 = DBSession().query(Instrument).filter('p48' in Instrument.name).first()
+        ztf = DBSession().query(Instrument).filter(Instrument.name.like('%ztf%')).first()
+        if ztf is None:
+            # insert into DB
+            
+            p48 = DBSession().query(Telescope).filter(Telescope.nickname.like('p48')).first()
+            if p48 is None:
+                p48 = Telescope(name='Palmoar 48-inch', nickname='p48',
+                                lat=33.3633675, lon=-116.8361345, elevation=1870,
+                                diameter=1.21)
+                DBSession().add(p48)
+            ztf = Instrument(telescope=p48, name='ZTF Camera', type='phot', band='optical')
+            
         photpoints = []
         triplets = []
 
@@ -114,9 +125,10 @@ def load_catalog(catpath, refpath, newpath, subpath):
             obsjd = Time(obsmjd, format='mjd', scale='utc').jd
             filter = imheader['FILTER']
 
-            photpoint = Photometry(instrument=p48, ra=ra, dec=dec, mag=mag,
+            photpoint = Photometry(instrument=ztf, ra=ra, dec=dec, mag=mag,
                                    e_mag=e_mag, jd=obsjd, filter=filter)
             photpoints.append(photpoint)
+            DBSession().add(photpoint)
 
             # do stamps
             detection = Detection(ra, dec, mag, e_mag, obsmjd, filter,
@@ -125,19 +137,19 @@ def load_catalog(catpath, refpath, newpath, subpath):
             stamps = detection.make_stamps(photpoint.id)
             triplets.append(stamps)
 
-        DBSession().add_all(photpoints)
-
     with status("Uploading stamps"):
-        with FTP(DB_FTP_ENDPOINT, user=DB_FTP_USERNAME, passwd=DB_FTP_PASSWORD) as ftp:
-            ftp.cwd(DB_FTP_DIR)
-            for triplet, photpoint in zip(triplets, photpoints):
-                for key in triplet:
-                    f = triplet[key]
-                    ftp.put(f)
-                    remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
-                    thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
-                                      file_uri=remotename, public_url=os.path.join('/', remotename))
-                    DBSession().add(thumb)
+
+        with paramiko.Transport((DB_FTP_ENDPOINT, 22)) as transport:
+            transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
+            with paramiko.SFTPClient.from_transport(transport) as sftp:
+                for triplet, photpoint in zip(triplets, photpoints):
+                    for key in triplet:
+                        f = triplet[key]
+                        remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
+                        sftp.put(f, remotename)
+                        thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
+                                          file_uri=remotename, public_url=os.path.join('/', remotename))
+                        DBSession().add(thumb)
 
 
     with status('Grouping detections into sources'):
