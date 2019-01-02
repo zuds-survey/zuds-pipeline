@@ -7,13 +7,14 @@ import uuid
 
 from filterobjects import filter_sexcat
 from makecoadd import Fake
+from publish import load_catalog
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
-def make_sub(myframes, mytemplates):
+def make_sub(myframes, mytemplates, publish=True):
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -228,6 +229,9 @@ def make_sub(myframes, mytemplates):
 
         # publish to marshal
 
+        if publish:
+            goodcat = subcat.replace('cat', 'cat.out.fits')
+            load_catalog(goodcat, refremap, frame, sub)
 
         # put fake info in header and region file if there are any fakes
         with fits.open(frame) as f, fits.open(sub, mode='update') as fsub:
@@ -283,6 +287,8 @@ if __name__ == '__main__':
                         help='Input frames. Prefix with "@" to read from a list.', nargs='+')
     parser.add_argument('--templates', dest='template', nargs='+', required=True,
                         help='Templates to subtract. Prefix with "@" to read from a list.')
+    parser.add_argument('--no-publish', dest='publish', action='store_false', default=True,
+                        help='Dont publish results to the marshal.')
     args = parser.parse_args()
 
     # distribute the work to each processor
@@ -313,7 +319,7 @@ if __name__ == '__main__':
     myframes = _split(frames, size)[rank]
     mytemplates = _split(templates, size)[rank]
 
-    make_sub(myframes, mytemplates)
+    make_sub(myframes, mytemplates, publish=args.publish)
 
 
 
