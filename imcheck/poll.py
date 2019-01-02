@@ -743,9 +743,9 @@ class IPACQueryManager(object):
 
         if len(npaths) > 0:
             # download the images
-            self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            self.reset_manifest()
-            self.download_images(npaths, ipaths)
+            #self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
+            #self.reset_manifest()
+            #self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
             metatable = self.prune_metatable(npaths, new_npaths, metatable)
