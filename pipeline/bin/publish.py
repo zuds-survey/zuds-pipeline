@@ -172,3 +172,16 @@ def load_catalog(catpath, refpath, newpath, subpath):
                     s.add_linked_thumbnails()
 
     DBSession().commit()
+
+
+if __name__ == '__main__':
+
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('catalog')
+    parser.add_argument('ref')
+    parser.add_argument('new')
+    parser.add_argument('sub')
+    args = parser.parse_args()
+
+    load_catalog(args.catalog, args.ref, args.new, args.sub)
