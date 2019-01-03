@@ -1,3 +1,4 @@
+
 import requests
 import numpy as np
 from astropy.io import fits
@@ -124,11 +125,13 @@ def load_catalog(catpath, refpath, newpath, subpath):
             mag = row['MAG_BEST']
             e_mag = row['MAGERR_BEST']
             obsmjd = imheader['MJDEFF']
-            obsjd = Time(obsmjd, format='mjd', scale='utc').jd
+            obstime = Time(obsmjd, format='mjd', scale='utc').tcb.datetime
             filter = imheader['FILTER']
+            limmag = imheader['LMT_MG']
 
             photpoint = Photometry(instrument=ztf, ra=ra, dec=dec, mag=mag,
-                                   e_mag=e_mag, jd=obsjd, filter=filter)
+                                   e_mag=e_mag, filter=filter,
+                                   lim_mag=limmag, observed_at=obstime)
             photpoints.append(photpoint)
             DBSession().add(photpoint)
             DBSession().commit()
