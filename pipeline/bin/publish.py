@@ -5,12 +5,13 @@ from astropy.wcs import WCS
 import scipy.misc
 from astropy.time import Time
 from datetime import date
-from ftplib import FTP
+import paramiko
 import os
 from pathlib import Path
 
 from baselayer.app.env import load_env
 from baselayer.app.model_util import status
+from social_tornado.models import TornadoStorage
 
 from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
                               Instrument, Group, GroupUser, Photometry, Role,
@@ -79,7 +80,7 @@ class Detection(object):
 
                 name = f'/stamps/{objname}.{key}.png'
                 scipy.misc.imsave(name, stamp)
-                stamps[f'{key}file'] = (f'{objname}.{key}.png', open(name, 'rb'), 'image/png')
+                stamps[f'{key}file'] = name
 
         return stamps
 
@@ -92,6 +93,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
     with status(f"Connecting to database {cfg['database']['database']}"):
         init_db(**cfg['database'])
 
+            
     with status("Loading in photometry"):
 
         with fits.open(catpath) as f, fits.open(newpath) as new:
@@ -100,7 +102,18 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
         gooddata = data[data['GOODCUT'] == 1]
 
-        p48 = DBSession().query(Instrument).filter('p48' in Instrument.name).first()
+        ztf = DBSession().query(Instrument).filter(Instrument.name.like('%ztf%')).first()
+        if ztf is None:
+            # insert into DB
+            
+            p48 = DBSession().query(Telescope).filter(Telescope.nickname.like('p48')).first()
+            if p48 is None:
+                p48 = Telescope(name='Palmoar 48-inch', nickname='p48',
+                                lat=33.3633675, lon=-116.8361345, elevation=1870,
+                                diameter=1.21)
+                DBSession().add(p48)
+            ztf = Instrument(telescope=p48, name='ZTF Camera', type='phot', band='optical')
+            
         photpoints = []
         triplets = []
 
@@ -114,9 +127,11 @@ def load_catalog(catpath, refpath, newpath, subpath):
             obsjd = Time(obsmjd, format='mjd', scale='utc').jd
             filter = imheader['FILTER']
 
-            photpoint = Photometry(instrument=p48, ra=ra, dec=dec, mag=mag,
+            photpoint = Photometry(instrument=ztf, ra=ra, dec=dec, mag=mag,
                                    e_mag=e_mag, jd=obsjd, filter=filter)
             photpoints.append(photpoint)
+            DBSession().add(photpoint)
+            DBSession().commit()
 
             # do stamps
             detection = Detection(ra, dec, mag, e_mag, obsmjd, filter,
@@ -125,25 +140,27 @@ def load_catalog(catpath, refpath, newpath, subpath):
             stamps = detection.make_stamps(photpoint.id)
             triplets.append(stamps)
 
-        DBSession().add_all(photpoints)
-
     with status("Uploading stamps"):
-        with FTP(DB_FTP_ENDPOINT, user=DB_FTP_USERNAME, passwd=DB_FTP_PASSWORD) as ftp:
-            ftp.cwd(DB_FTP_DIR)
-            for triplet, photpoint in zip(triplets, photpoints):
-                for key in triplet:
-                    f = triplet[key]
-                    ftp.put(f)
-                    remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
-                    thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
-                                      file_uri=remotename, public_url=os.path.join('/', remotename))
-                    DBSession().add(thumb)
+
+        with paramiko.Transport((DB_FTP_ENDPOINT, 22)) as transport:
+            transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
+            with paramiko.SFTPClient.from_transport(transport) as sftp:
+                for triplet, photpoint in zip(triplets, photpoints):
+                    for key in triplet:
+                        f = triplet[key]
+                        remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
+                        sftp.put(f, remotename)
+                        thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
+                                          file_uri=f'static/thumbnails/{os.path.basename(f)}',
+                                          public_url=f'/static/thumbnails/{os.path.basename(f)}')
+                        DBSession().add(thumb)
 
 
     with status('Grouping detections into sources'):
-        srcquery = 'SELECT ID FROM SOURCES WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 2.)'
-        detquery = 'SELECT ID FROM PHOTOMETRY WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 2.) AND ' \
+        srcquery = 'SELECT ID FROM SOURCES WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554)'
+        detquery = 'SELECT ID FROM PHOTOMETRY WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554) AND ' \
                    'ID != :id'
+        g = Group.query.first()
         for point in photpoints:
             result = DBSession().execute(srcquery, {'ra': point.ra, 'dec': point.dec}).fetchall()
             if len(result) > 0:
@@ -156,19 +173,25 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
 
             else:
-                result = DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
-                                                        'id': point.id}).fetchall()
+                result = [a[0] for a in DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
+                                                                       'id': point.id}).fetchall()]
                 if len(result) > 0:
                     # create a new source
-                    points = list(Photometry.query.get(result['id'])) + [point]
+                    points = list(DBSession().query(Photometry).filter(Photometry.id.in_(result)).all())
+                    points = points + [point]
                     ra = np.median([p.ra for p in points])
                     dec = np.median([p.dec for p in points])
 
                     seqquery = "SELECT nextval('namenum')"
                     num = DBSession().execute(seqquery).fetchone()[0]
                     name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
-                    s = Source(id=name, ra=ra, dec=dec)
-                    DBSession.add(s)
+                    s = Source(id=name, ra=ra, dec=dec, groups=[g])
+
+                    for point in points:
+                        point.source =  s
+
+                    DBSession().add(s)
+                    DBSession().commit()
                     s.add_linked_thumbnails()
 
     DBSession().commit()
