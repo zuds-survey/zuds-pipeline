@@ -334,7 +334,7 @@ ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
 
 ENV PYTHONPATH $PYTHONPATH:/skyportal
 
-ENV DB_FTP_ENPOINT ***REMOVED***
+ENV DB_FTP_ENDPOINT ***REMOVED***
 ENV DB_FTP_DIR /scratch/danny/stamps
 ENV DB_FTP_USERNAME danny
 ENV DB_FTP_PASSWORD 6BJ6l71KS0ie7eCevIKEUUlD

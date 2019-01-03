@@ -1,3 +1,4 @@
+
 import requests
 import numpy as np
 from astropy.io import fits
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from baselayer.app.env import load_env
 from baselayer.app.model_util import status
+from social_tornado.models import TornadoStorage
 
 from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
                               Instrument, Group, GroupUser, Photometry, Role,
@@ -79,7 +81,7 @@ class Detection(object):
 
                 name = f'/stamps/{objname}.{key}.png'
                 scipy.misc.imsave(name, stamp)
-                stamps[f'{key}file'] = f'{objname}.{key}.png'
+                stamps[f'{key}file'] = name
 
         return stamps
 
@@ -92,6 +94,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
     with status(f"Connecting to database {cfg['database']['database']}"):
         init_db(**cfg['database'])
 
+            
     with status("Loading in photometry"):
 
         with fits.open(catpath) as f, fits.open(newpath) as new:
@@ -122,13 +125,16 @@ def load_catalog(catpath, refpath, newpath, subpath):
             mag = row['MAG_BEST']
             e_mag = row['MAGERR_BEST']
             obsmjd = imheader['MJDEFF']
-            obsjd = Time(obsmjd, format='mjd', scale='utc').jd
+            obstime = Time(obsmjd, format='mjd', scale='utc').tcb.datetime
             filter = imheader['FILTER']
+            limmag = imheader['LMT_MG']
 
             photpoint = Photometry(instrument=ztf, ra=ra, dec=dec, mag=mag,
-                                   e_mag=e_mag, jd=obsjd, filter=filter)
+                                   e_mag=e_mag, filter=filter,
+                                   lim_mag=limmag, observed_at=obstime)
             photpoints.append(photpoint)
             DBSession().add(photpoint)
+            DBSession().commit()
 
             # do stamps
             detection = Detection(ra, dec, mag, e_mag, obsmjd, filter,
@@ -148,14 +154,16 @@ def load_catalog(catpath, refpath, newpath, subpath):
                         remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
                         sftp.put(f, remotename)
                         thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
-                                          file_uri=remotename, public_url=os.path.join('/', remotename))
+                                          file_uri=f'static/thumbnails/{os.path.basename(f)}',
+                                          public_url=f'/static/thumbnails/{os.path.basename(f)}')
                         DBSession().add(thumb)
 
 
     with status('Grouping detections into sources'):
-        srcquery = 'SELECT ID FROM SOURCES WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 2.)'
-        detquery = 'SELECT ID FROM PHOTOMETRY WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 2.) AND ' \
+        srcquery = 'SELECT ID FROM SOURCES WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554)'
+        detquery = 'SELECT ID FROM PHOTOMETRY WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554) AND ' \
                    'ID != :id'
+        g = Group.query.first()
         for point in photpoints:
             result = DBSession().execute(srcquery, {'ra': point.ra, 'dec': point.dec}).fetchall()
             if len(result) > 0:
@@ -168,19 +176,25 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
 
             else:
-                result = DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
-                                                        'id': point.id}).fetchall()
+                result = [a[0] for a in DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
+                                                                       'id': point.id}).fetchall()]
                 if len(result) > 0:
                     # create a new source
-                    points = list(Photometry.query.get(result['id'])) + [point]
+                    points = list(DBSession().query(Photometry).filter(Photometry.id.in_(result)).all())
+                    points = points + [point]
                     ra = np.median([p.ra for p in points])
                     dec = np.median([p.dec for p in points])
 
                     seqquery = "SELECT nextval('namenum')"
                     num = DBSession().execute(seqquery).fetchone()[0]
                     name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
-                    s = Source(id=name, ra=ra, dec=dec)
-                    DBSession.add(s)
+                    s = Source(id=name, ra=ra, dec=dec, groups=[g])
+
+                    for point in points:
+                        point.source =  s
+
+                    DBSession().add(s)
+                    DBSession().commit()
                     s.add_linked_thumbnails()
 
     DBSession().commit()
