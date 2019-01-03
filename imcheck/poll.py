@@ -44,7 +44,7 @@ date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 coadd_minframes = 3
 img_batchsize = 1024
-template_batchsize = 16
+template_batchsize = 4
 
 # this is the night id corresponding
 # to the first science observation in the survey
@@ -743,9 +743,9 @@ class IPACQueryManager(object):
 
         if len(npaths) > 0:
             # download the images
-            self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            self.reset_manifest()
-            self.download_images(npaths, ipaths)
+            #self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
+            #self.reset_manifest()
+            #self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
             metatable = self.prune_metatable(npaths, new_npaths, metatable)
