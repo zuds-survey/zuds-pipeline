@@ -421,7 +421,7 @@ class IPACQueryManager(object):
                                     tuple(row[dfkey].tolist())))
 
         query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0 OR SEEING > 3. OR ' \
-                '(FILTER=\'r\' OR FILTER=\'g\' AND MAGLIM < 19) OR (FILTER=\'i\' AND MAGLIM < 18.5)'
+                '(FILTER=\'r\' OR FILTER=\'g\' AND MAGLIMIT < 19) OR (FILTER=\'i\' AND MAGLIMIT < 18.5)'
         self.cursor.execute(query)
 
         self.dbc.commit()
