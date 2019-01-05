@@ -420,7 +420,8 @@ class IPACQueryManager(object):
                                     row['qid'], row['field'], row['ccdid']) +
                                     tuple(row[dfkey].tolist())))
 
-        query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0'
+        query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0 OR SEEING > 3. OR ' \
+                '(FILTER=\'r\' OR FILTER=\'g\' AND MAGLIM < 19) OR (FILTER=\'i\' AND MAGLIM < 18.5)'
         self.cursor.execute(query)
 
         self.dbc.commit()
@@ -720,6 +721,7 @@ class IPACQueryManager(object):
             packet = {'jobtype': 'coaddsub', 'jobs': batch}
             body = json.dumps(packet)
             self.relay_job(body)
+
 
     def prune_metatable(self, old_npaths, new_npaths, metatable):
 
