@@ -102,7 +102,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
     with status(f"Connecting to database {cfg['database']['database']}"):
         init_db(**cfg['database'])
 
-            
+
     with status("Loading in photometry"):
 
         with fits.open(catpath) as f, fits.open(newpath) as new:
@@ -111,10 +111,10 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
         gooddata = data[data['GOODCUT'] == 1]
 
-        ztf = DBSession().query(Instrument).filter(Instrument.name.like('%ztf%')).first()
+        ztf = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
         if ztf is None:
             # insert into DB
-            
+
             p48 = DBSession().query(Telescope).filter(Telescope.nickname.like('p48')).first()
             if p48 is None:
                 p48 = Telescope(name='Palmoar 48-inch', nickname='p48',
@@ -122,7 +122,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
                                 diameter=1.21)
                 DBSession().add(p48)
             ztf = Instrument(telescope=p48, name='ZTF Camera', type='phot', band='optical')
-            
+
         photpoints = []
         triplets = []
 
@@ -216,7 +216,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
                                           file_uri=f'static/thumbnails/{firstpoint.id}.{t}.png',
                                           public_url=f'/static/thumbnails/{firstpoint.id}.{t}.png')
                         DBSession().add(thumb)
-                    
+
                     s.add_linked_thumbnails()
 
     DBSession().commit()
