@@ -23,7 +23,7 @@ def make_variance(frames, masks, logger=None, extra={}):
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
-    confdir = os.path.join(wd, '..', 'config', 'makevariance')
+    confdir = os.path.join(wd, '..', 'astromatic', 'makevariance')
     sexconf = os.path.join(confdir, 'scamp.sex')
     nnwname = os.path.join(confdir, 'default.nnw')
     filtname = os.path.join(confdir, 'default.conv')
