@@ -327,7 +327,9 @@ RUN apt-get install -y curl build-essential software-properties-common && \
     apt-get install -y nodejs && \
     cd / && git clone https://github.com/dannygoldstein/skyportal.git \
     && cd skyportal && git checkout marshal && cd baselayer \
-    && git submodule update --init --remote && cd - && \
+    && git submodule update --init --remote \
+    && git remote add me https://github.com/dannygoldstein/baselayer.git \
+    && git branch work && git checkout work && git pull me work && cd - &&\
     make -C baselayer paths && \
     make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
 ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
