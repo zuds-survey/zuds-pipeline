@@ -18,7 +18,7 @@ def make_sub(myframes, mytemplates, publish=True):
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
-    confdir = os.path.join(wd, '..', 'config', 'makesub')
+    confdir = os.path.join(wd, '..', 'astromatic', 'makesub')
     scampconfcat = os.path.join(confdir, 'scamp.conf.cat')
     defswarp = os.path.join(confdir, 'default.swarp')
     defsexref = os.path.join(confdir, 'default.sex.ref')
