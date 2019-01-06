@@ -771,8 +771,8 @@ class IPACQueryManager(object):
 
 if __name__ == '__main__':
 
-    glsn_schema = {'template_minimages': 100, 'template_science_minsep_days': 30,
-                   'scicoadd_window_size': 10, 'rolling':False, 'schema_id': 1}
+    glsn_schema = {'template_minimages': 20, 'template_science_minsep_days': 10,
+                   'scicoadd_window_size': 1, 'rolling':False, 'schema_id': 1}
 
     schemas = [glsn_schema]
 
