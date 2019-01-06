@@ -3,12 +3,12 @@ import requests
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
-import scipy.misc
 from astropy.time import Time
 from datetime import date
 import paramiko
 import os
 from pathlib import Path
+from matplotlib import pyplot as plt
 
 from baselayer.app.env import load_env
 from baselayer.app.model_util import status
@@ -19,15 +19,19 @@ from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
                               Source, Spectrum, Telescope, Thumbnail, User,
                               Token)
 
+from astropy.visualization import ZScaleInterval
+
 __all__ = ['load_catalog']
 
 
-CUTOUT_SIZE = 51  # pix
+CUTOUT_SIZE = 61  # pix
 SEARCH_RADIUS = 2. / 3600.  # 2 arcsec
-DB_FTP_DIR = os.getenv('DB_FTP_DIR')
+#DB_FTP_DIR = os.getenv('DB_FTP_DIR')
+DB_FTP_DIR = '/skyportal/static/thumbnails'
 DB_FTP_ENDPOINT = os.getenv('DB_FTP_ENDPOINT')
-DB_FTP_USERNAME = os.getenv('DB_FTP_USERNAME')
-DB_FTP_PASSWORD = os.getenv('DB_FTP_PASSWORD')
+DB_FTP_USERNAME = 'root'
+DB_FTP_PASSWORD = 'root'
+DB_FTP_PORT = 222
 
 lookup = dict(zip(range(0, 25), 'abcdefghijklmnopqrstuvwxyz'))
 
@@ -39,12 +43,12 @@ def num_to_alpha(num):
         updates.append(lookup[mod])
         num //= 25
 
-    return ''.join(updates)
+    return ''.join(updates[::-1])
 
 
 class Detection(object):
 
-    def __init__(self, ra, dec, mag, magerr, mjd, filter, locdict):
+    def __init__(self, ra, dec, mag, magerr, mjd, filter, locdict, vdict):
 
         self.ra = ra
         self.dec = dec
@@ -53,6 +57,7 @@ class Detection(object):
         self.mag = mag
         self.magerr = magerr
         self.filter = filter
+        self.vdict = vdict
 
     def make_stamps(self, objname):
 
@@ -64,7 +69,7 @@ class Detection(object):
             with fits.open(fname) as f:
 
                 wcs = WCS(f[0].header)
-                xp, yp = wcs.all_world2pix([[self.ra, self.dec]], 0)[0]
+                xp, yp = wcs.all_world2pix([[self.ra, self.dec]], 0).astype(int)[0]
 
                 stamp = np.zeros((CUTOUT_SIZE, CUTOUT_SIZE))
 
@@ -79,8 +84,11 @@ class Detection(object):
                             continue
                         stamp[n, m] = f[0].section[j, i]
 
+                # match the orientation to pan starrs and sloan
+                stamp = np.flipud(stamp)
+
                 name = f'/stamps/{objname}.{key}.png'
-                scipy.misc.imsave(name, stamp)
+                plt.imsave(name, stamp, vmin=self.vdict[key][0], vmax=self.vdict[key][1], cmap='gray')
                 stamps[f'{key}file'] = name
 
         return stamps
@@ -118,6 +126,14 @@ def load_catalog(catpath, refpath, newpath, subpath):
         photpoints = []
         triplets = []
 
+        vdict = {}
+        zscale = ZScaleInterval()
+
+        for t, f in zip(('ref','new','sub'), (refpath, newpath, subpath)):
+            with fits.open(f) as hdu:
+                data = hdu[0].data
+                vdict[t] = zscale.get_limits(data)
+
         for row in gooddata:
 
             ra = row['X_WORLD']
@@ -138,14 +154,15 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
             # do stamps
             detection = Detection(ra, dec, mag, e_mag, obsmjd, filter,
-                                  {'ref':refpath, 'new': newpath, 'sub':subpath})
+                                  {'ref':refpath, 'new': newpath, 'sub':subpath},
+                                  vdict)
 
             stamps = detection.make_stamps(photpoint.id)
             triplets.append(stamps)
 
     with status("Uploading stamps"):
 
-        with paramiko.Transport((DB_FTP_ENDPOINT, 22)) as transport:
+        with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
             transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
             with paramiko.SFTPClient.from_transport(transport) as sftp:
                 for triplet, photpoint in zip(triplets, photpoints):
@@ -153,10 +170,6 @@ def load_catalog(catpath, refpath, newpath, subpath):
                         f = triplet[key]
                         remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
                         sftp.put(f, remotename)
-                        thumb = Thumbnail(type=key[:3], photometry_id=photpoint.id,
-                                          file_uri=f'static/thumbnails/{os.path.basename(f)}',
-                                          public_url=f'/static/thumbnails/{os.path.basename(f)}')
-                        DBSession().add(thumb)
 
 
     with status('Grouping detections into sources'):
@@ -195,6 +208,15 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
                     DBSession().add(s)
                     DBSession().commit()
+
+                    firstpoint = sorted(points, key=lambda p: p.observed_at)[0]
+
+                    for t in ['ref', 'new', 'sub']:
+                        thumb = Thumbnail(type=t, photometry_id=firstpoint.id,
+                                          file_uri=f'static/thumbnails/{firstpoint.id}.{t}.png',
+                                          public_url=f'/static/thumbnails/{firstpoint.id}.{t}.png')
+                        DBSession().add(thumb)
+                    
                     s.add_linked_thumbnails()
 
     DBSession().commit()
