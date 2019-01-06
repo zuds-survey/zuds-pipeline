@@ -319,7 +319,7 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
     && rm -rf scamp*
 
 
-RUN apt-get install -y libpq-dev supervisor nginx postgresql-client
+RUN apt-get update && apt-get install -y libpq-dev supervisor nginx postgresql-client
 RUN apt-get install -y curl build-essential software-properties-common && \
     curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
     apt-get update && \
