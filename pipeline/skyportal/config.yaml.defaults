@@ -10,8 +10,8 @@ app:
 
 database:
     database: skyportal
-    host: localhost
-    port: 5432
+    host: ***REMOVED***
+    port: 7777
     user: skyportal
     password:
 
