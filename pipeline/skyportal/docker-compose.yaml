@@ -1,0 +1,21 @@
+web:
+  build: .
+  ports:
+    - "9000:5000"
+    - "9001:5001"
+    - "222:22"
+  links:
+    - db
+  volumes:
+    - ./skyportal:/skyportal/skyportal
+
+db:
+  build: ./q3c
+  environment:
+    - POSTGRES_USER=skyportal
+    - POSTGRES_PASSWORD=
+    - POSTGRES_DB=skyportal
+  ports:
+    - "7777:5432"
+
+    

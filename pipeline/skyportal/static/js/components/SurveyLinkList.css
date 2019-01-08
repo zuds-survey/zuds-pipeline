@@ -1,0 +1,10 @@
+.SurveyLinkList {
+    display: inline-block;
+}
+
+.SurveyLink {
+    background-color: #EEE;
+    padding: 0.2em;
+    margin: 0.2em;
+    display: inline-block;
+}
