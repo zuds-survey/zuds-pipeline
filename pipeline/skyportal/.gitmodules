@@ -1,4 +1,0 @@
-[submodule "baselayer"]
-	path = baselayer
-	url = https://github.com/dannygoldstein/baselayer.git
-	branch = work

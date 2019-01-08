@@ -1,0 +1,15 @@
+psycopg2
+pyyaml
+tornado
+pyzmq
+pyjwt
+distributed>=1.21.1
+simplejson
+requests
+selenium>=3.12.0
+pytest
+sqlalchemy
+social-auth-core
+social-auth-app-tornado
+social-auth-storage-sqlalchemy
+selenium-requests

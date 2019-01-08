@@ -1,0 +1,16 @@
+.#*
+log/
+.cache
+static/build
+run/
+public/
+\#*
+*~
+*.swp
+*.swo
+.DS_Store
+__pycache__/
+node_modules/
+*.pyc
+conf/nginx.conf
+conf/supervisor/supervisor.conf
