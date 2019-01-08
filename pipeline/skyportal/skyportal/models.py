@@ -91,6 +91,9 @@ class Source(Base):
     photometry = relationship('Photometry', back_populates='source',
                               cascade='all',
                               order_by="Photometry.observed_at")
+    forcedphotometry = relationship('ForcedPhotometry', back_populates='forcedphotometry',
+                                    order_by='ForcedPhotometry.mjd',
+                                    cascade='all')
     spectra = relationship('Spectrum', back_populates='source', cascade='all',
                            order_by="Spectrum.observed_at")
     thumbnails = relationship('Thumbnail', back_populates='source',
@@ -164,6 +167,8 @@ class Instrument(Base):
                              cascade='all')
     photometry = relationship('Photometry', back_populates='instrument',
                               cascade='all')
+    forcedphotometry = relationship('ForcedPhotometry', back_populates='forcedphotometry',
+                                    cascade='all')
     spectra = relationship('Spectrum', back_populates='instrument',
                            cascade='all')
 
@@ -201,11 +206,11 @@ class ForcedPhotometry(Base):
 
     source_id = sa.Column(sa.ForeignKey('sources.id', ondelete='CASCADE'),
                           nullable=True, index=True)
-    source = relationship('Source', back_populates='photometry', cascade='all')
+    source = relationship('Source', back_populates='forcedphotometry', cascade='all')
     instrument_id = sa.Column(sa.ForeignKey('instruments.id',
                                             ondelete='CASCADE'),
                               nullable=False, index=True)
-    instrument = relationship('Instrument', back_populates='photometry',
+    instrument = relationship('Instrument', back_populates='forcedphotometry',
                               cascade='all')
 
 
