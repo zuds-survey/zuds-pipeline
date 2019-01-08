@@ -327,7 +327,7 @@ RUN apt-get install -y curl build-essential software-properties-common && \
 
 ADD skyportal /skyportal
 
-RUN cd /skyportal &&  git submodule update --init --remote && \
+RUN cd /skyportal && \
     make -C baselayer paths && \
     make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
 ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
