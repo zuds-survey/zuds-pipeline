@@ -91,7 +91,7 @@ class Source(Base):
     photometry = relationship('Photometry', back_populates='source',
                               cascade='all',
                               order_by="Photometry.observed_at")
-    forcedphotometry = relationship('ForcedPhotometry', back_populates='forcedphotometry',
+    forcedphotometry = relationship('ForcedPhotometry', back_populates='source',
                                     order_by='ForcedPhotometry.mjd',
                                     cascade='all')
     spectra = relationship('Spectrum', back_populates='source', cascade='all',
