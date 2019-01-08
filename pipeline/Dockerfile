@@ -349,6 +349,8 @@ ADD astromatic /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
+RUN pip install sep
+
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]
