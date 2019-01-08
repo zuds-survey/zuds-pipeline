@@ -1,0 +1,4 @@
+[submodule "skyportal"]
+	path = skyportal
+	url = git@github.com:dannygoldstein/skyportal.git
+	branch = marshal
