@@ -318,18 +318,16 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
     && cd .. \
     && rm -rf scamp*
 
-
 RUN apt-get update && apt-get install -y libpq-dev supervisor nginx postgresql-client
 RUN apt-get install -y curl build-essential software-properties-common && \
     curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
     apt-get update && \
     apt-get -y upgrade && \
-    apt-get install -y nodejs && \
-    cd / && git clone https://github.com/dannygoldstein/skyportal.git \
-    && cd skyportal && git checkout marshal && cd baselayer \
-    && git submodule update --init --remote \
-    && git remote add me https://github.com/dannygoldstein/baselayer.git \
-    && git branch work && git checkout work && git pull me work && cd - &&\
+    apt-get install -y nodejs &&
+
+ADD skyportal /skyportal
+
+RUN cd /skyportal &&  git submodule update --init --remote && \
     make -C baselayer paths && \
     make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
 ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
@@ -349,7 +347,7 @@ ADD astromatic /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
-RUN pip install sep
+RUN pip install sep sncosmo
 
 
 ENTRYPOINT ["/bin/bash", "-c"]

@@ -376,7 +376,9 @@ class IPACQueryManager(object):
                                f'\n( flock -x 200; echo {npath} >> {manifest} ) 200> {lockfile}; fi'
                                for ipath, npath in zip(ipc, npc)]
             mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
+            sub_download_script = [p.replace('sciimg.fits', 'scimrefdiffimg.fits.fz') for p in download_script]
             download_script.extend(mask_download_script)
+            download_script.extend(sub_download_script)
             random.shuffle(download_script)
 
             print(len(download_script))
@@ -633,6 +635,7 @@ class IPACQueryManager(object):
         self._refresh_connections()
 
         batch = []
+        correlation_ids = []
 
         for (field, ccdnum, quadrant, filter), group in metatable.groupby(['field', 'ccdid',
                                                                            'qid', 'filtercode']):
@@ -714,13 +717,15 @@ class IPACQueryManager(object):
                         if len(batch) == sub_batchsize:
                             packet = {'jobtype': 'coaddsub', 'jobs': batch}
                             body = json.dumps(packet)
-                            self.relay_job(body)
+                            correlation_ids.append(self.relay_job(body))
                             batch = []
 
         if len(batch) > 0:
             packet = {'jobtype': 'coaddsub', 'jobs': batch}
             body = json.dumps(packet)
-            self.relay_job(body)
+            correlation_ids.append(self.relay_job(body))
+
+        return correlation_ids
 
 
     def prune_metatable(self, old_npaths, new_npaths, metatable):
@@ -765,7 +770,11 @@ class IPACQueryManager(object):
             template_corrids = self.determine_and_relay_template_jobs(variance_corrids, metatable)
 
             # finally coadd the science frames and make the corresponding subtractions
-            self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
+            coaddsub_corrids = self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
+
+            # lastly do forced photometry on the detected objects
+            self.determine_and_relay_forcephoto_jobs(coaddsub_corrids)
+
             self.__del__()
 
 
