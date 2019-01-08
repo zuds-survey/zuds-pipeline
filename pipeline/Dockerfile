@@ -318,19 +318,19 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
     && cd .. \
     && rm -rf scamp*
 
-RUN apt-get update && apt-get install -y libpq-dev supervisor nginx postgresql-client
-RUN apt-get install -y curl build-essential software-properties-common && \
-    curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
+ADD skyportal /skyportal
+RUN apt-get update && apt-get install -y supervisor nginx postgresql-client
+RUN curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
     apt-get update && \
     apt-get -y upgrade && \
-    apt-get install -y nodejs &&
-
-ADD skyportal /skyportal
-
-RUN cd /skyportal && \
+    apt-get install -y nodejs && \
+    cd /skyportal && \
     make -C baselayer paths && \
     make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
+
 ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
+
+
 
 ENV PYTHONPATH $PYTHONPATH:/skyportal
 
