@@ -61,9 +61,15 @@ def make_app(cfg, baselayer_handlers, baselayer_settings):
     app = tornado.web.Application(handlers, **settings)
     models.init_db(**cfg['database'])
     model_util.create_tables()
-    model_util.create_indexes()
     model_util.setup_permissions()
-    model_util.create_groups_and_users()
+
+    # create indexes and users if necessary
+    try:
+        models.DBSession().execute('SELECT \'public.namenum\'::regclass')
+    except:
+        model_util.create_indexes()
+        model_util.create_groups_and_users()
+
     app.cfg = cfg
 
     return app

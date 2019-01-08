@@ -15,17 +15,13 @@ from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
                               Token)
 
 def create_indexes():
-    try:
-        DBSession().execute('SELECT \'public.namenum\'::regclass')
-    except:
-        for table in ['sources', 'photometry']:
-            DBSession().execute(text(f'CREATE INDEX ON {table} (q3c_ang2ipix(ra, dec))'))
-            DBSession().execute(text(f'CLUSTER {table}_q3c_ang2ipix_idx on {table}'))
-            DBSession().execute(text(f'ANALYZE {table}'))
-        DBSession().execute('CREATE SEQUENCE namenum')
-        DBSession().commit()
-    else:
-        pass
+    for table in ['sources', 'photometry']:
+        DBSession().execute(text(f'CREATE INDEX ON {table} (q3c_ang2ipix(ra, dec))'))
+        DBSession().execute(text(f'CLUSTER {table}_q3c_ang2ipix_idx on {table}'))
+        DBSession().execute(text(f'ANALYZE {table}'))
+    DBSession().execute('CREATE SEQUENCE namenum')
+    DBSession().commit()
+
 
 def add_super_user(username):
     """Initializes a super user with full permissions."""
