@@ -167,7 +167,7 @@ class Instrument(Base):
                              cascade='all')
     photometry = relationship('Photometry', back_populates='instrument',
                               cascade='all')
-    forcedphotometry = relationship('ForcedPhotometry', back_populates='forcedphotometry',
+    forcedphotometry = relationship('ForcedPhotometry', back_populates='instrument',
                                     cascade='all')
     spectra = relationship('Spectrum', back_populates='instrument',
                            cascade='all')
