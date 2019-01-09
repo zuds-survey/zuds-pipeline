@@ -213,7 +213,8 @@ def photometry_plot(source_id):
             color='color',
             marker='circle',
             fill_color='color',
-            alpha='alpha',
+            line_alpha='alpha',
+            fill_alpha='alpha',
             source=ColumnDataSource(df)
         )
 
@@ -240,7 +241,7 @@ def photometry_plot(source_id):
             y_err_x.append((px, px))
             y_err_y.append((py - err, py + err))
 
-        model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color', alpha='alpha',
+        model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color', line_alpha='alpha', fill_alpha='alpha',
                                           source=ColumnDataSource(data=dict(xs=y_err_x, ys=y_err_y,
                                                                   color=df['color'],
                                                                   alpha=[1.] * len(df))))
