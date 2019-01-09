@@ -339,7 +339,7 @@ def photometry_plot(source_id):
                      
                      var mymjd = mjdsum / nflux;
                      var myflux = fluxsum / nflux;
-                     var myfluxerr = Math.sqrt(fluxvarsum / nflux);
+                     var myfluxerr = Math.sqrt(fluxvarsum) / nflux;
                      
                      binsource.data['mjd'].push(mymjd);
                      binsource.data['flux'].push(myflux);
