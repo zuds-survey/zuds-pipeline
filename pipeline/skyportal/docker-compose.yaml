@@ -8,6 +8,7 @@ web:
     - db
   volumes:
     - ./skyportal:/skyportal/skyportal
+    - ./static/js:/skyportal/static/js
 
 db:
   build: ./q3c
