@@ -223,8 +223,7 @@ def photometry_plot(source_id):
             color='color',
             marker='circle',
             fill_color='color',
-            source=ColumnDataSource(source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[],
-                                                                      filter=[], color=[])))
+            source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[], filter=[], color=[]))
         )
 
         key = 'obserr' + str(i)
@@ -359,7 +358,7 @@ def photometry_plot(source_id):
          }
          
     """)
-    slider.callback = callback
+    slider.js_on_change('value', callback)
 
     layout = row(plot, toggle)
     layout = column(slider, layout)
