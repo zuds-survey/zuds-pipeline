@@ -302,7 +302,7 @@ def photometry_plot(source_id):
              binerrsource.data['ys'] = [];
              binerrsource.data['color'] = [];
 
-             for (var j = 0; j < fluxsource.length; j++){
+             for (var j = 0; j < fluxsource.get_length(); j++){
                  fluxsource.data['alpha'][j] = fluxalph;
                  fluxerrsource.data['alpha'][j] = fluxalph;
              }
