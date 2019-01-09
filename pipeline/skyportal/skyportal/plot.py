@@ -277,11 +277,11 @@ def photometry_plot(source_id):
          
          for (var i = 0; i < toggle.labels.length; i++) {
          
-             var fluxsource = eval("obs" + i).source;
-             var binsource = eval("bin" + i).source;
+             var fluxsource = eval("obs" + i).data_source;
+             var binsource = eval("bin" + i).data_source;
              
-             var fluxerrsource = eval("obserr" + i).source;
-             var binerrsource = eval("binerr" + i).source;
+             var fluxerrsource = eval("obserr" + i).data_source;
+             var binerrsource = eval("binerr" + i).data_source;
              
              var minmjd = Math.min(fluxsource.data['mjd']);
 
