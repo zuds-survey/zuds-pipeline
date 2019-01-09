@@ -238,12 +238,14 @@ def photometry_plot(source_id):
             y_err_x.append((px, px))
             y_err_y.append((py - err, py + err))
 
-        model_dict[key] = plot.multi_line(source=ColumnDataSource(data=dict(xs=y_err_x, ys=y_err_y,
+        model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color', alpha='alpha',
+                                          source=ColumnDataSource(data=dict(xs=y_err_x, ys=y_err_y,
                                                                   color=df['color'],
                                                                   alpha=[1.] * len(df))))
 
         key = f'binerr{i}'
-        model_dict[key] = plot.multi_line(source=ColumnDataSource(data=dict(xs=[], ys=[], color=[])))
+        model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color',
+                                          source=ColumnDataSource(data=dict(xs=[], ys=[], color=[])))
 
     plot.xaxis.axis_label = 'MJD'
     plot.yaxis.axis_label = 'Flux (AB Zeropoint = 25.)'
