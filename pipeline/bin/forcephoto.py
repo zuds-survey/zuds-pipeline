@@ -14,7 +14,7 @@ def force_photometry(sources, sub_list):
 
     for image in sub_list:
         with fits.open(image) as hdulist:
-            hdu = hdulist[0]
+            hdu = hdulist[1]
             zeropoint = hdu.header['MAGZP']
             seeing = hdu.header['SEEING']  # FWHM of seeing
             mjd = hdu.header['OBSMJD']
