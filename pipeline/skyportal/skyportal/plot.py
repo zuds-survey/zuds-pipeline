@@ -275,7 +275,7 @@ def photometry_plot(source_id):
     callback = CustomJS(args={'slider': slider, 'toggle': toggle, **model_dict}, code="""
          
          var binsize = slider.value
-         var fluxalph = ((binsize == 0) ? 1. : 0.3);
+         var fluxalph = ((binsize == 0) ? 1. : 0.1);
          
          for (var i = 0; i < toggle.labels.length; i++) {
          
