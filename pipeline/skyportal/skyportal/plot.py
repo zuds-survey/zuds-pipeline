@@ -283,7 +283,7 @@ def photometry_plot(source_id):
              var fluxerrsource = eval("obserr" + i).data_source;
              var binerrsource = eval("binerr" + i).data_source;
              
-             var minmjd = Math.min(fluxsource.data['mjd']);
+             var minmjd = Math.min.apply(Math, fluxsource.data['mjd']);
 
              var date = new Date();     // a new date
              var time = date.getTime(); // the timestamp, not neccessarely using UTC as current time
