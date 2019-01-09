@@ -15,7 +15,7 @@ RUN apt-get update && \
 RUN python3.6 -m venv /skyportal_env && \
     \
     bash -c "source /skyportal_env/bin/activate && \
-    pip install --upgrade pip sncosmo astropy"
+    pip install --upgrade pip"
 
 ENV LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
@@ -43,8 +43,12 @@ RUN mkdir -p static/thumbnails /var/run/sshd /run/sshd /root/.ssh && \
     sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
     sed -ri 's/UsePAM yes/#UsePAM yes/g' /etc/ssh/sshd_config
 
-EXPOSE 5000 5001 22
+RUN bash -c "\
+    source /skyportal_env/bin/activate && \
+    cd / && git clone https://github.com/dannygoldstein/sncosmo.git && \
+    cd sncosmo && python setup.py install && cd - && rm -rf sncosmo"
 
+EXPOSE 5000 5001 22
 
 CMD bash -c "source /skyportal_env/bin/activate && \
              (make log &) && \

@@ -177,8 +177,10 @@ def photometry_plot(source_id):
     data['label'] = [f'{t} {f}-band'
                      for t, f in zip(data['telescope'], data['filter'])]
 
+    data['filter'] = ['ztf' + f for f in data['filter']]
+
     # normalize everything to a common zeropoint
-    photdata = PhotometricData(Table(data[['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys']]))
+    photdata = PhotometricData(Table.from_pandas(data[['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys']]))
     normalized = photdata.normalized(zp=25., zpsys='ab')
 
     data['flux'] = normalized.flux
@@ -191,8 +193,8 @@ def photometry_plot(source_id):
         plot_height=300,
         active_drag='box_zoom',
         tools='box_zoom,wheel_zoom,pan,reset',
-        y_range=(np.nanmax(data['flux'] + data['fluxerr']) * 1.1,
-                 np.nanmin(data['flux'] - data['fluxerr']) - np.abs(np.nanmin(data['flux'] - data['fluxerr'])) * 0.1)
+        y_range=(np.nanmin(data['flux'] - data['fluxerr']) - np.abs(np.nanmin(data['flux'] - data['fluxerr'])) * 0.1,
+                 np.nanmax(data['flux'] + data['fluxerr']) * 1.1)                 
     )
 
     hover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
@@ -201,34 +203,33 @@ def photometry_plot(source_id):
     plot.add_tools(hover)
 
     model_dict = {}
-    for i, (label, ddff) in enumerate(split):
-        for is_obs, df in ddff.groupby('observed'):
-            key = ("" if is_obs else "un") + 'obs' + str(i)
-            model_dict[key] = plot.scatter(
-                x='mjd', y='flux',
-                color='color',
-                marker='circle',
-                fill_color='color',
-                source=ColumnDataSource(df)
-            )
+    for i, (label, df) in enumerate(split):
+        key = f'obs{i}'
+        model_dict[key] = plot.scatter(
+            x='mjd', y='flux',
+            color='color',
+            marker='circle',
+            fill_color='color',
+            source=ColumnDataSource(df)
+        )
 
-            hover.renderers.append(model_dict[key])
+        hover.renderers.append(model_dict[key])
 
-            if is_obs:
-                key = 'obserr' + str(i)
-                y_err_x = []
-                y_err_y = []
+        key = 'obserr' + str(i)
+        y_err_x = []
+        y_err_y = []
 
-                for d, ro in df.iterrows():
-                    px = ro['mjd']
-                    py = ro['flux']
-                    err = ro['fluxerr']
+        for d, ro in df.iterrows():
+            px = ro['mjd']
+            py = ro['flux']
+            err = ro['fluxerr']
 
-                    y_err_x.append((px, px))
-                    y_err_y.append((py - err, py + err))
-                model_dict[key] = plot.multi_line(y_err_x, y_err_y, color=df['color'])
+            y_err_x.append((px, px))
+            y_err_y.append((py - err, py + err))
+        model_dict[key] = plot.multi_line(y_err_x, y_err_y, color=df['color'])
 
     plot.xaxis.axis_label = 'MJD'
+    plot.yaxis.axis_label = 'Flux (AB Zeropoint = 25.)'
     plot.toolbar.logo = None
 
     toggle = CheckboxWithLegendGroup(
