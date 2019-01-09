@@ -326,7 +326,7 @@ def photometry_plot(source_id):
                      var nflux = 0;
                      var mjdsum = 0.;
                       
-                     for (var m = 0; m < fluxsource.length; m++){
+                     for (var m = 0; m < fluxsource.get_length(); m++){
                          if ((fluxsource.data['mjd'][m] < mjdbins[l + 1]) && (fluxsource.data['mjd'][m] >= mjdbins[l])){
                              nflux += 1;
                              fluxsum += fluxsource.data['flux'][m];
