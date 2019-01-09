@@ -204,7 +204,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
                     s = Source(id=name, ra=ra, dec=dec, groups=[g])
 
                     for point in points:
-                        point.source =  s
+                        point.source = s
 
                     DBSession().add(s)
                     DBSession().commit()

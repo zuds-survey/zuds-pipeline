@@ -1,6 +1,7 @@
 import sep
 from astropy.io import fits
 from astropy.wcs import WCS
+import numpy as np
 
 from skyportal.models import DBSession, Instrument, ForcedPhotometry
 
@@ -24,9 +25,7 @@ def force_photometry(sources, sub_list):
             band = hdu.header['FILTER'][-1].lower()
 
             image = hdu.data
-            bkg = sep.Background(image)
-            rms = bkg.rms()
-            bkg.subfrom(image)
+            rms = 1.4826 * np.median(np.abs(image - np.median(image)))
 
         for source in sources:
 
@@ -42,5 +41,6 @@ def force_photometry(sources, sub_list):
                                                zp=zeropoint, lim_mag=maglim, filter=band,
                                                source=source, instrument=instrument)
                 DBSession().add(force_point)
+
 
     DBSession().commit()
