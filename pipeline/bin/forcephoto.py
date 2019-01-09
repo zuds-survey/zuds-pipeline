@@ -35,6 +35,10 @@ def force_photometry(sources, sub_list):
             # convert the ra and dec into pixel coordinates
             x, y = wcs.wcs_world2pix([[ra, dec]], 0.)[0]
             flux, fluxerr, flag = sep.sum_circle(image, x, y, r_aper_pix, err=rms)
+
+            flux = flux[()]
+            fluxerr = fluxerr[()]
+
             if flag == 0:
 
                 force_point = ForcedPhotometry(mjd=mjd, flux=flux, fluxerr=fluxerr,

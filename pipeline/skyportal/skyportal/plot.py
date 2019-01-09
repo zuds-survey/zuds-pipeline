@@ -359,7 +359,7 @@ def photometry_plot(source_id):
          }
          
     """)
-    slider.js_on_change('value', callback)
+    slider.callback = callback
 
     layout = row(plot, toggle)
     layout = column(slider, layout)
