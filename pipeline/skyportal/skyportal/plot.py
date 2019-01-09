@@ -213,7 +213,7 @@ def photometry_plot(source_id):
             color='color',
             marker='circle',
             fill_color='color',
-            alpha='alpha,'
+            alpha='alpha,',
             source=ColumnDataSource(df)
         )
 
