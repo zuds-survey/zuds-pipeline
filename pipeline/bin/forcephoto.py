@@ -15,7 +15,7 @@ def force_photometry(sources, sub_list):
     for image in sub_list:
         with fits.open(image) as hdulist:
             hdu = hdulist[0]
-            zeropoint = hdu.header['MAGZERO']
+            zeropoint = hdu.header['MAGZP']
             seeing = hdu.header['SEEING']  # FWHM of seeing
             mjd = hdu.header['OBSMJD']
             r_aper_arcsec = APER_RAD_FRAC_SEEING_FWHM * seeing
@@ -30,7 +30,7 @@ def force_photometry(sources, sub_list):
         for source in sources:
 
             # get the RA and DEC of the source
-            ra, dec = source['ra'], source['dec']
+            ra, dec = source.ra, source.dec
 
             # convert the ra and dec into pixel coordinates
             x, y = wcs.wcs_world2pix([[ra, dec]], 0.)[0]
