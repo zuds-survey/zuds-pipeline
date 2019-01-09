@@ -56,7 +56,7 @@ Red Shift:
           <br /><br />
           <Responsive
             element={FoldBox}
-            title="Photometry"
+            title="Forced Photometry"
             mobileProps={{ folded: true }}
           >
             <PlotContainer className={styles.plot} url={`/api/plot/photometry/${id}`} />
