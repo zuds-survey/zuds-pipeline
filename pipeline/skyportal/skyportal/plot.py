@@ -185,6 +185,8 @@ def photometry_plot(source_id):
 
     data['flux'] = normalized.flux
     data['fluxerr'] = normalized.fluxerr
+    data['alpha'] = 1.
+
 
     split = data.groupby('label', sort=False)
 
@@ -206,12 +208,12 @@ def photometry_plot(source_id):
     model_dict = {}
     for i, (label, df) in enumerate(split):
         key = f'obs{i}'
-        df['alpha'] = 1.
         model_dict[key] = plot.scatter(
             x='mjd', y='flux',
             color='color',
             marker='circle',
             fill_color='color',
+            alpha='alpha',
             source=ColumnDataSource(df)
         )
 
