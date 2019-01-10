@@ -10,7 +10,7 @@ from skyportal.handlers import (SourceHandler, CommentHandler, GroupHandler,
                                 BecomeUserHandler, LogoutHandler,
                                 PhotometryHandler, TokenHandler)
 from skyportal import models, model_util
-
+from sqlalchemy.exc import ProgrammingError
 
 def make_app(cfg, baselayer_handlers, baselayer_settings):
     """Create and return a `tornado.web.Application` object with specified
@@ -66,7 +66,7 @@ def make_app(cfg, baselayer_handlers, baselayer_settings):
     # create indexes and users if necessary
     try:
         models.DBSession().execute('SELECT \'public.namenum\'::regclass')
-    except:
+    except ProgrammingError:
         model_util.create_indexes()
         model_util.create_groups_and_users()
 
