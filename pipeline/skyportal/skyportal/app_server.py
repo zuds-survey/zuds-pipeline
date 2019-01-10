@@ -64,9 +64,9 @@ def make_app(cfg, baselayer_handlers, baselayer_settings):
     model_util.setup_permissions()
 
     # create indexes and users if necessary
-    try:
-        models.DBSession().execute('SELECT \'public.namenum\'::regclass')
-    except ProgrammingError:
+    exists = models.DBSession().execute('SELECT to_regclass(\'public.namenum\')').count()
+
+    if exists == 0:
         model_util.create_indexes()
         model_util.create_groups_and_users()
 
