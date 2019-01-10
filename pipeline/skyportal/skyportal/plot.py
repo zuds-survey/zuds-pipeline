@@ -6,7 +6,7 @@ from bokeh.core.properties import List, String
 from bokeh.document import Document
 from bokeh.layouts import row, column
 from bokeh.models import CustomJS, DatetimeTickFormatter, HoverTool, Range1d, Slider
-from bokeh.models.widgets import CheckboxGroup, TextInput
+from bokeh.models.widgets import CheckboxGroup, TextInput, Panel, Tabs
 from bokeh.palettes import viridis
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.util.compiler import bundle_all_models
@@ -179,14 +179,22 @@ def photometry_plot(source_id):
 
     data['filter'] = ['ztf' + f for f in data['filter']]
 
+
     # normalize everything to a common zeropoint
-    photdata = PhotometricData(Table.from_pandas(data[['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys']]))
+    photdata = PhotometricData(Table.from_pandas(data[['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys', 'lim_mag']]))
     normalized = photdata.normalized(zp=25., zpsys='ab')
 
     data['flux'] = normalized.flux
     data['fluxerr'] = normalized.fluxerr
     data['alpha'] = 1.
 
+    # calculate the magnitudes
+    obsind = data['flux'] / data['fluxerr'] >= 5
+    data.loc['mag', ~obsind] = 99.
+    data.loc['mag', obsind] = -2.5 * np.log10(data['flux']) + 25.
+    data.loc['magerr', ~obsind] = 99.
+    data.loc['magerr', obsind] = np.abs(-2.5 * data['fluxerr'] / data['flux'] / np.log(10))
+    data['obs'] = obsind
 
     split = data.groupby('label', sort=False)
 
@@ -202,7 +210,10 @@ def photometry_plot(source_id):
 
     hover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
                                 ('filter', '@filter'),
-                                ('fluxerr', '@fluxerr')])
+                                ('fluxerr', '@fluxerr'),
+                                ('mag', '@mag'),
+                                ('magerr', '@magerr'),
+                                ('lim_mag', '@lim_mag')])
     plot.add_tools(hover)
 
     model_dict = {}
@@ -227,6 +238,8 @@ def photometry_plot(source_id):
             fill_color='color',
             source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[], filter=[], color=[]))
         )
+
+        hover.renderers.append(model_dict[key])
 
         key = 'obserr' + str(i)
         y_err_x = []
@@ -273,30 +286,30 @@ def photometry_plot(source_id):
     slider = Slider(start=0., end=15., value=0., step=1., title='binsize (days)')
 
     callback = CustomJS(args={'slider': slider, 'toggle': toggle, **model_dict}, code="""
-         
+
          var binsize = slider.value
          var fluxalph = ((binsize == 0) ? 1. : 0.1);
-         
+
          for (var i = 0; i < toggle.labels.length; i++) {
-         
+
              var fluxsource = eval("obs" + i).data_source;
              var binsource = eval("bin" + i).data_source;
-             
+
              var fluxerrsource = eval("obserr" + i).data_source;
              var binerrsource = eval("binerr" + i).data_source;
-             
+
              var minmjd = Math.min.apply(Math, fluxsource.data['mjd']);
 
              var date = new Date();     // a new date
              var time = date.getTime(); // the timestamp, not neccessarely using UTC as current time
              var maxmjd = ((time / 86400000) - (date.getTimezoneOffset()/1440) + 40587.);
-             
+
              binsource.data['mjd'] = [];
              binsource.data['flux'] = [];
              binsource.data['fluxerr'] = [];
              binsource.data['filter'] = [];
              binsource.data['color'] = [];
-             
+
              binerrsource.data['xs'] = [];
              binerrsource.data['ys'] = [];
              binerrsource.data['color'] = [];
@@ -305,29 +318,29 @@ def photometry_plot(source_id):
                  fluxsource.data['alpha'][j] = fluxalph;
                  fluxerrsource.data['alpha'][j] = fluxalph;
              }
-             
+
              if (binsize > 0){ 
-             
+
                  // now do the binning
                  var k = 0;
                  var curmjd = minmjd;
                  var mjdbins = [curmjd];
-                 
+
                  while (curmjd < maxmjd){
                      curmjd += binsize;
                      mjdbins.push(curmjd);               
                  }
-                 
+
                  var nbins = mjdbins.length - 1;
                  for (var l = 0; l < nbins; l++) {
-                 
-                     
+
+
                      // calculate the flux, fluxerror, and mjd of the bin
                      var fluxsum = 0.;
                      var fluxvarsum = 0.;
                      var nflux = 0;
                      var mjdsum = 0.;
-                      
+
                      for (var m = 0; m < fluxsource.get_length(); m++){
                          if ((fluxsource.data['mjd'][m] < mjdbins[l + 1]) && (fluxsource.data['mjd'][m] >= mjdbins[l])){
                              nflux += 1;
@@ -336,37 +349,247 @@ def photometry_plot(source_id):
                              mjdsum += fluxsource.data['mjd'][m];
                          }
                      }
-                     
+
                      var mymjd = mjdsum / nflux;
                      var myflux = fluxsum / nflux;
                      var myfluxerr = Math.sqrt(fluxvarsum) / nflux;
-                     
+
                      binsource.data['mjd'].push(mymjd);
                      binsource.data['flux'].push(myflux);
                      binsource.data['fluxerr'].push(myfluxerr);
                      binsource.data['filter'].push(fluxsource.data['filter'][0]);
                      binsource.data['color'].push(fluxsource.data['color'][0]);
-                     
+
                      binerrsource.data['xs'].push([mymjd, mymjd]);
                      binerrsource.data['ys'].push([myflux - myfluxerr, myflux + myfluxerr]);
                      binerrsource.data['color'].push(fluxsource.data['color'][0]);
-                     
+
                  }
              }
-             
+
              fluxsource.change.emit();
              binsource.change.emit();
-             
+
              fluxerrsource.change.emit();
              binerrsource.change.emit();
          }
-         
+
     """)
     slider.js_on_change('value', callback)
 
     layout = row(plot, toggle)
     layout = column(slider, layout)
-    return _plot_to_json(layout)
+
+    p1 = Panel(child=layout, title='flux')
+
+    # now make the mag light curve
+
+    plot = figure(
+        plot_width=600,
+        plot_height=300,
+        active_drag='box_zoom',
+        tools='box_zoom,wheel_zoom,pan,reset',
+        y_range=(np.nanmax(data['mag'] + data['magerr']) * 1.1,
+                 np.nanmin(data['mag'] - data['magerr']) * 0.9)
+    )
+
+    hover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
+                                ('filter', '@filter'),
+                                ('fluxerr', '@fluxerr'),
+                                ('mag', '@mag'),
+                                ('magerr', '@magerr'),
+                                ('lim_mag', '@lim_mag')])
+    plot.add_tools(hover)
+
+    model_dict = {}
+
+    for i, (label, df) in enumerate(split):
+
+        key = f'obs{i}'
+        model_dict[key] = plot.scatter(
+            x='mjd', y='mag',
+            color='color',
+            marker='circle',
+            fill_color='color',
+            alpha='alpha',
+            source=ColumnDataSource(df[df['obs']])
+        )
+
+        hover.renderers.append(model_dict[key])
+
+        key = f'unobs{i}'
+        model_dict[key] = plot.scatter(
+            x='mjd', y='lim_mag',
+            color='color',
+            marker='inverted_triangle',
+            fill_color='color',
+            alpha='alpha',
+            source=ColumnDataSource(df[~df['obs']])
+        )
+
+        hover.renderers.append(model_dict[key])
+
+        key = f'bin{i}'
+        model_dict[key] = plot.scatter(
+            x='mjd', y='mag',
+            color='color',
+            marker='circle',
+            fill_color='color',
+            source=ColumnDataSource(data=dict(mjd=[], mag=[], magerr=[], filter=[], color=[]))
+        )
+
+        hover.renderers.append(model_dict[key])
+
+        key = 'obserr' + str(i)
+        y_err_x = []
+        y_err_y = []
+
+        for d, ro in df.iterrows():
+            px = ro['mjd']
+            py = ro['mag']
+            err = ro['magerr']
+
+            y_err_x.append((px, px))
+            y_err_y.append((py - err, py + err))
+
+        model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color', alpha='alpha',
+                                          source=ColumnDataSource(data=dict(xs=y_err_x, ys=y_err_y,
+                                                                  color=df['color'],
+                                                                  alpha=[1.] * len(df))))
+
+        key = f'binerr{i}'
+        model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color',
+                                          source=ColumnDataSource(data=dict(xs=[], ys=[], color=[])))
+
+    plot.xaxis.axis_label = 'MJD'
+    plot.yaxis.axis_label = 'mag'
+    plot.toolbar.logo = None
+
+    toggle = CheckboxWithLegendGroup(
+        labels=list(data.label.unique()),
+        active=list(range(len(data.label.unique()))),
+        colors=list(data.color.unique()))
+
+    # TODO replace `eval` with Namespaces
+    # https://github.com/bokeh/bokeh/pull/6340
+    toggle.callback = CustomJS(args={'toggle': toggle, **model_dict},
+                               code="""
+        for (let i = 0; i < toggle.labels.length; i++) {
+            eval("obs" + i).visible = (toggle.active.includes(i));
+            eval("obserr" + i).visible = (toggle.active.includes(i));
+            eval("bin" + i).visible = (toggle.active.includes(i));
+            eval("binerr" + i).visible = (toggle.active.includes(i));
+            eval("unobs" + i).visible = (toggle.active.includes(i));
+        }
+    """)
+
+
+    slider = Slider(start=0., end=15., value=0., step=1., title='binsize (days)')
+
+    callback = CustomJS(args={'slider': slider, 'toggle': toggle, **model_dict}, code="""
+
+         var binsize = slider.value
+         var fluxalph = ((binsize == 0) ? 1. : 0.1);
+
+         for (var i = 0; i < toggle.labels.length; i++) {
+
+             var fluxsource = eval("obs" + i).data_source;
+             var binsource = eval("bin" + i).data_source;
+
+             var fluxerrsource = eval("obserr" + i).data_source;
+             var binerrsource = eval("binerr" + i).data_source;
+             
+             var limitsource = eval("unobs" + i).data_source;
+
+             var minmjd = Math.min.apply(Math, fluxsource.data['mjd']);
+
+             var date = new Date();     // a new date
+             var time = date.getTime(); // the timestamp, not neccessarely using UTC as current time
+             var maxmjd = ((time / 86400000) - (date.getTimezoneOffset()/1440) + 40587.);
+
+             binsource.data['mjd'] = [];
+             binsource.data['mag'] = [];
+             binsource.data['magerr'] = [];
+             binsource.data['filter'] = [];
+             binsource.data['color'] = [];
+
+             binerrsource.data['xs'] = [];
+             binerrsource.data['ys'] = [];
+             binerrsource.data['color'] = [];
+
+             for (var j = 0; j < fluxsource.get_length(); j++){
+                 fluxsource.data['alpha'][j] = fluxalph;
+                 fluxerrsource.data['alpha'][j] = fluxalph;
+                 limitsource.data['alpha'][j] = fluxalph;
+             }
+
+             if (binsize > 0){ 
+
+                 // now do the binning
+                 var k = 0;
+                 var curmjd = minmjd;
+                 var mjdbins = [curmjd];
+
+                 while (curmjd < maxmjd){
+                     curmjd += binsize;
+                     mjdbins.push(curmjd);               
+                 }
+
+                 var nbins = mjdbins.length - 1;
+                 for (var l = 0; l < nbins; l++) {
+
+
+                     // calculate the flux, fluxerror, and mjd of the bin
+                     var fluxsum = 0.;
+                     var fluxvarsum = 0.;
+                     var nflux = 0;
+                     var mjdsum = 0.;
+
+                     for (var m = 0; m < fluxsource.get_length(); m++){
+                         if ((fluxsource.data['mjd'][m] < mjdbins[l + 1]) && (fluxsource.data['mjd'][m] >= mjdbins[l])){
+                             nflux += 1;
+                             fluxsum += fluxsource.data['mag'][m];
+                             fluxvarsum += fluxsource.data['magerr'][m] * fluxsource.data['magerr'][m];
+                             mjdsum += fluxsource.data['mjd'][m];
+                         }
+                     }
+
+                     var mymjd = mjdsum / nflux;
+                     var myflux = fluxsum / nflux;
+                     var myfluxerr = Math.sqrt(fluxvarsum) / nflux;
+
+                     binsource.data['mjd'].push(mymjd);
+                     binsource.data['flux'].push(myflux);
+                     binsource.data['fluxerr'].push(myfluxerr);
+                     binsource.data['filter'].push(fluxsource.data['filter'][0]);
+                     binsource.data['color'].push(fluxsource.data['color'][0]);
+
+                     binerrsource.data['xs'].push([mymjd, mymjd]);
+                     binerrsource.data['ys'].push([myflux - myfluxerr, myflux + myfluxerr]);
+                     binerrsource.data['color'].push(fluxsource.data['color'][0]);
+
+                 }
+             }
+
+             fluxsource.change.emit();
+             binsource.change.emit();
+
+             fluxerrsource.change.emit();
+             binerrsource.change.emit();
+             
+             limitsource.change.emit();
+         }
+
+    """)
+    slider.js_on_change('value', callback)
+
+    layout = row(plot, toggle)
+    layout = column(slider, layout)
+
+    p2 = Panel(child=layout, title='flux')
+
+    tabs = Tabs(tabs=[p1, p2])
+    return _plot_to_json(tabs)
 
 
 # TODO make async so that thread isn't blocked
