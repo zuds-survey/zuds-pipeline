@@ -284,7 +284,7 @@ class Spectrum(Base):
 class ForceThumb(Base):
     # TODO delete file after deleting row
     type = sa.Column(sa.Enum('new', 'ref', 'sub',
-                             name='thumbnail_types', validate_strings=True))
+                             name='forcethumbnail_types', validate_strings=True))
     file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
 
