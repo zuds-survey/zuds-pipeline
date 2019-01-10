@@ -215,7 +215,7 @@ class ForcedPhotometry(Base):
     instrument = relationship('Instrument', back_populates='forcedphotometry',
                               cascade='all')
 
-    thumbnails = relationship('ForceThumb', cascade='all')
+    forcethumbs = relationship('ForceThumb', cascade='all')
 
 class Photometry(Base):
     __tablename__ = 'photometry'
