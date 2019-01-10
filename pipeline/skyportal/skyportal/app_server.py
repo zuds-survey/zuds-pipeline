@@ -66,7 +66,7 @@ def make_app(cfg, baselayer_handlers, baselayer_settings):
     # create indexes and users if necessary
     exists = models.DBSession().execute('SELECT to_regclass(\'public.namenum\')').fetchall()
 
-    if len(exists) == 0:
+    if exists[0][0] is None:
         model_util.create_indexes()
         model_util.create_groups_and_users()
 
