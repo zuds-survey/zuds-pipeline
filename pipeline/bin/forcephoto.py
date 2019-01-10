@@ -63,14 +63,15 @@ def force_photometry(sources, sub_list):
                                                ra=ra, dec=dec)
 
                 DBSession().add(force_point)
+                DBSession().commit()
 
                 mystamps = []
                 for key in ['sub', 'new']:
                     name = f'/stamps/{force_point.id}.force.{key}.png'
                     if key == 'new':
                         with fits.open(im.replace('scirefdiffimg.fits.fz', 'sciimg.fits')) as hdul:
-                            image = hdul[0].data
-                            wcs = WCS(hdul[0].header)
+                            image = hdul[1].data
+                            wcs = WCS(hdul[1].header)
                             interval = ZScaleInterval().get_limits(image)
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image, wcs)
                     mystamps.append(name)
