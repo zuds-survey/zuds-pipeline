@@ -98,7 +98,7 @@ class Source(Base):
                            order_by="Spectrum.observed_at")
     thumbnails = relationship('Thumbnail', back_populates='source',
                               secondary='photometry', cascade='all')
-    forcethumbs = relationship('ForceThumbs', back_populates='source',
+    forcethumbs = relationship('ForceThumb', back_populates='source',
                                secondary='forcedphotometry', cascade='all')
 
     def add_linked_thumbnails(self):
