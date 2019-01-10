@@ -190,9 +190,9 @@ def photometry_plot(source_id):
 
     # calculate the magnitudes
     obsind = data['flux'] / data['fluxerr'] >= 5
-    data.ix[~obsind, 'mag'] = 99.
+    data.ix[~obsind, 'mag'] = np.nan
     data.ix[obsind, 'mag'] = -2.5 * np.log10(data['flux']) + 25.
-    data.ix[~obsind, 'magerr'] = 99.
+    data.ix[~obsind, 'magerr'] = np.nan
     data.ix[obsind, 'obsind'] = np.abs(-2.5 * data['fluxerr'] / data['flux'] / np.log(10))
     data['obs'] = obsind
 
@@ -389,8 +389,8 @@ def photometry_plot(source_id):
         plot_height=300,
         active_drag='box_zoom',
         tools='box_zoom,wheel_zoom,pan,reset',
-        y_range=(np.nanmax(data['mag'] + data['magerr']) * 1.1,
-                 np.nanmin(data['mag'] - data['magerr']) * 0.9)
+        y_range=(max(np.nanmax(data['mag'] + data['magerr']) * 1.1, np.nanmax(data['lim_mag']) * 1.1),
+                 min(np.nanmin(data['mag'] - data['magerr']) * 0.9, np.nanmin(data['lim_mag']) * 0.9))
     )
 
     hover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
