@@ -165,8 +165,8 @@ def photometry_plot(source_id):
     """
     color_map = {'ipr': 'yellow', 'rpr': 'red', 'g': 'green'}
 
-    qobj = DBSession().query(ForcedPhotometry, Telescope.nickname.label('telescope'))\
-        .join(Instrument).join(Telescope)\
+    qobj = DBSession().query(ForcedPhotometry, Telescope.nickname.label('telescope')) \
+        .join(Instrument).join(Telescope) \
         .filter(ForcedPhotometry.source_id == source_id)
     data = pd.read_sql(qobj.statement, DBSession().bind)
 
@@ -176,6 +176,7 @@ def photometry_plot(source_id):
     objects = qobj.all()
     news = []; subs = []
     for object in objects:
+        object = object[0]
         thumbs = object.forcethumbs
         for thumb in thumbs:
             if thumb.type == 'sub':
