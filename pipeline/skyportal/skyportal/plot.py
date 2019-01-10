@@ -444,7 +444,7 @@ def photometry_plot(source_id):
         y_err_x = []
         y_err_y = []
 
-        for d, ro in df.iterrows():
+        for d, ro in df[df['obs']].iterrows():
             px = ro['mjd']
             py = ro['mag']
             err = ro['magerr']
@@ -482,7 +482,6 @@ def photometry_plot(source_id):
             eval("unobs" + i).visible = (toggle.active.includes(i));
         }
     """)
-
 
     slider = Slider(start=0., end=15., value=0., step=1., title='binsize (days)')
 
@@ -586,7 +585,7 @@ def photometry_plot(source_id):
     layout = row(plot, toggle)
     layout = column(slider, layout)
 
-    p2 = Panel(child=layout, title='flux')
+    p2 = Panel(child=layout, title='mag')
 
     tabs = Tabs(tabs=[p1, p2])
     return _plot_to_json(tabs)
