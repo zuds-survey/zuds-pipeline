@@ -180,9 +180,9 @@ def photometry_plot(source_id):
         thumbs = object.forcethumbs
         for thumb in thumbs:
             if thumb.type == 'sub':
-                subs.append(thumb)
+                subs.append(thumb.file_uri)
             elif thumb.type == 'new':
-                news.append(thumb)
+                news.append(thumb.file_uri)
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
     data['label'] = [f'{t} {f}-band'
