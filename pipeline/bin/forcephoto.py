@@ -62,6 +62,8 @@ def force_photometry(sources, sub_list):
                                                source=source, instrument=instrument,
                                                ra=ra, dec=dec)
 
+                DBSession().add(force_point)
+
                 mystamps = []
                 for key in ['sub', 'new']:
                     name = f'/stamps/{force_point.id}.force.{key}.png'
@@ -75,7 +77,7 @@ def force_photometry(sources, sub_list):
 
                 stamps.append(mystamps)
                 points.append(force_point)
-                DBSession().add(force_point)
+
 
     thumbs = []
     with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
