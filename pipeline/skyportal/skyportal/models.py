@@ -98,6 +98,8 @@ class Source(Base):
                            order_by="Spectrum.observed_at")
     thumbnails = relationship('Thumbnail', back_populates='source',
                               secondary='photometry', cascade='all')
+    forcethumbs = relationship('ForceThumbs', back_populates='source',
+                               secondary='forcedphotometry', cascade='all')
 
     def add_linked_thumbnails(self):
         sdss_thumb = Thumbnail(photometry=self.photometry[0],
@@ -213,7 +215,7 @@ class ForcedPhotometry(Base):
     instrument = relationship('Instrument', back_populates='forcedphotometry',
                               cascade='all')
 
-
+    thumbnails = relationship('ForceThumb', cascade='all')
 
 class Photometry(Base):
     __tablename__ = 'photometry'
@@ -278,6 +280,19 @@ class Spectrum(Base):
 #        return file_uri
 #    else:  # local file
 #        return '/' + file_uri.lstrip('./')
+
+class ForceThumb(Base):
+    # TODO delete file after deleting row
+    type = sa.Column(sa.Enum('new', 'ref', 'sub',
+                             name='thumbnail_types', validate_strings=True))
+    file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
+    public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
+
+    forcedphotometry_id = sa.Column(sa.ForeignKey('forcedphotometry.id', ondelete='CASCADE'),
+                              nullable=False, index=True)
+    forcedphotometry = relationship('ForcedPhotometry', back_populates='forcethumbs', cascade='all')
+    source = relationship('Source', back_populates='forcethumbs', uselist=False,
+                          secondary='forcedphotometry', cascade='all')
 
 
 class Thumbnail(Base):
