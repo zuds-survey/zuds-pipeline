@@ -25,9 +25,9 @@ def force_photometry(sources, sub_list):
     stamps = []
     points = []
 
-    for image in sub_list:
+    for im in sub_list:
 
-        with fits.open(image) as hdulist:
+        with fits.open(im) as hdulist:
             hdu = hdulist[1]
             zeropoint = hdu.header['MAGZP']
             seeing = hdu.header['SEEING']  # FWHM of seeing
@@ -62,8 +62,13 @@ def force_photometry(sources, sub_list):
                                                source=source, instrument=instrument)
 
                 mystamps = []
-                for key in ['sub']:
+                for key in ['sub', 'new']:
                     name = f'/stamps/{force_point.id}.force.{key}.png'
+                    if name == 'new':
+                        with fits.open(im.replace('scirefdiffimg.fits.fz', 'sciimg.fits')) as hdul:
+                            image = hdul[0].data
+                            wcs = WCS(hdul[0].header)
+                            interval = ZScaleInterval().get_limits(image)
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image, wcs)
                     mystamps.append(name)
 
