@@ -19,6 +19,8 @@ from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
                               Source, Spectrum, Telescope, Thumbnail, User,
                               Token)
 
+from astropy.coordinates import SkyCoord
+from astropy.nddata.utils import Cutout2D
 from astropy.visualization import ZScaleInterval
 
 __all__ = ['load_catalog']
@@ -46,52 +48,10 @@ def num_to_alpha(num):
     return ''.join(updates[::-1])
 
 
-class Detection(object):
-
-    def __init__(self, ra, dec, mag, magerr, mjd, filter, locdict, vdict):
-
-        self.ra = ra
-        self.dec = dec
-        self.locdict = locdict
-        self.mjd = mjd
-        self.mag = mag
-        self.magerr = magerr
-        self.filter = filter
-        self.vdict = vdict
-
-    def make_stamps(self, objname):
-
-        stamps = {}
-
-        for key in self.locdict:
-            fname = self.locdict[key]
-
-            with fits.open(fname) as f:
-
-                wcs = WCS(f[0].header)
-                xp, yp = wcs.all_world2pix([[self.ra, self.dec]], 0).astype(int)[0]
-
-                stamp = np.zeros((CUTOUT_SIZE, CUTOUT_SIZE))
-
-                xind = np.arange(xp - CUTOUT_SIZE // 2, xp + CUTOUT_SIZE // 2 + 1, dtype=int)
-                yind = np.arange(yp - CUTOUT_SIZE // 2, yp + CUTOUT_SIZE // 2 + 1, dtype=int)
-
-                for m, i in enumerate(xind):
-                    if i < 0 or i >= f[0].header['NAXIS1']:
-                        continue
-                    for n, j in enumerate(yind):
-                        if j < 0 or j >= f[0].header['NAXIS2']:
-                            continue
-                        stamp[n, m] = f[0].section[j, i]
-
-                # match the orientation to pan starrs and sloan
-                stamp = np.flipud(stamp)
-
-                name = f'/stamps/{objname}.{key}.png'
-                plt.imsave(name, stamp, vmin=self.vdict[key][0], vmax=self.vdict[key][1], cmap='gray')
-                stamps[f'{key}file'] = name
-
-        return stamps
+def make_stamp(name, ra, dec, vmin, vmax, data, wcs):
+    coord = SkyCoord(ra, dec, frame='icrs', unit='deg')
+    cutout = Cutout2D(data, coord, CUTOUT_SIZE, wcs=wcs, fill_value=0.)
+    plt.imsave(name, cutout.data, vmin=vmin, vmax=vmax, cmap='gray')
 
 
 def load_catalog(catpath, refpath, newpath, subpath):
@@ -101,7 +61,6 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
     with status(f"Connecting to database {cfg['database']['database']}"):
         init_db(**cfg['database'])
-
 
     with status("Loading in photometry"):
 
@@ -129,9 +88,14 @@ def load_catalog(catpath, refpath, newpath, subpath):
         vdict = {}
         zscale = ZScaleInterval()
 
+        pix = []
+        wcs = []
+
         for t, f in zip(('ref','new','sub'), (refpath, newpath, subpath)):
             with fits.open(f) as hdu:
                 data = hdu[0].data
+                pix.append(data)
+                wcs.append(WCS(hdu[0].header))
                 vdict[t] = zscale.get_limits(data)
 
         for row in gooddata:
@@ -153,11 +117,13 @@ def load_catalog(catpath, refpath, newpath, subpath):
             DBSession().commit()
 
             # do stamps
-            detection = Detection(ra, dec, mag, e_mag, obsmjd, filter,
-                                  {'ref':refpath, 'new': newpath, 'sub':subpath},
-                                  vdict)
 
-            stamps = detection.make_stamps(photpoint.id)
+            stamps = {}
+
+            for key, p, w in zip(['ref', 'new', 'sub'], pix, wcs):
+                name = f'/stamps/{photpoint.id}.{key}.png'
+                make_stamp(name, p, photpoint.ra, photpoint.dec, vdict[key]['vmin'], vdict[key]['vmax'], w)
+                stamps[f'{key}file'] = name
             triplets.append(stamps)
 
     with status("Uploading stamps"):
