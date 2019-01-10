@@ -64,7 +64,7 @@ def force_photometry(sources, sub_list):
                 mystamps = []
                 for key in ['sub', 'new']:
                     name = f'/stamps/{force_point.id}.force.{key}.png'
-                    if name == 'new':
+                    if key == 'new':
                         with fits.open(im.replace('scirefdiffimg.fits.fz', 'sciimg.fits')) as hdul:
                             image = hdul[0].data
                             wcs = WCS(hdul[0].header)

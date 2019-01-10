@@ -165,17 +165,30 @@ def photometry_plot(source_id):
     """
     color_map = {'ipr': 'yellow', 'rpr': 'red', 'g': 'green'}
 
-    data = pd.read_sql(DBSession()
-                       .query(ForcedPhotometry, Telescope.nickname.label('telescope'))
-                       .join(Instrument).join(Telescope)
-                       .filter(ForcedPhotometry.source_id == source_id)
-                       .statement, DBSession().bind)
+    qobj = DBSession().query(ForcedPhotometry, Telescope.nickname.label('telescope'))\
+        .join(Instrument).join(Telescope)\
+        .filter(ForcedPhotometry.source_id == source_id)
+    data = pd.read_sql(qobj.statement, DBSession().bind)
+
     if data.empty:
         return None, None, None
+
+    objects = qobj.all()
+    news = []; subs = []
+    for object in objects:
+        thumbs = object.forcethumbs
+        for thumb in thumbs:
+            if thumb.type == 'sub':
+                subs.append(thumb)
+            elif thumb.type == 'new':
+                news.append(thumb)
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
     data['label'] = [f'{t} {f}-band'
                      for t, f in zip(data['telescope'], data['filter'])]
+
+    data['new_img'] = news
+    data['sub_img'] = subs
 
     data['filter'] = ['ztf' + f for f in data['filter']]
 
@@ -213,7 +226,9 @@ def photometry_plot(source_id):
                                 ('fluxerr', '@fluxerr'),
                                 ('mag', '@mag'),
                                 ('magerr', '@magerr'),
-                                ('lim_mag', '@lim_mag')])
+                                ('lim_mag', '@lim_mag'),
+                                ('new_img', '<img src=@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                ('sub_img', '<img src=@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
     plot.add_tools(hover)
 
     model_dict = {}
@@ -389,7 +404,7 @@ def photometry_plot(source_id):
 
     ymin = 0.9 * data['lim_mag']
     ymin[data['obs']] = (data['mag'] - data['magerr']) * 0.9
-    
+
     plot = figure(
         plot_width=600,
         plot_height=300,
