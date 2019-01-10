@@ -59,7 +59,8 @@ def force_photometry(sources, sub_list):
 
                 force_point = ForcedPhotometry(mjd=mjd, flux=flux, fluxerr=fluxerr,
                                                zp=zeropoint, lim_mag=maglim, filter=band,
-                                               source=source, instrument=instrument)
+                                               source=source, instrument=instrument,
+                                               ra=ra, dec=dec)
 
                 mystamps = []
                 for key in ['sub', 'new']:
