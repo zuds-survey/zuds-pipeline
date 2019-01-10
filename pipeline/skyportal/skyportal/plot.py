@@ -190,10 +190,10 @@ def photometry_plot(source_id):
 
     # calculate the magnitudes
     obsind = data['flux'] / data['fluxerr'] >= 5
-    data.loc['mag', ~obsind] = 99.
-    data.loc['mag', obsind] = -2.5 * np.log10(data['flux']) + 25.
-    data.loc['magerr', ~obsind] = 99.
-    data.loc['magerr', obsind] = np.abs(-2.5 * data['fluxerr'] / data['flux'] / np.log(10))
+    data.ix[~obsind, 'mag'] = 99.
+    data.ix[obsind, 'mag'] = -2.5 * np.log10(data['flux']) + 25.
+    data.ix[~obsind, 'magerr'] = 99.
+    data.ix[obsind, 'obsind'] = np.abs(-2.5 * data['fluxerr'] / data['flux'] / np.log(10))
     data['obs'] = obsind
 
     split = data.groupby('label', sort=False)
