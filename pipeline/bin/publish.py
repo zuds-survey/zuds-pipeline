@@ -51,7 +51,7 @@ def num_to_alpha(num):
 def make_stamp(name, ra, dec, vmin, vmax, data, wcs):
     coord = SkyCoord(ra, dec, frame='icrs', unit='deg')
     cutout = Cutout2D(data, coord, CUTOUT_SIZE, wcs=wcs, fill_value=0.)
-    plt.imsave(name, cutout.data, vmin=vmin, vmax=vmax, cmap='gray')
+    plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax, cmap='gray')
 
 
 def load_catalog(catpath, refpath, newpath, subpath):

@@ -88,7 +88,7 @@ def force_photometry(sources, sub_list):
                 for f in triplet:
                     remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
                     sftp.put(f, remotename)
-                    uri = os.path.join('/'.join(DB_FTP_DIR.split("/")[-2:]), os.path.basename(f))
+                    uri = f'static/thumbnails/{os.path.basename(f)}'
                     thumb = ForceThumb(type=f.split('.')[-2],
                                        file_uri=uri, public_url='/' + uri,
                                        forcedphotometry_id=photpoint.id)
