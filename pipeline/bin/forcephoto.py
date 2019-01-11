@@ -71,6 +71,7 @@ def force_photometry(sources, sub_list):
                     if key == 'new':
                         with fits.open(im.replace('scimrefdiffimg.fits.fz', 'sciimg.fits')) as hdul:
                             image = hdul[0].data
+                            image = image.byteswap().newbyteorder()
                             wcs = WCS(hdul[0].header)
                             interval = ZScaleInterval().get_limits(image)
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image, wcs)
