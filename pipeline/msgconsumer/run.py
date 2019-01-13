@@ -193,7 +193,7 @@ class TaskHandler(object):
         # command to run a single sub
 
         for job in jobs:
-            subs = job['images']
+            subs = ' '.join(job['images'])
             runcmd = f'shifter python /pipeline/bin/forcephoto.py {subs} &'
             contents += f'\n{runcmd}'
         contents += '\nwait\n'
