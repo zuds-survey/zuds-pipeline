@@ -164,7 +164,7 @@ class TaskHandler(object):
 
         return r.json()['jobid']
 
-    def submit_forcephoto(self, jobs, host='cori', scriptname=None):
+    def submit_forcephoto(self, data, host='cori', scriptname=None):
 
         # login to nersc
         cookies = nersc_authenticate()
@@ -183,20 +183,13 @@ class TaskHandler(object):
         contents = contents.replace('$5', f'forcephoto_{scriptname.replace(".sh","")}')
 
         # consolidate dependencies
-
-        alldeps = []
-        for j in jobs:
-            alldeps.extend(j['dependencies'])
-        data = {'dependencies': list(set(alldeps))}
         contents = self.resolve_dependencies(contents, data)
 
         # command to run a single sub
 
-        for job in jobs:
-            subs = ' '.join(job['images'])
-            runcmd = f'shifter python /pipeline/bin/forcephoto.py {subs} &'
-            contents += f'\n{runcmd}'
-        contents += '\nwait\n'
+        subs = ' '.join(data['images'])
+        runcmd = f'srun -n 64 shifter python /pipeline/bin/forcephoto.py {subs}\n'
+        contents += f'\n{runcmd}'
 
         requests.put(target, data=contents, cookies=cookies)
 
@@ -324,9 +317,8 @@ class TaskHandler(object):
             args = (jobs, host, scriptname)
 
         elif data['jobtype'] == 'forcephoto':
-            jobs = data['jobs']
             submit_func = self.submit_forcephoto
-            args = (jobs, host, scriptname)
+            args = (data, host, scriptname)
 
         else:
             raise ValueError('invalid task type')
