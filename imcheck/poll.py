@@ -745,14 +745,8 @@ class IPACQueryManager(object):
 
     def determine_and_relay_forcephoto_jobs(self, coaddsub_corrids, metatable):
 
-        subs = _split(metatable['path'], 64)
-        batch = []
-        for images in subs:
-            data = {'jobtype': 'forcephoto', 'images': images.tolist(), 'dependencies': coaddsub_corrids}
-            batch.append(data)
-
-        packet = {'jobtype': 'forcephoto', 'jobs': batch}
-        body = json.dumps(packet)
+        data = {'jobtype': 'forcephoto', 'images': metatable['path'].tolist(), 'dependencies': coaddsub_corrids}
+        body = json.dumps(data)
         self.relay_job(body)
 
 
@@ -769,9 +763,9 @@ class IPACQueryManager(object):
 
         if len(npaths) > 0:
             # download the images
-            #self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            #self.reset_manifest()
-            #self.download_images(npaths, ipaths)
+            self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
+            self.reset_manifest()
+            self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
             sub_npaths = self.read_sub_manifest()

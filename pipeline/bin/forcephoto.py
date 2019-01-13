@@ -3,6 +3,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import numpy as np
 import paramiko
+from itertools import chain
 import os
 
 
@@ -19,7 +20,31 @@ DB_FTP_PASSWORD = 'root'
 DB_FTP_PORT = 222
 
 
-def force_photometry(sources, sub_list):
+# split an iterable over some processes recursively
+_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
+             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
+
+
+def post_stamps(stamps, points):
+
+    thumbs = []
+    with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
+        transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
+        with paramiko.SFTPClient.from_transport(transport) as sftp:
+            for triplet, photpoint in zip(stamps, points):
+                for f in triplet:
+                    remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
+                    sftp.put(f, remotename)
+                    uri = f'static/thumbnails/{os.path.basename(f)}'
+                    thumb = ForceThumb(type=f.split('.')[-2],
+                                       file_uri=uri, public_url='/' + uri,
+                                       forcedphotometry_id=photpoint.id)
+                    thumbs.append(thumb)
+    DBSession().add_all(thumbs)
+    DBSession().commit()
+
+
+def force_photometry(sources, sub_list, send_stamps=True):
 
     instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
 
@@ -85,22 +110,10 @@ def force_photometry(sources, sub_list):
                 stamps.append(mystamps)
                 points.append(force_point)
 
-
-    thumbs = []
-    with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
-        transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
-        with paramiko.SFTPClient.from_transport(transport) as sftp:
-            for triplet, photpoint in zip(stamps, points):
-                for f in triplet:
-                    remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
-                    sftp.put(f, remotename)
-                    uri = f'static/thumbnails/{os.path.basename(f)}'
-                    thumb = ForceThumb(type=f.split('.')[-2],
-                                       file_uri=uri, public_url='/' + uri,
-                                       forcedphotometry_id=photpoint.id)
-                    thumbs.append(thumb)
-    DBSession().add_all(thumbs)
-    DBSession().commit()
+    if send_stamps:
+        post_stamps(stamps, points)
+    else:
+        return stamps, points
 
 
 if __name__ == '__main__':
@@ -110,8 +123,18 @@ if __name__ == '__main__':
     parser.add_argument('sub_names', nargs="+")
     args = parser.parse_args()
 
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+
     sub_list = args.sub_names
-    for sub in sub_list:
+    my_names = _split(sub_list, size)[rank]
+
+    allstamps = []
+    allpoints = []
+
+    for sub in my_names:
         with fits.open(sub) as f:
             wcs = WCS(f[1].header)
             footprint = wcs.calc_footprint().ravel()
@@ -121,4 +144,16 @@ if __name__ == '__main__':
 
             sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
 
-            force_photometry(sources, [sub])
+            stamps, points = force_photometry(sources, [sub], send_stamps=False)
+
+            allstamps.extend(stamps)
+            allpoints.extend(points)
+
+    stamps = comm.gather(allstamps, root=0)
+    points = comm.gather(allpoints, root=0)
+
+    stamps = list(chain(*stamps))
+    points = list(chain(*points))
+
+    # send them
+    post_stamps(stamps, points)

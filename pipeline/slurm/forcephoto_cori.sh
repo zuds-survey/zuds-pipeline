@@ -11,12 +11,13 @@
 #SBATCH --dependency=afterok:DLIST
 #SBATCH -C haswell
 #SBATCH --exclusive
-#SBATCH --volume=/global/homes/d/dgold:/home/desi;/global/cscratch1/sd/dgold/lensgrinder/pipeline:/pipeline;/global/cscratch1/sd/dgold/lensgrinder/pipeline/astromatic:/config
+#SBATCH --volume=/global/homes/d/dgold:/home/desi;/global/cscratch1/sd/dgold/lensgrinder/pipeline:/pipeline;/global/cscratch1/sd/dgold/lensgrinder/pipeline/astromatic:/config;/global/cscratch1/sd/dgold/lensgrinder/pipeline/skyportal:/skyportal
 #SBATCH -o $4/slurm-%A.out
 
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
 cd /global/cscratch1/sd/dgold/ztfcoadd/job_scripts
+
 
 
