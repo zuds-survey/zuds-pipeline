@@ -308,7 +308,7 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND ((FIELD=847 AND CCDID=2 AND QID=3) OR (FIELD=681 AND CCDID=6 AND QID=4) OR (FIELD=796 AND CCDID=12 AND QID=4) OR (FIELD=795 AND CCDID=5 AND QID=4) OR (FIELD=681 AND CCDID=14 AND QID=3))'% (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND (FIELD=847 AND CCDID=2 AND QID=3)'% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -829,8 +829,8 @@ class IPACQueryManager(object):
 
 if __name__ == '__main__':
 
-    glsn_schema = {'template_minimages': 20, 'template_science_minsep_days': 10,
-                   'scicoadd_window_size': 1, 'rolling':False, 'schema_id': 1}
+    glsn_schema = {'template_minimages': 100, 'template_science_minsep_days': 10,
+                   'scicoadd_window_size': 10, 'rolling':False, 'schema_id': 1}
 
     schemas = [glsn_schema]
 
@@ -838,6 +838,10 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
     logger.addHandler(ch)
+
+    env, cfg = load_env()
+    init_db(**cfg['database'])
+
 
     for s in schemas:
         manager = IPACQueryManager(s, logger)
