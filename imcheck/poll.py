@@ -4,7 +4,6 @@ import pika
 import datetime
 import psycopg2
 import requests
-#import schedule
 import logging
 import uuid
 import json
@@ -19,9 +18,6 @@ from ztfquery import query as zq
 from astropy.time import Time
 from pika.exceptions import ConnectionClosed
 from liblg import ipac_authenticate, nersc_authenticate, nersc_username, nersc_password
-
-from baselayer.app.env import load_env
-from skyportal.models import DBSession, init_db
 
 
 ipac_root = 'https://irsa.ipac.caltech.edu/'
@@ -749,33 +745,15 @@ class IPACQueryManager(object):
 
     def determine_and_relay_forcephoto_jobs(self, coaddsub_corrids, metatable):
 
+        subs = _split(metatable['path'], 64)
         batch = []
-        for i, row in metatable.iterrows():
-            ra1, dec1, ra2, dec2, ra3, dec3, ra4, dec4 = row[['ra1', 'dec1', 'ra2', 'dec2',
-                                                              'ra3', 'dec3', 'ra4', 'dec4']]
-
-            ids = DBSession().execute('SELECT ID FROM SOURCES WHERE Q3C_POLY_QUERY(RA, DEC, \'{:ra1, :dec1, '
-                                      ':ra2, :dec2, :ra3, :dec3, :ra4, :dec4}\')',
-                                      {'ra1': ra1, 'ra2': ra2, 'ra3': ra3, 'ra4': ra4,
-                                       'dec1': dec1, 'dec2': dec2, 'dec3': dec3, 'dec4': dec4}).fetchall()
-
-            ids = [i[0] for i in ids]
-
-            data = {'jobtype': 'forcephoto', 'image': row['path'], 'source_ids': ids,
-                    'dependencies': coaddsub_corrids}
-
+        for images in subs:
+            data = {'jobtype': 'forcephoto', 'images': images, 'dependencies': coaddsub_corrids}
             batch.append(data)
 
-            if len(batch) == 64:
-                packet = {'jobtype': 'forcephoto', 'jobs': batch}
-                body = json.dumps(packet)
-                self.relay_job(body)
-                batch = []
-
-        if len(batch) > 0:
-            packet = {'jobtype': 'forcephoto', 'jobs': batch}
-            body = json.dumps(packet)
-            self.relay_job(body)
+        packet = {'jobtype': 'forcephoto', 'jobs': batch}
+        body = json.dumps(packet)
+        self.relay_job(body)
 
 
     def __call__(self):
@@ -840,10 +818,6 @@ if __name__ == '__main__':
     logger.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
     logger.addHandler(ch)
-
-    env, cfg = load_env()
-    init_db(**cfg['database'])
-
 
     for s in schemas:
         manager = IPACQueryManager(s, logger)

@@ -164,7 +164,6 @@ class TaskHandler(object):
 
         return r.json()['jobid']
 
-
     def submit_forcephoto(self, jobs, host='cori', scriptname=None):
 
         # login to nersc
@@ -194,9 +193,8 @@ class TaskHandler(object):
         # command to run a single sub
 
         for job in jobs:
-            sub = job['image']
-            source_ids = job['source_ids']
-            runcmd = f'shifter python /pipeline/bin/forcephoto.py "{source_ids}" "{sub}" &'
+            subs = job['images']
+            runcmd = f'shifter python /pipeline/bin/forcephoto.py {subs} &'
             contents += f'\n{runcmd}'
         contents += '\nwait\n'
 

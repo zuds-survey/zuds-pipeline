@@ -107,13 +107,18 @@ if __name__ == '__main__':
 
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('source_ids', nargs='+')
-    parser.add_argument('sub_name')
+    parser.add_argument('sub_names')
     args = parser.parse_args()
 
-    source_ids = list(map(int, args.source_ids))
-    sub_list = [args.sub_name]
+    sub_list = args.sub_names
+    for sub in sub_list:
+        with fits.open(sub) as f:
+            wcs = WCS(f[1].header)
+            footprint = wcs.calc_footprint().ravel()
+            source_ids = DBSession().execute('SELECT ID FROM SOURCES WHERE Q3C_POLY_QUERY(RA, DEC, '
+                                             '\'{%f,%f,%f,%f,%f,%f,%f,%f}\'').fetchall()
+            source_ids = [s[0] for s in source_ids]
 
-    sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
+            sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
 
-    force_photometry(sources, sub_list)
+            force_photometry(sources, [sub])
