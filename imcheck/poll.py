@@ -764,14 +764,16 @@ class IPACQueryManager(object):
             data = {'jobtype': 'forcephoto', 'image': row['path'], 'source_ids': ids,
                     'dependencies': coaddsub_corrids}
 
+            batch.append(data)
+
             if len(batch) == 64:
-                packet = {'jobtype': 'forcephoto', 'jobs': data}
+                packet = {'jobtype': 'forcephoto', 'jobs': batch}
                 body = json.dumps(packet)
                 self.relay_job(body)
                 batch = []
 
         if len(batch) > 0:
-            packet = {'jobtype': 'forcephoto', 'jobs': data}
+            packet = {'jobtype': 'forcephoto', 'jobs': batch}
             body = json.dumps(packet)
             self.relay_job(body)
 
