@@ -748,7 +748,7 @@ class IPACQueryManager(object):
         subs = _split(metatable['path'], 64)
         batch = []
         for images in subs:
-            data = {'jobtype': 'forcephoto', 'images': images, 'dependencies': coaddsub_corrids}
+            data = {'jobtype': 'forcephoto', 'images': images.tolist(), 'dependencies': coaddsub_corrids}
             batch.append(data)
 
         packet = {'jobtype': 'forcephoto', 'jobs': batch}
