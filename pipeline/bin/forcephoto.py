@@ -107,7 +107,7 @@ if __name__ == '__main__':
 
     from argparse import ArgumentParser
     parser = ArgumentParser()
-    parser.add_argument('sub_names')
+    parser.add_argument('sub_names', nargs="+")
     args = parser.parse_args()
 
     sub_list = args.sub_names
