@@ -26,20 +26,20 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
-def post_stamps(stamps, points):
+def post_stamps(stamps, pointids):
 
     thumbs = []
     with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
         transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
         with paramiko.SFTPClient.from_transport(transport) as sftp:
-            for triplet, photpoint in zip(stamps, points):
+            for triplet, photpointid in zip(stamps, pointids):
                 for f in triplet:
                     remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
                     sftp.put(f, remotename)
                     uri = f'static/thumbnails/{os.path.basename(f)}'
                     thumb = ForceThumb(type=f.split('.')[-2],
                                        file_uri=uri, public_url='/' + uri,
-                                       forcedphotometry_id=photpoint.id)
+                                       forcedphotometry_id=photpointid)
                     thumbs.append(thumb)
     DBSession().add_all(thumbs)
     DBSession().commit()
@@ -109,7 +109,7 @@ def force_photometry(sources, sub_list, send_stamps=True):
                     mystamps.append(name)
 
                 stamps.append(mystamps)
-                points.append(force_point)
+                points.append(force_point.id)
 
     if send_stamps:
         post_stamps(stamps, points)
@@ -160,8 +160,6 @@ if __name__ == '__main__':
     if rank == 0:
         stamps = list(chain(*stamps))
         points = list(chain(*points))
-
-        DBSession().add_all(points)
 
         # send them
         post_stamps(stamps, points)
