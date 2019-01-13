@@ -157,8 +157,9 @@ if __name__ == '__main__':
     stamps = comm.gather(allstamps, root=0)
     points = comm.gather(allpoints, root=0)
 
-    stamps = list(chain(*stamps))
-    points = list(chain(*points))
+    if rank == 0:
+        stamps = list(chain(*stamps))
+        points = list(chain(*points))
 
-    # send them
-    post_stamps(stamps, points)
+        # send them
+        post_stamps(stamps, points)
