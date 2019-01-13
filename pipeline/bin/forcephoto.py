@@ -9,7 +9,8 @@ import os
 from publish import make_stamp
 from astropy.visualization import ZScaleInterval
 
-from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb, Source
+from baselayer.app.env import load_env
+from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb, Source, init_db
 
 APER_RAD_FRAC_SEEING_FWHM = 0.6731
 DB_FTP_DIR = '/skyportal/static/thumbnails'
@@ -111,12 +112,16 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     sub_list = args.sub_names
+
+    env, cfg = load_env()
+    init_db(**cfg['database'])
+
     for sub in sub_list:
         with fits.open(sub) as f:
             wcs = WCS(f[1].header)
             footprint = wcs.calc_footprint().ravel()
             source_ids = DBSession().execute('SELECT ID FROM SOURCES WHERE Q3C_POLY_QUERY(RA, DEC, '
-                                             '\'{%f,%f,%f,%f,%f,%f,%f,%f}\'').fetchall()
+                                             '\'{%f,%f,%f,%f,%f,%f,%f,%f}\')' % tuple(footprint.tolist())).fetchall()
             source_ids = [s[0] for s in source_ids]
 
             sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
