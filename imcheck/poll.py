@@ -371,7 +371,7 @@ class IPACQueryManager(object):
             icookies = ipac_authenticate()  # get a different cookie for each DTN
             sessionid = icookies.get('JOSSO_SESSIONID')
 
-            download_script = [f'if curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"; then'
+            download_script = [f'if curl {ipath} --fail --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"; then'
                                f'\n( flock -x 200; echo {npath} >> {manifest} ) 200> {lockfile}; fi'
                                for ipath, npath in zip(ipc, npc)]
             mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
