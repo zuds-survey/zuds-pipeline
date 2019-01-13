@@ -161,5 +161,7 @@ if __name__ == '__main__':
         stamps = list(chain(*stamps))
         points = list(chain(*points))
 
+        DBSession().add_all(points)
+
         # send them
         post_stamps(stamps, points)
