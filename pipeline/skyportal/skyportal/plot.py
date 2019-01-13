@@ -401,10 +401,11 @@ def photometry_plot(source_id):
     # now make the mag light curve
 
     ymax = 1.1 * data['lim_mag']
-    ymax[data['obs']] = (data['mag'] + data['magerr']) * 1.1
-
     ymin = 0.9 * data['lim_mag']
-    ymin[data['obs']] = (data['mag'] - data['magerr']) * 0.9
+
+    if len(data['obs']) > 0:
+        ymax[data['obs']] = (data['mag'] + data['magerr']) * 1.1
+        ymin[data['obs']] = (data['mag'] - data['magerr']) * 0.9
 
     plot = figure(
         plot_width=600,

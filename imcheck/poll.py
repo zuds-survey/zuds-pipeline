@@ -20,6 +20,9 @@ from astropy.time import Time
 from pika.exceptions import ConnectionClosed
 from liblg import ipac_authenticate, nersc_authenticate, nersc_username, nersc_password
 
+from baselayer.app.env import load_env
+from skyportal.models import DBSession, init_db
+
 
 ipac_root = 'https://irsa.ipac.caltech.edu/'
 formula = 'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{year:s}/{month:s}{day:s}/{fracday:s}' \
@@ -398,7 +401,15 @@ class IPACQueryManager(object):
         ncookies = nersc_authenticate()
         target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
         r = requests.get(target, cookies=ncookies)
-        return list(filter(lambda s: 'msk' not in s, r.content.decode('utf-8').strip().split('\n')))
+        return list(filter(lambda s: 'msk' not in s and 'scimref' not in s,
+                           r.content.decode('utf-8').strip().split('\n')))
+
+    def read_sub_manifest(self):
+        ncookies = nersc_authenticate()
+        target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
+        r = requests.get(target, cookies=ncookies)
+        return list(filter(lambda s: 'msk' not in s and 'sciimg' not in s,
+                           r.content.decode('utf-8').strip().split('\n')))
 
     def update_database_with_new_images(self, npaths, metatable):
 
@@ -727,7 +738,6 @@ class IPACQueryManager(object):
 
         return correlation_ids
 
-
     def prune_metatable(self, old_npaths, new_npaths, metatable):
 
         inds = []
@@ -736,6 +746,35 @@ class IPACQueryManager(object):
             index = olist.index(path)
             inds.append(index)
         return metatable.iloc[inds]
+
+    def determine_and_relay_forcephoto_jobs(self, coaddsub_corrids, metatable):
+
+        batch = []
+        for i, row in metatable.iterrows():
+            ra1, dec1, ra2, dec2, ra3, dec3, ra4, dec4 = row[['ra1', 'dec1', 'ra2', 'dec2',
+                                                              'ra3', 'dec3', 'ra4', 'dec4']]
+
+            ids = DBSession().execute('SELECT ID FROM SOURCES WHERE Q3C_POLY_QUERY(RA, DEC, \'{:ra1, :dec1, '
+                                      ':ra2, :dec2, :ra3, :dec3, :ra4, :dec4}\')',
+                                      {'ra1': ra1, 'ra2': ra2, 'ra3': ra3, 'ra4': ra4,
+                                       'dec1': dec1, 'dec2': dec2, 'dec3': dec3, 'dec4': dec4}).fetchall()
+
+            ids = [i[0] for i in ids]
+
+            data = {'jobtype': 'forcephoto', 'image': row['path'], 'source_ids': ids,
+                    'dependencies': coaddsub_corrids}
+
+            if len(batch) == 64:
+                packet = {'jobtype': 'forcephoto', 'jobs': data}
+                body = json.dumps(packet)
+                self.relay_job(body)
+                batch = []
+
+        if len(batch) > 0:
+            packet = {'jobtype': 'forcephoto', 'jobs': data}
+            body = json.dumps(packet)
+            self.relay_job(body)
+
 
     def __call__(self):
 
@@ -755,7 +794,17 @@ class IPACQueryManager(object):
             #self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
+            sub_npaths = self.read_sub_manifest()
+
+            sub_allnpaths = np.asarray([p.replace('sciimg', 'scimrefdiffimg')
+                                         .replace('fits', 'fits.fz') for p in npaths])
+
+            mtcopy = metatable.copy()
+            mtcopy['path'] = sub_allnpaths
+
+            sub_metatable = self.prune_metatable(sub_allnpaths, sub_npaths, mtcopy)
             metatable = self.prune_metatable(npaths, new_npaths, metatable)
+
             npaths = new_npaths
 
             # update the database with the new images that were downloaded
@@ -773,7 +822,7 @@ class IPACQueryManager(object):
             coaddsub_corrids = self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
 
             # lastly do forced photometry on the detected objects
-            self.determine_and_relay_forcephoto_jobs(coaddsub_corrids)
+            self.determine_and_relay_forcephoto_jobs(coaddsub_corrids, sub_metatable)
 
             self.__del__()
 

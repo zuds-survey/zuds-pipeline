@@ -5,10 +5,11 @@ import numpy as np
 import paramiko
 import os
 
+
 from publish import make_stamp
 from astropy.visualization import ZScaleInterval
 
-from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb
+from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb, Source
 
 APER_RAD_FRAC_SEEING_FWHM = 0.6731
 DB_FTP_DIR = '/skyportal/static/thumbnails'
@@ -100,3 +101,19 @@ def force_photometry(sources, sub_list):
                     thumbs.append(thumb)
     DBSession().add_all(thumbs)
     DBSession().commit()
+
+
+if __name__ == '__main__':
+
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('source_ids', nargs='+')
+    parser.add_argument('sub_name')
+    args = parser.parse_args()
+
+    source_ids = list(map(int, args.source_ids))
+    sub_list = [args.sub_name]
+
+    sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
+
+    force_photometry(sources, sub_list)

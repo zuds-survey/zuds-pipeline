@@ -19,6 +19,7 @@ mkcoadd_cori = os.path.join(slurmd, 'makecoadd_cori.sh')
 mksub_cori = os.path.join(slurmd, 'makesub_cori.sh')
 mkvar_cori = os.path.join(slurmd, 'makevariance_cori.sh')
 mkcoaddsub_cori = os.path.join(slurmd, 'makecoaddsub_cori.sh')
+forcephoto_cori = os.path.join(slurmd, 'forcephoto_cori.sh')
 newt_baseurl = 'https://newt.nersc.gov/newt'
 
 #database_uri = os.getenv('DATABASE_URI')
@@ -163,6 +164,57 @@ class TaskHandler(object):
 
         return r.json()['jobid']
 
+
+    def submit_forcephoto(self, jobs, host='cori', scriptname=None):
+
+        # login to nersc
+        cookies = nersc_authenticate()
+
+        # create the payload
+        with open(mkcoaddsub_cori, 'r') as f:
+            contents = f.read()
+
+        if scriptname is None:
+            scriptname = f'{uuid.uuid4().hex}.sh'
+
+        # first upload the job script to scratch
+        path = f'global/cscratch1/sd/dgold/ztfcoadd/job_scripts/{scriptname}'
+        target = os.path.join(newt_baseurl, 'file', host, path)
+        contents = contents.replace('$4', f'/{os.path.dirname(path)}')
+        contents = contents.replace('$5', f'forcephoto_{scriptname.replace(".sh","")}')
+
+        # consolidate dependencies
+
+        alldeps = []
+        for j in jobs:
+            alldeps.extend(j['dependencies'])
+        data = {'dependencies': list(set(alldeps))}
+        contents = self.resolve_dependencies(contents, data)
+
+        # command to run a single sub
+
+        for job in jobs:
+            sub = job['image']
+            source_ids = job['source_ids']
+            runcmd = f'shifter python /pipeline/bin/forcephoto.py "{source_ids}" "{sub}" &'
+            contents += f'\n{runcmd}'
+        contents += '\nwait\n'
+
+        requests.put(target, data=contents, cookies=cookies)
+
+        target = os.path.join(newt_baseurl, 'queue', host)
+        payload = {'jobfile': f'/{path}'}
+        self.logger.info(payload)
+
+        r = requests.post(target, data=payload, cookies=cookies)
+
+        # check the return code
+        if r.status_code != 200:
+            raise ValueError(r.content)
+
+        return r.json()['jobid']
+
+
     def submit_variance(self, images, masks, host='cori', scriptname=None):
 
         # login to nersc
@@ -197,6 +249,8 @@ class TaskHandler(object):
             raise ValueError(r.content)
 
         return r.json()['jobid']
+
+
 
     def _reconnect(self):
 
@@ -269,6 +323,11 @@ class TaskHandler(object):
 
             jobs = data['jobs']
             submit_func = self.submit_coaddsub
+            args = (jobs, host, scriptname)
+
+        elif data['jobtype'] == 'forcephoto':
+            jobs = data['jobs']
+            submit_func = self.submit_forcephoto
             args = (jobs, host, scriptname)
 
         else:
