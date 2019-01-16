@@ -205,9 +205,9 @@ def photometry_plot(source_id):
     # calculate the magnitudes
     obsind = data['flux'] / data['fluxerr'] >= 5
     data.ix[~obsind, 'mag'] = 99.
-    data.ix[obsind, 'mag'] = -2.5 * np.log10(data['flux']) + 25.
+    data.ix[obsind, 'mag'] = -2.5 * np.log10(data[obsind]['flux']) + 25.
     data.ix[~obsind, 'magerr'] = 99.
-    data.ix[obsind, 'obsind'] = np.abs(-2.5 * data['fluxerr'] / data['flux'] / np.log(10))
+    data.ix[obsind, 'magerr'] = np.abs(-2.5 * data[obsind]['fluxerr'] / data[obsind]['flux'] / np.log(10))
     data['obs'] = obsind
 
     split = data.groupby('label', sort=False)
@@ -222,15 +222,26 @@ def photometry_plot(source_id):
                  np.nanmax(data['flux'] + data['fluxerr']) * 1.1)
     )
 
-    hover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
-                                ('filter', '@filter'),
-                                ('fluxerr', '@fluxerr'),
-                                ('mag', '@mag'),
-                                ('magerr', '@magerr'),
-                                ('lim_mag', '@lim_mag'),
-                                ('new_img', '<img src=../@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
-                                ('sub_img', '<img src=../@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
-    plot.add_tools(hover)
+    imhover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
+                                  ('filter', '@filter'),
+                                  ('fluxerr', '@fluxerr'),
+                                  ('mag', '@mag'),
+                                  ('magerr', '@magerr'),
+                                  ('lim_mag', '@lim_mag'),
+                                  ('new_img', '<img src=../@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                  ('sub_img', '<img src=../@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
+    plot.add_tools(imhover)
+
+    # simpler tool tip for coadded light curve points
+    simplehover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
+                                      ('filter', '@filter'),
+                                      ('fluxerr', '@fluxerr'),
+                                      ('mag', '@mag'),
+                                      ('magerr', '@magerr'),
+                                      ('lim_mag', '@lim_mag')])
+
+    plot.add_tools(simplehover)
+
 
     model_dict = {}
     for i, (label, df) in enumerate(split):
@@ -244,7 +255,7 @@ def photometry_plot(source_id):
             source=ColumnDataSource(df)
         )
 
-        hover.renderers.append(model_dict[key])
+        imhover.renderers.append(model_dict[key])
 
         key = f'bin{i}'
         model_dict[key] = plot.scatter(
@@ -255,7 +266,7 @@ def photometry_plot(source_id):
             source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[], filter=[], color=[]))
         )
 
-        hover.renderers.append(model_dict[key])
+        simplehover.renderers.append(model_dict[key])
 
         key = 'obserr' + str(i)
         y_err_x = []
@@ -415,13 +426,8 @@ def photometry_plot(source_id):
         y_range=(np.nanmax(ymax), np.nanmin(ymin))
     )
 
-    hover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
-                                ('filter', '@filter'),
-                                ('fluxerr', '@fluxerr'),
-                                ('mag', '@mag'),
-                                ('magerr', '@magerr'),
-                                ('lim_mag', '@lim_mag')])
-    plot.add_tools(hover)
+    plot.add_tools(imhover)
+    plot.add_tools(simplehover)
 
     model_dict = {}
 
@@ -437,7 +443,7 @@ def photometry_plot(source_id):
             source=ColumnDataSource(df[df['obs']])
         )
 
-        hover.renderers.append(model_dict[key])
+        imhover.renderers.append(model_dict[key])
 
         key = f'unobs{i}'
         model_dict[key] = plot.scatter(
@@ -449,7 +455,7 @@ def photometry_plot(source_id):
             source=ColumnDataSource(df[~df['obs']])
         )
 
-        hover.renderers.append(model_dict[key])
+        imhover.renderers.append(model_dict[key])
 
         key = f'bin{i}'
         model_dict[key] = plot.scatter(
@@ -460,7 +466,7 @@ def photometry_plot(source_id):
             source=ColumnDataSource(data=dict(mjd=[], mag=[], magerr=[], filter=[], color=[]))
         )
 
-        hover.renderers.append(model_dict[key])
+        simplehover.renderers.append(model_dict[key])
 
         key = 'obserr' + str(i)
         y_err_x = []
