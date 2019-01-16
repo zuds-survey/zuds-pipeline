@@ -482,8 +482,8 @@ def photometry_plot(source_id):
 
         model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color', alpha='alpha',
                                           source=ColumnDataSource(data=dict(xs=y_err_x, ys=y_err_y,
-                                                                  color=df['color'],
-                                                                  alpha=[1.] * len(df))))
+                                                                  color=df[df['obs']]['color'],
+                                                                  alpha=[1.] * len(df[df['obs']]))))
 
         key = f'binerr{i}'
         model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color',
