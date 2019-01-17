@@ -5,6 +5,7 @@ import numpy as np
 import paramiko
 from itertools import chain
 import os
+from scipy.interpolate import interp1d
 
 
 from publish import make_stamp
@@ -61,6 +62,7 @@ def force_photometry(sources, sub_list, send_stamps=True):
             mjd = hdu.header['OBSMJD']
             r_aper_arcsec = APER_RAD_FRAC_SEEING_FWHM * seeing
             r_aper_pix = r_aper_arcsec / 1.013 # arcsec per pixel
+            d_aper_pix = r_aper_pix * 2.  # diameter of aperture in pixels
             wcs = WCS(hdu.header)
             maglim = hdu.header['MAGLIM']
             band = hdu.header['FILTER'][-1].lower()
@@ -69,6 +71,35 @@ def force_photometry(sources, sub_list, send_stamps=True):
             rms = 1.4826 * np.median(np.abs(image - np.median(image)))
 
             interval = ZScaleInterval().get_limits(image)
+
+
+            # prepare the aperture correction
+
+            # aperture diameters in pixels
+            xpix = [2.,3.,4.,6.,10.,14.]
+
+            # aperture corrections in magnitudes
+            apcor_mag = [hdu.header[f'APCOR{i}'] for i in range(1, 7)]
+            apcor_unc_mag = [hdu.header[f'APCORUN{i}'] for i in range(1, 7)]
+
+            # interpolate
+            corfunc = interp1d(xpix, apcor_mag, kind='linear')
+            corunfunc = interp1d(xpix, apcor_unc_mag, kind='linear')
+
+            if d_aper_pix < 2. or d_aper_pix
+                mycor = corfunc(d_aper_pix)[()]
+            except ValueError:
+                mycor = 0.
+
+            try:
+                mycorunc = corunfunc(d_aper_pix)[()]
+            except ValueError:
+                mycorunc = 0.
+
+            # convert to flux correction
+            flux_aper_correction = 10**(-0.4 * mycor)
+            fluxerr_aper_correction =
+
 
         for source in sources:
 
@@ -79,10 +110,12 @@ def force_photometry(sources, sub_list, send_stamps=True):
             x, y = wcs.wcs_world2pix([[ra, dec]], 0.)[0]
             flux, fluxerr, flag = sep.sum_circle(image, x, y, r_aper_pix, err=rms)
 
-            flux = flux[()]
-            fluxerr = fluxerr[()]
+            flux = flux[()] * flux_aper_correction
+            fluxerr = fluxerr[()] * fluxerr_aper_correction
 
             if flag == 0:
+
+
 
                 force_point = ForcedPhotometry(mjd=mjd, flux=flux, fluxerr=fluxerr,
                                                zp=zeropoint, lim_mag=maglim, filter=band,

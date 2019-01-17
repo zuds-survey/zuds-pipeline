@@ -421,6 +421,20 @@ def photometry_plot(source_id):
     p1 = Panel(child=layout, title='flux')
 
     # now make the mag light curve
+    ymax = 1.1 * data['lim_mag']
+    ymin = 0.9 * data['lim_mag']
+
+    if len(data['obs']) > 0:
+        ymax[data['obs']] = (data['mag'] + data['magerr']) * 1.1
+        ymin[data['obs']] = (data['mag'] - data['magerr']) * 0.9
+
+    plot = figure(
+        plot_width=600,
+        plot_height=300,
+        active_drag='box_zoom',
+        tools='box_zoom,wheel_zoom,pan,reset',
+        y_range=(np.nanmax(ymax), np.nanmin(ymin))
+    )
 
     imhover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
                                   ('filter', '@filter'),
@@ -440,20 +454,8 @@ def photometry_plot(source_id):
                                       ('magerr', '@magerr'),
                                       ('lim_mag', '@lim_mag')])
 
-    ymax = 1.1 * data['lim_mag']
-    ymin = 0.9 * data['lim_mag']
 
-    if len(data['obs']) > 0:
-        ymax[data['obs']] = (data['mag'] + data['magerr']) * 1.1
-        ymin[data['obs']] = (data['mag'] - data['magerr']) * 0.9
 
-    plot = figure(
-        plot_width=600,
-        plot_height=300,
-        active_drag='box_zoom',
-        tools='box_zoom,wheel_zoom,pan,reset',
-        y_range=(np.nanmax(ymax), np.nanmin(ymin))
-    )
 
     plot.add_tools(imhover)
     plot.add_tools(simplehover)
