@@ -314,7 +314,7 @@ def photometry_plot(source_id):
 
     callback = CustomJS(args={'slider': slider, 'toggle': toggle, **model_dict}, code="""
 
-         var binsize = slider.value
+         var binsize = slider.value;
          var fluxalph = ((binsize == 0) ? 1. : 0.1);
 
          for (var i = 0; i < toggle.labels.length; i++) {
@@ -363,23 +363,34 @@ def photometry_plot(source_id):
 
 
                      // calculate the flux, fluxerror, and mjd of the bin
-                     var fluxsum = 0.;
-                     var fluxvarsum = 0.;
-                     var nflux = 0;
-                     var mjdsum = 0.;
+                     var flux = [];
+                     var weight = [];
+                     var mjd = [];
+                     var ivarsum = 0;
 
                      for (var m = 0; m < fluxsource.get_length(); m++){
                          if ((fluxsource.data['mjd'][m] < mjdbins[l + 1]) && (fluxsource.data['mjd'][m] >= mjdbins[l])){
-                             nflux += 1;
-                             fluxsum += fluxsource.data['flux'][m];
-                             fluxvarsum += fluxsource.data['fluxerr'][m] * fluxsource.data['fluxerr'][m];
-                             mjdsum += fluxsource.data['mjd'][m];
+                         
+                             let fluxvar = fluxsource.data['fluxerr'][m] * fluxsource.data['fluxerr'][m];
+                             let ivar = 1 / fluxvar;
+                             
+                             weight.push(ivar);
+                             flux.push(fluxsource.data['flux'][m]);
+                             mjd.push(fluxsource.data['mjd'][m]);
+                             ivarsum += ivar;
                          }
                      }
+                     
 
-                     var mymjd = mjdsum / nflux;
-                     var myflux = fluxsum / nflux;
-                     var myfluxerr = Math.sqrt(fluxvarsum) / nflux;
+                     var myflux = 0;
+                     var mymjd = 0;
+                     
+                     for (var n = 0; n < weight.get_length(); n++){
+                         myflux += weight[n] * flux[n] / ivarsum;
+                         mymjd += weight[n] * mjd[n] / ivarsum;
+                     }
+                     
+                     var myfluxerr = Math.sqrt(1 / ivarsum);
 
                      binsource.data['mjd'].push(mymjd);
                      binsource.data['flux'].push(myflux);
@@ -410,6 +421,24 @@ def photometry_plot(source_id):
     p1 = Panel(child=layout, title='flux')
 
     # now make the mag light curve
+
+    imhover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
+                                  ('filter', '@filter'),
+                                  ('fluxerr', '@fluxerr'),
+                                  ('mag', '@mag'),
+                                  ('magerr', '@magerr'),
+                                  ('lim_mag', '@lim_mag'),
+                                  ('new_img', '<img src=../@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                  ('sub_img', '<img src=../@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
+    plot.add_tools(imhover)
+
+    # simpler tool tip for coadded light curve points
+    simplehover = HoverTool(tooltips=[('mjd', '@mjd'), ('flux', '@flux'),
+                                      ('filter', '@filter'),
+                                      ('fluxerr', '@fluxerr'),
+                                      ('mag', '@mag'),
+                                      ('magerr', '@magerr'),
+                                      ('lim_mag', '@lim_mag')])
 
     ymax = 1.1 * data['lim_mag']
     ymin = 0.9 * data['lim_mag']
