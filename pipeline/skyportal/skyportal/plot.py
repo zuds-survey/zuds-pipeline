@@ -385,7 +385,7 @@ def photometry_plot(source_id):
                      var myflux = 0;
                      var mymjd = 0;
                      
-                     for (var n = 0; n < weight.get_length(); n++){
+                     for (var n = 0; n < weight.length; n++){
                          myflux += weight[n] * flux[n] / ivarsum;
                          mymjd += weight[n] * mjd[n] / ivarsum;
                      }
