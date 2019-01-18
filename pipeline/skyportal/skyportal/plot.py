@@ -514,7 +514,9 @@ def photometry_plot(source_id):
             color='color',
             marker='circle',
             fill_color='color',
-            source=ColumnDataSource(data=pd.DataFrame(data=None, columns=df.columns))
+            source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[],
+                                              filter=[], color=[], lim_mag=[],
+                                              mag=[], magerr=[]))
         )
 
         simplehover.renderers.append(model_dict[key])
@@ -546,7 +548,9 @@ def photometry_plot(source_id):
             color='color',
             marker='inverted_triangle',
             fill_color='color',
-            source=ColumnDataSource(data=pd.DataFrame(data=None, columns=df.columns))
+            source=ColumnDataSource(data=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[],
+                                                                    filter=[], color=[], lim_mag=[],
+                                                                    mag=[], magerr=[])))
         )
 
         key = f'all{i}'
