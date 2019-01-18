@@ -593,7 +593,7 @@ def photometry_plot(source_id):
              var unobssource = eval("unobs" + i).data_source;
              var unobsbinsource = eval("unobsbin" + i).data_source;
              
-             var allsource = eval("all" + i).data_source;
+             var allsource = eval("all" + i);
              
              var minmjd = Math.min.apply(Math, fluxsource.data['mjd']);
 
