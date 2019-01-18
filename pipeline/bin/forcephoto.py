@@ -86,20 +86,13 @@ def force_photometry(sources, sub_list, send_stamps=True):
             corfunc = interp1d(xpix, apcor_mag, kind='linear')
             corunfunc = interp1d(xpix, apcor_unc_mag, kind='linear')
 
-            if d_aper_pix < 2. or d_aper_pix
+            if d_aper_pix >= 2. or d_aper_pix <= 14:
                 mycor = corfunc(d_aper_pix)[()]
-            except ValueError:
+            else:
                 mycor = 0.
-
-            try:
-                mycorunc = corunfunc(d_aper_pix)[()]
-            except ValueError:
-                mycorunc = 0.
 
             # convert to flux correction
             flux_aper_correction = 10**(-0.4 * mycor)
-            fluxerr_aper_correction =
-
 
         for source in sources:
 
@@ -111,11 +104,9 @@ def force_photometry(sources, sub_list, send_stamps=True):
             flux, fluxerr, flag = sep.sum_circle(image, x, y, r_aper_pix, err=rms)
 
             flux = flux[()] * flux_aper_correction
-            fluxerr = fluxerr[()] * fluxerr_aper_correction
+            fluxerr = fluxerr[()] * flux_aper_correction
 
             if flag == 0:
-
-
 
                 force_point = ForcedPhotometry(mjd=mjd, flux=flux, fluxerr=fluxerr,
                                                zp=zeropoint, lim_mag=maglim, filter=band,
