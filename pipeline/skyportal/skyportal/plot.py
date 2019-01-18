@@ -402,14 +402,14 @@ def photometry_plot(source_id):
                      
                      
                      if (myflux / myfluxerr > 5.){
-                         var mymag = -2.5 * np.log10(myflux) + 25;
+                         var mymag = -2.5 * Math.log10(myflux) + 25;
                          var mymagerr = Math.abs(-2.5 * myfluxerr  / myflux / Math.log(10));
                      } else {
                          var mymag = null;
                          var mymagerr = null;
                      }
                      
-                     var mymaglim = -2.5 * np.log10(5 * myfluxerr) + 25;   
+                     var mymaglim = -2.5 * Math.log10(5 * myfluxerr) + 25;   
 
                      binsource.data['mjd'].push(mymjd);
                      binsource.data['flux'].push(myflux);
