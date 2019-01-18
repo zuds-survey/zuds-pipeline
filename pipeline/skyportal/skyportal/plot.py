@@ -704,7 +704,11 @@ def photometry_plot(source_id):
 
                      }
                      
-                     var mymaglim = -2.5 * Math.log10(5 * myfluxerr) + 25;   
+                     if (weight.length > 1) {
+                         var mymaglim = -2.5 * Math.log10(5 * myfluxerr) + 25;
+                     } else {
+                         var mymaglim = limmag[0];
+                     }   
                      
                      mysource.data['mjd'].push(mymjd);
                      mysource.data['flux'].push(myflux);
