@@ -514,7 +514,7 @@ def photometry_plot(source_id):
             color='color',
             marker='circle',
             fill_color='color',
-            source=ColumnDataSource(data=pd.DataFrame(data=None, dtype=df.dtypes))
+            source=ColumnDataSource(data=pd.DataFrame(data=None, columns=df.columns))
         )
 
         simplehover.renderers.append(model_dict[key])
