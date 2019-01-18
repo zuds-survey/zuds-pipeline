@@ -304,7 +304,7 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND (FIELD=847 AND CCDID=2 AND QID=3)'% (left, right),
+            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND (FIELD=643 AND CCDID=3 AND QID=2)'% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -739,6 +739,7 @@ class IPACQueryManager(object):
         inds = []
         olist = old_npaths.tolist()
         for path in new_npaths:
+
             index = olist.index(path)
             inds.append(index)
         return metatable.iloc[inds]
