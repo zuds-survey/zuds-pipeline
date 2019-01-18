@@ -336,6 +336,9 @@ def photometry_plot(source_id):
              binsource.data['fluxerr'] = [];
              binsource.data['filter'] = [];
              binsource.data['color'] = [];
+             binsource.data['maglim'] = [];
+             binsource.data['mag'] = [];
+             binsource.data['magerr'] = [];
 
              binerrsource.data['xs'] = [];
              binerrsource.data['ys'] = [];
@@ -366,6 +369,7 @@ def photometry_plot(source_id):
                      var flux = [];
                      var weight = [];
                      var mjd = [];
+                     var limmag = [];
                      var ivarsum = 0;
 
                      for (var m = 0; m < fluxsource.get_length(); m++){
@@ -377,12 +381,11 @@ def photometry_plot(source_id):
                              weight.push(ivar);
                              flux.push(fluxsource.data['flux'][m]);
                              mjd.push(fluxsource.data['mjd'][m]);
+                             limmag.push(fluxsource.data['lim_mag']);
                              ivarsum += ivar;
                          }
                      }
                      
-                     
-
                      var myflux = 0;
                      var mymjd = 0;
                      
@@ -396,12 +399,26 @@ def photometry_plot(source_id):
                      }
                      
                      var myfluxerr = Math.sqrt(1 / ivarsum);
+                     
+                     
+                     if (myflux / myfluxerr > 5.){
+                         var mymag = -2.5 * np.log10(myflux) + 25;
+                         var mymagerr = Math.abs(-2.5 * myfluxerr  / myflux / Math.log(10));
+                     } else {
+                         var mymag = null;
+                         var mymagerr = null;
+                     }
+                     
+                     var mymaglim = -2.5 * np.log10(5 * myfluxerr) + 25;   
 
                      binsource.data['mjd'].push(mymjd);
                      binsource.data['flux'].push(myflux);
                      binsource.data['fluxerr'].push(myfluxerr);
                      binsource.data['filter'].push(fluxsource.data['filter'][0]);
                      binsource.data['color'].push(fluxsource.data['color'][0]);
+                     binsource.data['mag'].push(mymag);
+                     binsource.data['magerr'].push(mymagerr);
+                     binsource.data['lim_mag'].push(mymaglim);
 
                      binerrsource.data['xs'].push([mymjd, mymjd]);
                      binerrsource.data['ys'].push([myflux - myfluxerr, myflux + myfluxerr]);
