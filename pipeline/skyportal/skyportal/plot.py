@@ -621,6 +621,11 @@ def photometry_plot(source_id):
              unobsbinsource.data['mjd'] = [];
              unobsbinsource.data['lim_mag'] = [];
              unobsbinsource.data['color'] = [];
+             unobsbinsource.data['flux'] = [];
+             unobsbinsource.data['fluxerr'] = [];
+             unobsbinsource.data['mag'] = [];
+             unobsbinsource.data['magerr'] = [];
+             unobsbinsource.data['filter'] = [];
 
              for (var j = 0; j < fluxsource.get_length(); j++){
                  fluxsource.data['alpha'][j] = fluxalph;
