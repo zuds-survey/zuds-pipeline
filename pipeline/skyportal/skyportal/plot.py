@@ -548,9 +548,9 @@ def photometry_plot(source_id):
             color='color',
             marker='inverted_triangle',
             fill_color='color',
-            source=ColumnDataSource(data=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[],
-                                                                    filter=[], color=[], lim_mag=[],
-                                                                    mag=[], magerr=[])))
+            source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[],
+                                              filter=[], color=[], lim_mag=[],
+                                              mag=[], magerr=[]))
         )
 
         key = f'all{i}'
