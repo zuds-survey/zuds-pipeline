@@ -336,7 +336,7 @@ def photometry_plot(source_id):
              binsource.data['fluxerr'] = [];
              binsource.data['filter'] = [];
              binsource.data['color'] = [];
-             binsource.data['maglim'] = [];
+             binsource.data['lim_mag'] = [];
              binsource.data['mag'] = [];
              binsource.data['magerr'] = [];
 
