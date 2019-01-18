@@ -668,7 +668,7 @@ def photometry_plot(source_id):
                              weight.push(ivar);
                              flux.push(allsource.data['flux'][m]);
                              mjd.push(allsource.data['mjd'][m]);
-                             limmag.push(allsource.data['lim_mag']);
+                             limmag.push(allsource.data['lim_mag'][m]);
                              ivarsum += ivar;
                          }
                      }
