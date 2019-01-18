@@ -709,8 +709,8 @@ def photometry_plot(source_id):
                      mysource.data['mjd'].push(mymjd);
                      mysource.data['flux'].push(myflux);
                      mysource.data['fluxerr'].push(myfluxerr);
-                     mysource.data['filter'].push(fluxsource.data['filter'][0]);
-                     mysource.data['color'].push(fluxsource.data['color'][0]);
+                     mysource.data['filter'].push(allsource.data['filter'][0]);
+                     mysource.data['color'].push(allsource.data['color'][0]);
                      mysource.data['mag'].push(mymag);
                      mysource.data['magerr'].push(mymagerr);
                      mysource.data['lim_mag'].push(mymaglim);
@@ -727,6 +727,9 @@ def photometry_plot(source_id):
              
              unobssource.change.emit();
              unobsbinsource.change.emit();
+             
+             makebug 
+             
          }
 
     """)
