@@ -182,9 +182,9 @@ def photometry_plot(source_id):
         thumbs = object.forcethumbs
         for thumb in thumbs:
             if thumb.type == 'sub':
-                ro['sub_img'] = thumb.file_uri
+                ro['sub_img'] = thumb.public_url
             elif thumb.type == 'new':
-                ro['new_img'] = thumb.file_uri
+                ro['new_img'] = thumb.public_url
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
     data['label'] = [f'{t} {f}-band'
@@ -228,8 +228,8 @@ def photometry_plot(source_id):
                                   ('mag', '@mag'),
                                   ('magerr', '@magerr'),
                                   ('lim_mag', '@lim_mag'),
-                                  ('new_img', '<img src=../@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
-                                  ('sub_img', '<img src=../@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
+                                  ('new_img', '<img src=@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                  ('sub_img', '<img src=@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
     plot.add_tools(imhover)
 
     # simpler tool tip for coadded light curve points
