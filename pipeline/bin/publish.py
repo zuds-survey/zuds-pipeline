@@ -52,6 +52,7 @@ def make_stamp(name, ra, dec, vmin, vmax, data, wcs):
     coord = SkyCoord(ra, dec, frame='icrs', unit='deg')
     cutout = Cutout2D(data, coord, CUTOUT_SIZE, wcs=wcs, fill_value=0.)
     plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax, cmap='gray')
+    os.chmod(name, 0o774)
 
 
 def load_catalog(catpath, refpath, newpath, subpath):
