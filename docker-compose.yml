@@ -13,6 +13,9 @@ services:
         - "nersc-job-submission-service"
     stdin_open: true
     tty: true
+    volumes:
+        - ./:/poll
+    command: ['bash', '/poll/poll.py']
 
   nersc-queue-monitor-service:
     build: ./queuemon
