@@ -14,7 +14,7 @@ from liblg import nersc_authenticate
 
 # some constants
 cwd = os.path.dirname(__file__)
-slurmd = os.path.join(cwd, '../', 'slurm')
+slurmd = '/slurm'
 mkcoadd_cori = os.path.join(slurmd, 'makecoadd_cori.sh')
 mksub_cori = os.path.join(slurmd, 'makesub_cori.sh')
 mkvar_cori = os.path.join(slurmd, 'makevariance_cori.sh')
