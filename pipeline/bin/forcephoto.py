@@ -380,8 +380,8 @@ def force_photometry(sources, sub_list):
                                    public_url=os.path.join('http://portal.nersc.gov/project/astro250/', name))
                 thumbs.append(thumb)
 
-    DBSession().add_all(thumbs)
     DBSession().add_all(points)
+    DBSession().add_all(thumbs)
     DBSession().commit()
 
 
