@@ -321,9 +321,11 @@ class ZTFphot(object):
 def force_photometry(sources, sub_list):
 
     instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
-    thumbs = []
-    points = []
+
     for im in sub_list:
+
+        thumbs = []
+        points = []
 
         with fits.open(im) as hdulist:
             hdu = hdulist[1]
@@ -362,6 +364,10 @@ def force_photometry(sources, sub_list):
 
             points.append(force_point)
 
+        DBSession().add_all(points)
+        DBSession().commit()
+
+        for source, force_point in zip(sources, points):
             for key in ['sub', 'new']:
                 name = f'/stamps/{uuid4().hex}.force.{key}.png'
                 if key == 'new':
@@ -376,14 +382,12 @@ def force_photometry(sources, sub_list):
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image,
                                wcs)
 
-                thumb = ForceThumb(source=source, forcedphotometry=force_point,
+                thumb = ForceThumb(source=source, forcedphotometry_id=force_point.id,
                                    public_url=os.path.join('http://portal.nersc.gov/project/astro250/', name))
                 thumbs.append(thumb)
-
-    DBSession().add_all(points)
-    DBSession().commit()
-    DBSession().add_all(thumbs)
-    DBSession().commit()
+                
+        DBSession().add_all(thumbs)
+        DBSession().commit()
 
 
 if __name__ == '__main__':
