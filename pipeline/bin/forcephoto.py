@@ -14,6 +14,7 @@ from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb
 from photutils import CircularAnnulus
 from image_registration import chi2_shift_iterzoom
 from scipy import ndimage
+from uuid import uuid4
 
 
 APER_RAD_FRAC_SEEING_FWHM = 0.6731
@@ -22,6 +23,7 @@ DB_FTP_ENDPOINT = os.getenv('DB_FTP_ENDPOINT')
 DB_FTP_USERNAME = 'root'
 DB_FTP_PASSWORD = 'root'
 DB_FTP_PORT = 222
+
 
 
 # split an iterable over some processes recursively
@@ -320,7 +322,7 @@ def force_photometry(sources, sub_list):
 
     instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
     thumbs = []
-
+    points = []
     for im in sub_list:
 
         with fits.open(im) as hdulist:
@@ -358,11 +360,10 @@ def force_photometry(sources, sub_list):
                                            source=source, instrument=instrument,
                                            ra=ra, dec=dec)
 
-            DBSession().add(force_point)
-            DBSession().commit()
+            points.append(force_point)
 
             for key in ['sub', 'new']:
-                name = f'/stamps/{force_point.id}.force.{key}.png'
+                name = f'/stamps/{uuid4().hex}.force.{key}.png'
                 if key == 'new':
                     with fits.open(im.replace('scimrefdiffimg.fits.fz', 'sciimg.fits')) as hdul:
                         newimage = hdul[0].data
@@ -375,11 +376,12 @@ def force_photometry(sources, sub_list):
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image,
                                wcs)
 
-                thumb = ForceThumb(source=source, forcedphotometry_id=force_point.id,
+                thumb = ForceThumb(source=source, forcedphotometry=force_point,
                                    public_url=os.path.join('http://portal.nersc.gov/project/astro250/', name))
                 thumbs.append(thumb)
 
     DBSession().add_all(thumbs)
+    DBSession().add_all(points)
     DBSession().commit()
 
 

@@ -808,7 +808,7 @@ class IPACQueryManager(object):
 
 if __name__ == '__main__':
 
-    schema = yaml.load(open(sys.argv[1], 'r'))
+    schema = yaml.load(open(sys.argv[-1], 'r'))
     schema['schema_id'] = 1
 
     logger = logging.getLogger('poll')

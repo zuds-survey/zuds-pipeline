@@ -15,7 +15,7 @@ services:
     tty: true
     volumes:
         - ./imcheck:/poll
-    command: ['bash', '/poll.py', '/poll/plan']
+    command: ['bash', '/poll.py', '/poll/plan.yaml']
 
   nersc-queue-monitor-service:
     build: ./queuemon
