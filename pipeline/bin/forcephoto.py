@@ -381,6 +381,7 @@ def force_photometry(sources, sub_list):
                 thumbs.append(thumb)
 
     DBSession().add_all(points)
+    DBSession().commit()
     DBSession().add_all(thumbs)
     DBSession().commit()
 
