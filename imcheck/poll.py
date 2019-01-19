@@ -10,6 +10,7 @@ import json
 import paramiko
 import threading
 import random
+import yaml
 
 
 import numpy as np
@@ -304,7 +305,8 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND (FIELD=678 AND CCDID=6 AND QID=4)'% (left, right),
+            zquery.load_metadata(sql_query=f' NID BETWEEN %d AND %d AND '
+                                           f'({self.pipeline_schema["sql"]})'% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -806,28 +808,14 @@ class IPACQueryManager(object):
 
 if __name__ == '__main__':
 
-    glsn_schema = {'template_minimages': 100, 'template_science_minsep_days': 10,
-                   'scicoadd_window_size': 10, 'rolling':False, 'schema_id': 1}
-
-    schemas = [glsn_schema]
+    schema = yaml.load(open(sys.argv[1], 'r'))
+    schema['schema_id'] = 1
 
     logger = logging.getLogger('poll')
     logger.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
     logger.addHandler(ch)
 
-    for s in schemas:
-        manager = IPACQueryManager(s, logger)
-        manager()
+    manager = IPACQueryManager(schema, logger)
+    manager()
 
-
-    """
-        schedule.every().day.at("06:00").do(manager)
-
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(600.)  # check every 10 minutes whether to run the job
-    except KeyboardInterrupt:
-        pass
-    """

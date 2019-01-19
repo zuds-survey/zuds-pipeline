@@ -14,8 +14,8 @@ services:
     stdin_open: true
     tty: true
     volumes:
-        - ./:/poll
-    command: ['bash', '/poll/poll.py']
+        - ./imcheck:/poll
+    command: ['bash', '/poll.py', '/poll/plan']
 
   nersc-queue-monitor-service:
     build: ./queuemon
