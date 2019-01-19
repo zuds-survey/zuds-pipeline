@@ -332,7 +332,7 @@ ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
 
 
 
-ENV PYTHONPATH $PYTHONPATH:/skyportal
+ENV PYTHONPATH $PYTHONPATH:/skyportal:/pipeline/bin
 
 ENV DB_FTP_ENDPOINT ***REMOVED***
 ENV DB_FTP_DIR /scratch/danny/stamps
@@ -347,7 +347,7 @@ ADD astromatic /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
-RUN pip install sep sncosmo
+RUN pip install sncosmo image_registration
 
 
 ENTRYPOINT ["/bin/bash", "-c"]
