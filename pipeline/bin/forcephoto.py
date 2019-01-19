@@ -29,25 +29,6 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
-def post_stamps(stamps, pointids):
-
-    thumbs = []
-    with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
-        transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
-        with paramiko.SFTPClient.from_transport(transport) as sftp:
-            for triplet, photpointid in zip(stamps, pointids):
-                for f in triplet:
-                    remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
-                    sftp.put(f, remotename)
-                    uri = f'static/thumbnails/{os.path.basename(f)}'
-                    thumb = ForceThumb(type=f.split('.')[-2],
-                                       file_uri=uri, public_url='/' + uri,
-                                       forcedphotometry_id=photpointid)
-                    thumbs.append(thumb)
-    DBSession().add_all(thumbs)
-    DBSession().commit()
-
-
 def mylinear_fit(x, y, yerr, npar=2):
     '''
     Ref:
@@ -335,12 +316,10 @@ class ZTFphot(object):
         self.yerrs = _yerr
 
 
-def force_photometry(sources, sub_list, send_stamps=True):
+def force_photometry(sources, sub_list):
 
     instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
-
-    stamps = []
-    points = []
+    thumbs = []
 
     for im in sub_list:
 
@@ -382,7 +361,6 @@ def force_photometry(sources, sub_list, send_stamps=True):
             DBSession().add(force_point)
             DBSession().commit()
 
-            mystamps = []
             for key in ['sub', 'new']:
                 name = f'/stamps/{force_point.id}.force.{key}.png'
                 if key == 'new':
@@ -396,15 +374,13 @@ def force_photometry(sources, sub_list, send_stamps=True):
                 else:
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image,
                                wcs)
-                mystamps.append(name)
 
-            stamps.append(mystamps)
-            points.append(force_point.id)
+                thumb = ForceThumb(source=source, forcedphotometry_id=force_point.id,
+                                   public_url=os.path.join('http://portal.nersc.gov/project/astro250/', name))
+                thumbs.append(thumb)
 
-    if send_stamps:
-        post_stamps(stamps, points)
-    else:
-        return stamps, points
+    DBSession().add_all(thumbs)
+    DBSession().commit()
 
 
 if __name__ == '__main__':
@@ -439,17 +415,4 @@ if __name__ == '__main__':
 
             sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
 
-            stamps, points = force_photometry(sources, [sub], send_stamps=False)
-
-            allstamps.extend(stamps)
-            allpoints.extend(points)
-
-    stamps = comm.gather(allstamps, root=0)
-    points = comm.gather(allpoints, root=0)
-
-    if rank == 0:
-        stamps = list(chain(*stamps))
-        points = list(chain(*points))
-
-        # send them
-        post_stamps(stamps, points)
+            force_photometry(sources, [sub])

@@ -157,7 +157,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
             else:
                 result = [a[0] for a in DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
                                                                        'id': point.id}).fetchall()]
-                if len(result) > 3:
+                if len(result) > 2:
                     # create a new source
                     points = list(DBSession().query(Photometry).filter(Photometry.id.in_(result)).all())
                     points = points + [point]
