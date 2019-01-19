@@ -376,8 +376,10 @@ class IPACQueryManager(object):
                                for ipath, npath in zip(ipc, npc)]
             mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
             sub_download_script = [p.replace('sciimg.fits', 'scimrefdiffimg.fits.fz') for p in download_script]
+            subpsf_download_script = [p.replace('sciimg.fits', 'diffimgpsf.fits') for p in download_script]
             download_script.extend(mask_download_script)
             download_script.extend(sub_download_script)
+            download_script.extend(subpsf_download_script)
             random.shuffle(download_script)
 
             print(len(download_script))
