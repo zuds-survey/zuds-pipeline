@@ -288,7 +288,7 @@ class ForceThumb(Base):
     file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     forcedphotometry_id = sa.Column(sa.ForeignKey('forcedphotometry.id', ondelete='CASCADE'),
-                              nullable=False, index=True)
+                                    nullable=False, index=True)
     forcedphotometry = relationship('ForcedPhotometry', back_populates='forcethumbs', cascade='all')
     source = relationship('Source', back_populates='forcethumbs', uselist=False,
                           secondary='forcedphotometry', cascade='all')
