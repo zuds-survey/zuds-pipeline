@@ -163,7 +163,7 @@ def photometry_plot(source_id):
     (str, str)
         Returns (docs_json, render_items) json for the desired plot.
     """
-    color_map = {'ipr': 'yellow', 'rpr': 'red', 'g': 'green', 'r': 'red', 'i': 'yellow'}
+    color_map = {'ipr': 'yellow', 'rpr': 'red', 'g': 'green', 'r': 'red', 'i': 'orange'}
 
     qobj = DBSession().query(ForcedPhotometry, Telescope.nickname.label('telescope')) \
         .join(Instrument).join(Telescope) \
