@@ -228,8 +228,8 @@ def photometry_plot(source_id):
                                   ('mag', '@mag'),
                                   ('magerr', '@magerr'),
                                   ('lim_mag', '@lim_mag'),
-                                  ('new_img', '<img src=@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
-                                  ('sub_img', '<img src=@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
+                                  ('new_img', '<img src=@new_img height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                  ('sub_img', '<img src=@sub_img height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
     plot.add_tools(imhover)
 
     # simpler tool tip for coadded light curve points
