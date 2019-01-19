@@ -177,14 +177,14 @@ def photometry_plot(source_id):
     data['sub_img'] = None
 
     objects = qobj.all()
-    for object, (_, row) in zip(objects, data.iterrows()):
+    for object, (_, ro) in zip(objects, data.iterrows()):
         object = object[0]
         thumbs = object.forcethumbs
         for thumb in thumbs:
             if thumb.type == 'sub':
-                row['sub_img'] = thumb.file_uri
+                ro['sub_img'] = thumb.file_uri
             elif thumb.type == 'new':
-                row['new_img'] = thumb.file_uri
+                ro['new_img'] = thumb.file_uri
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
     data['label'] = [f'{t} {f}-band'
