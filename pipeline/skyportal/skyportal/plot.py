@@ -173,23 +173,23 @@ def photometry_plot(source_id):
     if data.empty:
         return None, None, None
 
+    data['new_img'] = None
+    data['sub_img'] = None
+
     objects = qobj.all()
-    news = []; subs = []
-    for object in objects:
+    for object, (_, row) in zip(objects, data.iterrows()):
         object = object[0]
         thumbs = object.forcethumbs
         for thumb in thumbs:
             if thumb.type == 'sub':
-                subs.append(thumb.file_uri)
+                row['sub_img'] = thumb.file_uri
             elif thumb.type == 'new':
-                news.append(thumb.file_uri)
+                row['new_img'] = thumb.file_uri
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
     data['label'] = [f'{t} {f}-band'
                      for t, f in zip(data['telescope'], data['filter'])]
 
-    data['new_img'] = news
-    data['sub_img'] = subs
 
     data['filter'] = ['ztf' + f for f in data['filter']]
 

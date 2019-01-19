@@ -399,14 +399,14 @@ class IPACQueryManager(object):
         ncookies = nersc_authenticate()
         target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
         r = requests.get(target, cookies=ncookies)
-        return list(filter(lambda s: 'msk' not in s and 'scimref' not in s,
+        return list(filter(lambda s: 'sciimg' in s,
                            r.content.decode('utf-8').strip().split('\n')))
 
     def read_sub_manifest(self):
         ncookies = nersc_authenticate()
         target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
         r = requests.get(target, cookies=ncookies)
-        return list(filter(lambda s: 'msk' not in s and 'sciimg' not in s,
+        return list(filter(lambda s: 'scimrefdiffimg' in s,
                            r.content.decode('utf-8').strip().split('\n')))
 
     def update_database_with_new_images(self, npaths, metatable):
@@ -767,8 +767,8 @@ class IPACQueryManager(object):
         if len(npaths) > 0:
             # download the images
             self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            self.reset_manifest()
-            self.download_images(npaths, ipaths)
+            #self.reset_manifest()
+            #self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
             sub_npaths = self.read_sub_manifest()
