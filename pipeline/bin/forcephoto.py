@@ -382,8 +382,7 @@ def force_photometry(sources, sub_list):
                     make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image,
                                wcs)
 
-                thumb = ForceThumb(type=key, source=source, forcedphotometry_id=force_point.id,
-                                   file_uri=None,
+                thumb = ForceThumb(type=key, forcedphotometry_id=force_point.id, file_uri=None,
                                    public_url='http://portal.nersc.gov/project/astro250'+ name)
                 thumbs.append(thumb)
 
