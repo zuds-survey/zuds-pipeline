@@ -15,7 +15,8 @@ services:
     tty: true
     volumes:
         - ./imcheck:/poll
-    command: ['bash', '/poll.py', '/poll/plan.yaml']
+    command: ['ipython', '/poll.py', '/poll/plan.yaml']
+
 
   nersc-queue-monitor-service:
     build: ./queuemon
@@ -36,6 +37,7 @@ services:
     volumes:
         - ./pipeline/msgconsumer:/daemon
         - ./pipeline:/pipeline
+        - ./pipeline/slurm:/slurm 
 
   db:
     build: ./q3cpsql
