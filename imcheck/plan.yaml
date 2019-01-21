@@ -2,4 +2,4 @@ template_minimages: 40
 template_science_minsep_days: 0
 scicoadd_window_size: 10
 rolling: false
-sql: (FIELD=847 AND CCDID=2 AND QID=3)
+sql: FIELD=792
