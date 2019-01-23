@@ -13,7 +13,7 @@ database:
     host: ***REMOVED***
     port: 7777
     user: skyportal
-    password:
+    password: ***REMOVED***
 
 server:
     # From https://console.developers.google.com/
