@@ -371,12 +371,18 @@ if __name__ == '__main__':
     channel.basic_qos(prefetch_count=1)
 
     # try to connect
-    while True:
-        try:
-            channel.basic_consume(handler, queue='jobs')
-        except pika.exceptions.ChannelClosed:
-            pass
-        else:
-            break
 
-    channel.start_consuming()
+    while True:
+        while True:
+            try:
+                channel.basic_consume(handler, queue='jobs')
+            except pika.exceptions.ChannelClosed:
+                pass
+            else:
+                break
+
+        try:
+            channel.start_consuming()
+        except pika.exceptions.ConnectionClosed:
+            continue
+
