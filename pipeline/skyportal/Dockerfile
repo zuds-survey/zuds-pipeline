@@ -43,7 +43,7 @@ RUN bash -c "\
     cd / && git clone https://github.com/dannygoldstein/sncosmo.git && \
     cd sncosmo && python setup.py install && cd - && rm -rf sncosmo"
 
-EXPOSE 5000 5001 22
+EXPOSE 5000 5001
 
 CMD bash -c "source /skyportal_env/bin/activate && \
              (make log &) && \
