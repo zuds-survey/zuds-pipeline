@@ -15,7 +15,7 @@ services:
     tty: true
     volumes:
         - ./imcheck:/poll
-    command: ['ipython', '/poll/poll.py', '/poll/plan.yaml']
+    entrypoint: ['python', '/poll/poll.py', '/poll/plan.yaml']
 
 
   nersc-queue-monitor-service:
