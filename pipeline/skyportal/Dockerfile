@@ -38,11 +38,6 @@ RUN bash -c "\
     \
     cp docker.yaml config.yaml"
 
-RUN mkdir -p static/thumbnails /var/run/sshd /run/sshd /root/.ssh && \
-    echo 'root:root' |chpasswd && \
-    sed -ri 's/^#?PermitRootLogin\s+.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -ri 's/UsePAM yes/#UsePAM yes/g' /etc/ssh/sshd_config
-
 RUN bash -c "\
     source /skyportal_env/bin/activate && \
     cd / && git clone https://github.com/dannygoldstein/sncosmo.git && \

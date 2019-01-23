@@ -15,11 +15,6 @@ file=run/supervisor.sock
 username = dummy
 password = dummy
 
-[program:sshd]
-command=/usr/sbin/sshd -D
-stdout_logfile=log/sshd.log
-redirect_stderr=true
-
 [rpcinterface:supervisor]
 supervisor.rpcinterface_factory = supervisor.rpcinterface:make_main_rpcinterface
 
