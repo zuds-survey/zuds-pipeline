@@ -127,16 +127,6 @@ def load_catalog(catpath, refpath, newpath, subpath):
                 stamps[f'{key}file'] = name
             triplets.append(stamps)
 
-    with status("Uploading stamps"):
-
-        with paramiko.Transport((DB_FTP_ENDPOINT, DB_FTP_PORT)) as transport:
-            transport.connect(username=DB_FTP_USERNAME, password=DB_FTP_PASSWORD)
-            with paramiko.SFTPClient.from_transport(transport) as sftp:
-                for triplet, photpoint in zip(triplets, photpoints):
-                    for key in triplet:
-                        f = triplet[key]
-                        remotename = os.path.join(DB_FTP_DIR, os.path.basename(f))
-                        sftp.put(f, remotename)
 
 
     with status('Grouping detections into sources'):
@@ -180,8 +170,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
                     for t in ['ref', 'new', 'sub']:
                         thumb = Thumbnail(type=t, photometry_id=firstpoint.id,
-                                          file_uri=f'static/thumbnails/{firstpoint.id}.{t}.png',
-                                          public_url=f'/static/thumbnails/{firstpoint.id}.{t}.png')
+                                          public_url=f'http://portal.nersc.gov/project/astro250/stamps/{firstpoint.id}.{t}.png')
                         DBSession().add(thumb)
 
                     s.add_linked_thumbnails()
