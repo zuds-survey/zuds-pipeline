@@ -385,6 +385,7 @@ class SDSSObject(Base):
     Mg = sa.Column(sa.Float)
     Mr = sa.Column(sa.Float)
 
+    @property
     def g_minus_r(self):
         return self.Mg - self.Mr
 
@@ -472,5 +473,5 @@ class RongpuObject(Base):
         with fits.open(fitsfile) as hdul:
             data = hdul[1].data
             for row in data:
-                result.append(cls(*[v.val() for v in row]))
+                result.append(cls(*[v.item() for v in row]))
         return result
