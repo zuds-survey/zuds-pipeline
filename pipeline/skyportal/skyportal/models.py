@@ -3,6 +3,8 @@ import re
 import requests
 import numpy as np
 
+from astropy.io import fits
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.orm import backref, relationship
@@ -356,6 +358,11 @@ class CFHTObject(Base):
     My = sa.Column(sa.Float)
     Mz = sa.Column(sa.Float)
 
+    @property
+    def redshift(self):
+        return self.pz_final
+
+
     @classmethod
     def load_from_table(cls, path_to_ascii):
         array = np.genfromtxt(path_to_ascii, dtype=None, encoding='ascii').tolist()
@@ -384,4 +391,86 @@ class SDSSObject(Base):
     def distmod(self, cosmo):
         return cosmo.distmod(self.z)
 
+    @property
+    def redshift(self):
+        return self.z
+
     load_from_table = CFHTObject.load_from_table
+
+
+class RongpuObject(Base):
+
+    """Photo z's from Rongpu and Jeff """
+
+    type = sa.Column(sa.String)
+    ra = sa.Column(sa.Float)
+    dec = sa.Column(sa.Float)
+    dchisq = sa.Column(NumpyArray)
+    ebv = sa.Column(sa.Float)
+    flux_g = sa.Column(sa.Float)
+    flux_r = sa.Column(sa.Float)
+    flux_z = sa.Column(sa.Float)
+    flux_w1 = sa.Column(sa.Float)
+    flux_w2 = sa.Column(sa.Float)
+    flux_ivar_g = sa.Column(sa.Float)
+    flux_ivar_r = sa.Column(sa.Float)
+    flux_ivar_z = sa.Column(sa.Float)
+    flux_ivar_w1 = sa.Column(sa.Float)
+    flux_ivar_w2 = sa.Column(sa.Float)
+    nobs_g = sa.Column(sa.Integer)
+    nobs_r = sa.Column(sa.Integer)
+    nobs_z = sa.Column(sa.Integer)
+    fracflux_g = sa.Column(sa.Float)
+    fracflux_r = sa.Column(sa.Float)
+    fracflux_z = sa.Column(sa.Float)
+    fracflux_w1 = sa.Column(sa.Float)
+    fracflux_w2 = sa.Column(sa.Float)
+    fracmasked_g = sa.Column(sa.Float)
+    fracmasked_r = sa.Column(sa.Float)
+    fracmasked_z = sa.Column(sa.Float)
+    psfsize_g = sa.Column(sa.Float)
+    psfsize_r = sa.Column(sa.Float)
+    psfsize_z = sa.Column(sa.Float)
+    psfdepth_g = sa.Column(sa.Float)
+    psfdepth_r = sa.Column(sa.Float)
+    psfdepth_z = sa.Column(sa.Float)
+    galdepth_g = sa.Column(sa.Float)
+    galdepth_r = sa.Column(sa.Float)
+    galdepth_z = sa.Column(sa.Float)
+    fracdev = sa.Column(sa.Float)
+    shapedev_r = sa.Column(sa.Float)
+    shapedev_e1 = sa.Column(sa.Float)
+    shapedev_e2 = sa.Column(sa.Float)
+    shapeexp_r = sa.Column(sa.Float)
+    shapeexp_e1 = sa.Column(sa.Float)
+    shapeexp_e2 = sa.Column(sa.Float)
+    allmask = sa.Column(sa.Integer)
+    anymask = sa.Column(sa.Integer)
+    z_phot = sa.Column(sa.Float)
+    z_phot_err = sa.Column(sa.Float)
+    z_spec = sa.Column(sa.Float)
+    survey = sa.Column(sa.String)
+    training = sa.Column(sa.Integer)
+    w1_source = sa.Column(sa.Float)
+    d2d_source = sa.Column(sa.Float)
+    circ_flag = sa.Column(sa.Integer)
+    ds_flag = sa.Column(sa.Integer)
+    wisemask = sa.Column(sa.Integer)
+    gmag = sa.Column(sa.Float)
+    rmag = sa.Column(sa.Float)
+    zmag = sa.Column(sa.Float)
+    w1mag = sa.Column(sa.Float)
+    w2mag = sa.Column(sa.Float)
+
+    @property
+    def redshift(self):
+        return self.z_phot
+
+    @classmethod
+    def load_from_table(cls, fitsfile):
+        result = []
+        with fits.open(fitsfile) as hdul:
+            data = hdul[1].data
+            for row in data:
+                result.append(cls(*[v.val() for v in row]))
+        return result
