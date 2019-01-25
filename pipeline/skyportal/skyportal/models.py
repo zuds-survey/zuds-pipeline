@@ -366,14 +366,22 @@ class CFHTObject(Base):
         return result
 
 
+class SDSSObject(Base):
 
+    "Stars, galaxies"
 
+    sdss_id = sa.Column(sa.Integer)
+    z = sa.Column(sa.Float)
+    zerr = sa.Column(sa.Float)
+    ra = sa.Column(sa.Float)
+    dec = sa.Column(sa.Float)
+    Mg = sa.Column(sa.Float)
+    Mr = sa.Column(sa.Float)
 
+    def g_minus_r(self):
+        return self.Mg - self.Mr
 
+    def distmod(self, cosmo):
+        return cosmo.distmod(self.z)
 
-
-
-
-
-
-
+    load_from_table = CFHTObject.load_from_table
