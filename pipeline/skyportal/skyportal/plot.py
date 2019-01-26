@@ -11,6 +11,7 @@ from bokeh.palettes import viridis
 from bokeh.plotting import figure, ColumnDataSource
 from bokeh.util.compiler import bundle_all_models
 from bokeh.util.serialization import make_id
+from bokeh.models.widgets import Toggle
 
 from sncosmo.photdata import PhotometricData
 from astropy.table import Table
@@ -289,6 +290,11 @@ def photometry_plot(source_id):
         model_dict[key] = plot.multi_line(xs='xs', ys='ys', color='color',
                                           source=ColumnDataSource(data=dict(xs=[], ys=[], color=[])))
 
+
+        key = f'fit{i}'
+        model_dict[key] = plot.line(x='time', y='flux', color='color',
+                                    source=ColumnDataSource(data=dict(time=[], flux=[], color=[])))
+
     plot.xaxis.axis_label = 'MJD'
     plot.yaxis.axis_label = 'Flux (AB Zeropoint = 25.)'
     plot.toolbar.logo = None
@@ -307,6 +313,7 @@ def photometry_plot(source_id):
             eval("obserr" + i).visible = (toggle.active.includes(i));
             eval("bin" + i).visible = (toggle.active.includes(i));
             eval("binerr" + i).visible = (toggle.active.includes(i));
+            eval("fit" + i).visible = (toggle.active.includes(i));
         }
     """)
 
@@ -437,8 +444,60 @@ def photometry_plot(source_id):
     """)
     slider.js_on_change('value', callback)
 
+    button = Toggle(label="Plot GN17 Fit")
+
+    buttonhandler = CustomJS(args={'button': button, 'source_id': source_id, **model_dict},
+                             code="""
+    
+    if (button.active){
+    
+        var xmlhttp = new XMLHttpRequest();
+
+        xmlhttp.onreadystatechange = function() {
+            if (xmlhttp.readyState == XMLHttpRequest.DONE) {   // XMLHttpRequest.DONE == 4
+               if (xmlhttp.status == 200) {
+                   var response = xmlhttp.response["json"];
+                   for (var i = 0; i < toggle.labels.length; i++){
+                       var source = eval("fit" + i).data_source;
+                       source.data['time'] = response['time'];
+                       source.data['flux'] = response['flux'];
+                       source.data['color'] = response['color'];
+                       source.change.emit();  
+                   }
+               }
+               else if (xmlhttp.status == 400) {
+                  alert('There was an error 400');
+               }
+               else {
+                   alert('something else other than 200 was returned');
+               }
+            }
+        };
+        
+        var target = "/api/fit/" + source_id;
+        var payload = {source_id: source_id, fittype: "gn17"};
+    
+        xmlhttp.open("POST", target, false);
+        xmlhttp.send(JSON.stringify(payload));
+        
+    } else {
+       for (var i = 0; i < toggle.labels.length; i++){
+           var source = eval("fit" + i).data_source;
+           source.data['time'] = [];
+           source.data['flux'] = [];
+           source.data['color'] = [];
+           source.change.emit();  
+       }        
+    }    
+    """)
+
+
+
+    button.js_on_click(buttonhandler)
+
+
     layout = row(plot, toggle)
-    layout = column(slider, layout)
+    layout = column(slider, layout, button)
 
     p1 = Panel(child=layout, title='flux')
 
