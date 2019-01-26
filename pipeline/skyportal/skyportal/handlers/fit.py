@@ -1,6 +1,6 @@
 from baselayer.app.handlers.base import BaseHandler
 from baselayer.app.access import auth_or_token
-from pipeline.skyportal.skyportal import fit
+from .. import fit
 
 import tornado.web
 
