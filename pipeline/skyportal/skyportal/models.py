@@ -3,6 +3,8 @@ import re
 import requests
 import numpy as np
 
+from astropy.io import fits
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.orm import backref, relationship
@@ -306,3 +308,170 @@ class Thumbnail(Base):
     photometry = relationship('Photometry', back_populates='thumbnails', cascade='all')
     source = relationship('Source', back_populates='thumbnails', uselist=False,
                           secondary='photometry', cascade='all')
+
+
+class CFHTObject(Base):
+
+    "Stars, galaxies"
+
+    cfht_id = sa.Column(sa.String)
+    ra = sa.Column(sa.Float)
+    dec = sa.Column(sa.Float)
+    flag = sa.Column(sa.Integer)
+    sg = sa.Column(sa.Float) # star/galaxy separation
+    r_eff = sa.Column(sa.Float)  # half-light radius
+    pz_final = sa.Column(sa.Float) # final photo-z, z=zPDF if galaxy, z=0 if star, z=9.99 if strange object, z =-99.9 if in masked arean
+    pz_zpdf = sa.Column(sa.Float) # photo-z measured using the galaxy templates. Median of the maximum likelihood distribution.
+    pz_zpdf_l68 = sa.Column(sa.Float) # lower limit, 68% confidence level
+    pz_zpdf_u68 = sa.Column(sa.Float) #  upper limit, 68% confidence level
+    chi2_zpdf = sa.Column(sa.Float) # reduced chi2 (-99 if less than 3 filters) at zPDF (doesn't include the N(z) prior in the chi2)
+    mod = sa.Column(sa.Integer)
+    ebv = sa.Column(sa.Float)
+    nbfilt = sa.Column(sa.Integer)
+    pz_zmin = sa.Column(sa.Float) # photo-z measured using the galaxy templates. Photo-z defined as the minimum of the chi2 distribution.
+    pz_zmin_l68 = sa.Column(sa.Float) # lower limit, 68% confidence level for zMin
+    pz_zmin_u68 = sa.Column(sa.Float) # upper limit, 68% confidence level for zMin
+    chi2_best = sa.Column(sa.Float)  # reduced chi2 (-99 if less than 3 filters) for zMin (N(z) prior is included in the chi2)
+    zp_2 = sa.Column(sa.Float)  # second photo-z solution if a second peak is detected with P>5% in the PDF
+    chi2_2 = sa.Column(sa.Float) # reduced chi2 for the second photo-z solution
+    mods = sa.Column(sa.Integer)  # model for the star library
+    chis = sa.Column(sa.Float) # reduced chi2 for the star model
+    zq = sa.Column(sa.Float)  # photoz for the AGN library
+    chiq = sa.Column(sa.Float)  # reduced chisq for AGN model
+    modq = sa.Column(sa.Float)  # best fit agn model
+    u = sa.Column(sa.Float) # u* mag
+    g = sa.Column(sa.Float) # g mag
+    r = sa.Column(sa.Float) # r mag
+    i = sa.Column(sa.Float) # old i mag
+    y = sa.Column(sa.Float) # new i mag
+    z = sa.Column(sa.Float) # z mag
+    eu = sa.Column(sa.Float) # error on u* mag
+    eg = sa.Column(sa.Float) # error on g mag
+    er = sa.Column(sa.Float) # error on r mag
+    ei = sa.Column(sa.Float) # error on i mag
+    ey = sa.Column(sa.Float) # error on y mag
+    ez = sa.Column(sa.Float) # error on z mag
+    Mu = sa.Column(sa.Float) # absolute U mag
+    Mg = sa.Column(sa.Float) # absolute G mag
+    Mr = sa.Column(sa.Float) # absolute R mag
+    Mi = sa.Column(sa.Float) # absolute I mag
+    My = sa.Column(sa.Float)
+    Mz = sa.Column(sa.Float)
+
+    @property
+    def redshift(self):
+        return self.pz_final
+
+
+    @classmethod
+    def load_from_table(cls, path_to_ascii):
+        array = np.genfromtxt(path_to_ascii, dtype=None, encoding='ascii').tolist()
+        result = []
+        for row in array:
+            cfobj = cls(*row)
+            result.append(cfobj)
+        return result
+
+
+class SDSSObject(Base):
+
+    "Stars, galaxies"
+
+    sdss_id = sa.Column(sa.Integer)
+    z = sa.Column(sa.Float)
+    zerr = sa.Column(sa.Float)
+    ra = sa.Column(sa.Float)
+    dec = sa.Column(sa.Float)
+    Mg = sa.Column(sa.Float)
+    Mr = sa.Column(sa.Float)
+
+    @property
+    def g_minus_r(self):
+        return self.Mg - self.Mr
+
+    def distmod(self, cosmo):
+        return cosmo.distmod(self.z)
+
+    @property
+    def redshift(self):
+        return self.z
+
+    load_from_table = CFHTObject.load_from_table
+
+
+class RongpuObject(Base):
+
+    """Photo z's from Rongpu and Jeff """
+
+    type = sa.Column(sa.String)
+    ra = sa.Column(sa.Float)
+    dec = sa.Column(sa.Float)
+    dchisq = sa.Column(NumpyArray)
+    ebv = sa.Column(sa.Float)
+    flux_g = sa.Column(sa.Float)
+    flux_r = sa.Column(sa.Float)
+    flux_z = sa.Column(sa.Float)
+    flux_w1 = sa.Column(sa.Float)
+    flux_w2 = sa.Column(sa.Float)
+    flux_ivar_g = sa.Column(sa.Float)
+    flux_ivar_r = sa.Column(sa.Float)
+    flux_ivar_z = sa.Column(sa.Float)
+    flux_ivar_w1 = sa.Column(sa.Float)
+    flux_ivar_w2 = sa.Column(sa.Float)
+    nobs_g = sa.Column(sa.Integer)
+    nobs_r = sa.Column(sa.Integer)
+    nobs_z = sa.Column(sa.Integer)
+    fracflux_g = sa.Column(sa.Float)
+    fracflux_r = sa.Column(sa.Float)
+    fracflux_z = sa.Column(sa.Float)
+    fracflux_w1 = sa.Column(sa.Float)
+    fracflux_w2 = sa.Column(sa.Float)
+    fracmasked_g = sa.Column(sa.Float)
+    fracmasked_r = sa.Column(sa.Float)
+    fracmasked_z = sa.Column(sa.Float)
+    psfsize_g = sa.Column(sa.Float)
+    psfsize_r = sa.Column(sa.Float)
+    psfsize_z = sa.Column(sa.Float)
+    psfdepth_g = sa.Column(sa.Float)
+    psfdepth_r = sa.Column(sa.Float)
+    psfdepth_z = sa.Column(sa.Float)
+    galdepth_g = sa.Column(sa.Float)
+    galdepth_r = sa.Column(sa.Float)
+    galdepth_z = sa.Column(sa.Float)
+    fracdev = sa.Column(sa.Float)
+    shapedev_r = sa.Column(sa.Float)
+    shapedev_e1 = sa.Column(sa.Float)
+    shapedev_e2 = sa.Column(sa.Float)
+    shapeexp_r = sa.Column(sa.Float)
+    shapeexp_e1 = sa.Column(sa.Float)
+    shapeexp_e2 = sa.Column(sa.Float)
+    allmask = sa.Column(sa.Integer)
+    anymask = sa.Column(sa.Integer)
+    z_phot = sa.Column(sa.Float)
+    z_phot_err = sa.Column(sa.Float)
+    z_spec = sa.Column(sa.Float)
+    survey = sa.Column(sa.String)
+    training = sa.Column(sa.Integer)
+    w1_source = sa.Column(sa.Float)
+    d2d_source = sa.Column(sa.Float)
+    circ_flag = sa.Column(sa.Integer)
+    ds_flag = sa.Column(sa.Integer)
+    wisemask = sa.Column(sa.Integer)
+    gmag = sa.Column(sa.Float)
+    rmag = sa.Column(sa.Float)
+    zmag = sa.Column(sa.Float)
+    w1mag = sa.Column(sa.Float)
+    w2mag = sa.Column(sa.Float)
+
+    @property
+    def redshift(self):
+        return self.z_phot
+
+    @classmethod
+    def load_from_table(cls, fitsfile):
+        result = []
+        with fits.open(fitsfile) as hdul:
+            data = hdul[1].data
+            for row in data:
+                result.append(cls(*[v.item() for v in row]))
+        return result
