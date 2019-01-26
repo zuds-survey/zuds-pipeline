@@ -466,7 +466,7 @@ def photometry_plot(source_id):
                    }
                }
                else if (xmlhttp.status == 400) {
-                  alert('There was an error 400');
+                   alert('There was an error 400');
                }
                else {
                    alert('something else other than 200 was returned');
@@ -474,7 +474,7 @@ def photometry_plot(source_id):
             }
         };
         
-        var target = "/api/fit/" + source_id;
+        var target = "/api/fit" ;
         var payload = {source_id: source_id, fittype: "gn17"};
     
         xmlhttp.open("POST", target, false);

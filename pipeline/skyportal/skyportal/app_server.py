@@ -47,7 +47,7 @@ def make_app(cfg, baselayer_handlers, baselayer_settings):
         (r'/api/tokens(/.*)?', TokenHandler),
         (r'/become_user(/.*)?', BecomeUserHandler),
         (r'/logout', LogoutHandler),
-        (r'/api/fit(/.*)?', FitHandler),
+        (r'/api/fit', FitHandler),
 
         # User-facing pages
         (r'/.*', MainPageHandler)  # Route all frontend pages, such as
