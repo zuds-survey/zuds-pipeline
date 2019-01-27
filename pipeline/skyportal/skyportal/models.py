@@ -380,7 +380,7 @@ class SDSSObject(Base):
 
     "Stars, galaxies"
 
-    sdss_id = sa.Column(sa.Integer)
+    sdss_id = sa.Column(sa.BigInteger)
     z = sa.Column(sa.Float)
     zerr = sa.Column(sa.Float)
     ra = sa.Column(sa.Float)
