@@ -473,10 +473,11 @@ class RongpuObject(Base):
     @classmethod
     def load_from_table(cls, fitsfile):
         result = []
-        data = Table.read(fitsfile, format='fits')
-        names = [c.lower() for c in data.colnames]
+        with fits.open(fitsfile) as hdul:
+            data = hdul[1].data
+        names = [c.lower() for c in data.dtype.names]
         for row in data:
-            v = row.as_void()
+            v = tuple(row)
             l = []
             for var in v:
                 try:
