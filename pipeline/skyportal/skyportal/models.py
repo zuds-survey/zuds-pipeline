@@ -1,4 +1,4 @@
-import os.path
+import pandas as pd
 import re
 import requests
 import numpy as np
@@ -365,10 +365,10 @@ class CFHTObject(Base):
 
     @classmethod
     def load_from_table(cls, path_to_ascii):
-        array = np.genfromtxt(path_to_ascii, dtype=None, encoding='ascii').tolist()
+        data = pd.read_csv(path_to_ascii, delim_whitespace=True)
         result = []
-        for row in array:
-            cfobj = cls(*row)
+        for _, row in data.iterrows():
+            cfobj = cls(**row.to_dict())
             result.append(cfobj)
         return result
 
