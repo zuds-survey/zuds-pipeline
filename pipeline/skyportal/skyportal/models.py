@@ -477,5 +477,11 @@ class RongpuObject(Base):
         names = [c.lower() for c in data.colnames]
         for row in data:
             v = row.as_void()
-            result.append(cls(**dict(zip(names, v))))
+            l = []
+            for var in v:
+                try:
+                    l.append(var.item()) # use native python type
+                except AttributeError:
+                    l.append(var)
+            result.append(cls(**dict(zip(names, l))))
         return result
