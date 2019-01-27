@@ -473,7 +473,7 @@ class RongpuObject(Base):
     @classmethod
     def load_from_table(cls, fitsfile):
         result = []
-        data = Table.read(fitsfile, format='fits').to_pandas()
+        data = Table.read(fitsfile, format='fits')
         names = [c.lower() for c in data.colnames]
         for row in data:
             v = row.as_void()
