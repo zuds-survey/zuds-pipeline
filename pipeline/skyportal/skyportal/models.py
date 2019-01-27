@@ -481,7 +481,9 @@ class RongpuObject(Base):
             for var in v:
                 try:
                     l.append(var.item()) # use native python type
-                except:
+                except ValueError:
+                    l.append(var.astype(float).tolist())
+                except AttributeError:
                     l.append(var)
             result.append(cls(**dict(zip(names, l))))
         return result
