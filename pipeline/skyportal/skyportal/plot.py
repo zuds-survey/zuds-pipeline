@@ -174,18 +174,19 @@ def photometry_plot(source_id):
     if data.empty:
         return None, None, None
 
-    data['new_img'] = None
-    data['sub_img'] = None
+    data['new_img'] = ''
+    data['sub_img'] = ''
 
     objects = qobj.all()
-    for object, (_, ro) in zip(objects, data.iterrows()):
+    for object, (i, ro) in zip(objects, data.iterrows()):
         object = object[0]
         thumbs = object.forcethumbs
         for thumb in thumbs:
             if thumb.type == 'sub':
-                ro['sub_img'] = thumb.public_url
+                data.ix[i, 'sub_img'] = thumb.public_url
             elif thumb.type == 'new':
-                ro['new_img'] = thumb.public_url
+                data.ix[i, 'new_img'] = thumb.public_url
+
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
     data['label'] = [f'{t} {f}-band'
@@ -213,6 +214,8 @@ def photometry_plot(source_id):
 
     split = data.groupby('label', sort=False)
 
+    print(data[['new_img', 'sub_img']])
+
     plot = figure(
         plot_width=600,
         plot_height=300,
@@ -229,8 +232,8 @@ def photometry_plot(source_id):
                                   ('mag', '@mag'),
                                   ('magerr', '@magerr'),
                                   ('lim_mag', '@lim_mag'),
-                                  ('new_img', '<img src=@new_img height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
-                                  ('sub_img', '<img src=@sub_img height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
+                                  ('new_img', '<img src="@new_img" height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                  ('sub_img', '<img src="@sub_img" height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
     plot.add_tools(imhover)
 
     # simpler tool tip for coadded light curve points
@@ -523,8 +526,8 @@ def photometry_plot(source_id):
                                   ('mag', '@mag'),
                                   ('magerr', '@magerr'),
                                   ('lim_mag', '@lim_mag'),
-                                  ('new_img', '<img src=../@new_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
-                                  ('sub_img', '<img src=../@sub_img{safe} height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
+                                  ('new_img', '<img src="@new_img" height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">'),
+                                  ('sub_img', '<img src="@sub_img" height=61 width=61 style="float: left; margin: 0px 15px 15px 0px;" border="2">')])
     plot.add_tools(imhover)
 
     # simpler tool tip for coadded light curve points
@@ -611,9 +614,11 @@ def photometry_plot(source_id):
                                               filter=[], color=[], lim_mag=[],
                                               mag=[], magerr=[]))
         )
+        simplehover.renderers.append(model_dict[key])        
 
         key = f'all{i}'
         model_dict[key] = ColumnDataSource(df)
+
 
     plot.xaxis.axis_label = 'MJD'
     plot.yaxis.axis_label = 'mag'
