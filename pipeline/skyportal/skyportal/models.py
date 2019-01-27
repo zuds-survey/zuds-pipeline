@@ -481,7 +481,10 @@ class RongpuObject(Base):
             l = []
             for var in v:
                 try:
-                    l.append(var.item()) # use native python type
+                    item = var.item() # use native python type
+                    if isinstance(item, bool):
+                        item = int(item)
+                    l.append(item)
                 except ValueError:
                     l.append(var.astype(float).tolist())
                 except AttributeError:
