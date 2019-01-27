@@ -474,6 +474,8 @@ class RongpuObject(Base):
     def load_from_table(cls, fitsfile):
         result = []
         data = Table.read(fitsfile, format='fits').to_pandas()
+        names = [c.lower() for c in data.colnames]
         for row in data:
-            result.append(cls(**row.to_dict()))
+            v = row.as_void()
+            result.append(cls(**dict(zip(names, v))))
         return result
