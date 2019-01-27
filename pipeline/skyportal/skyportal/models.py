@@ -4,6 +4,7 @@ import requests
 import numpy as np
 
 from astropy.io import fits
+from astropy.table import Table
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -11,6 +12,8 @@ from sqlalchemy.orm import backref, relationship
 
 from baselayer.app.models import (init_db, join_model, Base, DBSession, ACL,
                                   Role, User, Token)
+
+
 
 
 def is_owned_by(self, user_or_token):
@@ -470,8 +473,7 @@ class RongpuObject(Base):
     @classmethod
     def load_from_table(cls, fitsfile):
         result = []
-        with fits.open(fitsfile) as hdul:
-            data = hdul[1].data
-            for row in data:
-                result.append(cls(*[v.item() for v in row]))
+        data = Table.read(fitsfile, format='fits').to_pandas()
+        for row in data:
+            result.append(cls(**row.to_dict()))
         return result
