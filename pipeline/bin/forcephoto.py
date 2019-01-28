@@ -410,6 +410,10 @@ if __name__ == '__main__':
 
     sub_list = args.sub_names
 
+    if sub_list[0].startswith('@'):
+        with open(sub_list[0][1:], 'r') as f:
+            sub_list = f.read().split()
+
     env, cfg = load_env()
     init_db(**cfg['database'])
 
