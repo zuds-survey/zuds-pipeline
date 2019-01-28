@@ -449,7 +449,7 @@ def photometry_plot(source_id):
 
     button = Toggle(label="Plot GN17 Fit")
 
-    buttonhandler = CustomJS(args={'button': button, 'source_id': source_id, **model_dict},
+    buttonhandler = CustomJS(args={'button': button, **model_dict},
                              code="""
     
     if (button.active){
@@ -478,7 +478,7 @@ def photometry_plot(source_id):
         };
         
         var target = "/api/fit" ;
-        var payload = {source_id: source_id, fittype: "gn17"};
+        var payload = {source_id: "%s", fittype: "gn17"};
     
         xmlhttp.open("POST", target, false);
         xmlhttp.send(JSON.stringify(payload));
@@ -492,7 +492,7 @@ def photometry_plot(source_id):
            source.change.emit();  
        }        
     }    
-    """)
+    """ % source_id)
 
 
 
@@ -614,7 +614,7 @@ def photometry_plot(source_id):
                                               filter=[], color=[], lim_mag=[],
                                               mag=[], magerr=[]))
         )
-        simplehover.renderers.append(model_dict[key])        
+        simplehover.renderers.append(model_dict[key])
 
         key = f'all{i}'
         model_dict[key] = ColumnDataSource(df)
