@@ -353,7 +353,10 @@ def force_photometry(sources, sub_list):
             pobj.load_source_cutout()
             pobj.load_bkg_cutout()
             pobj.get_scr_cor_fn(False, 0, 0, 0, 0)
-            pobj.fit_psf()
+            try:
+                pobj.fit_psf()
+            except IndexError:
+                continue
             flux = pobj.Fpsf
             fluxerr = pobj.eFpsf
 

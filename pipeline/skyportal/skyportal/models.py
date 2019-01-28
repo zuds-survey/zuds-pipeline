@@ -89,6 +89,7 @@ class Source(Base):
     ra = sa.Column(sa.Float)
     dec = sa.Column(sa.Float)
     red_shift = sa.Column(sa.Float, nullable=True)
+    classification = sa.Column(sa.String)
 
     groups = relationship('Group', secondary='group_sources', cascade='all')
     comments = relationship('Comment', back_populates='source', cascade='all',
