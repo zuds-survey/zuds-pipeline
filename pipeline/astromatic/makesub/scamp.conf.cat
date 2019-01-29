@@ -61,7 +61,7 @@ CROSSID_RADIUS         2.0             # Cross-id initial radius (arcsec)
 #---------------------------- Astrometric solution ----------------------------
 
 SOLVE_ASTROM           Y               # Compute astrometric solution (Y/N) ?
-PROJECTION_TYPE        SAME            # SAME, TPV or TAN
+PROJECTION_TYPE        TPV            # SAME, TPV or TAN
 ASTRINSTRU_KEY         FILTER   # FITS keyword(s) defining the astrom
 STABILITY_TYPE         INSTRUMENT      # EXPOSURE, PRE-DISTORTED or INSTRUMENT
 CENTROID_KEYS          XWIN_IMAGE,YWIN_IMAGE # Cat. parameters for centroiding
@@ -86,12 +86,12 @@ ASTR_IMAFLAGSMASK      0x0             # Astrometry rejection mask on IMAFLAGS
 
 #---------------------------- Photometric solution ----------------------------
 
-SOLVE_PHOTOM           Y               # Compute photometric solution (Y/N) ?
-MAGZERO_OUT            30.0             # Magnitude zero-point(s) in output
+SOLVE_PHOTOM           N               # Compute photometric solution (Y/N) ?
+MAGZERO_OUT            30.             # Magnitude zero-point(s) in output
 MAGZERO_INTERR         0.01            # Internal mag.zero-point accuracy
 MAGZERO_REFERR         0.03            # Photom.field mag.zero-point accuracy
 PHOTINSTRU_KEY         FILTER          # FITS keyword(s) defining the photom.
-MAGZERO_KEY            PS1ZP          # FITS keyword for the mag zero-point
+MAGZERO_KEY            MAGZP          # FITS keyword for the mag zero-point
 EXPOTIME_KEY           EXPTIME         # FITS keyword for the exposure time (s)
 AIRMASS_KEY            SECZ         # FITS keyword for the airmass
 EXTINCT_KEY            PHOT_K          # FITS keyword for the extinction coeff
@@ -132,8 +132,8 @@ AHEADER_SUFFIX         .ahead          # Filename extension for additional
                                        # INPUT headers
 HEADER_SUFFIX          .head           # Filename extension for OUTPUT headers
 HEADER_TYPE            NORMAL          # NORMAL or FOCAL_PLANE
-VERBOSE_TYPE           NORMAL          # QUIET, NORMAL, LOG or FULL
+VERBOSE_TYPE           LOG          # QUIET, NORMAL, LOG or FULL
 WRITE_XML              N               # Write XML file (Y/N)?
-NTHREADS               2               # Number of simultaneous threads for
+NTHREADS               4               # Number of simultaneous threads for
                                        # the SMP version of SCAMP
                                        # 0 = automatic

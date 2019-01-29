@@ -4,13 +4,13 @@ import pika
 import datetime
 import psycopg2
 import requests
-#import schedule
 import logging
 import uuid
 import json
 import paramiko
 import threading
 import random
+import yaml
 
 
 import numpy as np
@@ -44,7 +44,7 @@ date_start = datetime.date(2018, 2, 16)
 n_concurrent_requests = 50
 coadd_minframes = 3
 img_batchsize = 1024
-template_batchsize = 16
+template_batchsize = 4
 
 # this is the night id corresponding
 # to the first science observation in the survey
@@ -305,7 +305,8 @@ class IPACQueryManager(object):
         tab = []
         self.logger.info(f'nidbins is {nidbins}')
         for left, right in nidbins:
-            zquery.load_metadata(sql_query=' NID BETWEEN %d AND %d AND FIELD=847 AND CCDID=2 AND QID=3'% (left, right),
+            zquery.load_metadata(sql_query=f' NID BETWEEN %d AND %d AND '
+                                           f'({self.pipeline_schema["sql"]})'% (left, right),
                                  auth=[ipac_username, ipac_password])
             df = zquery.metatable
             tab.append(df)
@@ -372,11 +373,15 @@ class IPACQueryManager(object):
             icookies = ipac_authenticate()  # get a different cookie for each DTN
             sessionid = icookies.get('JOSSO_SESSIONID')
 
-            download_script = [f'if curl {ipath} --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"; then'
+            download_script = [f'if curl {ipath} --fail --create-dirs -o {npath} --cookie "JOSSO_SESSIONID={sessionid}"; then'
                                f'\n( flock -x 200; echo {npath} >> {manifest} ) 200> {lockfile}; fi'
                                for ipath, npath in zip(ipc, npc)]
             mask_download_script = [p.replace('sciimg', 'mskimg') for p in download_script]
+            sub_download_script = [p.replace('sciimg.fits', 'scimrefdiffimg.fits.fz') for p in download_script]
+            subpsf_download_script = [p.replace('sciimg.fits', 'diffimgpsf.fits') for p in download_script]
             download_script.extend(mask_download_script)
+            download_script.extend(sub_download_script)
+            download_script.extend(subpsf_download_script)
             random.shuffle(download_script)
 
             print(len(download_script))
@@ -396,7 +401,15 @@ class IPACQueryManager(object):
         ncookies = nersc_authenticate()
         target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
         r = requests.get(target, cookies=ncookies)
-        return list(filter(lambda s: 'msk' not in s, r.content.decode('utf-8').strip().split('\n')))
+        return list(filter(lambda s: 'sciimg' in s,
+                           r.content.decode('utf-8').strip().split('\n')))
+
+    def read_sub_manifest(self):
+        ncookies = nersc_authenticate()
+        target = f'{newt_baseurl}/file/dtn01/{manifest[1:]}?view=read'
+        r = requests.get(target, cookies=ncookies)
+        return list(filter(lambda s: 'scimrefdiffimg' in s,
+                           r.content.decode('utf-8').strip().split('\n')))
 
     def update_database_with_new_images(self, npaths, metatable):
 
@@ -420,7 +433,8 @@ class IPACQueryManager(object):
                                     row['qid'], row['field'], row['ccdid']) +
                                     tuple(row[dfkey].tolist())))
 
-        query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0'
+        query = 'UPDATE IMAGE SET GOOD=FALSE WHERE INFOBITS != 0 OR SEEING > 3. OR ' \
+                '((FILTER=\'r\' OR FILTER=\'g\') AND MAGLIMIT < 19) OR (FILTER=\'i\' AND MAGLIMIT < 18.5)'
         self.cursor.execute(query)
 
         self.dbc.commit()
@@ -632,6 +646,7 @@ class IPACQueryManager(object):
         self._refresh_connections()
 
         batch = []
+        correlation_ids = []
 
         for (field, ccdnum, quadrant, filter), group in metatable.groupby(['field', 'ccdid',
                                                                            'qid', 'filtercode']):
@@ -713,22 +728,32 @@ class IPACQueryManager(object):
                         if len(batch) == sub_batchsize:
                             packet = {'jobtype': 'coaddsub', 'jobs': batch}
                             body = json.dumps(packet)
-                            self.relay_job(body)
+                            correlation_ids.append(self.relay_job(body))
                             batch = []
 
         if len(batch) > 0:
             packet = {'jobtype': 'coaddsub', 'jobs': batch}
             body = json.dumps(packet)
-            self.relay_job(body)
+            correlation_ids.append(self.relay_job(body))
+
+        return correlation_ids
 
     def prune_metatable(self, old_npaths, new_npaths, metatable):
 
         inds = []
         olist = old_npaths.tolist()
         for path in new_npaths:
+
             index = olist.index(path)
             inds.append(index)
         return metatable.iloc[inds]
+
+    def determine_and_relay_forcephoto_jobs(self, coaddsub_corrids, metatable):
+
+        data = {'jobtype': 'forcephoto', 'images': metatable['path'].tolist(), 'dependencies': coaddsub_corrids}
+        body = json.dumps(data)
+        self.relay_job(body)
+
 
     def __call__(self):
 
@@ -744,11 +769,21 @@ class IPACQueryManager(object):
         if len(npaths) > 0:
             # download the images
             self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
-            self.reset_manifest()
-            self.download_images(npaths, ipaths)
+            #self.reset_manifest()
+            #self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
+            sub_npaths = self.read_sub_manifest()
+
+            sub_allnpaths = np.asarray([p.replace('sciimg', 'scimrefdiffimg')
+                                         .replace('fits', 'fits.fz') for p in npaths])
+
+            mtcopy = metatable.copy()
+            mtcopy['path'] = sub_allnpaths
+
+            sub_metatable = self.prune_metatable(sub_allnpaths, sub_npaths, mtcopy)
             metatable = self.prune_metatable(npaths, new_npaths, metatable)
+
             npaths = new_npaths
 
             # update the database with the new images that were downloaded
@@ -763,34 +798,24 @@ class IPACQueryManager(object):
             template_corrids = self.determine_and_relay_template_jobs(variance_corrids, metatable)
 
             # finally coadd the science frames and make the corresponding subtractions
-            self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
+            coaddsub_corrids = self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
+
+            # lastly do forced photometry on the detected objects
+            self.determine_and_relay_forcephoto_jobs(coaddsub_corrids, sub_metatable)
+
             self.__del__()
 
 
 if __name__ == '__main__':
 
-    glsn_schema = {'template_minimages': 100, 'template_science_minsep_days': 30,
-                   'scicoadd_window_size': 10, 'rolling':False, 'schema_id': 1}
-
-    schemas = [glsn_schema]
+    schema = yaml.load(open(sys.argv[-1], 'r'))
+    schema['schema_id'] = 1
 
     logger = logging.getLogger('poll')
     logger.setLevel(logging.INFO)
     ch = logging.StreamHandler(sys.stdout)
     logger.addHandler(ch)
 
-    for s in schemas:
-        manager = IPACQueryManager(s, logger)
-        manager()
+    manager = IPACQueryManager(schema, logger)
+    manager()
 
-
-    """
-        schedule.every().day.at("06:00").do(manager)
-
-    try:
-        while True:
-            schedule.run_pending()
-            time.sleep(600.)  # check every 10 minutes whether to run the job
-    except KeyboardInterrupt:
-        pass
-    """

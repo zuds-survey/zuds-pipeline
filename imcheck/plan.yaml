@@ -1,0 +1,5 @@
+template_minimages: 40
+template_science_minsep_days: 0
+scicoadd_window_size: 10
+rolling: false
+sql: FIELD=792

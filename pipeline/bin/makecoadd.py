@@ -199,6 +199,11 @@ if __name__ == '__main__':
         h0 = f[0].header
         band = h0['FILTER']
 
+    mjds = []
+    for frame in frames:
+        with fits.open(frame) as f:
+            mjds.append(f[0].header['OBSMJD'])
+
     with fits.open(out, mode='update') as f:
         header = f[0].header
 
@@ -213,6 +218,7 @@ if __name__ == '__main__':
 
         # TODO make this more general
         header['PIXSCALE'] = 1.0
+        header['MJDEFF'] = np.median(mjds)
 
         # Add the sky back in as a constant
         f[0].data += 150.

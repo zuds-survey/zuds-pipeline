@@ -171,18 +171,18 @@ RUN curl -SL ftp://ftp.atnf.csiro.au/pub/software/wcslib/wcslib-5.20.tar.bz2 \
     && cd .. \
     && rm -rf wcslib*
 
-# wcstools 
+# wcstools
 
 RUN curl -SL http://tdc-www.harvard.edu/software/wcstools/wcstools-3.9.5.tar.gz \
     -o wcstools-3.9.5.tar.gz \
-    && tar xzf wcstools-3.9.5.tar.gz \ 
+    && tar xzf wcstools-3.9.5.tar.gz \
     && cd wcstools-3.9.5 \
     && chmod -R u+w . \
     && CC="gcc" CFLAGS="-O3 -fPIC -pthread" \
     CPPFLAGS="-I/usr/include" \
     LDFLAGS="-L/usr/lib" \
     && make -j 4 all \
-    && cd .. 
+    && cd ..
 
 ENV PATH=$PATH:/usr/src/desi/wcstools-3.9.5/bin
 
@@ -285,8 +285,8 @@ RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
 # Set the entrypoint and default command
 
 ENV PYTHONPATH /global/cscratch1/sd/dgold/lsn/install/lib/python3.6/site-packages/
-    
-RUN apt-get install -y wget    
+
+RUN apt-get install -y wget
 
 RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
@@ -303,16 +303,52 @@ ENV NERSC_PASSWORD ***REMOVED***
 RUN conda install astropy=3
 RUN pip install paramiko
 
+# install galsim
+RUN conda install galsim -c conda-forge
+
+RUN apt-get install -y  libcurl4-openssl-dev libatlas-base-dev
+RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
+    -o scamp-2.6.7.tar.gz \
+    && tar xzf scamp-2.6.7.tar.gz \
+    && cd scamp-2.6.7 \
+    && chmod +x autogen.sh \
+    && ./autogen.sh \
+    && ./configure \
+    && make && make install \
+    && cd .. \
+    && rm -rf scamp*
+
+ADD skyportal /skyportal
+RUN apt-get update && apt-get install -y supervisor nginx postgresql-client
+RUN curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
+    apt-get update && \
+    apt-get -y upgrade && \
+    apt-get install -y nodejs && \
+    cd /skyportal && \
+    make -C baselayer paths && \
+    make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
+
+ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
+
+
+
+ENV PYTHONPATH $PYTHONPATH:/skyportal:/pipeline/bin
+
+ENV DB_FTP_ENDPOINT ***REMOVED***
+ENV DB_FTP_DIR /scratch/danny/stamps
+ENV DB_FTP_USERNAME danny
+ENV DB_FTP_PASSWORD 6BJ6l71KS0ie7eCevIKEUUlD
+
 ADD . /pipeline
 ADD msgconsumer /daemon
 ADD slurm /slurm
 ADD astromatic /config
-    
+
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
-# install galsim
-RUN pip install galsim
+RUN pip install sncosmo image_registration
+
 
 ENTRYPOINT ["/bin/bash", "-c"]
 CMD ["python /daemon/run.py"]

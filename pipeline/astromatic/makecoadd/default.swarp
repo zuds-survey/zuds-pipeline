@@ -105,7 +105,7 @@ WRITE_FILEINFO         N               # Write information about each input
                                        # file in the output image header?
 WRITE_XML              N               # Write XML file (Y/N)?
 XML_NAME               swarp.xml       # Filename for XML output
-VERBOSE_TYPE           NORMAL          # QUIET,LOG,NORMAL, or FULL
+VERBOSE_TYPE           LOG          # QUIET,LOG,NORMAL, or FULL
 NNODES                 1               # Number of nodes (for clusters)
 NODE_INDEX             0               # Node index (for clusters)
  

@@ -10,7 +10,7 @@
 #SBATCH --image=registry.services.nersc.gov/dgold/improc:latest
 #SBATCH --dependency=afterok:DLIST
 #SBATCH -C haswell
-#SBATCH --volume=/global/homes/d/dgold:/home/desi
+#SBATCH --volume=/global/homes/d/dgold:/home/desi;/global/cscratch1/sd/dgold/lensgrinder/pipeline:/pipeline;/global/cscratch1/sd/dgold/lensgrinder/pipeline/astromatic:/config;/global/project/projectdirs/astro250/www/stamps:/stamps;/global/cscratch1/sd/dgold/lensgrinder/pipeline/skyportal:/skyportal
 #SBATCH -o $4/slurm-%A.out
 #SBATCH --exclusive
 

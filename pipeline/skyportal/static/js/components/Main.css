@@ -1,0 +1,81 @@
+.main {
+    font-family: 'Roboto', sans-serif;
+    position: absolute;
+    width: 100%;
+    top: 0;
+    left: 0;
+    min-height: 100%;
+}
+
+.topBanner {
+    position: relative;
+    display: inline-block;
+    top: 0;
+    margin: 0;
+    background: #38B0DE;
+    border-bottom: 0.25em solid lightgray;
+    zIndex: 10;
+    width: 100%;
+    height: 6em;
+}
+
+.topBannerContent {
+    position: relative;
+    top: 50%;
+    transform: translate(0%, -50%);
+    padding-left: 1em;
+    padding-right: 1em;
+}
+
+.title {
+    text-decoration: none;
+    color: white;
+    padding-left: 0.4em;
+    font-size: 200%;
+    font-weight: bold;
+    vertical-align: middle;
+}
+
+.websocket {
+    display: none;
+}
+
+.content {
+    padding: 1em;
+    height: auto;
+    padding-bottom: 6em; /* same as footer height */
+}
+
+.content a {
+    text-decoration: none;
+    color: gray;
+    font-weight: bold;
+}
+
+.footer {
+    position: absolute;
+    bottom: 0;
+    background: #38B0DE;
+    width: 100%;
+    zIndex: -1000;
+    text-align: center;
+    vertical-align: middle;
+    height: 5em;
+    color: white;
+    font-size: 110%;
+    border-top: .25em solid lightgray;
+}
+
+.footerContent {
+    position: relative;
+    top: 50%;
+    transform: translate(0%, -50%);
+    padding-left: 1em;
+    padding-right: 1em;
+}
+
+.footer a {
+    color: white;
+    font-weight: bold;
+    text-decoration: none;
+}

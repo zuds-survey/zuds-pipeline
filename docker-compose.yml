@@ -13,6 +13,10 @@ services:
         - "nersc-job-submission-service"
     stdin_open: true
     tty: true
+    volumes:
+        - ./imcheck:/poll
+    entrypoint: ['python', '/poll/poll.py', '/poll/plan.yaml']
+
 
   nersc-queue-monitor-service:
     build: ./queuemon
@@ -33,6 +37,7 @@ services:
     volumes:
         - ./pipeline/msgconsumer:/daemon
         - ./pipeline:/pipeline
+        - ./pipeline/slurm:/slurm 
 
   db:
     build: ./q3cpsql
