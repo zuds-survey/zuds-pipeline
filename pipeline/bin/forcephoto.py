@@ -374,7 +374,10 @@ def force_photometry(sources, sub_list):
             for key in ['sub', 'new']:
                 name = f'/stamps/{uuid4().hex}.force.{key}.png'
                 if key == 'new':
-                    with fits.open(im.replace('scimrefdiffimg.fits.fz', 'sciimg.fits')) as hdul:
+                    fname = im.replace('scimrefdiffimg.fits.fz', 'sciimg.fits')
+                    if not os.path.exists(fname): 
+                        continue
+                    with fits.open(fname) as hdul:
                         newimage = hdul[0].data
                         newimage = newimage.byteswap().newbyteorder()
                         newwcs = WCS(hdul[0].header)
