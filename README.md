@@ -1,2 +1,2 @@
 # lensgrinder
-dockerized coadd+subtraction pipeline for ZTF
+dockerized subtraction pipeline for CCD imagers 
