@@ -1,15 +1,5 @@
 var binsize = slider.value;
 var fluxalph = ((binsize == 0) ? 1. : 0.1);
-var dlsource = dl.data_source;
-dlsource.data['mjd'] = [];
-dlsource.data['flux'] = [];
-dlsource.data['fluxerr'] = [];
-dlsource.data['filter'] = [];
-dlsource.data['lim_mag'] = [];
-dlsource.data['mag'] = [];
-dlsource.data['magerr'] = [];
-dlsource.data['zp'] = [];
-dlsource.data['zpsys'] = [];
 
 for (var i = 0; i < toggle.labels.length; i++) {
 
@@ -99,8 +89,8 @@ for (var i = 0; i < toggle.labels.length; i++) {
              var mymag = -2.5 * Math.log10(myflux) + 25;
              var mymagerr = Math.abs(-2.5 * myfluxerr  / myflux / Math.log(10));
          } else {
-             var mymag = null;
-             var mymagerr = null;
+             var mymag = NaN;
+             var mymagerr = NaN;
          }
 
          var mymaglim = -2.5 * Math.log10(5 * myfluxerr) + 25;
@@ -113,16 +103,6 @@ for (var i = 0; i < toggle.labels.length; i++) {
          binsource.data['mag'].push(mymag);
          binsource.data['magerr'].push(mymagerr);
          binsource.data['lim_mag'].push(mymaglim);
-
-         dlsource.data['mjd'].push(mymjd);
-         dlsource.data['flux'].push(myflux);
-         dlsource.data['fluxerr'].push(myfluxerr);
-         dlsource.data['filter'].push(fluxsource.data['filter'][0]);
-         dlsource.data['mag'].push(mymag);
-         dlsource.data['magerr'].push(mymagerr);
-         dlsource.data['lim_mag'].push(mymaglim);
-         dlsource.data['zp'].push(25.);
-         dlsource.data['zpsys'].push('ab');
 
          binerrsource.data['xs'].push([mymjd, mymjd]);
          binerrsource.data['ys'].push([myflux - myfluxerr, myflux + myfluxerr]);
@@ -138,4 +118,3 @@ for (var i = 0; i < toggle.labels.length; i++) {
  binerrsource.change.emit();
 }
 
-dlsource.change.emit();
