@@ -44,9 +44,11 @@ class CommentHandler(BaseHandler):
     def put(self, comment_id):
         data = self.get_json()
 
-        # TODO: Check ownership
         comment = Comment.query.get(comment_id)
         comment.text = data['text']
+
+        if not comment.is_owned_by(self.current_user):
+            self.error('Cannot delete comment: not owned by user.')
 
         DBSession().commit()
 
@@ -56,9 +58,13 @@ class CommentHandler(BaseHandler):
 
     @permissions(['Comment'])
     def delete(self, comment_id):
-        # TODO: Check ownership
+
         comment = Comment.query.get(comment_id)
-        DBSession().delete(c)
+
+        if not comment.is_owned_by(self.current_user):
+            self.error('Cannot delete comment: not owned by user.')
+
+        DBSession().delete(comment)
         DBSession().commit()
 
         self.push_all(action='skyportal/REFRESH_SOURCE',

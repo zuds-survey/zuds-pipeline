@@ -28,6 +28,8 @@ def is_owned_by(self, user_or_token):
         return bool(set(self.groups) & set(user_or_token.groups))
     elif hasattr(self, 'users'):
         return (user_or_token in self.users)
+    elif hasattr(self, 'user'):
+        return user_or_token == self.user
     else:
         raise NotImplementedError(f"{type(self).__name__} object has no owner")
 Base.is_owned_by = is_owned_by
