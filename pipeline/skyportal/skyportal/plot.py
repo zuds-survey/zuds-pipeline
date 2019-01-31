@@ -361,7 +361,8 @@ def photometry_plot(source_id):
             x='mjd', y='lim_mag',
             color='color',
             marker='inverted_triangle',
-            fill_color='color',
+            fill_color='white',
+            line_color='color',
             alpha='alpha',
             source=ColumnDataSource(df[~df['obs']])
         )
@@ -407,7 +408,8 @@ def photometry_plot(source_id):
             x='mjd', y='lim_mag',
             color='color',
             marker='inverted_triangle',
-            fill_color='color',
+            fill_color='white',
+            line_color='color',
             source=ColumnDataSource(data=dict(mjd=[], flux=[], fluxerr=[],
                                               filter=[], color=[], lim_mag=[],
                                               mag=[], magerr=[]))
