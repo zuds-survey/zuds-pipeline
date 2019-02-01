@@ -174,7 +174,7 @@ def photometry_plot(source_id):
     """
     color_map = {'ipr': 'yellow', 'rpr': 'red', 'g': 'green', 'r': 'red', 'i': 'orange'}
 
-    qobj = DBSession().query(ForcedPhotometry, Telescope.nickname.label('telescope')) \
+    qobj = DBSession().query(ForcedPhotometry, Instrument.name.label('instrument')) \
         .join(Instrument).join(Telescope) \
         .filter(ForcedPhotometry.source_id == source_id)
     data = pd.read_sql(qobj.statement, DBSession().bind)
@@ -196,7 +196,7 @@ def photometry_plot(source_id):
                 data.ix[i, 'new_img'] = thumb.public_url
 
     data['color'] = [color_map.get(f, 'black') for f in data['filter']]
-    data['label'] = [f'{t} {f}-band' for t, f in zip(data['telescope'], data['filter'])]
+    data['label'] = [f'{i} {f}-band' for i, f in zip(data['instrument'], data['filter'])]
     data['filter'] = ['ztf' + f for f in data['filter']]
 
     # normalize everything to a common zeropoint
