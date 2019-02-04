@@ -78,6 +78,12 @@ export function hydrate() {
   };
 }
 
+
+export function fetchUser(id) {
+  return API.GET(`/api/user/${id}`, FETCH_USER);
+}
+
+
 export function rotateLogo() {
   return {
     type: ROTATE_LOGO
