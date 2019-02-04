@@ -6,7 +6,7 @@ from sqlalchemy.sql.expression import func
 from .models import DBSession, Source, SDSSObject, CFHTObject, RongpuObject
 
 GALAXY_TYPES = [CFHTObject, SDSSObject, RongpuObject]
-TWOARCSEC_DEG = 0.0002777 * 2.
+TWOARCSEC_DEG = 0.0002777 * 5.
 
 
 def get_source(source_or_sourceid):
@@ -29,10 +29,10 @@ def get_photometry(source_or_sourceid):
     for point in source.forcedphotometry:
         points.append({
             'time': point.mjd,
-            'filter': point.filter,
+            'filter': 'ztf' + point.filter,
             'flux': point.flux,
             'fluxerr': point.fluxerr,
-            'zp': point.zeropoint,
+            'zp': point.zp,
             'zpsys': 'ab'
         })
     table = Table(points)
@@ -65,7 +65,7 @@ def get_overlapping_galaxy(source_or_sourceid):
         else:
             return galaxy
 
-    raise KeyError(f'No neighbors found for source "{source}."')
+    raise KeyError(f'No neighbors found for source "{source.__repr__()}."')
 
 
 def fit_source(source_or_sourceid, fix_z_to_nearest_neighbor=True, bounds=None):
@@ -73,7 +73,7 @@ def fit_source(source_or_sourceid, fix_z_to_nearest_neighbor=True, bounds=None):
     source = get_source(source_or_sourceid)
     photom = get_photometry(source)
 
-    vparam_names = ['x0', 'x1', 'c', 'z']
+    vparam_names = ['x0', 'x1', 'c', 't0', 'z']
     fitmod = sncosmo.Model(source='salt2')
 
     if fix_z_to_nearest_neighbor:
@@ -82,6 +82,21 @@ def fit_source(source_or_sourceid, fix_z_to_nearest_neighbor=True, bounds=None):
         vparam_names.pop(-1)
         fitmod['z'] = zfix
 
+    # calculate amplitude bounds
+    fitmod.set_source_peakabsmag(-20, 'bessellb', 'ab')
+    amphi = fitmod['x0']
+
+    fitmod.set_source_peakabsmag(-18.5, 'bessellb', 'ab')
+    amplo = fitmod['x0']
+
+    # initial guess
+    fitmod.set_source_peakabsmag(-19.3, 'bessellb', 'ab')
+
+
+
     # this is where the magic happens
-    result = sncosmo.fit_lc(data=photom, model=fitmod, vparam_names=vparam_names, bounds=bounds)
+    result = sncosmo.fit_lc(data=photom, model=fitmod, vparam_names=vparam_names,
+                            bounds={'x1': (-1, 1), 'c':(-0.2,0.2), 'x0': (amplo, amphi),
+                                    't0': (58250, 58325)}, minsnr=0.)
+
     return result

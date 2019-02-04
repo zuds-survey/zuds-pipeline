@@ -43,6 +43,10 @@ export const DELETE_TOKEN_OK = 'skyportal/DELETE_TOKEN_OK';
 
 export const ROTATE_LOGO = 'skyportal/ROTATE_LOGO';
 
+export const FETCH_USER = 'skyportal/FETCH_USER';
+export const FETCH_USER_OK = 'skyportal/FETCH_USER_OK';
+
+
 export function fetchSource(id) {
   return API.GET(`/api/sources/${id}`, FETCH_LOADED_SOURCE);
 }

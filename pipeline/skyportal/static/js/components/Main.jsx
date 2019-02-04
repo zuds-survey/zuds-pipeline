@@ -29,6 +29,8 @@ import ProfileDropdown from '../containers/ProfileDropdown';
 import Logo from '../containers/Logo';
 import * as Action from '../actions';
 import Responsive from './Responsive';
+import UserInfo from '../containers/UserInfo';
+
 
 
 const store = configureStore({});
@@ -77,6 +79,7 @@ SkyPortal ∝
             <PropsRoute exact path="/groups/" component={Groups} />
             <PropsRoute path="/group/:id" component={GroupContainer} />
             <PropsRoute path="/profile" component={Profile} />
+            <PropsRoute path="/user/:id" component={UserInfo} />
             <PropsRoute component={NoMatchingRoute} />
           </Switch>
 

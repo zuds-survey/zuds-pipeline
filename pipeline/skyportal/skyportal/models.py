@@ -363,6 +363,7 @@ class CFHTObject(Base):
     Mi = sa.Column(sa.Float) # absolute I mag
     My = sa.Column(sa.Float)
     Mz = sa.Column(sa.Float)
+    red = sa.Column(sa.Boolean)
 
     @property
     def redshift(self):
@@ -374,8 +375,9 @@ class CFHTObject(Base):
         data = pd.read_csv(path_to_ascii, delim_whitespace=True)
         result = []
         for _, row in data.iterrows():
-            cfobj = cls(**row.to_dict())
+            cfobj = cls(**{'red': row['Mg'] - row['Mr'] > 0.65, **row.to_dict()})
             result.append(cfobj)
+
         return result
 
 
