@@ -8,7 +8,8 @@ from skyportal.handlers import (SourceHandler, CommentHandler, GroupHandler,
                                 GroupUserHandler, PlotPhotometryHandler,
                                 PlotSpectroscopyHandler, ProfileHandler,
                                 BecomeUserHandler, LogoutHandler,
-                                PhotometryHandler, TokenHandler, UserInfoHandler)
+                                PhotometryHandler, TokenHandler, UserInfoHandler,
+                                FitHandler)
 from skyportal import models, model_util
 from sqlalchemy.exc import ProgrammingError
 
