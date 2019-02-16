@@ -8,7 +8,7 @@ from astropy.wcs import WCS
 import galsim
 from makevariance import make_variance
 import logging
-
+from galsim import des
 
 #TODO: Delete this
 SEED = 1234
@@ -107,6 +107,7 @@ if __name__ == '__main__':
     nnwname = os.path.join(confdir, 'default.nnw')
     scampconf = os.path.join(confdir, 'scamp.conf')
     swarpconf = os.path.join(confdir, 'default.swarp')
+    psfconf = os.path.join(confdir, 'psfex.conf')
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
@@ -231,8 +232,27 @@ if __name__ == '__main__':
     syscall = ' '.join([syscall, clargs])
     liblg.execute(syscall, capture=False)
 
+    # now model the PSF
+    syscall = f'psfex -c {psfconf} {outcat}'
+    liblg.execute(syscall, capture=False)
+    psf = args.output_basename[0] + '.psf'
+
+    # and save it as a fits model
+    gsmod = des.DES_PSFEx(psf)
+    with fits.open(psf) as f:
+        xcen = f[1].header['POLZERO1']
+        ycen = f[1].header['POLZERO2']
+        psfsamp = f[1].header['PSF_SAMP']
+
+    cpos = galsim.PositionD(xcen, ycen)
+    psfmod = gsmod.getPSF(cpos)
+    psfimg = psfmod.drawImage(scale=psfsamp**-1, nx=25, ny=25)
+
+    # save it to the D
+    psfimg.write(f'{psf}.fits')
+
     # And zeropoint the coadd, putting results in the header
-    liblg.solve_zeropoint(out, outcat)
+    liblg.solve_zeropoint(out, psf, outcat)
 
     # Now retrieve the zeropoint
     with fits.open(out) as f:
