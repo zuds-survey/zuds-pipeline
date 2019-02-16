@@ -188,6 +188,8 @@ def make_sub(myframes, mytemplates, publish=True):
                   '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
+
+        print(syscall)
         execute(syscall, capture=False)
 
         # Calibrate the subtraction
