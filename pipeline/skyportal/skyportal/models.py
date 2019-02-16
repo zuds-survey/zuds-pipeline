@@ -28,6 +28,8 @@ def is_owned_by(self, user_or_token):
         return bool(set(self.groups) & set(user_or_token.groups))
     elif hasattr(self, 'users'):
         return (user_or_token in self.users)
+    elif hasattr(self, 'user'):
+        return user_or_token == self.user
     else:
         raise NotImplementedError(f"{type(self).__name__} object has no owner")
 Base.is_owned_by = is_owned_by
@@ -361,6 +363,7 @@ class CFHTObject(Base):
     Mi = sa.Column(sa.Float) # absolute I mag
     My = sa.Column(sa.Float)
     Mz = sa.Column(sa.Float)
+    red = sa.Column(sa.Boolean)
 
     @property
     def redshift(self):
@@ -372,8 +375,9 @@ class CFHTObject(Base):
         data = pd.read_csv(path_to_ascii, delim_whitespace=True)
         result = []
         for _, row in data.iterrows():
-            cfobj = cls(**row.to_dict())
+            cfobj = cls(**{'red': row['Mg'] - row['Mr'] > 0.65, **row.to_dict()})
             result.append(cfobj)
+
         return result
 
 

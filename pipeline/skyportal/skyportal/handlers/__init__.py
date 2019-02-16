@@ -13,3 +13,5 @@ from .become_user import BecomeUserHandler
 from .photometry import PhotometryHandler
 from .token import TokenHandler
 from .fit import FitHandler
+from .userinfo import UserInfoHandler
+

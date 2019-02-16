@@ -8,7 +8,8 @@ from skyportal.handlers import (SourceHandler, CommentHandler, GroupHandler,
                                 GroupUserHandler, PlotPhotometryHandler,
                                 PlotSpectroscopyHandler, ProfileHandler,
                                 BecomeUserHandler, LogoutHandler,
-                                PhotometryHandler, TokenHandler, FitHandler)
+                                PhotometryHandler, TokenHandler, UserInfoHandler,
+                                FitHandler)
 from skyportal import models, model_util
 from sqlalchemy.exc import ProgrammingError
 
@@ -47,6 +48,7 @@ def make_app(cfg, baselayer_handlers, baselayer_settings):
         (r'/api/tokens(/.*)?', TokenHandler),
         (r'/become_user(/.*)?', BecomeUserHandler),
         (r'/logout', LogoutHandler),
+        (r'/api/user(/.*)?', UserInfoHandler),
         (r'/api/fit', FitHandler),
 
         # User-facing pages

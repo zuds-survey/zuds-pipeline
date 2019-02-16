@@ -30,6 +30,10 @@ const SurveyLinkList = ({ ra, dec, id }) => {
   return (
     <div className={styles.SurveyLinkList}>
       <SurveyLink
+        name="GROWTH Marshal"
+        url={`http://skipper.caltech.edu:8080/cgi-bin/growth/cone_search.cgi?doit=yes&ra=${ra}&dec=${dec}+&radius=10`}
+      />
+      <SurveyLink
         name="NED"
         url={`http://nedwww.ipac.caltech.edu/cgi-bin/nph-objsearch?lon=${ra}sd&lat=${dec}sd&radius=1.0&search_type=Near+Position+Search`}
       />

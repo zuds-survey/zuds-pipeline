@@ -1,7 +1,9 @@
 import os
 import numpy as np
 from .shellcmd import execute
+from .yao import yao_photometry_single
 from astropy.io import fits
+
 
 __all__ = ['solve_zeropoint']
 __whatami__ = 'Zeropoint an image by calibrating to PS1.'
@@ -34,7 +36,7 @@ def parse_sexcat(cat, bin=False):
     return data
 
 
-def zpsee(image, cat, cursor):
+def zpsee(image, psf, cat, cursor):
     """Compute the median zeropoint of an image or images (path/paths:
     `im_or_ims`) using the Pan-STARRS photometric database (cursor:
     `cursor`)."""
@@ -65,33 +67,33 @@ def zpsee(image, cat, cursor):
                                                 ('dec','<f8'),
                                                 ('mag','<f8')])
 
-    these_seeings = []
     these_zps = []
 
     for row in cat:
-        mag_c = row['MAG_AUTO']
         ra_c = row['X_WORLD']
         dec_c = row['Y_WORLD']
-        fwhm = row['FWHM_IMAGE']
-
         sep = 3600. * ( np.cos(dec_c*np.pi/180.) * (ra_c - result['ra'])**2 + (dec_c - result['dec'])**2)**0.5
 
         match = result[sep <= 2.]
-        seeing = fwhm * 1.01 # arcsec (1.01 = PTF plate scale)
-        these_seeings.append(seeing)
-
 
         for mps1 in match['mag']:
+
+            # now calculate the PSF mag
+
+            pobj = yao_photometry_single(image, psf, ra_c, dec_c)
+            mag_c = -2.5 * np.log10(pobj.Fpsf) + 27.5
+
             zp = 27.5 + (mps1 - mag_c)
             these_zps.append(zp)
 
-    seeing = np.median(these_seeings) if len(these_seeings) > 2 else 1.9999
+    with fits.open(psf) as f:
+        seeing = f[1].header['PSF_FWHM'] * 1.013
     zp = np.median(these_zps) if len(these_zps) > 2 else 31.9999
 
     return zp, seeing
 
 
-def solve_zeropoint(image, cat):
+def solve_zeropoint(image, psf, cat):
 
     import psycopg2
 
@@ -101,9 +103,12 @@ def solve_zeropoint(image, cat):
     # takes a list of images and sextractor catalogs and computes seeing /
     # zeropoints for all of them
 
+    # the sextractor catalogs are just to list detections
+    # the photometry is done using PSF fitting in zpsee
+
     with con:
         cursor = con.cursor()
-        zp, see = zpsee(image, cat, cursor)
+        zp, see = zpsee(image, psf, cat, cursor)
         with fits.open(image, mode='update') as f:
             f[0].header['MAGZP'] = zp
             f[0].header['SEEING'] = see
