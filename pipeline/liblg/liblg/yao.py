@@ -59,8 +59,13 @@ class ZTFphot(object):
         self.bad_threshold = bad_threshold
         self.length = 2 * r_psf + 1
 
-        hd = fits.open(imgpath)[1].header
-        dt = fits.open(imgpath)[1].data
+        try:
+            hd = fits.open(imgpath)[1].header
+            dt = fits.open(imgpath)[1].data
+        except IndexError:
+            hd = fits.open(imgpath)[0].header
+            dt = fits.open(imgpath)[0].data
+
         n_dty = dt.shape[0]
         n_dtx = dt.shape[1]
         w = WCS(hd)
