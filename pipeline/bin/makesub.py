@@ -196,8 +196,8 @@ def make_sub(myframes, mytemplates, publish=True):
             header = f[0].header
             #frat = float(header['KSUM00'])
             #subzp = 2.5 * np.log10(frat) + refzp
-
-            header['MAGZP'] = fr[0].header['MAGZP']
+            subzp = fr[0].header['MAGZP']
+            header['MAGZP'] = subzp
 
         # Make the subtraction catalogs
         clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
