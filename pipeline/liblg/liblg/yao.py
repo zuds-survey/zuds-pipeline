@@ -109,13 +109,10 @@ class ZTFphot(object):
             else:
                 self.status = True
 
-        self.obsjd = hd['OBSJD']
+
         self.zp = hd['MAGZP']
-        self.e_zp = hd['MAGZPUNC']
-        self.filter = hd['FILTER'][4]
         self.gain = hd['GAIN']
-        self.seeing = hd['SEEING']
-        self.programid = hd['PROGRMID']
+
 
         # load psf cutout
         psf_fn = fits.open(psfpath)[0].data[12 - r_psf:12 + r_psf + 1, 12 - r_psf:12 + r_psf + 1]
