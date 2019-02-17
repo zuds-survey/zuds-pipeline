@@ -59,12 +59,12 @@ class ZTFphot(object):
         self.bad_threshold = bad_threshold
         self.length = 2 * r_psf + 1
 
-        try:
+        dt = fits.open(imgpath)[0].data
+        if dt is None:
             hd = fits.open(imgpath)[1].header
             dt = fits.open(imgpath)[1].data
-        except IndexError:
+        else:
             hd = fits.open(imgpath)[0].header
-            dt = fits.open(imgpath)[0].data
 
         n_dty = dt.shape[0]
         n_dtx = dt.shape[1]
@@ -143,10 +143,9 @@ class ZTFphot(object):
         length = self.length
         # n_dtx = self.n_dtx
 
-        try:
+        dt = fits.open(imgpath)[0].data
+        if dt is None:
             dt = fits.open(imgpath)[1].data
-        except:
-            dt = fits.open(imgpath)[0].data
 
         if (pixYint + r_psf + 2) > n_dty:
             new_patch = np.zeros((10, dt.shape[1]))
@@ -177,9 +176,11 @@ class ZTFphot(object):
         pixY = self.pixY
         imgpath = self.imgpath
 
-        try:
+        dt = fits.open(imgpath)[0].data
+
+        if dt is None:
             hd = fits.open(imgpath)[1].header
-        except:
+        else:
             hd = fits.open(imgpath)[0].header
 
         w = WCS(hd)
@@ -209,10 +210,10 @@ class ZTFphot(object):
         r_bkg_in = self.r_bkg_in
         r_bkg_out = self.r_bkg_out
 
-        try:
+
+        dt = fits.open(imgpath)[0].data
+        if dt is None:
             dt = fits.open(imgpath)[1].data
-        except:
-            dt = fits.open(imgpath)[0].data
 
         positions = [(pixX, pixY)]
         annulus_aperture = CircularAnnulus(positions,
