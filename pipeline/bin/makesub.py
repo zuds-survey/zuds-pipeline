@@ -192,11 +192,12 @@ def make_sub(myframes, mytemplates, publish=True):
 
         # Calibrate the subtraction
 
-        with fits.open(sub, mode='update') as f:
+        with fits.open(sub, mode='update') as f, fits.open(frame) as fr:
             header = f[0].header
-            frat = float(header['KSUM00'])
-            subzp = 2.5 * np.log10(frat) + refzp
-            header['MAGZP'] = subzp
+            #frat = float(header['KSUM00'])
+            #subzp = 2.5 * np.log10(frat) + refzp
+
+            header['MAGZP'] = fr[0].header['MAGZP']
 
         # Make the subtraction catalogs
         clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
