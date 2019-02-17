@@ -143,7 +143,11 @@ class ZTFphot(object):
         length = self.length
         # n_dtx = self.n_dtx
 
-        dt = fits.open(imgpath)[1].data
+        try:
+            dt = fits.open(imgpath)[1].data
+        except:
+            dt = fits.open(imgpath)[0].data
+
         if (pixYint + r_psf + 2) > n_dty:
             new_patch = np.zeros((10, dt.shape[1]))
             dt = np.vstack([dt, new_patch])
@@ -173,7 +177,11 @@ class ZTFphot(object):
         pixY = self.pixY
         imgpath = self.imgpath
 
-        hd = fits.open(imgpath)[1].header
+        try:
+            hd = fits.open(imgpath)[1].header
+        except:
+            hd = fits.open(imgpath)[0].header
+
         w = WCS(hd)
         xoff, yoff, exoff, eyoff = chi2_shift_iterzoom(psf_fn, scr_fn)
         pixX_cor = pixX + xoff
@@ -201,7 +209,11 @@ class ZTFphot(object):
         r_bkg_in = self.r_bkg_in
         r_bkg_out = self.r_bkg_out
 
-        dt = fits.open(imgpath)[1].data
+        try:
+            dt = fits.open(imgpath)[1].data
+        except:
+            dt = fits.open(imgpath)[0].data
+
         positions = [(pixX, pixY)]
         annulus_aperture = CircularAnnulus(positions,
                                            r_in=r_bkg_in, r_out=r_bkg_out)
