@@ -109,8 +109,6 @@ class ZTFphot(object):
             else:
                 self.status = True
 
-
-        self.zp = hd['MAGZP']
         self.gain = hd['GAIN']
 
 
