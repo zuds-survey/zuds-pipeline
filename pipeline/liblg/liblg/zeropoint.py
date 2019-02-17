@@ -86,7 +86,8 @@ def zpsee(image, psf, cat, cursor):
             zp = 27.5 + (mps1 - mag_c)
             these_zps.append(zp)
 
-    with fits.open(psf) as f:
+    psfex_output = psf[:-5]
+    with fits.open(psfex_output) as f:
         seeing = f[1].header['PSF_FWHM'] * 1.013
     zp = np.median(these_zps) if len(these_zps) > 2 else 31.9999
 
