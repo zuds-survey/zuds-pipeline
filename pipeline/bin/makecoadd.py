@@ -246,13 +246,18 @@ if __name__ == '__main__':
 
     cpos = galsim.PositionD(xcen, ycen)
     psfmod = gsmod.getPSF(cpos)
-    psfimg = psfmod.drawImage(scale=psfsamp**-1, nx=25, ny=25)
+    psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
 
+    # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
+    psfimg.wcs = None
+    psfimg = galsim.Image(np.fliplr(psfimg.array))
+
+    psfimpath = f'{psf}.fits'
     # save it to the D
-    psfimg.write(f'{psf}.fits')
+    psfimg.write(psfimpath)
 
     # And zeropoint the coadd, putting results in the header
-    liblg.solve_zeropoint(out, psf, outcat)
+    liblg.solve_zeropoint(out, psfimpath, outcat)
 
     # Now retrieve the zeropoint
     with fits.open(out) as f:
