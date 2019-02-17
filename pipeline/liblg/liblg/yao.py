@@ -113,7 +113,10 @@ class ZTFphot(object):
 
 
         # load psf cutout
-        psf_fn = fits.open(psfpath)[0].data[12 - r_psf:12 + r_psf + 1, 12 - r_psf:12 + r_psf + 1]
+        try:
+            psf_fn = fits.open(psfpath)[1].data[12 - r_psf:12 + r_psf + 1, 12 - r_psf:12 + r_psf + 1]
+        except:
+            psf_fn = fits.open(psfpath)[0].data[12 - r_psf:12 + r_psf + 1, 12 - r_psf:12 + r_psf + 1]
         self.psf_fn = psf_fn
 
     def load_source_cutout(self):
