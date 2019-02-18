@@ -9,6 +9,7 @@ import galsim
 from makevariance import make_variance
 import logging
 from galsim import des
+from astropy.convolution import convolve
 
 #TODO: Delete this
 SEED = 1234
@@ -293,3 +294,9 @@ physical
                 x, y = fake.xy(wcs)
                 hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = x, y
                 o.write(f'circle({x},{y},10) # width=2 color=red\n')
+
+    with fits.open(out, mode='update') as f, fits.open(psfimpath) as pf:
+        kernel = pf[0].data
+        idata = f[0].data
+        convolved = convolve(idata, kernel)
+        f[0].data = convolved
