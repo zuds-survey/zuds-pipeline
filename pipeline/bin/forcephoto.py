@@ -3,7 +3,7 @@ from astropy.wcs import WCS
 import os
 from publish import make_stamp
 from astropy.visualization import ZScaleInterval
-from liblg import yao_photometry_single
+from liblg.yao import yao_photometry_single
 from baselayer.app.env import load_env
 from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb, Source, init_db
 
@@ -24,11 +24,11 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
-def force_photometry(sources, sub_list):
+def force_photometry(sources, sub_list, psf_list):
 
     instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
 
-    for im in sub_list:
+    for im, psf in zip(sub_list, psf_list):
 
         thumbs = []
         points = []
@@ -49,8 +49,6 @@ def force_photometry(sources, sub_list):
 
             # get the RA and DEC of the source
             ra, dec = source.ra, source.dec
-
-            psf = im.replace('scimrefdiffimg.fits.fz', 'diffimgpsf.fits')
 
             try:
                 pobj = yao_photometry_single(im, psf, ra, dec)
