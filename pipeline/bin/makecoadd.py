@@ -116,6 +116,21 @@ if __name__ == '__main__':
     # TODO: Delete this
     rng = np.random.RandomState(SEED)
 
+    # First stamp everything together so that fakes are put down at the right place
+    mycats = ' '.join(cats)
+
+    # First scamp everything
+    # make a random dir for the output catalogs
+    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
+    os.makedirs(scamp_outpath)
+
+    syscall = 'scamp -c %s %s' % (scampconf, mycats)
+    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
+    if args.nothreads:
+        syscall += ' -NTHREADS 2'
+    liblg.execute(syscall, capture=False)
+
+
     # First check to see if the fakes should be added
     if args.nfakes > 0:
 
@@ -124,9 +139,17 @@ if __name__ == '__main__':
         radec = []
 
         for frame in frames:
-            with fits.open(frame) as f:
 
-                wcs = WCS(f[0].header)
+            # read in the fits header from scamp
+
+            head = frame.replace('.fits', '.head')
+            
+            with open('your .head file') as f:
+                h = fits.Header()
+                for text in f:
+                    h.append(fits.Card.fromstring(text))
+                            
+                wcs = WCS(h)
                 im = f[0].data
                 n1, n2 = im.shape
 
@@ -169,18 +192,6 @@ if __name__ == '__main__':
         logger.setLevel(logging.DEBUG)
         make_variance(frames, masks, logger)
 
-    mycats = ' '.join(cats)
-
-    # First scamp everything
-    # make a random dir for the output catalogs
-    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
-    os.makedirs(scamp_outpath)
-
-    syscall = 'scamp -c %s %s' % (scampconf, mycats)
-    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
-    if args.nothreads:
-        syscall += ' -NTHREADS 2'
-    liblg.execute(syscall, capture=False)
 
     allims = ' '.join(frames)
     out = args.output_basename[0] + '.fits'
