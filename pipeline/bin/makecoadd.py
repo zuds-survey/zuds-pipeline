@@ -84,6 +84,9 @@ if __name__ == '__main__':
                         help='Run astromatic software with only one thread.')
     parser.add_argument('--add-fakes', dest='nfakes', type=int, default=0,
                         help='Number of fakes to add. Default 0.')
+    parser.add_argument('--convolve', dest='convolve', action='store_true', default=False,
+                        help='Convolve image with PSF to artificially degrade its quality.')
+
     args = parser.parse_args()
 
     # distribute the work to each processor
@@ -306,8 +309,13 @@ physical
                 hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = x, y
                 o.write(f'circle({x},{y},10) # width=2 color=red\n')
 
-    with fits.open(out, mode='update') as f, fits.open(psfimpath) as pf:
-        kernel = pf[0].data
-        idata = f[0].data
-        convolved = convolve(idata, kernel)
-        f[0].data = convolved
+    if args.convolve:
+        with fits.open(out, mode='update') as f, fits.open(psfimpath, mode='update') as pf:
+            kernel = pf[0].data
+            idata = f[0].data
+            convolved = convolve(idata, kernel)
+            f[0].data = convolved
+            newpsf = convolve(kernel, kernel)
+            pf[0].data = newpsf
+
+            
