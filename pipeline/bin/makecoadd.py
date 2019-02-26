@@ -146,19 +146,23 @@ if __name__ == '__main__':
             # read in the fits header from scamp
 
             head = frame.replace('.fits', '.head')
-
-            with open('your .head file') as f:
+            
+            with open(head) as f:
                 h = fits.Header()
                 for text in f:
-                    h.append(fits.Card.fromstring(text))
-
+                    h.append(fits.Card.fromstring(text.strip()))
+                with fits.open(frame) as hdul:
+                    hh = hdul[0].header
+                    h['SIMPLE'] = hh['SIMPLE']
+                    h['NAXIS'] = hh['NAXIS']
+                    h['BITPIX'] = hh['BITPIX']
+                    h['NAXIS1'] = hh['NAXIS1']
+                    h['NAXIS2'] = hh['NAXIS2']
+                    
                 wcs = WCS(h)
-                im = f[0].data
-                n1, n2 = im.shape
-
+                
                 # get x and y coords
-                pixcrd = np.asarray([[1, 1], [n1, 1], [1, n2], [n1, n2]])
-                world_corners = wcs.wcs_pix2world(pixcrd, 1)
+                world_corners = wcs.calc_footprint()
                 radec.append(world_corners)
 
         radec = np.vstack(radec)
