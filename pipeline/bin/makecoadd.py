@@ -10,6 +10,7 @@ from makevariance import make_variance
 import logging
 from galsim import des
 from astropy.convolution import convolve
+import shutil
 
 #TODO: Delete this
 SEED = 1234
@@ -144,6 +145,7 @@ if __name__ == '__main__':
     if args.nfakes > 0:
 
         # get the range of ra and dec over which fakes can be implanted
+
         radec = []
         headers = []
 
@@ -153,19 +155,23 @@ if __name__ == '__main__':
 
             head = frame.replace('.fits', '.head')
 
-            with open('your .head file') as f:
+            with open(head) as f:
                 h = fits.Header()
                 for text in f:
-                    h.append(fits.Card.fromstring(text))
+                    h.append(fits.Card.fromstring(text.strip()))
+                with fits.open(frame) as hdul:
+                    hh = hdul[0].header
+                    h['SIMPLE'] = hh['SIMPLE']
+                    h['NAXIS'] = hh['NAXIS']
+                    h['BITPIX'] = hh['BITPIX']
+                    h['NAXIS1'] = hh['NAXIS1']
+                    h['NAXIS2'] = hh['NAXIS2']
 
                 wcs = WCS(h)
                 headers.append(h)
-                im = f[0].data
-                n1, n2 = im.shape
 
                 # get x and y coords
-                pixcrd = np.asarray([[1, 1], [n1, 1], [1, n2], [n1, n2]])
-                world_corners = wcs.wcs_pix2world(pixcrd, 1)
+                world_corners = wcs.calc_footprint()
                 radec.append(world_corners)
 
         radec = np.vstack(radec)
@@ -187,7 +193,7 @@ if __name__ == '__main__':
 
             ra = rng.uniform(fakeminra, fakemaxra)
             dec = rng.uniform(fakemaxdec, fakemindec)
-            mag = rng.uniform(17, 24)
+            mag = rng.uniform(19.5, 24)
             fake = Fake(ra, dec, mag=mag)
             fakes.append(fake)
 
@@ -201,8 +207,8 @@ if __name__ == '__main__':
             newhead = orighead.replace('.head', '.fake.head')
             origcat = f.replace('.fits', '.cat')
             newcat = origcat.replace('.cat', '.fake.cat')
-            os.rename(orighead, newhead)
-            os.rename(origcat, newcat)
+            shutil.copy(orighead, newhead)
+            shutil.copy(origcat, newcat)
 
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
         logger = logging.getLogger('fakevar')
@@ -293,6 +299,7 @@ if __name__ == '__main__':
             f[0].data = convolved
             newpsf = convolve(kernel, kernel)
             pf[0].data = newpsf
+
 
     # And zeropoint the coadd, putting results in the header
     liblg.solve_zeropoint(out, psfimpath, outcat)
