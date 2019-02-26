@@ -67,7 +67,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None, inhdr=None):
         orighdr = ff[0].header
         hdr.update(orighdr.cards)
         if inhdr is not None:
-            hdr.update(inhdr.cards)
+            hdr.update([card for card in inhdr.cards if card.keyword not in ['END', 'COMMENT', 'HISTORY']])
         for i, fake in enumerate(fakes):
             hdr[f'FAKE{i:02d}RA'] = fake.ra
             hdr[f'FAKE{i:02d}DC'] = fake.dec
