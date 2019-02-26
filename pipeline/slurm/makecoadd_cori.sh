@@ -11,7 +11,7 @@
 #SBATCH --dependency=afterok:DLIST
 #SBATCH -C haswell
 #SBATCH --exclusive
-#SBATCH --volume=/global/homes/d/dgold:/home/desi;/global/cscratch1/sd/dgold/lensgrinder/pipeline:/pipeline;/global/cscratch1/sd/dgold/lensgrinder/pipeline/astromatic:/config
+#SBATCH --volume="$3"
 #SBATCH -o $4/slurm-%A.out
 
 export OMP_NUM_THREADS=1

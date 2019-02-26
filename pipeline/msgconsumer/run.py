@@ -25,6 +25,16 @@ newt_baseurl = 'https://newt.nersc.gov/newt'
 #database_uri = os.getenv('DATABASE_URI')
 database_uri = 'host=db port=5432 dbname=ztfcoadd user=ztfcoadd_admin'
 
+mounts = {
+    '/global/homes/d/dgold':'/home/desi',
+    '/global/cscratch1/sd/dgold/lensgrinder/pipeline':'/pipeline',
+    '/global/cscratch1/sd/dgold/lensgrinder/pipeline/astromatic': '/config',
+    '/global/cscratch1/sd/dgold/lensgrinder/pipeline/skyportal':'/skyportal',
+    '/global/project/projectdirs/astro250/www/stamps': '/stamps',
+    '/global/cscratch1/sd/dgold/lensgrinder/pipeline/slurm': '/slurm'
+}
+vstring = ';'.join([f'{k}:{mounts[k]}' for k in mounts])
+
 
 def is_up(host):
     """Check to see if cori or edison is up via the NEWT REST API."""
@@ -90,6 +100,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
         contents = contents.replace('$5', f'coadd_{scriptname.replace(".sh","")}')
+        contents = contents.replace('$3', vstring)
 
         for job in jobs:
             imstr = ' '.join(job['images'])
@@ -130,6 +141,7 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
         contents = contents.replace('$5', f'coaddsub_{scriptname.replace(".sh","")}')
+        contents = contents.replace('$3', vstring)
 
         # consolidate dependencies
 
@@ -181,6 +193,8 @@ class TaskHandler(object):
         target = os.path.join(newt_baseurl, 'file', host, path)
         contents = contents.replace('$4', f'/{os.path.dirname(path)}')
         contents = contents.replace('$5', f'forcephoto_{scriptname.replace(".sh","")}')
+        contents = contents.replace('$3', vstring)
+
 
         # consolidate dependencies
         contents = self.resolve_dependencies(contents, data)
@@ -217,6 +231,7 @@ class TaskHandler(object):
 
         contents = contents.replace('$1', '\n'.join(images))
         contents = contents.replace('$2', '\n'.join(masks))
+        contents = contents.replace('$5', vstring)
 
         if scriptname is None:
             scriptname = f'{uuid.uuid4().hex}.sh'

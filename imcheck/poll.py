@@ -770,8 +770,8 @@ class IPACQueryManager(object):
             # download the images
             self.logger.info(f'Downloading {len(npaths)} images on {ndtn} data transfer nodes...')
 
-            #self.reset_manifest()
-            #self.download_images(npaths, ipaths)
+            self.reset_manifest()
+            self.download_images(npaths, ipaths)
 
             new_npaths = self.read_manifest()
             sub_npaths = self.read_sub_manifest()
@@ -793,7 +793,7 @@ class IPACQueryManager(object):
             # now actually determine the new jobs
 
             # batch dispatch variance map making
-            #variance_corrids = self.determine_and_relay_variance_jobs(npaths)
+            variance_corrids = self.determine_and_relay_variance_jobs(npaths)
 
             # then make any new templates that are needed
             #template_corrids = self.determine_and_relay_template_jobs(variance_corrids, metatable)
@@ -802,7 +802,7 @@ class IPACQueryManager(object):
             #coaddsub_corrids = self.determine_and_relay_coaddsub_jobs(variance_corrids, template_corrids, metatable)
 
             # lastly do forced photometry on the detected objects
-            self.determine_and_relay_forcephoto_jobs([], sub_metatable)
+            #self.determine_and_relay_forcephoto_jobs([], sub_metatable)
 
             self.__del__()
 
