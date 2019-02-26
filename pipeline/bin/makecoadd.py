@@ -32,7 +32,7 @@ class Fake(object):
         return obj
 
 
-def add_fakes_to_image(inim, outim, fakes, seed=None):
+def add_fakes_to_image(inim, outim, fakes, seed=None, inhdr=None):
 
     if seed is None:
         seed = time.time()
@@ -44,7 +44,11 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
         seeing = f[0].header['SEEING']
         sigma = seeing / 2.355
         zp = f[0].header['MAGZP']
-        wcs = WCS(f[0].header)
+
+        if inhdr is not None:
+            wcs = WCS(inhdr)
+        else:
+            wcs = WCS(f[0].header)
 
     for fake in fakes:
         obj = fake.galsim_object(sigma, zp)
@@ -59,8 +63,10 @@ def add_fakes_to_image(inim, outim, fakes, seed=None):
 
     with fits.open(outim, mode='update') as f, fits.open(inim) as ff:
         hdr = f[0].header
-        inhdr = ff[0].header
-        hdr.update(inhdr.cards)
+        orighdr = ff[0].header
+        hdr.update(orighdr.cards)
+        if inhdr is not None:
+            hdr.update(inhdr.cards)
         for i, fake in enumerate(fakes):
             hdr[f'FAKE{i:02d}RA'] = fake.ra
             hdr[f'FAKE{i:02d}DC'] = fake.dec
@@ -138,8 +144,8 @@ if __name__ == '__main__':
     if args.nfakes > 0:
 
         # get the range of ra and dec over which fakes can be implanted
-
         radec = []
+        headers = []
 
         for frame in frames:
 
@@ -153,6 +159,7 @@ if __name__ == '__main__':
                     h.append(fits.Card.fromstring(text))
 
                 wcs = WCS(h)
+                headers.append(h)
                 im = f[0].data
                 n1, n2 = im.shape
 
@@ -184,9 +191,9 @@ if __name__ == '__main__':
             fake = Fake(ra, dec, mag=mag)
             fakes.append(fake)
 
-        for frame in frames:
+        for frame, hdr in zip(frames, headers):
             outim = frame.replace('.fits', '.fake.fits')
-            add_fakes_to_image(frame, outim, fakes, seed=SEED)
+            add_fakes_to_image(frame, outim, fakes, seed=SEED, inhdr=hdr)
 
         masks = [f.replace('sciimg','mskimg') for f in frames]
         for f in frames:
@@ -286,7 +293,6 @@ if __name__ == '__main__':
             f[0].data = convolved
             newpsf = convolve(kernel, kernel)
             pf[0].data = newpsf
-
 
     # And zeropoint the coadd, putting results in the header
     liblg.solve_zeropoint(out, psfimpath, outcat)
