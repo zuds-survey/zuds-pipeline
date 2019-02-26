@@ -278,6 +278,16 @@ if __name__ == '__main__':
     # save it to the D
     psfimg.write(psfimpath)
 
+    if args.convolve:
+        with fits.open(out, mode='update') as f, fits.open(psfimpath, mode='update') as pf:
+            kernel = pf[0].data
+            idata = f[0].data
+            convolved = convolve(idata, kernel)
+            f[0].data = convolved
+            newpsf = convolve(kernel, kernel)
+            pf[0].data = newpsf
+
+
     # And zeropoint the coadd, putting results in the header
     liblg.solve_zeropoint(out, psfimpath, outcat)
 
@@ -315,14 +325,4 @@ physical
                 x, y = fake.xy(wcs)
                 hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = x, y
                 o.write(f'circle({x},{y},10) # width=2 color=red\n')
-
-    if args.convolve:
-        with fits.open(out, mode='update') as f, fits.open(psfimpath, mode='update') as pf:
-            kernel = pf[0].data
-            idata = f[0].data
-            convolved = convolve(idata, kernel)
-            f[0].data = convolved
-            newpsf = convolve(kernel, kernel)
-            pf[0].data = newpsf
-
 
