@@ -60,7 +60,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None, inhdr=None):
         bounds = img.bounds
         im[bounds] = im[bounds] + img
 
-    galsim.fits.write(im, file_name=outim)
+    galsim.fits.write(im, file_name=outim, clobber=True)
 
     with fits.open(outim, mode='update') as f, fits.open(inim) as ff:
         hdr = f[0].header
