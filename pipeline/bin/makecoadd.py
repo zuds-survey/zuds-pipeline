@@ -10,6 +10,7 @@ from makevariance import make_variance
 import logging
 from galsim import des
 from astropy.convolution import convolve
+import shutil
 
 #TODO: Delete this
 SEED = 1234
@@ -184,7 +185,7 @@ if __name__ == '__main__':
 
             ra = rng.uniform(fakeminra, fakemaxra)
             dec = rng.uniform(fakemaxdec, fakemindec)
-            mag = rng.uniform(17, 24)
+            mag = rng.uniform(19.5, 24)
             fake = Fake(ra, dec, mag=mag)
             fakes.append(fake)
 
@@ -198,8 +199,8 @@ if __name__ == '__main__':
             newhead = orighead.replace('.head', '.fake.head')
             origcat = f.replace('.fits', '.cat')
             newcat = origcat.replace('.cat', '.fake.cat')
-            os.rename(orighead, newhead)
-            os.rename(origcat, newcat)
+            shutil.copy(orighead, newhead)
+            shutil.copy(origcat, newcat)
 
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
         logger = logging.getLogger('fakevar')
