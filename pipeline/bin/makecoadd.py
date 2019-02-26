@@ -146,12 +146,12 @@ if __name__ == '__main__':
             # read in the fits header from scamp
 
             head = frame.replace('.fits', '.head')
-            
+
             with open('your .head file') as f:
                 h = fits.Header()
                 for text in f:
                     h.append(fits.Card.fromstring(text))
-                            
+
                 wcs = WCS(h)
                 im = f[0].data
                 n1, n2 = im.shape
@@ -189,8 +189,15 @@ if __name__ == '__main__':
             add_fakes_to_image(frame, outim, fakes, seed=SEED)
 
         masks = [f.replace('sciimg','mskimg') for f in frames]
+        for f in frames:
+            orighead = f.replace('.fits', '.head')
+            newhead = orighead.replace('.head', '.fake.head')
+            origcat = f.replace('.fits', '.cat')
+            newcat = origcat.replace('.cat', '.fake.cat')
+            os.rename(orighead, newhead)
+            os.rename(origcat, newcat)
+
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
-        cats = [f.replace('.fits', '.cat') for f in frames]
         logger = logging.getLogger('fakevar')
         logger.setLevel(logging.DEBUG)
         make_variance(frames, masks, logger)
@@ -318,4 +325,4 @@ physical
             newpsf = convolve(kernel, kernel)
             pf[0].data = newpsf
 
-            
+
