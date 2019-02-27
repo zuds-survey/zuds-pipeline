@@ -207,8 +207,11 @@ if __name__ == '__main__':
             newhead = orighead.replace('.head', '.fake.head')
             origcat = f.replace('.fits', '.cat')
             newcat = origcat.replace('.cat', '.fake.cat')
+            oldnoise = f.replace('.fits', '.noise.fits')
+            newnoise = oldnoise.replace('.noise.fits', '.fake.noise.fits')
             shutil.copy(orighead, newhead)
             shutil.copy(origcat, newcat)
+            shutil.copy(oldnoise, newnoise)
 
         frames = [f.replace('.fits', '.fake.fits') for f in frames]
         logger = logging.getLogger('fakevar')
