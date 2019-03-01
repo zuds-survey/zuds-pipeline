@@ -296,6 +296,7 @@ class TaskHandler(object):
         self._reconnect()
         data = json.loads(body)
 
+        """
         if is_up('cori'):
             host = 'cori'
         elif is_up('edison'):
@@ -308,6 +309,9 @@ class TaskHandler(object):
             self.cursor.execute(query, ('DEAD_LETTER', properties.correlation_id))
 
             return ch.basic_reject(method.delivery_tag, requeue=False)
+        """
+
+        host = 'cori'
 
         scriptname = f'{properties.correlation_id}.sh'
 
