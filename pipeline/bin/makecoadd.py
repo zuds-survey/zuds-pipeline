@@ -38,6 +38,7 @@ def add_fakes_to_image(inim, outim, fakes, inhdr=None):
         seeing = f[0].header['SEEING']
         sigma = seeing / 2.355
         zp = f[0].header['MAGZP']
+        scale = f[0].header['PIXSCALE']
 
         if inhdr is not None:
             wcs = WCS(inhdr)
@@ -46,7 +47,7 @@ def add_fakes_to_image(inim, outim, fakes, inhdr=None):
 
     for fake in fakes:
         obj = fake.galsim_object(sigma, zp)
-        img = obj.drawImage()
+        img = obj.drawImage(scale=scale)
         img.setCenter(fake.xy(wcs))
         bounds = img.bounds
         im[bounds] = im[bounds] + img
