@@ -12,9 +12,7 @@ from galsim import des
 from astropy.convolution import convolve
 import shutil
 
-#TODO: Delete this
 SEED = 1234
-
 
 class Fake(object):
 
@@ -33,12 +31,7 @@ class Fake(object):
         return obj
 
 
-def add_fakes_to_image(inim, outim, fakes, seed=None, inhdr=None):
-
-    if seed is None:
-        seed = time.time()
-
-    rng = galsim.BaseDeviate(seed)
+def add_fakes_to_image(inim, outim, fakes, inhdr=None):
 
     im = galsim.fits.read(inim)
     with fits.open(inim) as f:
@@ -54,8 +47,6 @@ def add_fakes_to_image(inim, outim, fakes, seed=None, inhdr=None):
     for fake in fakes:
         obj = fake.galsim_object(sigma, zp)
         img = obj.drawImage()
-        noise = galsim.PoissonNoise(rng)
-        img.addNoise(noise)
         img.setCenter(fake.xy(wcs))
         bounds = img.bounds
         im[bounds] = im[bounds] + img
@@ -71,6 +62,7 @@ def add_fakes_to_image(inim, outim, fakes, seed=None, inhdr=None):
         for i, fake in enumerate(fakes):
             hdr[f'FAKE{i:02d}RA'] = fake.ra
             hdr[f'FAKE{i:02d}DC'] = fake.dec
+            hdr[f'FAKE{i:02d}FL'] = fake.galsim_object(sigma, zp).flux
             hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = fake.xy(wcs)
             hdr[f'FAKE{i:02d}MG'] = fake.mag
 
@@ -121,7 +113,6 @@ if __name__ == '__main__':
     psfconf = os.path.join(confdir, 'psfex.conf')
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
-
 
     # TODO: Delete this
     rng = np.random.RandomState(SEED)
@@ -199,7 +190,7 @@ if __name__ == '__main__':
 
         for frame, hdr in zip(frames, headers):
             outim = frame.replace('.fits', '.fake.fits')
-            add_fakes_to_image(frame, outim, fakes, seed=SEED, inhdr=hdr)
+            add_fakes_to_image(frame, outim, fakes, inhdr=hdr)
 
         masks = [f.replace('sciimg','mskimg') for f in frames]
         for f in frames:
@@ -324,7 +315,8 @@ if __name__ == '__main__':
             cards = [c for c in ff[0].header.cards if ('FAKE' in c.keyword and
                                                        ('RA' in c.keyword or
                                                         'DC' in c.keyword or
-                                                        'MG' in c.keyword))]
+                                                        'MG' in c.keyword or
+                                                        'FL' in c.keyword))]
             wcs = WCS(f[0].header)
             f[0].header.update(cards)
 
