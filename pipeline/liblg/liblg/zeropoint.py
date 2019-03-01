@@ -36,7 +36,7 @@ def parse_sexcat(cat, bin=False):
     return data
 
 
-def zpsee(image, psf, cat, cursor):
+def zpsee(image, psf, cat, cursor, meas_image):
     """Compute the median zeropoint of an image or images (path/paths:
     `im_or_ims`) using the Pan-STARRS photometric database (cursor:
     `cursor`)."""
@@ -80,7 +80,7 @@ def zpsee(image, psf, cat, cursor):
 
             # now calculate the PSF mag
 
-            pobj = yao_photometry_single(image, psf, ra_c, dec_c)
+            pobj = yao_photometry_single(meas_image, psf, ra_c, dec_c)
             mag_c = -2.5 * np.log10(pobj.Fpsf) + 27.5
 
             zp = 27.5 + (mps1 - mag_c)
@@ -94,7 +94,7 @@ def zpsee(image, psf, cat, cursor):
     return zp, seeing
 
 
-def solve_zeropoint(image, psf, cat):
+def solve_zeropoint(image, psf, cat, bkgsub):
 
     import psycopg2
 
@@ -109,7 +109,7 @@ def solve_zeropoint(image, psf, cat):
 
     with con:
         cursor = con.cursor()
-        zp, see = zpsee(image, psf, cat, cursor)
+        zp, see = zpsee(image, psf, cat, cursor, bkgsub)
         with fits.open(image, mode='update') as f:
             f[0].header['MAGZP'] = zp
             f[0].header['SEEING'] = see

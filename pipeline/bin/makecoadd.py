@@ -257,8 +257,9 @@ if __name__ == '__main__':
     # Make a new catalog
     outcat = args.output_basename[0] + '.cat'
     noise = args.output_basename[0] + '.noise.fits'
-    syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT 27.5 %s'
-    syscall = syscall % (sexconf, outcat, noise, out)
+    bkgsub = args.output_basename[0] + '.bkgsub.fits'
+    syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
+              f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
     syscall = ' '.join([syscall, clargs])
     liblg.execute(syscall, capture=False)
 
@@ -297,7 +298,7 @@ if __name__ == '__main__':
 
 
     # And zeropoint the coadd, putting results in the header
-    liblg.solve_zeropoint(out, psfimpath, outcat)
+    liblg.solve_zeropoint(out, psfimpath, outcat, bkgsub)
 
     # Now retrieve the zeropoint
     with fits.open(out) as f:
