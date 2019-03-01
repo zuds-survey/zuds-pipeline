@@ -603,8 +603,12 @@ class IPACQueryManager(object):
 
         # see what should be in the coadd
         query = 'SELECT ID, PATH, HASVARIANCE FROM IMAGE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
-                'AND GOOD=TRUE AND OBSDATE BETWEEN %s AND %s'
-        self.cursor.execute(query, (field, ccdnum, quadrant, band, binl, binr))
+                'AND GOOD=TRUE AND OBSJD BETWEEN %s AND %s'
+
+        jdl = Time(binl, format='iso').jd
+        jdr = Time(binr, format='iso').jd
+
+        self.cursor.execute(query, (field, ccdnum, quadrant, band, jdl, jdr))
         result = self.cursor.fetchall()
         if len(result) == 0:
             return False, [], [], []
