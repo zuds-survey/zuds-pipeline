@@ -288,14 +288,45 @@ if __name__ == '__main__':
     psfimg.write(psfimpath)
 
     if args.convolve:
-        with fits.open(out, mode='update') as f, fits.open(psfimpath, mode='update') as pf:
+        with fits.open(out, mode='update') as f, fits.open(psfimpath) as pf:
             kernel = pf[0].data
             idata = f[0].data
             convolved = convolve(idata, kernel)
             f[0].data = convolved
-            newpsf = convolve(kernel, kernel)
-            pf[0].data = newpsf
 
+        # Now remake the PSF model
+        # Make a new catalog
+        outcat = args.output_basename[0] + '.cat'
+        noise = args.output_basename[0] + '.noise.fits'
+        bkgsub = args.output_basename[0] + '.bkgsub.fits'
+        syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
+                  f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
+        syscall = ' '.join([syscall, clargs])
+        liblg.execute(syscall, capture=False)
+
+        # now model the PSF
+        syscall = f'psfex -c {psfconf} {outcat}'
+        liblg.execute(syscall, capture=False)
+        psf = args.output_basename[0] + '.psf'
+
+        # and save it as a fits model
+        gsmod = des.DES_PSFEx(psf)
+        with fits.open(psf) as f:
+            xcen = f[1].header['POLZERO1']
+            ycen = f[1].header['POLZERO2']
+            psfsamp = f[1].header['PSF_SAMP']
+
+        cpos = galsim.PositionD(xcen, ycen)
+        psfmod = gsmod.getPSF(cpos)
+        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
+
+        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
+        psfimg.wcs = None
+        psfimg = galsim.Image(np.fliplr(psfimg.array))
+
+        psfimpath = f'{psf}.fits'
+        # save it to the D
+        psfimg.write(psfimpath)
 
     # And zeropoint the coadd, putting results in the header
     liblg.solve_zeropoint(out, psfimpath, outcat, bkgsub)
