@@ -72,7 +72,7 @@ def zpsee(image, psf, cat, cursor, meas_image):
     for row in cat:
         ra_c = row['X_WORLD']
         dec_c = row['Y_WORLD']
-        sep = 3600. * ( np.cos(dec_c*np.pi/180.) * (ra_c - result['ra'])**2 + (dec_c - result['dec'])**2)**0.5
+        sep = 3600. * ( np.cos(dec_c*np.pi/180.)**2 * (ra_c - result['ra'])**2 + (dec_c - result['dec'])**2)**0.5
 
         match = result[sep <= 2.]
 
