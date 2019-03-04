@@ -1,5 +1,5 @@
 function table_to_csv(source, write_header) {
-    const columns = ['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys', 'lim_mag', 'mag', 'magerr'];
+    const columns = ['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys', 'lim_mag', 'mag', 'magerr', 'instrument'];
     const nrows = source.get_length();
     const lines = [];
 
