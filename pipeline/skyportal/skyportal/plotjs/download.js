@@ -1,5 +1,5 @@
 function table_to_csv(source, write_header) {
-    const columns = ['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys', 'lim_mag'];
+    const columns = ['mjd', 'filter', 'flux', 'fluxerr', 'zp', 'zpsys', 'lim_mag', 'mag', 'magerr'];
     const nrows = source.get_length();
     const lines = [];
 
@@ -31,12 +31,16 @@ function table_to_csv(source, write_header) {
 
 const filename = 'objname.csv';
 filetext = '';
+var write_header = true;
+
 for (let i=0; i < toggle.labels.length; i++){
-    let write_header = i === 0;
-    if (slider.value > 0) {
-        filetext += table_to_csv(eval('bin' + i).data_source, write_header);
-    } else {
-        filetext += table_to_csv(eval('obs' + i).data_source, write_header);
+    if (toggle.active.includes(i)) {
+        if (slider.value > 0) {
+            filetext += table_to_csv(eval('bin' + i).data_source, write_header);
+        } else {
+            filetext += table_to_csv(eval('obs' + i).data_source, write_header);
+        }
+        write_header = false;
     }
 }
 const blob = new Blob([filetext], { type: 'text/csv;charset=utf-8;' });
