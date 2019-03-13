@@ -38,7 +38,10 @@ def make_variance(frames, masks, logger=None, extra={}):
 
         # get the zeropoint from the fits header using fortran
         with fits.open(frame) as f:
-            zp = f[0].header['MAGZP']
+            resolve = 'MAGZP' not in f[0].header or 'SEEING' not in f[0].header
+
+        if resolve:
+            solve_zeropoint(frame, frame.replace('fits', 'cat'))
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
