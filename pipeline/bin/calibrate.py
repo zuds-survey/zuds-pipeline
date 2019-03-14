@@ -122,7 +122,7 @@ def calibrate(frame):
 
     # first run source extractor
     cat = frame.replace('.fits', '.cat')
-    cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nwwfilt} {frame}'
+    cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nnwfilt} {frame}'
     subprocess.check_call(cmd.split())
 
     # now run scamp to solve the astrometry
