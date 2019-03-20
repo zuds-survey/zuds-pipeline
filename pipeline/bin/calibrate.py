@@ -30,19 +30,29 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     `im_or_ims`) using the Pan-STARRS photometric database (cursor:
     `cursor`)."""
 
+    hd = fits.Header()
+
     with fits.open(image) as f:
         band = f[0].header['FILTER'] + '_median'
         nax1 = f[0].header['NAXIS1']
         nax2 = f[0].header['NAXIS2']
-        hd = f[0].header.copy()
+
+    hd['NAXIS1'] = nax1
+    hd['NAXIS2'] = nax2
 
     if inhdr is not None:
         with open(inhdr, 'r') as f:
-            for line in f:
-                card = fits.Card.fromstring(f.strip())
+            for line in list(f.read().split('\n')):
+                card = fits.Card.fromstring(line.strip())
                 hd.append(card)
 
-    wcs = WCS(hd)
+    try:
+        wcs = WCS(hd)
+    except Exception as e: 
+        print(f'failing header: {hd}')
+        print(f'failing image: {image}')
+        raise e
+
     corners = wcs.calc_footprint()
 
     ra_ll, dec_ll = corners[0]
@@ -66,11 +76,17 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
                                                 ('dec','<f8'),
                                                 ('mag','<f8')])
 
-    these_zps = []
+    zps = []
 
     cat_coords = SkyCoord(ra=cat['X_WORLD'] * u.degree, dec=cat['Y_WORLD'] * u.degree)
     db_coords = SkyCoord(ra=result['ra'] * u.degree, dec=result['dec'] * u.degree)
-    idx, d2d, _ = cat_coords.match_to_catalog_sky(db_coords)
+    try:
+        idx, d2d, _ = cat_coords.match_to_catalog_sky(db_coords)
+    except ValueError as e:
+        print(f'failing frame was {image}')
+        print(f'cat coords were {cat_coords}')
+        print(f' db coords were {db_coords}')
+        raise e
 
     for cat_row, i, d in zip(cat, idx, d2d):
         if d <= 1 * u.arcsec:
@@ -101,7 +117,7 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
     with fits.open(psf) as f, fits.open(image) as im:
         seeing = f[1].header['PSF_FWHM'] * im[0].header['PIXSCALE']
         
-    with fits.open(image, mode='update') as f:
+    with fits.open(image, mode='update', memmap=False) as f:
         f[0].header['MAGZP'] = zp
         f[0].header['SEEING'] = seeing
     
@@ -111,14 +127,17 @@ def calibrate(frame):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
 
-    mypath = os.path.abspath(__file__)
+    mypath = os.path.dirname(os.path.abspath(__file__))
     sexconf = os.path.join(mypath, '../astromatic/calibration/scamp.sex')
     sexparam = os.path.join(mypath, '../astromatic/calibration/scamp.param')
     scampconf = os.path.join(mypath, '../astromatic/calibration/scamp.conf')
     sexphotconf = os.path.join(mypath, '../astromatic/calibration/psfphot.sex')
+    photparams = os.path.join(mypath, '../astromatic/calibration/psfphot.param')
     sexnnw = os.path.join(mypath, '../astromatic/calibration/default.nnw')
     sexfilter = os.path.join(mypath, '../astromatic/calibration/default.conv')
+    psfconf = os.path.join(mypath, '../astromatic/calibration/psfex.conf')
     nnwfilt = f'-FILTER_NAME {sexfilter} -STARNNW_NAME {sexnnw}'
+
 
     # first run source extractor
     cat = frame.replace('.fits', '.cat')
@@ -140,3 +159,7 @@ def calibrate(frame):
 
     # now solve for the zeropoint
     solve_zeropoint(frame, cat, psf, zp_fid=27.5)
+    
+    with fits.open(frame, mode='update', memmap=False) as f:
+        if 'SATURATE' not in f[0].header:
+            f[0].header['SATURATE'] = 5e4
