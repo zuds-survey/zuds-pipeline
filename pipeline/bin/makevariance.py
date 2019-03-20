@@ -1,8 +1,9 @@
 import os
 import string
 import numpy as np
-from liblg import medg, mkivar, execute, make_rms
+from liblg import medg, mkivar, execute, make_rms, solve_zeropoint
 from astropy.io import fits
+from calibrate import calibrate 
 
 __all__ = ['make_variance']
 
@@ -37,11 +38,10 @@ def make_variance(frames, masks, logger=None, extra={}):
             logger.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
+        calibrate(frame)
+        
         with fits.open(frame) as f:
-            resolve = 'MAGZP' not in f[0].header or 'SEEING' not in f[0].header
-
-        if resolve:
-            solve_zeropoint(frame, frame.replace('fits', 'cat'))
+            zp = f[0].header['MAGZP']
 
         # calculate some properties of the image (skysig, lmtmag, etc.)
         # and store them in the header. note: this call is to compiled fortran
