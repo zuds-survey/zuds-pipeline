@@ -5,6 +5,7 @@ from astropy.wcs import WCS
 from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
 import logging
+import shutil
 
 from liblg.yao import yao_photometry_single
 
@@ -190,8 +191,11 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsx))
         hotparlogger.info(str(nsy))
 
-        syscall = 'hotpants -inim %s -hki -n i -c i -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
-                  '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
+        convnew = seeref > seenew
+
+        convolve_target = 'i' if convnew else 't'
+        syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
+                  f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
 
@@ -202,10 +206,9 @@ def make_sub(myframes, mytemplates, publish=True):
 
         with fits.open(sub, mode='update') as f, fits.open(frame) as fr:
             header = f[0].header
-            frat = float(header['KSUM00'])
-            subzp = 2.5 * np.log10(frat) + fr[0].header['MAGZP']
+            subzp = fr[0].header['MAGZP']  # normalized to photometric system of new image
             header['MAGZP'] = subzp
-            subpix = sub[0].data
+            subpix = f[0].data
             wcs = WCS(header)
 
         subpixvar = (0.5 * (np.percentile(subpix, 84) - np.percentile(subpix, 16.)))**2
@@ -225,12 +228,16 @@ def make_sub(myframes, mytemplates, publish=True):
         submaxdec -= 0.1 * ddec
 
         refpsf = template.replace('.fits', '.psf')
+        newpsf = frame.replace('.fits', '.psf')
+        psf = newpsf if convnew else refpsf
+        subpsf = sub.replace('.fits', '.psf')
+        shutil.copy(psf, subpsf)
 
         fluxes = []
         for i in range(1000):
             ra = np.random.uniform(subminra, submaxra)
             dec = np.random.uniform(submindec, submaxdec)
-            pobj = yao_photometry_single(sub, refpsf, ra, dec)
+            pobj = yao_photometry_single(sub, subpsf, ra, dec)
             fluxes.append(pobj.Fpsf)
 
         subpsffluxvar = (0.5 * (np.percentile(fluxes, 84) - np.percentile(fluxes, 16.)))**2
@@ -315,8 +322,10 @@ if __name__ == '__main__':
 
     import argparse
 
-    rank = 0
-    size = 1
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
