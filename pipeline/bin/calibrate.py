@@ -33,7 +33,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     hd = fits.Header()
 
     with fits.open(image) as f:
-        band = f[0].header['FILTER'] + '_median'
+        band = f[0].header['FILTER'][-1].lower() + '_median'
         nax1 = f[0].header['NAXIS1']
         nax2 = f[0].header['NAXIS2']
 
@@ -45,6 +45,9 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
             for line in list(f.read().split('\n')):
                 card = fits.Card.fromstring(line.strip())
                 hd.append(card)
+
+    hd['CTYPE1'] = 'RA---TPV'
+    hd['CTYPE2'] = 'DEC--TPV'
 
     try:
         wcs = WCS(hd)
@@ -86,6 +89,10 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
         print(f'failing frame was {image}')
         print(f'cat coords were {cat_coords}')
         print(f' db coords were {db_coords}')
+        print(f'query dict was {query_dict}')
+        print(f'wcs was {wcs}')
+        print(f'header was {hd}')
+        print(f'corners was {corners}')
         raise e
 
     for cat_row, i, d in zip(cat, idx, d2d):
