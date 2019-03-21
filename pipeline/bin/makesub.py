@@ -4,6 +4,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
+import shutil
 
 from liblg import yao_photometry_single
 
@@ -225,12 +226,14 @@ def make_sub(myframes, mytemplates, publish=True):
         refpsf = template.replace('.fits', '.psf')
         newpsf = frame.replace('.fits', '.psf')
         psf = newpsf if convnew else refpsf
+        subpsf = sub.replace('.fits', '.psf')
+        shutil.copy(psf, subpsf)
 
         fluxes = []
         for i in range(1000):
             ra = np.random.uniform(subminra, submaxra)
             dec = np.random.uniform(submindec, submaxdec)
-            pobj = yao_photometry_single(sub, psf, ra, dec)
+            pobj = yao_photometry_single(sub, subpsf, ra, dec)
             fluxes.append(pobj.Fpsf)
 
         subpsffluxvar = (0.5 * (np.percentile(fluxes, 84) - np.percentile(fluxes, 16.)))**2
