@@ -25,6 +25,7 @@ def make_rms(im, weight):
 
     with afits.open(im) as f:
         saturval = f[0].header['SATURATE']
+        impix = f[0].data
 
     # make rms map
     weighthdul = afits.open(weight)
@@ -46,6 +47,11 @@ def make_rms(im, weight):
     # make bpm
     bpm = np.zeros_like(rawrms, dtype='int16')
     bpm[~np.isfinite(rawrms)] = 256
+
+    # correct for ghosting
+    med = np.median(impix)
+    threesig = 3 * (0.5 * (np.percentile(impix, 84) - np.percentile(impix, 16)))
+    bpm[impix < med - threesig] = 64 # ghosted 
 
     # write it out
     bpmhdu = afits.PrimaryHDU(bpm)
