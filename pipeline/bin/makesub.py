@@ -6,7 +6,7 @@ from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
 import logging
 
-from liblg import yao_photometry_single
+from liblg.yao import yao_photometry_single
 
 from filterobjects import filter_sexcat
 from makecoadd import Fake
