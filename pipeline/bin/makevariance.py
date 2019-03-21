@@ -38,7 +38,7 @@ def make_variance(frames, masks, logger=None, extra={}):
             logger.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
-        calibrate(frame)
+        #calibrate(frame)
         
         with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
@@ -116,5 +116,8 @@ if __name__ == '__main__':
 
     frames = _split(frames, size)[rank]
     masks = _split(masks, size)[rank]
+
+    print(f'rank {rank} has frames {frames}', flush=True)
+    print(f'rank {rank} has masks {masks}', flush=True)
 
     make_variance(frames, masks, logger, extra=extra)
