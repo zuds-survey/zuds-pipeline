@@ -4,6 +4,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
+import logging
 
 from filterobjects import filter_sexcat
 from makecoadd import Fake
@@ -15,6 +16,9 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
 
 
 def make_sub(myframes, mytemplates, publish=True):
+    
+    myframes = np.atleast_1d(myframes).tolist()
+    mytemplates = np.atleast_1d(mytemplates).tolist()
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -276,7 +280,6 @@ def make_sub(myframes, mytemplates, publish=True):
 if __name__ == '__main__':
 
     import argparse
-    import logging
 
     rank = 0
     size = 1
