@@ -6,10 +6,10 @@ from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
 import logging
 import shutil
-import subprocess
 
 from galsim import des
 import galsim
+
 
 from liblg.yao import yao_photometry_single
 
@@ -28,7 +28,7 @@ def make_sub(myframes, mytemplates, publish=True):
     mytemplates = np.atleast_1d(mytemplates).tolist()
 
     # now set up a few pointers to auxiliary files read by sextractor
-    wd = os.path.abspath(os.path.dirname(__file__))
+    wd = os.path.dirname(__file__)
     confdir = os.path.join(wd, '..', 'astromatic', 'makesub')
     scampconfcat = os.path.join(confdir, 'scamp.conf.cat')
     defswarp = os.path.join(confdir, 'default.swarp')
@@ -195,7 +195,7 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsx))
         hotparlogger.info(str(nsy))
 
-        convnew = seeref > seenew
+        convnew = False
 
         convolve_target = 'i' if convnew else 't'
         syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
@@ -231,37 +231,7 @@ def make_sub(myframes, mytemplates, publish=True):
         submindec += 0.1 * ddec
         submaxdec -= 0.1 * ddec
 
-        refpsf = template.replace('.fits', '.psf')
-        newpsf = frame.replace('.fits', '.psf')
-        psf = newpsf if convnew else refpsf
-        cat = newcat if convnew else refcat
-        if not os.path.exists(psf):
-            psfconf = os.path.join(wd, '../astromatic/calibration/psfex.conf')
-            # now get a model of the psf
-            cmd = f'psfex -c {psfconf} {cat}'
-            subprocess.check_call(cmd.split())
-        subpsf = sub.replace('.fits', '.psf')
-        shutil.copy(psf, subpsf)
-
-        # and save it as a fits model
-        gsmod = des.DES_PSFEx(subpsf)
-        with fits.open(psf) as f:
-            xcen = f[1].header['POLZERO1']
-            ycen = f[1].header['POLZERO2']
-            psfsamp = f[1].header['PSF_SAMP']
-
-        cpos = galsim.PositionD(xcen, ycen)
-        psfmod = gsmod.getPSF(cpos)
-        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-        psfimg.wcs = None
-        psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-        psfimpath = f'{subpsf}.fits'
-        # save it to the D
-        psfimg.write(psfimpath)
-
+        psfimpath = frame.replace('.fits', '.psf.fits')
 
         fluxes = []
         for i in range(1000):
@@ -352,10 +322,10 @@ if __name__ == '__main__':
 
     import argparse
 
-    #from mpi4py import MPI
-    #comm = MPI.COMM_WORLD
-    rank = 0
-    size = 1
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -377,7 +347,7 @@ if __name__ == '__main__':
             frames = np.atleast_1d(frames).tolist()
         else:
             frames = None
-        #frames = comm.bcast(frames, root=0)
+        frames = comm.bcast(frames, root=0)
     else:
         frames = args.sciimg
 
@@ -389,7 +359,7 @@ if __name__ == '__main__':
             templates = np.atleast_1d(templates).tolist()
         else:
             templates = None
-        #templates = comm.bcast(templates, root=0)
+        templates = comm.bcast(templates, root=0)
     else:
         templates = args.template
 

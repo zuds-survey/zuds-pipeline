@@ -8,7 +8,7 @@ template="$4"
 cd /global/cscratch1/sd/dgold/ztfcoadd/job_scripts
 
 python /pipeline/bin/makecoadd.py --input-frames ${news} --input-catalogs ${cats} \
-               --output-basename=${obase} --nothreads  --add-fakes 10 
+               --output-basename=${obase} --nothreads  --add-fakes 10  --convolve
 
 if [ $? -eq 0 ]; then
 
