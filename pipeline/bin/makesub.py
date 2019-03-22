@@ -10,6 +10,7 @@ import shutil
 from galsim import des
 import galsim
 
+
 from liblg.yao import yao_photometry_single
 
 from filterobjects import filter_sexcat
@@ -194,7 +195,7 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsx))
         hotparlogger.info(str(nsy))
 
-        convnew = seeref > seenew
+        convnew = False
 
         convolve_target = 'i' if convnew else 't'
         syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
@@ -230,31 +231,7 @@ def make_sub(myframes, mytemplates, publish=True):
         submindec += 0.1 * ddec
         submaxdec -= 0.1 * ddec
 
-        refpsf = template.replace('.fits', '.psf')
-        newpsf = frame.replace('.fits', '.psf')
-        psf = newpsf if convnew else refpsf
-        subpsf = sub.replace('.fits', '.psf')
-        shutil.copy(psf, subpsf)
-
-        # and save it as a fits model
-        gsmod = des.DES_PSFEx(subpsf)
-        with fits.open(psf) as f:
-            xcen = f[1].header['POLZERO1']
-            ycen = f[1].header['POLZERO2']
-            psfsamp = f[1].header['PSF_SAMP']
-
-        cpos = galsim.PositionD(xcen, ycen)
-        psfmod = gsmod.getPSF(cpos)
-        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-        psfimg.wcs = None
-        psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-        psfimpath = f'{subpsf}.fits'
-        # save it to the D
-        psfimg.write(psfimpath)
-
+        psfimpath = frame.replace('.fits', '.psf.fits')
 
         fluxes = []
         for i in range(1000):
