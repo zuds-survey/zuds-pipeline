@@ -7,6 +7,9 @@ import uuid
 import logging
 import shutil
 
+from galsim import des
+import galsim
+
 from liblg.yao import yao_photometry_single
 
 from filterobjects import filter_sexcat
@@ -19,7 +22,7 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
 
 
 def make_sub(myframes, mytemplates, publish=True):
-    
+
     myframes = np.atleast_1d(myframes).tolist()
     mytemplates = np.atleast_1d(mytemplates).tolist()
 
@@ -233,11 +236,31 @@ def make_sub(myframes, mytemplates, publish=True):
         subpsf = sub.replace('.fits', '.psf')
         shutil.copy(psf, subpsf)
 
+        # and save it as a fits model
+        gsmod = des.DES_PSFEx(subpsf)
+        with fits.open(psf) as f:
+            xcen = f[1].header['POLZERO1']
+            ycen = f[1].header['POLZERO2']
+            psfsamp = f[1].header['PSF_SAMP']
+
+        cpos = galsim.PositionD(xcen, ycen)
+        psfmod = gsmod.getPSF(cpos)
+        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
+
+        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
+        psfimg.wcs = None
+        psfimg = galsim.Image(np.fliplr(psfimg.array))
+
+        psfimpath = f'{subpsf}.fits'
+        # save it to the D
+        psfimg.write(psfimpath)
+
+
         fluxes = []
         for i in range(1000):
             ra = np.random.uniform(subminra, submaxra)
             dec = np.random.uniform(submindec, submaxdec)
-            pobj = yao_photometry_single(sub, subpsf, ra, dec)
+            pobj = yao_photometry_single(sub, psfimpath, ra, dec)
             fluxes.append(pobj.Fpsf)
 
         subpsffluxvar = (0.5 * (np.percentile(fluxes, 84) - np.percentile(fluxes, 16.)))**2
