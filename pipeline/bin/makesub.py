@@ -6,6 +6,7 @@ from liblg import make_rms, cmbmask, execute, cmbrms
 import uuid
 import logging
 import shutil
+import subprocess
 
 from liblg.yao import yao_photometry_single
 
@@ -24,7 +25,7 @@ def make_sub(myframes, mytemplates, publish=True):
     mytemplates = np.atleast_1d(mytemplates).tolist()
 
     # now set up a few pointers to auxiliary files read by sextractor
-    wd = os.path.dirname(__file__)
+    wd = os.path.abspath(os.path.dirname(__file__))
     confdir = os.path.join(wd, '..', 'astromatic', 'makesub')
     scampconfcat = os.path.join(confdir, 'scamp.conf.cat')
     defswarp = os.path.join(confdir, 'default.swarp')
@@ -230,6 +231,12 @@ def make_sub(myframes, mytemplates, publish=True):
         refpsf = template.replace('.fits', '.psf')
         newpsf = frame.replace('.fits', '.psf')
         psf = newpsf if convnew else refpsf
+        cat = newcat if convnew else refcat
+        if not os.path.exists(psf):
+            psfconf = os.path.join(wd, '../astromatic/calibration/psfex.conf')
+            # now get a model of the psf
+            cmd = f'psfex -c {psfconf} {cat}'
+            subprocess.check_call(cmd.split())
         subpsf = sub.replace('.fits', '.psf')
         shutil.copy(psf, subpsf)
 
