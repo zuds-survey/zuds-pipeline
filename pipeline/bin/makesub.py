@@ -377,7 +377,7 @@ if __name__ == '__main__':
             frames = np.atleast_1d(frames).tolist()
         else:
             frames = None
-
+        frames = comm.bcast(frames, root=0)
     else:
         frames = args.sciimg
 
@@ -389,6 +389,7 @@ if __name__ == '__main__':
             templates = np.atleast_1d(templates).tolist()
         else:
             templates = None
+        templates = comm.bcast(templates, root=0)
     else:
         templates = args.template
 
