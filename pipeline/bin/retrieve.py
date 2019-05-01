@@ -52,11 +52,14 @@ if __name__ == '__main__':
             syscall = f'htar xf {tarname} '
             for i, row in group.iterrows():
                 syscall += f'/global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"]}'
+            print(syscall, flush=True)
             check_call(syscall.split())
         else:
             for i, row in group.iterrows():
                 syscall = f'htar xf {tarname} -O /global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"]} ' \
                           f'> {os.path.join(args.output_dir, row["path"])}'
+
+                print(syscall, flush=True)
                 check_call(syscall.split())
 
     if not args.exclude_masks:
@@ -66,9 +69,13 @@ if __name__ == '__main__':
                 syscall = f'htar xf {tarname} '
                 for i, row in group.iterrows():
                     syscall += f'/global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"].replace("sciimg", "mskimg")}'
+
+                print(syscall, flush=True)
                 check_call(syscall.split())
             else:
                 for i, row in group.iterrows():
                     syscall = f'htar xf {tarname} -O /global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"].replace("sciimg", "mskimg")} ' \
                               f'> {os.path.join(args.output_dir, row["path"].replace("sciimg", "mskimg"))}'
+
+                    print(syscall, flush=True)
                     check_call(syscall.split())
