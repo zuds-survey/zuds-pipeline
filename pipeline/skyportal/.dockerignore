@@ -1,7 +1,0 @@
-.git
-.ipynb_checkpoints
-log
-worker*
-tmp
-node_modules
-ptf_data
