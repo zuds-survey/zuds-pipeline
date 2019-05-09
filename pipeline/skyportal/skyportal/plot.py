@@ -209,7 +209,7 @@ def photometry_plot(source_id):
     data['alpha'] = 1.
 
     # calculate the magnitudes
-    obsind = data['flux'] / data['fluxerr'] >= 3
+    obsind = data['flux'] / data['fluxerr'] >= 5
     data.ix[~obsind, 'mag'] = None
     data.ix[obsind, 'mag'] = -2.5 * np.log10(data[obsind]['flux']) + 25.
     data.ix[~obsind, 'magerr'] = None
