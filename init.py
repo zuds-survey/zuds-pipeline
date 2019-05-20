@@ -8,15 +8,22 @@ import os
 nersc_account = '***REMOVED***'
 nersc_username = 'dgold'
 nersc_password = '***REMOVED***'
-marshal_username = 'dannygoldstein'
-marshal_password = '***REMOVED***'
+
 lensgrinder_home = '/global/cscratch1/sd/dgold/lensgrinder'
-run_topdirectory = '/global/cscratch1/sd/dgold/knproc'
+run_topdirectory = '/global/cscratch1/sd/dgold/coadd'
+
 hpss_dbhost = '***REMOVED***'
 hpss_dbport = 6666
 hpss_dbusername = '***REMOVED***'
-hpss_dbname = 'decam'
+hpss_dbname = 'ztfimages'
 hpss_dbpassword = '***REMOVED***'
+
+skyportal_dbhost = hpss_dbhost
+skyportal_dbport = 7777
+skyportal_dbusername = 'skyportal'
+skyportal_dbpassword = '***REMOVED***'
+skyportal_dbname = 'skyportal'
+
 shifter_image = 'registry.services.nersc.gov/dgold/improc:latest'
 slurm_email = 'ztfcoadd@gmail.com'
 
@@ -27,17 +34,14 @@ slurm_email = 'ztfcoadd@gmail.com'
 
 volume_mounts = {
     os.path.join(lensgrinder_home, 'pipeline'): '/pipeline',
-    os.path.join(lensgrinder_home, 'pipeline', 'scripts'): '/scripts',
-    os.path.join(run_topdirectory, 'noao'): '/output',
-    os.path.join(run_topdirectory, 'calibdata'): '/calibdata',
+    os.path.join(run_topdirectory, 'output'): '/output',
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
     lensgrinder_home: '/lensgrinder',
-    os.path.join(lensgrinder_home, 'ingest', 'job_scripts'): '/job_scripts',
-    os.path.join(lensgrinder_home, 'process'): '/process',
+    os.path.join(run_topdirectory, 'job_scripts'): '/job_scripts',
     os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic'
 }
 
-logdir = os.path.join(lensgrinder_home, 'ingest', 'logs')
+logdir = os.path.join(run_topdirectory, 'logs')
 
 environment_variables = {
     'HPSS_DBHOST': hpss_dbhost,
@@ -45,10 +49,14 @@ environment_variables = {
     'HPSS_DBUSERNAME': hpss_dbusername,
     'HPSS_DBPASSWORD': hpss_dbpassword,
     'HPSS_DBNAME': hpss_dbname,
-    'MARSHAL_USERNAME': marshal_username,
-    'MARSHAL_PASSWORD': marshal_password,
+    'SKYPORTAL_DBHOST': skyportal_dbhost,
+    'SKYPORTAL_DBPORT': skyportal_dbport,
+    'SKYPORTAL_DBUSERNAME': skyportal_dbusername,
+    'SKYPORTAL_DBPASSWORD': skyportal_dbpassword,
+    'SKYPORTAL_DBNAME': skyportal_dbname,
     'NERSC_USERNAME': nersc_username,
-    'NERSC_PASSWORD': nersc_password
+    'NERSC_PASSWORD': nersc_password,
+
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
