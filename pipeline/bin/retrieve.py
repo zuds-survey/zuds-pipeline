@@ -1,4 +1,3 @@
-
 import os
 import psycopg2
 import pandas as pd
@@ -105,7 +104,7 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     hpssdb = HPSSDB()
 
     # this is the query to get the image paths
-    query = f'SELECT PATH, HPSS_SCI_PATH, HPSS_MASK_PATH FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL' \
+    query = f'SELECT PATH, HPSS_SCI_PATH, HPSS_MASK_PATH FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL ' \
             f'AND {whereclause}'
     hpssdb.cursor.execute(query)
     results = hpssdb.cursor.fetchall()
@@ -113,11 +112,11 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     df = pd.DataFrame(results, columns=['path', 'hpss_sci_path', 'hpss_mask_path'])
 
     dfsci = df[['path', 'hpss_sci_path']]
-    dfsci.rename({'hpss_sci_path': 'tarpath'}, inplace=True)
+    dfsci = dfsci.rename({'hpss_sci_path': 'tarpath'}, axis='columns')
 
     if not exclude_masks:
         dfmask = df[['path', 'hpss_mask_path']]
-        dfmask.rename({'hpss_mask_path': 'tarpath'}, inplace=True)
+        dfmask = dfmask.rename({'hpss_mask_path': 'tarpath'}, axis='columns')
         dfmask.dropna(inplace=True)
         df = pd.concat((dfsci, dfmask))
     else:
@@ -126,13 +125,21 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     tars = df['tarpath'].unique()
     instr = '\n'.join(tars.tolist())
 
-    with tempfile.NamedTemporaryFile() as f, io.StringIO() as out:
-        f.write(f"{instr}\n")
+    with tempfile.NamedTemporaryFile() as f, tempfile.NamedTemporaryFile() as out:
+        f.write(f"{instr}\n".encode('ASCII'))
+
+        # rewind the file
+        f.seek(0)
 
         # sort tarball retrieval by location on tape
         sortexec = '/pipeline/bin/hpsssort.sh'
         syscall = f'bash {sortexec} {f.name}'
-        check_call(syscall.split(), stdout=out)
+        check_call(syscall.split(), stdout=out, stderr=out)
+
+        # rewind the file 
+        out.seek(0)
+
+        # read it into pandas 
         ordered = pd.read_csv(out, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
 
     # submit the jobs based on which tape the tar files reside on

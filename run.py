@@ -41,7 +41,6 @@ volume_mounts = {
     os.path.join(lensgrinder_home, 'pipeline'): '/pipeline',
     run_topdirectory: '/output',
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
-    os.path.join(run_topdirectory, 'job_scripts'): '/job_scripts',
     os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic',
     lensgrinder_home: '/lg'
 }
