@@ -28,7 +28,7 @@ class HPSSDB(object):
         del self.connection
 
 
-def submit_hpss_job(tarfiles, rmimages, job_script_destination, frame_destination, log_destination, tape_number):
+def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -55,6 +55,8 @@ module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 ''')
 
+    hpt = f'hpss.{tape_number}'
+
     jobstr = f'''#!/usr/bin/env bash
 #SBATCH -J {tape_number}
 #SBATCH -L SCRATCH,project
@@ -63,23 +65,25 @@ sbatch {Path(jobscript.name).resolve()}
 #SBATCH -A {nersc_account}
 #SBATCH -t 48:00:00
 #SBATCH -C haswell
-#SBATCH -o {(Path(log_destination) / tape_number).resolve()}.out
+#SBATCH -o {(Path(log_destination) / hpt).resolve()}.out
 
 cd {Path(frame_destination).resolve()}
 
 '''
 
-    for tarfile in tarfiles:
+
+
+    for tarfile, imlist in zip(tarfiles, images):
+
+        wildimages = '\n'.join([f'*{p}' for p in imlist])
+
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
-tar --strip-components=12 -i xvf {os.path.basename(tarfile)}
+echo "{wildimages}" | tar --strip-components=12 -i --files-from=- --wildcards --wildcards-match-slash xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
         jobstr += directive
-
-    for image in rmimages:
-        jobstr += f'rm {image}\n'
 
     jobscript.write(jobstr)
 
@@ -160,16 +164,9 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
+        images = [df[df['tarname'] == tarname]['path'].tolist() for tarname in tarnames]
 
-        for tarname in tarnames:
-            query = 'SELECT PATH FROM IMAGE WHERE HPSS_SCI_PATH=%s OR HPSS_MASK_PATH=%s'
-            hpssdb.cursor.execute(query, (tarname, tarname))
-            allims = [t[0] for t in hpssdb.cursor.fetchall()]
-            allims += [im.replace('sciimg', 'mskimg') for im in allims]
-
-        rmimages = [im for im in allims if im not in df['path']]
-
-        jobid = submit_hpss_job(tarnames, rmimages, job_script_destination, frame_destination, log_destination, tape)
+        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape)
         for image in df['path']:
             dependency_dict[image] = jobid
 
