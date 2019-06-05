@@ -64,6 +64,8 @@ environment_variables = {
     'NERSC_HOST': nersc_host,
     'NERSC_ACCOUNT': nersc_account
 }
+
+"""
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
 
@@ -144,17 +146,21 @@ with open('interactive.sh', 'w') as f:
     f.write(f'''salloc -N 1 -t 00:30:00 -L SCRATCH -A {nersc_account} \
 --partition=realtime --image={shifter_image} -C haswell --exclusive \
 --volume="{vstring}"''')
-
+"""
 if __name__ == '__main__':
 
+    """
     parser = ArgumentParser()
     parser.add_argument('task', help='Path to yaml file describing the workflow.')
     args = parser.parse_args()
+    """
 
     # set the environment variables
     for k in environment_variables:
         os.environ[k] = environment_variables[k]
 
+
+    """
     # process the task
     task_file = args.task
     task_name = '.'.join(os.path.basename(task_file).split('.')[:-1])
@@ -211,3 +217,4 @@ if __name__ == '__main__':
         options = task_spec['template']
         from makecoadd import submit_makecoadd
         pass
+    """
