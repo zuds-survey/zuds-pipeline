@@ -65,7 +65,7 @@ environment_variables = {
     'NERSC_ACCOUNT': nersc_account
 }
 
-"""
+
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
 
@@ -77,6 +77,7 @@ shifter --volume="{vstring}" \
 ''')
 
 
+"""
 with open('retrieve_hpss.sh', 'w') as f:
     f.write(f'''#!/usr/bin/env bash
 
