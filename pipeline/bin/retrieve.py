@@ -79,7 +79,7 @@ cd {Path(frame_destination).resolve()}
 
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
-echo "{wildimages}" | tar --strip-components=12 -i --files-from=- --wildcards --wildcards-match-slash -xvf {os.path.basename(tarfile)}
+echo "{wildimages}" | tar --strip-components=12 -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
@@ -97,7 +97,7 @@ rm {os.path.basename(tarfile)}
     print(out, flush=True)
     print(err, flush=True)
 
-    jobid = err.split()[-1]
+    jobid = int(out[0].strip().split()[-1])
 
     ssh_client.close()
 
