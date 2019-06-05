@@ -28,7 +28,7 @@ class HPSSDB(object):
         del self.connection
 
 
-def submit_hpss_job(tarfiles, rmimages, job_script_destination, frame_destination, tape_number):
+def submit_hpss_job(tarfiles, rmimages, job_script_destination, frame_destination, log_destination, tape_number):
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -52,7 +52,7 @@ def submit_hpss_job(tarfiles, rmimages, job_script_destination, frame_destinatio
 
     subscript.write(f'''#!/usr/bin/env bash
 module load esslurm
-sbatch {jobscript.name}
+sbatch {Path(jobscript.name).resolve()}
 ''')
 
     jobstr = f'''#!/usr/bin/env bash
@@ -63,15 +63,16 @@ sbatch {jobscript.name}
 #SBATCH -A {nersc_account}
 #SBATCH -t 48:00:00
 #SBATCH -C haswell
+#SBATCH -o {(Path(log_destination) / tape_number).resolve()}.out
 
-cd {frame_destination}
+cd {Path(frame_destination).resolve()}
 
 '''
 
     for tarfile in tarfiles:
         directive = f'''
-hsi get {tarfile}
-tar xvf --strip-components=12 {os.path.basename(tarfile)}
+/usr/common/mss/bin/hsi get {tarfile}
+tar --strip-components=12 -i xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
@@ -82,7 +83,10 @@ rm {os.path.basename(tarfile)}
 
     jobscript.write(jobstr)
 
-    stdin, stdout, stderr = ssh_client.exec_command(f'/bin/bash {subscript.name}')
+    jobscript.close()
+    subscript.close()
+
+    stdin, stdout, stderr = ssh_client.exec_command(f'/bin/bash {Path(subscript.name).resolve()}')
     out = stdout.readlines()
     err = stderr.readlines()
 
@@ -92,13 +96,11 @@ rm {os.path.basename(tarfile)}
     jobid = err.split()[-1]
 
     ssh_client.close()
-    jobscript.close()
-    subscript.close()
 
     return jobid
 
 
-def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.'):
+def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.', log_destination='.'):
 
     # interface to HPSS and database
     hpssdb = HPSSDB()
@@ -115,7 +117,8 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     dfsci = dfsci.rename({'hpss_sci_path': 'tarpath'}, axis='columns')
 
     if not exclude_masks:
-        dfmask = df[['path', 'hpss_mask_path']]
+        dfmask = df[['path', 'hpss_mask_path']].copy()
+        dfmask.loc[:, 'path'] = [im.replace('sciimg', 'mskimg') for im in dfmask['path']]
         dfmask = dfmask.rename({'hpss_mask_path': 'tarpath'}, axis='columns')
         dfmask.dropna(inplace=True)
         df = pd.concat((dfsci, dfmask))
@@ -144,7 +147,7 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
 
         syscall = f'bash {sortexec} {f.name}'
-        _, stdout, _ = ssh_client.connect(syscall)
+        _, stdout, _ = ssh_client.exec_command(syscall)
 
         # read it into pandas
         ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
@@ -159,13 +162,14 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         tarnames = group['hpsspath'].tolist()
 
         for tarname in tarnames:
-            query = f'SELECT PATH FROM IMAGE WHERE HPSS_SCI_PATH={tarname} OR HPSS_MASK_PATH={tarname}'
-            hpssdb.cursor.execute(query)
+            query = 'SELECT PATH FROM IMAGE WHERE HPSS_SCI_PATH=%s OR HPSS_MASK_PATH=%s'
+            hpssdb.cursor.execute(query, (tarname, tarname))
             allims = [t[0] for t in hpssdb.cursor.fetchall()]
+            allims += [im.replace('sciimg', 'mskimg') for im in allims]
 
         rmimages = [im for im in allims if im not in df['path']]
 
-        jobid = submit_hpss_job(group, rmimages, job_script_destination, frame_destination, tape)
+        jobid = submit_hpss_job(tarnames, rmimages, job_script_destination, frame_destination, log_destination, tape)
         for image in df['path']:
             dependency_dict[image] = jobid
 
