@@ -2,7 +2,6 @@ import os
 import psycopg2
 import pandas as pd
 from argparse import ArgumentParser
-from subprocess import check_call
 import tempfile, io
 import paramiko
 from pathlib import Path
@@ -11,7 +10,6 @@ from pathlib import Path
 class HPSSDB(object):
 
     def __init__(self):
-
         dbname = os.getenv('HPSS_DBNAME')
         password = os.getenv('HPSS_DBPASSWORD')
         username = os.getenv('HPSS_DBUSERNAME')
@@ -23,7 +21,6 @@ class HPSSDB(object):
         self.cursor = self.connection.cursor()
 
     def __del__(self):
-
         del self.cursor
         del self.connection
 
@@ -71,10 +68,7 @@ cd {Path(frame_destination).resolve()}
 
 '''
 
-
-
     for tarfile, imlist in zip(tarfiles, images):
-
         wildimages = '\n'.join([f'*{p}' for p in imlist])
 
         directive = f'''
@@ -90,7 +84,6 @@ rm {os.path.basename(tarfile)}
     jobscript.seek(0)
     subscript.seek(0)
 
-
     stdin, stdout, stderr = ssh_client.exec_command(f'/bin/bash {Path(subscript.name).resolve()}')
     out = stdout.readlines()
     err = stderr.readlines()
@@ -100,7 +93,6 @@ rm {os.path.basename(tarfile)}
 
     jobscript.close()
     subscript.close()
-    
 
     jobid = int(out[0].strip().split()[-1])
 
@@ -109,8 +101,8 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.', log_destination='.'):
-
+def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.',
+                    log_destination='.'):
     # interface to HPSS and database
     hpssdb = HPSSDB()
 
@@ -139,7 +131,7 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     # if nothing is found raise valueerror
     if len(tars) == 0:
         raise ValueError('No images match the given query')
-    
+
     instr = '\n'.join(tars.tolist())
 
     with tempfile.NamedTemporaryFile() as f:
@@ -185,7 +177,6 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
 
 
 if __name__ == '__main__':
-
     parser = ArgumentParser()
     parser.add_argument("whereclause", default=None, type=str,
                         help='SQL where clause that tells the program which images to retrieve.')
