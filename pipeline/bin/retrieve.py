@@ -53,7 +53,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
     subscript.write(f'''#!/usr/bin/env bash
 module load esslurm
 sbatch {Path(jobscript.name).resolve()}
-''')
+    '''.encode('ASCII'))
 
     hpt = f'hpss.{tape_number}'
 
@@ -85,10 +85,11 @@ rm {os.path.basename(tarfile)}
 '''
         jobstr += directive
 
-    jobscript.write(jobstr)
+    jobscript.write(jobstr.encode('ASCII'))
 
-    jobscript.close()
-    subscript.close()
+    jobscript.seek(0)
+    subscript.seek(0)
+
 
     stdin, stdout, stderr = ssh_client.exec_command(f'/bin/bash {Path(subscript.name).resolve()}')
     out = stdout.readlines()
@@ -96,6 +97,10 @@ rm {os.path.basename(tarfile)}
 
     print(out, flush=True)
     print(err, flush=True)
+
+    jobscript.close()
+    subscript.close()
+    
 
     jobid = int(out[0].strip().split()[-1])
 
@@ -130,6 +135,11 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         df = dfsci
 
     tars = df['tarpath'].unique()
+
+    # if nothing is found raise valueerror
+    if len(tars) == 0:
+        raise ValueError('No images match the given query')
+    
     instr = '\n'.join(tars.tolist())
 
     with tempfile.NamedTemporaryFile() as f:
@@ -177,7 +187,7 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
 if __name__ == '__main__':
 
     parser = ArgumentParser()
-    parser.add_argument("whereclause", required=True, default=None, type=str,
+    parser.add_argument("whereclause", default=None, type=str,
                         help='SQL where clause that tells the program which images to retrieve.')
     parser.add_argument('--exclude-masks', default=False, action='store_true',
                         help='Only retrieve the science images.')
