@@ -1,4 +1,6 @@
 import os
+import yaml
+from argparse import ArgumentParser
 
 #########################################################################
 # Modify these variables to point to the right values for you.
@@ -7,6 +9,7 @@ import os
 
 nersc_account = '***REMOVED***'
 nersc_username = 'dgold'
+nersc_host = 'cori.nersc.gov'
 nersc_password = '***REMOVED***'
 
 lensgrinder_home = '/global/cscratch1/sd/dgold/lensgrinder'
@@ -36,9 +39,9 @@ volume_mounts = {
     os.path.join(lensgrinder_home, 'pipeline'): '/pipeline',
     os.path.join(run_topdirectory, 'output'): '/output',
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
-    lensgrinder_home: '/lensgrinder',
     os.path.join(run_topdirectory, 'job_scripts'): '/job_scripts',
-    os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic'
+    os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic',
+    lensgrinder_home: '/lg'
 }
 
 logdir = os.path.join(run_topdirectory, 'logs')
@@ -56,9 +59,8 @@ environment_variables = {
     'SKYPORTAL_DBNAME': skyportal_dbname,
     'NERSC_USERNAME': nersc_username,
     'NERSC_PASSWORD': nersc_password,
-
+    'NERSC_HOST': nersc_host
 }
-
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
 
@@ -67,6 +69,32 @@ with open('shifter.sh', 'w') as f:
 shifter --volume="{vstring}" \
         --image={shifter_image} \
         {estring} /bin/bash
+''')
+
+
+with open('retrieve_hpss.sh', 'w') as f:
+    f.write(f'''#!/usr/bin/env bash
+#SBATCH -J $1
+#SBATCH -L SCRATCH
+#SBATCH -q xfer
+#SBATCH -N 1
+#SBATCH -A {nersc_account}
+#SBATCH -t 48:00:00
+#SBATCH -C haswell
+
+start=`date +%s`
+/usr/common/mss/bin/htar xvf  -L /global/cscratch1/sd/dgold/ztf_xfer_jobscripts/rank02_chunk1624_hpjob0.cmd
+for f in ``; do
+    rm $f
+done
+
+end=`date +%s`
+
+runtime=$((end-start))
+
+echo runtime was $runtime
+
+
 ''')
 
 with open('process_focalplane.sh', 'w') as f:
@@ -84,7 +112,7 @@ with open('process_focalplane.sh', 'w') as f:
 #SBATCH -C haswell
 #SBATCH --exclusive
 #SBATCH --volume="{vstring}"
-#SBATCH -o {os.path.join(logdir, 'slurm-%A.out')}
+#SBATCH -o {os.path.join(logdir, '$1.out')}
 
 export OMP_NUM_THREADS=1
 export OPENBLAS_NUM_THREADS=1
@@ -114,7 +142,24 @@ echo runtime was $runtime
 
 ''')
 
+
 with open('interactive.sh', 'w') as f:
     f.write(f'''salloc -N 1 -t 00:30:00 -L SCRATCH -A {nersc_account} \
 --partition=realtime --image={shifter_image} -C haswell --exclusive \
 --volume="{vstring}"''')
+
+if __name__ == '__main__':
+
+    parser = ArgumentParser()
+    parser.add_argument('task', help='Path to yaml file describing the workflow.')
+    args = parser.parse_args()
+
+    task_file = args.task
+    task_spec = yaml.load(open(task_file, 'r'))
+
+    if 'hpss' in task_spec:
+        from retrieve import retrieve_images
+        whereclause = task_spec['hpss']['whereclause']
+        exclude_masks = task_spec['hpss']['exclude_masks']
+        hpss_jobids = retrieve_images(whereclause, exclude_masks=exclude_masks)
+
