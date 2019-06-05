@@ -26,7 +26,7 @@ tempin=$temp_dir/tempin_$RANDOM.txt
 cat $list | awk '{print "ls -P",$0}' > $tempin
 
 
-hsi -q "in "$tempin 2>&1 | grep -E ^FILE | awk '$3 != 0 {printf("%s %s %s %s\n",substr($6,0,6),substr($5\
+/usr/common/mss/bin/hsi -q "in "$tempin 2>&1 | grep -E ^FILE | awk '$3 != 0 {printf("%s %s %s %s\n",substr($6,0,6),substr($5\
 ,0,index($5,"+")-1),substr($5,index($5,"+")+1),$2)}' > $temp_dir/hsi_get.txt
 
 #cat $temp_dir/hsi_get.txt | sort -n -k 1,2 -k 2,3 -k 3,4 | awk '{print $4}'
