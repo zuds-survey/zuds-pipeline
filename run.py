@@ -36,36 +36,38 @@ if __name__ == '__main__':
     frames.mkdir()
     templates.mkdir()
 
-    # submit HPSS jobs if requested
-    if 'hpss' in task_spec:
+    # retrieve the images off of tape
+    from retrieve import retrieve_images
+    whereclause = task_spec['hpss']['whereclause']
+    exclude_masks = task_spec['hpss']['exclude_masks']
+    hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
+                                                   job_script_destination=jobscripts,
+                                                   frame_destination=frames, log_destination=logs)
 
-        from retrieve import retrieve_images
-        whereclause = task_spec['hpss']['whereclause']
-        exclude_masks = task_spec['hpss']['exclude_masks']
-        hpss_dependencies = retrieve_images(whereclause, exclude_masks=exclude_masks,
-                                            job_script_destination=jobscripts,
-                                            frame_destination=frames)
+    # make the variance maps
 
-    # submit make variance job if requested
-    if 'makevariance' in task_spec:
+    options = task_spec['makevariance']
+    batch_size = options['batch_size']
+    from makevariance import submit_makevariance
 
-        options = task_spec['makevariance']
-        from makevariance import submit_makevariance
+    if 'frames' in options and options['frames'] is not None:
+        frames = options['frames']
+        dependencies = None
+    elif 'hpss' in task_spec:
+        frames = [im for im in hpss_dependencies if 'msk' not in im]
+        dependencies = hpss_dependencies
+    else:
+        raise ValueError('No images specified')
 
-        if 'frames' in options and options['frames'] is not None:
-            frames = options['frames']
-            dependencies = None
-        elif 'hpss' in task_spec:
-            frames = [im for im in hpss_dependencies if 'msk' not in im]
-            dependencies = hpss_dependencies
-        else:
-            raise ValueError('No images specified')
+    masks = [im.replace('sciimg', 'mskimg') for im in frames]
+    variance_dependencies = submit_makevariance(frames, masks, dependencies=dependencies, task_name=task_name,
+                                                batch_size=batch_size, log_destination=logs,
+                                                job_script_destination=jobscripts)
 
-        masks = [im.replace('sciimg', 'mskimg') for im in frames]
-        variance_dependencies = submit_makevariance(frames, masks, dependencies=dependencies, task_name=task_name)
+    # todo: add fakes
 
     # create templates if requested
     if 'template' in task_spec:
         options = task_spec['template']
-        from makecoadd import submit_makecoadd
-        pass
+        from makecoadd import determine_and_submit_template_jobs
+        template_dependencies = determine_and_submit_template_jobs(variance_dependencies, metatable, options)

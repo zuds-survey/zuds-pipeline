@@ -45,7 +45,7 @@ volume_mounts = {
     lensgrinder_home: '/lg'
 }
 
-logdir = os.path.join(run_topdirectory, 'logs')
+vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
 
 environment_variables = {
     'HPSS_DBHOST': hpss_dbhost,
@@ -62,12 +62,13 @@ environment_variables = {
     'NERSC_PASSWORD': nersc_password,
     'NERSC_HOST': nersc_host,
     'NERSC_ACCOUNT': nersc_account,
-    'LENSGRINDER_HOME': lensgrinder_home
+    'LENSGRINDER_HOME': lensgrinder_home,
+    'VOLUMES': vstring
 }
 
-
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
-vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
+
+
 
 with open('shifter.sh', 'w') as f:
     f.write(f'''#!/bin/bash

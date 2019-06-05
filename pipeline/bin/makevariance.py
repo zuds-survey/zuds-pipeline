@@ -3,13 +3,25 @@ import string
 import numpy as np
 from liblg import medg, mkivar, execute, make_rms, solve_zeropoint
 from astropy.io import fits
-from calibrate import calibrate 
+#from calibrate import calibrate
+import paramiko
+import tempfile
+
+from pathlib import Path
 
 __all__ = ['make_variance']
+
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
+
+
+def chunk(iterable, chunksize):
+    isize = len(iterable)
+    nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
+    for i in range(nchunks):
+        yield iterable[i * chunksize : (i + 1) * chunksize]
 
 
 def _read_clargs(val):
@@ -18,6 +30,88 @@ def _read_clargs(val):
         val = np.genfromtxt(val[0][1:], dtype=None, encoding='ascii')
         val = np.atleast_1d(val)
     return np.asarray(val)
+
+
+def submit_makevariance(frames, masks, batch_size=1024, dependencies=None, job_script_destination=None,
+                        log_destination='.', task_name=None):
+
+
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
+
+    log_destination = Path(log_destination)
+
+    dependency_dict = {}
+
+    for i, (cframes, cmasks) in chunk(list(zip(frames, masks)), batch_size):
+
+        gdeps = ':'.join(list(map(str, set([dependencies[frame] for frame in cframes]))))
+
+        gframes = '\n'.join([Path(frame).resolve() for frame in cframes])
+        gmasks = '\n'.join([Path(mask).resolve() for mask in cmasks])
+
+        scriptstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J v{task_name}.{i}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --mail-type=ALL
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --exclusive
+#SBATCH -C haswell
+#SBATCH --volume="{volumes}"
+#SBATCH -o {log_destination.resolve()}/v{task_name}.{i}.out
+#SBATCH --dependency=afterok:{gdeps}
+
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
+
+news="{gframes}"
+masks="{gmasks}"
+srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames $news --input-masks $masks
+'''
+
+        if job_script_destination is None:
+            jobscript = tempfile.NamedTemporaryFile()
+        else:
+            job_script_destination = Path(job_script_destination)
+            jobscript = open(job_script_destination.resolve() / f'v{task_name}.{i}.sh', 'w')
+
+        jobscript.write(scriptstr)
+        jobscript.seek(0)
+
+
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
+        syscall = f'sbatch {jobscript.name}'
+        stdin, stdout, stderr = ssh_client.exec_command(syscall)
+
+        retcode = stdout.channel.return_code
+        if retcode != 0:
+            raise RuntimeError(f'Unable to submit job with script: "{scriptstr}"')
+
+        out = stdout.read()
+        err = stderr.read()
+
+        print(out, flush=True)
+        print(err, flush=True)
+
+        jobid = int(out.strip().split()[-1])
+        jobscript.close()
+
+        for frame in cframes:
+            dependency_dict[frame] = jobid
+
+    return dependency_dict
 
 
 def make_variance(frames, masks, logger=None, extra={}):
@@ -39,7 +133,7 @@ def make_variance(frames, masks, logger=None, extra={}):
 
         # get the zeropoint from the fits header using fortran
         #calibrate(frame)
-        
+
         with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
 

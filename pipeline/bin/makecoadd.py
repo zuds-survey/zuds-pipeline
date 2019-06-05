@@ -7,66 +7,143 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import galsim
 from makevariance import make_variance
+from astropy.time import Time
 import logging
 from galsim import des
 from astropy.convolution import convolve
 import shutil
-
-SEED = 1234
-
-class Fake(object):
-
-    def __init__(self, ra, dec, mag=20.):
-        self.ra = ra
-        self.dec = dec
-        self.mag = mag
-
-    def xy(self, wcs):
-        # Return xy pixel coordinates of fake on image
-        return wcs.wcs_world2pix([(self.ra, self.dec)], 1)[0]
-
-    def galsim_object(self, sigma, magzpt):
-        flux = 10**(-0.4 * (self.mag - magzpt))
-        obj = galsim.Gaussian(sigma=sigma).withFlux(flux)
-        return obj
+import pandas as pd
 
 
-def add_fakes_to_image(inim, outim, fakes, inhdr=None):
+def determine_and_submit_template_jobs(variance_corrids, metatable, options):
 
-    im = galsim.fits.read(inim)
-    with fits.open(inim) as f:
-        seeing = f[0].header['SEEING']
-        sigma = seeing / 2.355
-        zp = f[0].header['MAGZP']
-        scale = f[0].header['PIXSCALE']
+    # check to see if new templates are needed
+    template_corrids = {}
 
-        if inhdr is not None:
-            wcs = WCS(inhdr)
-        else:
-            wcs = WCS(f[0].header)
+    batch = []
 
-    for fake in fakes:
-        obj = fake.galsim_object(sigma, zp)
-        img = obj.drawImage(scale=scale)
-        img.setCenter(fake.xy(wcs))
-        bounds = img.bounds
-        im[bounds] = im[bounds] + img
+    for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
+                                                                     'qid',
+                                                                     'filtercode',
+                                                                     'ccdid']):
 
-    galsim.fits.write(im, file_name=outim, clobber=True)
+        ofield, oquadrant, oband, occdnum = field, quadrant, band, ccdnum
 
-    with fits.open(outim, mode='update') as f, fits.open(inim) as ff:
-        hdr = f[0].header
-        orighdr = ff[0].header
-        hdr.update(orighdr.cards)
-        if inhdr is not None:
-            hdr.update([card for card in inhdr.cards if card.keyword not in ['END', 'COMMENT', 'HISTORY']])
-        for i, fake in enumerate(fakes):
-            hdr[f'FAKE{i:02d}RA'] = fake.ra
-            hdr[f'FAKE{i:02d}DC'] = fake.dec
-            hdr[f'FAKE{i:02d}FL'] = fake.galsim_object(sigma, zp).flux
-            hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = fake.xy(wcs)
-            hdr[f'FAKE{i:02d}MG'] = fake.mag
+        # convert into proper values
+        field = int(field)
+        quadrant = int(quadrant)
+        band = band[1:]
+        ccdnum = int(ccdnum)
 
+        # check if a template is needed
+        if not self.needs_template(field, ccdnum, quadrant, band):
+            continue
+
+        tmplids, tmplims, jds, hasvar = self.create_template_image_list(field, ccdnum, quadrant, band)
+
+        if len(tmplids) < self.pipeline_schema['template_minimages']:
+            # not enough images to make a template -- try again some other time
+            continue
+
+        minjd = np.min(jds)
+        maxjd = np.max(jds)
+
+        mintime = Time(minjd, format='jd', scale='utc')
+        maxtime = Time(maxjd, format='jd', scale='utc')
+
+        mindatestr = mintime.iso.split()[0].replace('-', '')
+        maxdatestr = maxtime.iso.split()[0].replace('-', '')
+
+        # see what jobs need to finish before this one can run
+        dependencies = []
+        remake_variance = []
+        for path, hv in zip(tmplims, hasvar):
+            if not hv:
+                if path in variance_corrids:
+                    varcorrid = variance_corrids[path]
+                    dependencies.append(varcorrid)
+                else:
+                    remake_variance.append(path)
+
+        if len(remake_variance) > 0:
+            moredeps = self.determine_and_relay_variance_jobs(remake_variance)
+            dependencies.extend(moredeps.values())
+
+        dependencies = list(set(dependencies))
+
+        # what will this template be called?
+        tmpbase = tmp_basename_form.format(paddedfield=field,
+                                           qid=oquadrant,
+                                           paddedccdid=ccdnum,
+                                           filtercode=oband,
+                                           mindate=mindatestr,
+                                           maxdate=maxdatestr)
+
+        outfile_name = nersc_tmpform.format(fname=tmpbase)
+
+        # now that we have the dependencies we can relay the coadd job for submission
+        tmpl_data = {'dependencies':dependencies, 'jobtype':'template', 'images':tmplims,
+                     'outfile_name': outfile_name, 'imids': tmplids, 'quadrant': quadrant,
+                     'field': field, 'ccdnum': ccdnum, 'mindate':mindatestr,
+                     'maxdate':maxdatestr, 'filter': band,
+                     'pipeline_schema_id': self.pipeline_schema['schema_id']}
+
+        batch.append(tmpl_data)
+
+        if len(batch) == template_batchsize:
+            payload = {'jobtype': 'template', 'jobs': batch}
+            body = json.dumps(payload)
+            tmpl_corrid = self.relay_job(body)
+            for d in batch:
+                template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
+            batch = []
+
+    if len(batch) > 0:
+        payload = {'jobtype': 'template', 'jobs': batch}
+        body = json.dumps(payload)
+        tmpl_corrid = self.relay_job(body)
+        for d in batch:
+            template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
+
+    return template_corrids
+
+def make_coadd_bins(self, field, ccdnum, quadrant, filter, maxdate=None):
+
+    self._refresh_connections()
+
+    if maxdate is None:
+        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                'AND PIPELINE_SCHEMA_ID=%s'
+        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
+        result = self.cursor.fetchall()
+
+        if len(result) == 0:
+            raise ValueError('No template queued or on disk -- can\'t make coadd bins')
+        date = result[0][0]
+
+    else:
+        date = maxdate
+
+    startsci = pd.to_datetime(date) + pd.Timedelta(self.pipeline_schema['template_science_minsep_days'],
+                                                   unit='d')
+
+    if self.pipeline_schema['rolling']:
+        dates = pd.date_range(startsci, pd.to_datetime(datetime.date.today()), freq='1D')
+        bins = []
+        for i, date in enumerate(dates):
+            if i + self.pipeline_schema['scicoadd_window_size'] >= len(dates):
+                break
+            bins.append((date, dates[i + self.pipeline_schema['scicoadd_window_size']]))
+
+    else:
+        binedges = pd.date_range(startsci, pd.to_datetime(datetime.datetime.today()),
+                                 freq=f'{self.pipeline_schema["scicoadd_window_size"]}D')
+
+        bins = []
+        for i, lbin in enumerate(binedges[:-1]):
+            bins.append((lbin, binedges[i + 1]))
+
+    return bins
 
 if __name__ == '__main__':
 
@@ -115,100 +192,7 @@ if __name__ == '__main__':
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
-    # TODO: Delete this
-    rng = np.random.RandomState(SEED)
 
-    # First stamp everything together so that fakes are put down at the right place
-    mycats = ' '.join(cats)
-
-    # First scamp everything
-    # make a random dir for the output catalogs
-    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
-    os.makedirs(scamp_outpath)
-
-    syscall = 'scamp -c %s %s' % (scampconf, mycats)
-    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
-    if args.nothreads:
-        syscall += ' -NTHREADS 2'
-    liblg.execute(syscall, capture=False)
-
-
-    # First check to see if the fakes should be added
-    if args.nfakes > 0:
-
-        # get the range of ra and dec over which fakes can be implanted
-
-        radec = []
-        headers = []
-
-        for frame in frames:
-
-            # read in the fits header from scamp
-
-            head = frame.replace('.fits', '.head')
-
-            with open(head) as f:
-                h = fits.Header()
-                for text in f:
-                    h.append(fits.Card.fromstring(text.strip()))
-                with fits.open(frame) as hdul:
-                    hh = hdul[0].header
-                    h['SIMPLE'] = hh['SIMPLE']
-                    h['NAXIS'] = hh['NAXIS']
-                    h['BITPIX'] = hh['BITPIX']
-                    h['NAXIS1'] = hh['NAXIS1']
-                    h['NAXIS2'] = hh['NAXIS2']
-
-                wcs = WCS(h)
-                headers.append(h)
-
-                # get x and y coords
-                world_corners = wcs.calc_footprint()
-                radec.append(world_corners)
-
-        radec = np.vstack(radec)
-        minra, mindec = radec.min(axis=0)
-        maxra, maxdec = radec.max(axis=0)
-
-        rarange = maxra - minra
-        decrange = maxdec - mindec
-
-        fakeminra = minra + 0.15 * rarange
-        fakemaxra = minra + 0.85 * rarange
-
-        fakemindec = mindec + 0.15 * decrange
-        fakemaxdec = mindec + 0.85 * decrange
-
-        fakes = []
-
-        for i in range(args.nfakes):
-
-            ra = rng.uniform(fakeminra, fakemaxra)
-            dec = rng.uniform(fakemaxdec, fakemindec)
-            mag = rng.uniform(19.5, 24)
-            fake = Fake(ra, dec, mag=mag)
-            fakes.append(fake)
-
-        for frame, hdr in zip(frames, headers):
-            outim = frame.replace('.fits', '.fake.fits')
-            add_fakes_to_image(frame, outim, fakes, inhdr=hdr)
-
-        masks = [f.replace('sciimg','mskimg') for f in frames]
-        for f in frames:
-            orighead = f.replace('.fits', '.head')
-            newhead = orighead.replace('.head', '.fake.head')
-            origcat = f.replace('.fits', '.cat')
-            newcat = origcat.replace('.cat', '.fake.cat')
-            oldnoise = f.replace('.fits', '.noise.fits')
-            newnoise = oldnoise.replace('.noise.fits', '.fake.noise.fits')
-            shutil.copy(orighead, newhead)
-            shutil.copy(origcat, newcat)
-            shutil.copy(oldnoise, newnoise)
-
-        frames = [f.replace('.fits', '.fake.fits') for f in frames]
-        logger = logging.getLogger('fakevar')
-        logger.setLevel(logging.DEBUG)
-        make_variance(frames, masks, logger)
 
 
     allims = ' '.join(frames)

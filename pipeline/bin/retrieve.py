@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 import tempfile, io
 import paramiko
 from pathlib import Path
+from sqlalchemy import create_engine
 
 
 class HPSSDB(object):
@@ -15,14 +16,10 @@ class HPSSDB(object):
         username = os.getenv('HPSS_DBUSERNAME')
         port = os.getenv('HPSS_DBPORT')
         host = os.getenv('HPSS_DBHOST')
-        dsn = f'host={host} user={username} password={password} dbname={dbname} port={port}'
-
-        self.connection = psycopg2.connect(dsn)
-        self.cursor = self.connection.cursor()
+        self.engine = create_engine(f'postgresql://{username}:{password}@{host}:{port}/{dbname}')
 
     def __del__(self):
-        del self.cursor
-        del self.connection
+        del self.engine
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
@@ -50,7 +47,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
     subscript.write(f'''#!/usr/bin/env bash
 module load esslurm
 sbatch {Path(jobscript.name).resolve()}
-    '''.encode('ASCII'))
+'''.encode('ASCII'))
 
     hpt = f'hpss.{tape_number}'
 
@@ -103,16 +100,14 @@ rm {os.path.basename(tarfile)}
 
 def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.',
                     log_destination='.'):
+
     # interface to HPSS and database
     hpssdb = HPSSDB()
 
     # this is the query to get the image paths
-    query = f'SELECT PATH, HPSS_SCI_PATH, HPSS_MASK_PATH FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL ' \
-            f'AND {whereclause}'
-    hpssdb.cursor.execute(query)
-    results = hpssdb.cursor.fetchall()
-
-    df = pd.DataFrame(results, columns=['path', 'hpss_sci_path', 'hpss_mask_path'])
+    query = f'SELECT * FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL AND {whereclause}'
+    metatable = pd.read_sql(hpssdb.engine, query)
+    df = metatable[['path', 'hpss_sci_path', 'hpss_mask_path']]
 
     dfsci = df[['path', 'hpss_sci_path']]
     dfsci = dfsci.rename({'hpss_sci_path': 'tarpath'}, axis='columns')
@@ -169,11 +164,11 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
         jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape)
-        for image in df['path']:
+        for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
     del hpssdb
-    return dependency_dict
+    return dependency_dict, metatable
 
 
 if __name__ == '__main__':
