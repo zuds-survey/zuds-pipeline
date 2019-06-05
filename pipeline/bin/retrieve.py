@@ -4,6 +4,10 @@ import psycopg2
 import pandas as pd
 from argparse import ArgumentParser
 from subprocess import check_call
+import tempfile, io
+import paramiko
+from pathlib import Path
+
 
 class HPSSDB(object):
 
@@ -25,57 +29,142 @@ class HPSSDB(object):
         del self.connection
 
 
-if __name__ == '__main__':
+def submit_hpss_job(tarfiles, rmimages, job_script_destination, frame_destination, tape_number):
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    parser = ArgumentParser()
-    parser.add_argument("--whereclause", required=True, default=None, type=str,
-                        help='SQL where clause that tells the program which images to '
-                             'retrieve.')
-    parser.add_argument("--output-dir", default=None, help='Store all files flattened in this output directory.')
-    parser.add_argument('--exclude-masks', default=False, action='store_true', help='Only retrieve the science '
-                                                                                    'images.')
-    args = parser.parse_args()
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+
+    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
+    if job_script_destination is None:
+        # then just use temporary files
+
+        jobscript = tempfile.NamedTemporaryFile()
+        subscript = tempfile.NamedTemporaryFile()
+
+    else:
+
+        jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
+        subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
+
+    subscript.write(f'''#!/usr/bin/env bash
+module load esslurm
+sbatch {jobscript.name}
+''')
+
+    jobstr = f'''#!/usr/bin/env bash
+#SBATCH -J {tape_number}
+#SBATCH -L SCRATCH,project
+#SBATCH -q xfer
+#SBATCH -N 1
+#SBATCH -A {nersc_account}
+#SBATCH -t 48:00:00
+#SBATCH -C haswell
+
+cd {frame_destination}
+
+'''
+
+    for tarfile in tarfiles:
+        directive = f'''
+hsi get {tarfile}
+tar xvf --strip-components=12 {os.path.basename(tarfile)}
+rm {os.path.basename(tarfile)}
+
+'''
+        jobstr += directive
+
+    for image in rmimages:
+        jobstr += f'rm {image}\n'
+
+    jobscript.write(jobstr)
+
+    stdin, stdout, stderr = ssh_client.exec_command(f'/bin/bash {subscript.name}')
+    out = stdout.readlines()
+    err = stderr.readlines()
+
+    print(out, flush=True)
+    print(err, flush=True)
+
+    jobid = err.split()[-1]
+
+    ssh_client.close()
+    jobscript.close()
+    subscript.close()
+
+    return jobid
+
+
+def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.'):
 
     # interface to HPSS and database
     hpssdb = HPSSDB()
 
     # this is the query to get the image paths
-    query = f'SELECT PATH, HPSS_SCI_PATH, HPSS_MASK_PATH FROM IMAGE WHERE {args.whereclause}'
+    query = f'SELECT PATH, HPSS_SCI_PATH, HPSS_MASK_PATH FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL' \
+            f'AND {whereclause}'
     hpssdb.cursor.execute(query)
     results = hpssdb.cursor.fetchall()
+
     df = pd.DataFrame(results, columns=['path', 'hpss_sci_path', 'hpss_mask_path'])
 
-    # first retrieve the science images
-    for tarname, group in df.groupby('hpss_sci_path'):
+    dfsci = df[['path', 'hpss_sci_path']]
+    dfsci.rename({'hpss_sci_path': 'tarpath'}, inplace=True)
 
-        if args.output_dir is None:
-            syscall = f'htar xf {tarname} '
-            for i, row in group.iterrows():
-                syscall += f'/global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"]}'
-            print(syscall, flush=True)
-            check_call(syscall.split())
-        else:
-            for i, row in group.iterrows():
-                syscall = f'htar xf {tarname} -O /global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"]} ' \
-                          f'> {os.path.join(args.output_dir, row["path"])}'
+    if not exclude_masks:
+        dfmask = df[['path', 'hpss_mask_path']]
+        dfmask.rename({'hpss_mask_path': 'tarpath'}, inplace=True)
+        dfmask.dropna(inplace=True)
+        df = pd.concat((dfsci, dfmask))
+    else:
+        df = dfsci
 
-                print(syscall, flush=True)
-                check_call(syscall.split())
+    tars = df['tarpath'].unique()
+    instr = '\n'.join(tars.tolist())
 
-    if not args.exclude_masks:
-        for tarname, group in df.groupby('hpss_mask_path'):
+    with tempfile.NamedTemporaryFile() as f, io.StringIO() as out:
+        f.write(f"{instr}\n")
 
-            if args.output_dir is None:
-                syscall = f'htar xf {tarname} '
-                for i, row in group.iterrows():
-                    syscall += f'/global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"].replace("sciimg", "mskimg")}'
+        # sort tarball retrieval by location on tape
+        sortexec = '/pipeline/bin/hpsssort.sh'
+        syscall = f'bash {sortexec} {f.name}'
+        check_call(syscall.split(), stdout=out)
+        ordered = pd.read_csv(out, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
 
-                print(syscall, flush=True)
-                check_call(syscall.split())
-            else:
-                for i, row in group.iterrows():
-                    syscall = f'htar xf {tarname} -O /global/project/projectdirs/ptf/ztf/data/xfer/*/*/*/*/*/{row["path"].replace("sciimg", "mskimg")} ' \
-                              f'> {os.path.join(args.output_dir, row["path"].replace("sciimg", "mskimg"))}'
+    # submit the jobs based on which tape the tar files reside on
+    # and in what order they are on the tape
 
-                    print(syscall, flush=True)
-                    check_call(syscall.split())
+    dependency_dict = {}
+    for tape, group in ordered.groupby('tape'):
+
+        # get the tarfiles
+        tarnames = group['hpsspath'].tolist()
+
+        for tarname in tarnames:
+            query = f'SELECT PATH FROM IMAGE WHERE HPSS_SCI_PATH={tarname} OR HPSS_MASK_PATH={tarname}'
+            hpssdb.cursor.execute(query)
+            allims = [t[0] for t in hpssdb.cursor.fetchall()]
+
+        rmimages = [im for im in allims if im not in df['path']]
+
+        jobid = submit_hpss_job(group, rmimages, job_script_destination, frame_destination, tape)
+        for image in df['path']:
+            dependency_dict[image] = jobid
+
+    del hpssdb
+    return dependency_dict
+
+
+if __name__ == '__main__':
+
+    parser = ArgumentParser()
+    parser.add_argument("whereclause", required=True, default=None, type=str,
+                        help='SQL where clause that tells the program which images to retrieve.')
+    parser.add_argument('--exclude-masks', default=False, action='store_true',
+                        help='Only retrieve the science images.')
+    args = parser.parse_args()
+    retrieve_images(args.whereclause, exclude_masks=args.exclude_masks)
