@@ -79,7 +79,7 @@ cd {Path(frame_destination).resolve()}
 
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
-echo "{wildimages}" | tar --strip-components=12 -i --files-from=- --wildcards --wildcards-match-slash xvf {os.path.basename(tarfile)}
+echo "{wildimages}" | tar --strip-components=12 -i --files-from=- --wildcards --wildcards-match-slash -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
@@ -164,7 +164,7 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
-        images = [df[df['tarname'] == tarname]['path'].tolist() for tarname in tarnames]
+        images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
         jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape)
         for image in df['path']:
