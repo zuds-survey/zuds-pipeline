@@ -61,7 +61,8 @@ environment_variables = {
     'NERSC_USERNAME': nersc_username,
     'NERSC_PASSWORD': nersc_password,
     'NERSC_HOST': nersc_host,
-    'NERSC_ACCOUNT': nersc_account
+    'NERSC_ACCOUNT': nersc_account,
+    'LENSGRINDER_HOME': lensgrinder_home
 }
 
 

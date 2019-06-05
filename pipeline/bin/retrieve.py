@@ -125,22 +125,29 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     tars = df['tarpath'].unique()
     instr = '\n'.join(tars.tolist())
 
-    with tempfile.NamedTemporaryFile() as f, tempfile.NamedTemporaryFile() as out:
+    with tempfile.NamedTemporaryFile() as f:
         f.write(f"{instr}\n".encode('ASCII'))
 
         # rewind the file
         f.seek(0)
 
         # sort tarball retrieval by location on tape
-        sortexec = '/pipeline/bin/hpsssort.sh'
+        sortexec = Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/hpsssort.sh'
+
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        nersc_username = os.getenv('NERSC_USERNAME')
+        nersc_password = os.getenv('NERSC_PASSWORD')
+        nersc_host = os.getenv('NERSC_HOST')
+
+        ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
         syscall = f'bash {sortexec} {f.name}'
-        check_call(syscall.split(), stdout=out, stderr=out)
+        _, stdout, _ = ssh_client.connect(syscall)
 
-        # rewind the file 
-        out.seek(0)
-
-        # read it into pandas 
-        ordered = pd.read_csv(out, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
+        # read it into pandas
+        ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
 
     # submit the jobs based on which tape the tar files reside on
     # and in what order they are on the tape
