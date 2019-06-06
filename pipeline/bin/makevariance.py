@@ -66,7 +66,6 @@ def submit_makevariance(frames, masks, batch_size=1024,  job_script_destination=
 #SBATCH -t 00:30:00
 #SBATCH -L SCRATCH
 #SBATCH -A {nersc_account}
-#SBATCH --mail-type=ALL
 #SBATCH --partition=realtime
 #SBATCH --image={shifter_image}
 #SBATCH --exclusive
