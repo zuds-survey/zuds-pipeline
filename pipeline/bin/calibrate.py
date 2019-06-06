@@ -51,7 +51,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
 
     try:
         wcs = WCS(hd)
-    except Exception as e: 
+    except Exception as e:
         print(f'failing header: {hd}')
         print(f'failing image: {image}')
         raise e
@@ -100,7 +100,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
             ps1_mag = result[i]['mag']
             sex_mag = cat_row['MAG_PSF']
             zp = zp_fid + ps1_mag - sex_mag
-            seeing = cat_row['FWHM_IMAGE'] 
+            seeing = cat_row['FWHM_IMAGE']
             zps.append(zp)
 
     return np.median(zps)
@@ -120,15 +120,15 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
         cursor = con.cursor()
         inhdr = image.replace('.fits', '.head')
         zp = zpsee(image, cat, cursor, zp_fid, inhdr=inhdr)
-        
+
     with fits.open(psf) as f, fits.open(image) as im:
         seeing = f[1].header['PSF_FWHM'] * im[0].header['PIXSCALE']
-        
+
     with fits.open(image, mode='update', memmap=False) as f:
         f[0].header['MAGZP'] = zp
         f[0].header['SEEING'] = seeing
-    
-    
+
+
 
 def calibrate(frame):
     # astrometrically and photometrically calibrate a ZTF frame using
@@ -166,7 +166,7 @@ def calibrate(frame):
 
     # now solve for the zeropoint
     solve_zeropoint(frame, cat, psf, zp_fid=27.5)
-    
+
     with fits.open(frame, mode='update', memmap=False) as f:
         if 'SATURATE' not in f[0].header:
             f[0].header['SATURATE'] = 5e4

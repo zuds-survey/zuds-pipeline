@@ -60,8 +60,9 @@ if __name__ == '__main__':
         raise ValueError('No images specified')
 
     masks = [im.replace('sciimg', 'mskimg') for im in frames]
-    variance_dependencies = submit_makevariance(frames, masks, dependencies=dependencies, task_name=task_name,
+    variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
                                                 batch_size=batch_size, log_destination=logs,
+                                                frame_destination=framepath,
                                                 job_script_destination=jobscripts)
 
     metatable['full_path'] = [(framepath / frame).resolve() for frame in frames]
