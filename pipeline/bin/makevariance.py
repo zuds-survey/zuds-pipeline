@@ -62,7 +62,7 @@ def submit_makevariance(frames, masks, batch_size=1024,  job_script_destination=
 
         scriptstr = f'''#!/bin/bash
 #SBATCH -N 1
-#SBATCH -J v{task_name}.{i}
+#SBATCH -J var{task_name}.{i}
 #SBATCH -t 00:30:00
 #SBATCH -L SCRATCH
 #SBATCH -A {nersc_account}
@@ -71,7 +71,7 @@ def submit_makevariance(frames, masks, batch_size=1024,  job_script_destination=
 #SBATCH --exclusive
 #SBATCH -C haswell
 #SBATCH --volume="{volumes}"
-#SBATCH -o {log_destination.resolve()}/v{task_name}.{i}.out
+#SBATCH -o {log_destination.resolve()}/var{task_name}.{i}.out
 
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
