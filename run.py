@@ -83,8 +83,8 @@ if __name__ == '__main__':
                                                               task_name=task_name,
                                                               log_destination=logs,
                                                               job_script_destination=jobscripts,
-                                                              template_nimages=template_nimages,
-                                                              template_start_date=template_start_date,
-                                                              template_end_date=template_end_date)
+                                                              nimages=template_nimages,
+                                                              start_date=template_start_date,
+                                                              end_date=template_end_date)
 
 
