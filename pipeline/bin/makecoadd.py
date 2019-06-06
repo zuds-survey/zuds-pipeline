@@ -114,7 +114,7 @@ shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
         command = f'sbatch {jobscript.name}'
         stdin, stdout, stderr = ssh_client.exec_command(command)
 
-        if stdout.channel.exit_status != 0:
+        if stdout.channel.recv_exit_status() != 0:
             raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
 
         out = stdout.read()

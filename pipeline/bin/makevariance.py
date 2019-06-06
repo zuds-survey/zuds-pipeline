@@ -105,7 +105,7 @@ srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames $news --i
         print(out, flush=True)
         print(err, flush=True)
 
-        retcode = stdout.channel.exit_status
+        retcode = stdout.channel.recv_exit_status()
         if retcode != 0:
             raise RuntimeError(f'Unable to submit job with script: "{scriptstr}", nonzero retcode')
 

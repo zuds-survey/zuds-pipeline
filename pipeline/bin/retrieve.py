@@ -40,7 +40,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
 
         jobscript = tempfile.NamedTemporaryFile()
         subscript = tempfile.NamedTemporaryFile()
-   
+
 
     else:
 
@@ -51,7 +51,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
 module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 '''
-    
+
     if job_script_destination is None:
         substr = substr.encode('ASCII')
 
@@ -86,18 +86,25 @@ rm {os.path.basename(tarfile)}
 
     if job_script_destination is None:
         jobstr = jobstr.encode('ASCII')
-        
+
     jobscript.write(jobstr)
 
     jobscript.seek(0)
     subscript.seek(0)
 
-    stdin, stdout, stderr = ssh_client.exec_command(f'/bin/bash {Path(subscript.name).resolve()}')
+    command = f'/bin/bash {Path(subscript.name).resolve()}'
+    stdin, stdout, stderr = ssh_client.exec_command(command)
+
+    retcode = stdout.channel.recv_exit_status()
+
     out = stdout.readlines()
     err = stderr.readlines()
 
     print(out, flush=True)
     print(err, flush=True)
+
+    if retcode != 0:
+        raise ValueError(f'Nonzero return code ({retcode}) on command, "{command}"')
 
     jobscript.close()
     subscript.close()
