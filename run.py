@@ -76,12 +76,14 @@ if __name__ == '__main__':
     template_nimages = options['nimages']
     template_start_date = options['start_date']
     template_end_date = options['end_date']
-    template_science_minsep_days = options['template_science_minsep_days']
 
     template_dependencies, remaining_images = submit_template(variance_dependencies, metatable,
                                                               template_destination=templates,
                                                               task_name=task_name,
-                                                              log_destination=logs, **options)
+                                                              log_destination=logs,
+                                                              job_script_destination=jobscripts,
+                                                              template_nimages=template_nimages,
+                                                              template_start_date=template_start_date,
+                                                              template_end_date=template_end_date)
 
-    # make the coadds and the subtractions
     

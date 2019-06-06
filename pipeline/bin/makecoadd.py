@@ -19,7 +19,6 @@ import paramiko
 import tempfile
 
 
-
 def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
                     end_date=datetime(2018, 4, 1),  template_destination='.', log_destination='.',
                     job_script_destination=None, task_name=None):
@@ -136,43 +135,6 @@ shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
 
     return dependency_dict, remaining_images
 
-def make_coadd_bins(self, field, ccdnum, quadrant, filter, maxdate=None):
-
-    self._refresh_connections()
-
-    if maxdate is None:
-        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
-                'AND PIPELINE_SCHEMA_ID=%s'
-        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
-        result = self.cursor.fetchall()
-
-        if len(result) == 0:
-            raise ValueError('No template queued or on disk -- can\'t make coadd bins')
-        date = result[0][0]
-
-    else:
-        date = maxdate
-
-    startsci = pd.to_datetime(date) + pd.Timedelta(self.pipeline_schema['template_science_minsep_days'],
-                                                   unit='d')
-
-    if self.pipeline_schema['rolling']:
-        dates = pd.date_range(startsci, pd.to_datetime(datetime.date.today()), freq='1D')
-        bins = []
-        for i, date in enumerate(dates):
-            if i + self.pipeline_schema['scicoadd_window_size'] >= len(dates):
-                break
-            bins.append((date, dates[i + self.pipeline_schema['scicoadd_window_size']]))
-
-    else:
-        binedges = pd.date_range(startsci, pd.to_datetime(datetime.datetime.today()),
-                                 freq=f'{self.pipeline_schema["scicoadd_window_size"]}D')
-
-        bins = []
-        for i, lbin in enumerate(binedges[:-1]):
-            bins.append((lbin, binedges[i + 1]))
-
-    return bins
 
 if __name__ == '__main__':
 

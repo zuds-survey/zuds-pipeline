@@ -22,6 +22,45 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
+def make_coadd_bins(self, field, ccdnum, quadrant, filter, maxdate=None):
+
+    self._refresh_connections()
+
+    if maxdate is None:
+        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
+                'AND PIPELINE_SCHEMA_ID=%s'
+        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
+        result = self.cursor.fetchall()
+
+        if len(result) == 0:
+            raise ValueError('No template queued or on disk -- can\'t make coadd bins')
+        date = result[0][0]
+
+    else:
+        date = maxdate
+
+    startsci = pd.to_datetime(date) + pd.Timedelta(self.pipeline_schema['template_science_minsep_days'],
+                                                   unit='d')
+
+    if self.pipeline_schema['rolling']:
+        dates = pd.date_range(startsci, pd.to_datetime(datetime.date.today()), freq='1D')
+        bins = []
+        for i, date in enumerate(dates):
+            if i + self.pipeline_schema['scicoadd_window_size'] >= len(dates):
+                break
+            bins.append((date, dates[i + self.pipeline_schema['scicoadd_window_size']]))
+
+    else:
+        binedges = pd.date_range(startsci, pd.to_datetime(datetime.datetime.today()),
+                                 freq=f'{self.pipeline_schema["scicoadd_window_size"]}D')
+
+        bins = []
+        for i, lbin in enumerate(binedges[:-1]):
+            bins.append((lbin, binedges[i + 1]))
+
+    return bins
+
+
 def make_sub(myframes, mytemplates, publish=True):
 
     myframes = np.atleast_1d(myframes).tolist()
