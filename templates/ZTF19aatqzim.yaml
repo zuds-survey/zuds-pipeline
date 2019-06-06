@@ -8,7 +8,7 @@ makevariance:
   frames:
 
 template:
-  nimages: 100
+  nimages: 50
   start_date: 2017-12-20T00:00:00.0Z
   end_date: 2018-05-21T00:00:00.0Z
 
