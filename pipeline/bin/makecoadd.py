@@ -1,6 +1,6 @@
 import os
 import numpy as np
-import liblg
+import libztf
 import uuid
 import time
 from astropy.io import fits

@@ -1,7 +1,7 @@
 import os
 import string
 import numpy as np
-from liblg import medg, mkivar, execute, make_rms, solve_zeropoint
+from libztf import medg, mkivar, execute, make_rms, solve_zeropoint
 from astropy.io import fits
 #from calibrate import calibrate
 import paramiko

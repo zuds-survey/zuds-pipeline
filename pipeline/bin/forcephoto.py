@@ -3,7 +3,7 @@ from astropy.wcs import WCS
 import os
 from publish import make_stamp
 from astropy.visualization import ZScaleInterval
-from liblg.yao import yao_photometry_single
+from libztf.yao import yao_photometry_single
 from baselayer.app.env import load_env
 from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb, Source, init_db
 

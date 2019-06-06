@@ -4,7 +4,7 @@ from numpy.distutils.command.install import install
 import glob
 
 # Create the fortran extension to be compiled as a shared library using f2py
-fort_sources = glob.glob('liblg/nugent/*.f90')
+fort_sources = glob.glob('libztf/nugent/*.f90')
 ffits = Extension(name='_ffits', sources=fort_sources, libraries=['cfitsio'],
                   extra_compile_args=['-w', '-O3'], extra_f90_compile_args=['-w', '-O3'])
 
@@ -27,9 +27,9 @@ class InstallCommand(install):
         ffits.include_dirs = include_dirs
 
 
-setup(name='liblg',
-      ext_package='liblg',
-      packages=['liblg'],
+setup(name='libztf',
+      ext_package='libztf',
+      packages=['libztf'],
       version='dev',
       ext_modules=[ffits],
       cmdclass={'install':InstallCommand}
