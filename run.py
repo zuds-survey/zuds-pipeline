@@ -20,7 +20,8 @@ if __name__ == '__main__':
 
 
     # prepare the output directory for this particular task
-    task_output = Path('/output') / task_name
+    outdir = os.getenv('OUTPUT_DIRECTORY')
+    task_output = Path(outdir) / task_name
     if task_output.exists():
         shutil.rmtree(task_output)
     task_output.mkdir()
@@ -45,7 +46,6 @@ if __name__ == '__main__':
                                                    frame_destination=framepath, log_destination=logs)
 
     # make the variance maps
-
     options = task_spec['makevariance']
     batch_size = options['batch_size']
     from makevariance import submit_makevariance

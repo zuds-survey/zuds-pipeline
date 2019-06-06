@@ -39,7 +39,6 @@ slurm_email = 'ztfcoadd@gmail.com'
 
 volume_mounts = {
     os.path.join(lensgrinder_home, 'pipeline'): '/pipeline',
-    run_topdirectory: '/output',
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
     os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic',
     lensgrinder_home: '/lg'
@@ -64,7 +63,8 @@ environment_variables = {
     'NERSC_ACCOUNT': nersc_account,
     'LENSGRINDER_HOME': lensgrinder_home,
     'VOLUMES': vstring,
-    'SHIFTER_IMAGE': shifter_image
+    'SHIFTER_IMAGE': shifter_image,
+    'OUTPUT_DIRECTORY': run_topdirectory
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
