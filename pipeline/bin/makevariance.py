@@ -21,7 +21,7 @@ def chunk(iterable, chunksize):
     isize = len(iterable)
     nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
     for i in range(nchunks):
-        yield iterable[i * chunksize : (i + 1) * chunksize]
+        yield i, iterable[i * chunksize : (i + 1) * chunksize]
 
 
 def _read_clargs(val):
@@ -47,12 +47,15 @@ def submit_makevariance(frames, masks, batch_size=1024, dependencies=None, job_s
 
     dependency_dict = {}
 
-    for i, (cframes, cmasks) in chunk(list(zip(frames, masks)), batch_size):
+    for i, ch in chunk(list(zip(frames, masks)), batch_size):
+
+        # unzip the list 
+        cframes, cmasks = list(zip(*ch))
 
         gdeps = ':'.join(list(map(str, set([dependencies[frame] for frame in cframes]))))
 
-        gframes = '\n'.join([Path(frame).resolve() for frame in cframes])
-        gmasks = '\n'.join([Path(mask).resolve() for mask in cmasks])
+        gframes = '\n'.join([f'{Path(frame).resolve()}' for frame in cframes])
+        gmasks = '\n'.join([f'{Path(mask).resolve()}' for mask in cmasks])
 
         scriptstr = f'''#!/bin/bash
 #SBATCH -N 1
@@ -95,16 +98,16 @@ srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames $news --i
         syscall = f'sbatch {jobscript.name}'
         stdin, stdout, stderr = ssh_client.exec_command(syscall)
 
-        retcode = stdout.channel.return_code
-        if retcode != 0:
-            raise RuntimeError(f'Unable to submit job with script: "{scriptstr}"')
-
         out = stdout.read()
         err = stderr.read()
 
         print(out, flush=True)
         print(err, flush=True)
 
+        retcode = stdout.channel.exit_status
+        if retcode != 0:
+            raise RuntimeError(f'Unable to submit job with script: "{scriptstr}", nonzero retcode')
+        
         jobid = int(out.strip().split()[-1])
         jobscript.close()
 
