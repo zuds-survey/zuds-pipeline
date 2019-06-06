@@ -222,7 +222,7 @@ if __name__ == '__main__':
     print(f'rank {rank} has masks {masks}', flush=True)
 
     if args.wait:
-        while not all([Path(p).exists() for p in frames + masks]):
+        while not all([Path(p).exists() for p in frames.tolist() + masks.tolist()]):
             time.sleep(2.)
         time.sleep(2.)
 
