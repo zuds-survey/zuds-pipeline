@@ -63,7 +63,8 @@ environment_variables = {
     'NERSC_HOST': nersc_host,
     'NERSC_ACCOUNT': nersc_account,
     'LENSGRINDER_HOME': lensgrinder_home,
-    'VOLUMES': vstring
+    'VOLUMES': vstring,
+    'SHIFTER_IMAGE': shifter_image
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])

@@ -28,12 +28,12 @@ if __name__ == '__main__':
     # make all the subdirectories that will be needed
     jobscripts = task_output / 'job_scripts'
     logs = task_output / 'logs'
-    frames = task_output / 'frames'
+    framepath = task_output / 'frames'
     templates = task_output / 'templates'
 
     jobscripts.mkdir()
     logs.mkdir()
-    frames.mkdir()
+    framepath.mkdir()
     templates.mkdir()
 
     # retrieve the images off of tape
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     exclude_masks = task_spec['hpss']['exclude_masks']
     hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
                                                    job_script_destination=jobscripts,
-                                                   frame_destination=frames, log_destination=logs)
+                                                   frame_destination=framepath, log_destination=logs)
 
     # make the variance maps
 
@@ -64,10 +64,24 @@ if __name__ == '__main__':
                                                 batch_size=batch_size, log_destination=logs,
                                                 job_script_destination=jobscripts)
 
+    metatable['full_path'] = [(framepath / frame).resolve() for frame in frames]
+
     # todo: add fakes
 
-    # create templates if requested
-    if 'template' in task_spec:
-        options = task_spec['template']
-        from makecoadd import determine_and_submit_template_jobs
-        template_dependencies = determine_and_submit_template_jobs(variance_dependencies, metatable, options)
+    # create templates
+
+    from makecoadd import submit_template
+    options = task_spec['template']
+
+    template_nimages = options['nimages']
+    template_start_date = options['start_date']
+    template_end_date = options['end_date']
+    template_science_minsep_days = options['template_science_minsep_days']
+
+    template_dependencies, remaining_images = submit_template(variance_dependencies, metatable,
+                                                              template_destination=templates,
+                                                              task_name=task_name,
+                                                              log_destination=logs, **options)
+
+    # make the coadds and the subtractions
+    

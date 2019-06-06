@@ -13,40 +13,55 @@ from galsim import des
 from astropy.convolution import convolve
 import shutil
 import pandas as pd
+from datetime import datetime
+from pathlib import Path
+import paramiko
+import tempfile
 
 
-def determine_and_submit_template_jobs(variance_corrids, metatable, options):
 
-    # check to see if new templates are needed
-    template_corrids = {}
+def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
+                    end_date=datetime(2018, 4, 1),  template_destination='.', log_destination='.',
+                    job_script_destination=None, task_name=None):
 
-    batch = []
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
+
+    template_destination = Path(template_destination)
+    dependency_dict = {}
+
+    remaining_images = metatable.copy()
 
     for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
                                                                      'qid',
                                                                      'filtercode',
                                                                      'ccdid']):
+        template_rows = group.copy()
 
-        ofield, oquadrant, oband, occdnum = field, quadrant, band, ccdnum
+        if end_date is not None:
+            template_rows = template_rows[template_rows['obsdate'] < end_date]
 
-        # convert into proper values
-        field = int(field)
-        quadrant = int(quadrant)
-        band = band[1:]
-        ccdnum = int(ccdnum)
+        if start_date is not None:
+            template_rows = template_rows[template_rows['obsdate'] > start_date]
 
-        # check if a template is needed
-        if not self.needs_template(field, ccdnum, quadrant, band):
-            continue
 
-        tmplids, tmplims, jds, hasvar = self.create_template_image_list(field, ccdnum, quadrant, band)
+        if len(template_rows) < nimages:
+            raise ValueError(f'Not enough images to create requested template (Requested {nimages}, '
+                             f'got {len(template_rows)}).')
 
-        if len(tmplids) < self.pipeline_schema['template_minimages']:
-            # not enough images to make a template -- try again some other time
-            continue
+        template_rows = template_rows.sort_values(by='obsjd')
+        template_rows = template_rows.iloc[:nimages]
 
-        minjd = np.min(jds)
-        maxjd = np.max(jds)
+        dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+        jobname = f'ref.{task_name}.{field}.{quadrant}.{band}.{ccdnum}'
+        dependency_string = ':'.join(list(map(str, dependency_list)))
+
+        minjd = template_rows.iloc[0]['obsjd']
+        maxjd = template_rows.iloc[-1]['obsjd']
 
         mintime = Time(minjd, format='jd', scale='utc')
         maxtime = Time(maxjd, format='jd', scale='utc')
@@ -54,58 +69,72 @@ def determine_and_submit_template_jobs(variance_corrids, metatable, options):
         mindatestr = mintime.iso.split()[0].replace('-', '')
         maxdatestr = maxtime.iso.split()[0].replace('-', '')
 
-        # see what jobs need to finish before this one can run
-        dependencies = []
-        remake_variance = []
-        for path, hv in zip(tmplims, hasvar):
-            if not hv:
-                if path in variance_corrids:
-                    varcorrid = variance_corrids[path]
-                    dependencies.append(varcorrid)
-                else:
-                    remake_variance.append(path)
 
-        if len(remake_variance) > 0:
-            moredeps = self.determine_and_relay_variance_jobs(remake_variance)
-            dependencies.extend(moredeps.values())
+        template_basename = f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
+                            f'{band:s}_{mindatestr:s}_{maxdatestr:s}_ztf_deepref.fits'
 
-        dependencies = list(set(dependencies))
+        template_name = template_destination / template_basename
 
-        # what will this template be called?
-        tmpbase = tmp_basename_form.format(paddedfield=field,
-                                           qid=oquadrant,
-                                           paddedccdid=ccdnum,
-                                           filtercode=oband,
-                                           mindate=mindatestr,
-                                           maxdate=maxdatestr)
+        incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
+        inframestr = ' '.join(template_rows['full_path'])
 
-        outfile_name = nersc_tmpform.format(fname=tmpbase)
+        jobstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J {jobname}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --dependency=afterok:{dependency_string}
+#SBATCH -C haswell
+#SBATCH --exclusive
+#SBATCH --volume="{volumes}"
+#SBATCH -o {Path(log_destination).resolve() / jobname}.out
 
-        # now that we have the dependencies we can relay the coadd job for submission
-        tmpl_data = {'dependencies':dependencies, 'jobtype':'template', 'images':tmplims,
-                     'outfile_name': outfile_name, 'imids': tmplids, 'quadrant': quadrant,
-                     'field': field, 'ccdnum': ccdnum, 'mindate':mindatestr,
-                     'maxdate':maxdatestr, 'filter': band,
-                     'pipeline_schema_id': self.pipeline_schema['schema_id']}
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
 
-        batch.append(tmpl_data)
+shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
+                                          --input-catalogs {incatstr} \ 
+                                          --input-frames {inframestr} 
+'''
 
-        if len(batch) == template_batchsize:
-            payload = {'jobtype': 'template', 'jobs': batch}
-            body = json.dumps(payload)
-            tmpl_corrid = self.relay_job(body)
-            for d in batch:
-                template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
-            batch = []
+        if job_script_destination is None:
+            jobscript = tempfile.NamedTemporaryFile()
+        else:
+            jobscript = open(Path(job_script_destination / f'{jobname}.sh').resolve(), 'w')
 
-    if len(batch) > 0:
-        payload = {'jobtype': 'template', 'jobs': batch}
-        body = json.dumps(payload)
-        tmpl_corrid = self.relay_job(body)
-        for d in batch:
-            template_corrids[(d['field'], d['quadrant'], d['filter'], d['ccdnum'])] = (tmpl_corrid, d)
+        jobscript.write(jobstr)
+        jobscript.seek(0)
 
-    return template_corrids
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=nersc_host, password=nersc_password, username=nersc_username)
+
+        command = f'sbatch {jobscript.name}'
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+
+        if stdout.channel.exit_status != 0:
+            raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
+
+        out = stdout.read()
+        err = stderr.read()
+
+        print(out, flush=True)
+        print(err, flush=True)
+
+        jobscript.close()
+        ssh_client.close()
+
+        jobid = int(out.strip().split()[-1])
+
+        dependency_dict[template_name] = jobid
+
+        indices_left = remaining_images.index.difference(template_rows.index)
+        remaining_images = remaining_images.loc[indices_left, :]
+
+    return dependency_dict, remaining_images
 
 def make_coadd_bins(self, field, ccdnum, quadrant, filter, maxdate=None):
 
@@ -151,18 +180,12 @@ if __name__ == '__main__':
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output-basename', dest='output_basename', required=True,
+    parser.add_argument('--outfile-path', dest='outfile_path', required=True,
                         help='Basename of output coadd.', nargs=1)
     parser.add_argument('--input-catalogs', dest='cats', required=True,
                         help='List of catalogs to use for astrometric alignment.', nargs='+')
     parser.add_argument('--input-frames', dest='frames', nargs='+', required=True,
                         help='List of frames to coadd.')
-    parser.add_argument('--nothreads', dest='nothreads', action='store_true', default=False,
-                        help='Run astromatic software with only one thread.')
-    parser.add_argument('--add-fakes', dest='nfakes', type=int, default=0,
-                        help='Number of fakes to add. Default 0.')
-    parser.add_argument('--convolve', dest='convolve', action='store_true', default=False,
-                        help='Convolve image with PSF to artificially degrade its quality.')
 
     args = parser.parse_args()
 
@@ -192,12 +215,9 @@ if __name__ == '__main__':
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
-
-
-
     allims = ' '.join(frames)
-    out = args.output_basename[0] + '.fits'
-    oweight = args.output_basename[0] + '.weight.fits'
+    out = args.outfile_path[0]
+    oweight = out.replace('.fits', '.weight.fits')
 
     # put all swarp temp files into a random dir
     swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
@@ -239,9 +259,9 @@ if __name__ == '__main__':
         f[0].data += 150.
 
     # Make a new catalog
-    outcat = args.output_basename[0] + '.cat'
-    noise = args.output_basename[0] + '.noise.fits'
-    bkgsub = args.output_basename[0] + '.bkgsub.fits'
+    outcat = out.replace('.fits', '.cat')
+    noise = out.replace('.fits', '.noise.fits')
+    bkgsub =out.replace('.fits', '.bkgsub.fits')
     syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
               f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
     syscall = ' '.join([syscall, clargs])
@@ -250,7 +270,7 @@ if __name__ == '__main__':
     # now model the PSF
     syscall = f'psfex -c {psfconf} {outcat}'
     liblg.execute(syscall, capture=False)
-    psf = args.output_basename[0] + '.psf'
+    psf = out.replace('.fits', '.psf')
 
     # and save it as a fits model
     gsmod = des.DES_PSFEx(psf)
@@ -271,47 +291,6 @@ if __name__ == '__main__':
     # save it to the D
     psfimg.write(psfimpath)
 
-    if args.convolve:
-        with fits.open(out, mode='update') as f, fits.open(psfimpath) as pf:
-            kernel = pf[0].data
-            idata = f[0].data
-            convolved = convolve(idata, kernel)
-            f[0].data = convolved
-
-        # Now remake the PSF model
-        # Make a new catalog
-        outcat = args.output_basename[0] + '.cat'
-        noise = args.output_basename[0] + '.noise.fits'
-        bkgsub = args.output_basename[0] + '.bkgsub.fits'
-        syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
-                  f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
-        syscall = ' '.join([syscall, clargs])
-        liblg.execute(syscall, capture=False)
-
-        # now model the PSF
-        syscall = f'psfex -c {psfconf} {outcat}'
-        liblg.execute(syscall, capture=False)
-        psf = args.output_basename[0] + '.psf'
-
-        # and save it as a fits model
-        gsmod = des.DES_PSFEx(psf)
-        with fits.open(psf) as f:
-            xcen = f[1].header['POLZERO1']
-            ycen = f[1].header['POLZERO2']
-            psfsamp = f[1].header['PSF_SAMP']
-
-        cpos = galsim.PositionD(xcen, ycen)
-        psfmod = gsmod.getPSF(cpos)
-        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-        psfimg.wcs = None
-        psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-        psfimpath = f'{psf}.fits'
-        # save it to the D
-        psfimg.write(psfimpath)
-
     # And zeropoint the coadd, putting results in the header
     liblg.solve_zeropoint(out, psfimpath, outcat, bkgsub)
 
@@ -326,28 +305,3 @@ if __name__ == '__main__':
     liblg.execute(syscall, capture=False)
     liblg.make_rms(out, oweight)
     liblg.medg(out)
-
-    if args.nfakes > 0:
-        with fits.open(out, mode='update') as f, fits.open(frames[0]) as ff, open(out.replace('fits', 'reg'), 'w') as o:
-            cards = [c for c in ff[0].header.cards if ('FAKE' in c.keyword and
-                                                       ('RA' in c.keyword or
-                                                        'DC' in c.keyword or
-                                                        'MG' in c.keyword or
-                                                        'FL' in c.keyword))]
-            wcs = WCS(f[0].header)
-            f[0].header.update(cards)
-
-            # make the region file
-            hdr = f[0].header
-
-            o.write("""# Region file format: DS9 version 4.1
-global color=green dashlist=8 3 width=1 font="helvetica 10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 de\
-lete=1 include=1 source=1
-physical
-""")
-
-            for i, fake in enumerate(fakes):
-                x, y = fake.xy(wcs)
-                hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = x, y
-                o.write(f'circle({x},{y},10) # width=2 color=red\n')
-
