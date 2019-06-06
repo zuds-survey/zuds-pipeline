@@ -65,7 +65,7 @@ if __name__ == '__main__':
                                                 frame_destination=framepath,
                                                 job_script_destination=jobscripts)
 
-    metatable['full_path'] = [(framepath / frame).resolve() for frame in frames]
+    metatable['full_path'] = [f'{(framepath / frame).resolve()}' for frame in frames]
 
     # todo: add fakes
 
