@@ -33,23 +33,29 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
 
     ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
 
-    substr =  f'''#!/usr/bin/env bash
-module load esslurm
-sbatch {Path(jobscript.name).resolve()}
-'''
+
 
     if job_script_destination is None:
         # then just use temporary files
 
         jobscript = tempfile.NamedTemporaryFile()
         subscript = tempfile.NamedTemporaryFile()
-        substr = substr.encode('ASCII')
+   
 
     else:
 
         jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
         subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
+    substr =  f'''#!/usr/bin/env bash
+module load esslurm
+sbatch {Path(jobscript.name).resolve()}
+'''
+    
+    if job_script_destination is None:
+        substr = substr.encode('ASCII')
+
+    subscript.write(substr)
 
     hpt = f'hpss.{tape_number}'
 
@@ -78,7 +84,10 @@ rm {os.path.basename(tarfile)}
 '''
         jobstr += directive
 
-    jobscript.write(jobstr.encode('ASCII'))
+    if job_script_destination is None:
+        jobstr = jobstr.encode('ASCII')
+        
+    jobscript.write(jobstr)
 
     jobscript.seek(0)
     subscript.seek(0)
