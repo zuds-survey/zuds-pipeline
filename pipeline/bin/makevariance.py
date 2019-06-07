@@ -85,7 +85,7 @@ srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames $news --i
             jobscript = tempfile.NamedTemporaryFile()
         else:
             job_script_destination = Path(job_script_destination)
-            jobscript = open(job_script_destination.resolve() / f'v{task_name}.{i}.sh', 'w')
+            jobscript = open(job_script_destination.resolve() / f'var.{task_name}.{i}.sh', 'w')
 
         jobscript.write(scriptstr)
         jobscript.seek(0)
