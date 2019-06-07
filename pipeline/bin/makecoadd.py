@@ -194,7 +194,7 @@ if __name__ == '__main__':
 
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
-    liblg.execute(syscall, capture=False)
+    libztf.execute(syscall, capture=False)
 
     # Now postprocess it a little bit
     with fits.open(frames[0]) as f:
@@ -232,11 +232,11 @@ if __name__ == '__main__':
     syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
               f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
     syscall = ' '.join([syscall, clargs])
-    liblg.execute(syscall, capture=False)
+    libztf.execute(syscall, capture=False)
 
     # now model the PSF
     syscall = f'psfex -c {psfconf} {outcat}'
-    liblg.execute(syscall, capture=False)
+    libztf.execute(syscall, capture=False)
     psf = out.replace('.fits', '.psf')
 
     # and save it as a fits model
@@ -259,7 +259,7 @@ if __name__ == '__main__':
     psfimg.write(psfimpath)
 
     # And zeropoint the coadd, putting results in the header
-    liblg.solve_zeropoint(out, psfimpath, outcat, bkgsub)
+    libztf.solve_zeropoint(out, psfimpath, outcat, bkgsub)
 
     # Now retrieve the zeropoint
     with fits.open(out) as f:
@@ -269,6 +269,6 @@ if __name__ == '__main__':
     syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
     syscall = syscall % (sexconf, outcat, noise, zp, out)
     syscall = ' '.join([syscall, clargs])
-    liblg.execute(syscall, capture=False)
-    liblg.make_rms(out, oweight)
-    liblg.medg(out)
+    libztf.execute(syscall, capture=False)
+    libztf.make_rms(out, oweight)
+    libztf.medg(out)
