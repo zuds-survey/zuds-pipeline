@@ -80,7 +80,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 
                 if len(frames) == 0:
                     continue
-                
+
                 variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
                 cdep_list = variance_dependency_list + template_dependency_list
 
@@ -501,10 +501,10 @@ if __name__ == '__main__':
 
     import argparse
 
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-    size = comm.Get_size()
+    #from mpi4py import MPI
+    #comm = MPI.COMM_WORLD
+    rank = 0 #comm.Get_rank()
+    size = 1 #comm.Get_size()
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -526,7 +526,7 @@ if __name__ == '__main__':
             frames = np.atleast_1d(frames).tolist()
         else:
             frames = None
-        frames = comm.bcast(frames, root=0)
+        #frames = comm.bcast(frames, root=0)
     else:
         frames = args.sciimg
 
@@ -538,7 +538,7 @@ if __name__ == '__main__':
             templates = np.atleast_1d(templates).tolist()
         else:
             templates = None
-        templates = comm.bcast(templates, root=0)
+        #templates = comm.bcast(templates, root=0)
     else:
         templates = args.template
 

@@ -5,8 +5,6 @@ cats="$2"
 coadd="$3"
 template="$4"
 
-cd /global/cscratch1/sd/dgold/ztfcoadd/job_scripts
-
 python /pipeline/bin/makecoadd.py --input-frames $news --input-catalogs $cats --outfile-path=$coadd
 
 if [ $? -eq 0 ]; then
