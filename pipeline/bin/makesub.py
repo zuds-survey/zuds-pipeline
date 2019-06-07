@@ -118,7 +118,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 #SBATCH --exclusive
 #SBATCH -C haswell
 #SBATCH --volume="{volumes}"
-#SBATCH -o {log_destination.resolve()}/sub{task_name}.{i}.out
+#SBATCH -o {log_destination.resolve()}/sub.{task_name}.{i}.out
 #SBATCH --dependency=afterok:{my_deps}
 
 export OMP_NUM_THREADS=1
@@ -143,12 +143,13 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                           f'--science-frames {frame} --templates {template} &\n'
 
             jobstr += execstr
+        jobstr += 'wait\n'
 
         if job_script_destination is None:
             job_script = tempfile.NamedTemporaryFile()
             jobstr = jobstr.encode('ASCII')
         else:
-            job_script = open(job_script_destination.resolve() / f'sub{task_name}.sh', 'w')
+            job_script = open(job_script_destination.resolve() / f'sub.{task_name}.{i}.sh', 'w')
 
         job_script.write(jobstr)
         job_script.seek(0)
@@ -167,7 +168,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
             raise RuntimeError(f'Unable to submit job with script: "{jobstr}", nonzero retcode')
 
         job_script.close()
-        
+
 
 def make_coadd_bins(science_rows, window_size=3, rolling=False):
 
