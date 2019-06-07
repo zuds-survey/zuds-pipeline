@@ -374,9 +374,7 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsx))
         hotparlogger.info(str(nsy))
 
-        convnew = False
-
-        convolve_target = 'i' if convnew else 't'
+        convolve_target = 'i' if not ntst else 't'
         syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
                   f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
