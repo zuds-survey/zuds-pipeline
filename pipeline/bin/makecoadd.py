@@ -98,7 +98,9 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
                                           --input-catalogs {incatstr} \ 
-                                          --input-frames {inframestr} 
+                                          --input-frames {inframestr} \
+                                          --template 
+                                          
 '''
 
         if job_script_destination is None:
@@ -155,6 +157,8 @@ if __name__ == '__main__':
                         help='List of catalogs to use for astrometric alignment.', nargs='+')
     parser.add_argument('--input-frames', dest='frames', nargs='+', required=True,
                         help='List of frames to coadd.')
+    parser.add_argument('--template', help='Turn on 64 threads for template jobs.',
+                        action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -179,7 +183,7 @@ if __name__ == '__main__':
     filtname = os.path.join(confdir, 'default.conv')
     nnwname = os.path.join(confdir, 'default.nnw')
     scampconf = os.path.join(confdir, 'scamp.conf')
-    swarpconf = os.path.join(confdir, 'default.swarp')
+    swarpconf = os.path.join(confdir, 'default.swarp') if not args.template else os.path.join(confdir, 'template.swarp')
     psfconf = os.path.join(confdir, 'psfex.conf')
 
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
