@@ -13,15 +13,15 @@ from galsim import des
 from astropy.convolution import convolve
 import shutil
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import paramiko
 import tempfile
 
 
 def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
-                    end_date=datetime(2018, 4, 1),  template_destination='.', log_destination='.',
-                    job_script_destination=None, task_name=None):
+                    end_date=datetime(2018, 4, 1), template_science_minsep_days=0, template_destination='.',
+                    log_destination='.', job_script_destination=None, task_name=None):
 
     nersc_account = os.getenv('NERSC_ACCOUNT')
     nersc_username = os.getenv('NERSC_USERNAME')
@@ -133,6 +133,10 @@ shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
         indices_left = remaining_images.index.difference(template_rows.index)
         remaining_images = remaining_images.loc[indices_left, :]
 
+    early_enough = remaining_images['obsdate'] < start_date - timedelta(days=template_science_minsep_days)
+    late_enough = remaining_images['obsdate'] > end_date + timedelta(days=template_science_minsep_days)
+
+    remaining_images = remaining_images[early_enough & late_enough]
     return dependency_dict, remaining_images
 
 

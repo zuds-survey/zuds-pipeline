@@ -11,6 +11,10 @@ import pandas as pd
 from galsim import des
 import galsim
 
+import tempfile
+from pathlib import Path
+import paramiko
+
 
 from libztf.yao import yao_photometry_single
 
@@ -23,37 +27,163 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
-def make_coadd_bins(self, field, ccdnum, quadrant, filter, maxdate=None):
+def chunk(iterable, chunksize):
+    isize = len(iterable)
+    nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
+    for i in range(nchunks):
+        yield i, iterable[i * chunksize : (i + 1) * chunksize]
 
-    self._refresh_connections()
 
-    if maxdate is None:
-        query = 'SELECT MAXDATE FROM TEMPLATE WHERE FIELD=%s AND CCDNUM=%s AND QUADRANT=%s AND FILTER=%s ' \
-                'AND PIPELINE_SCHEMA_ID=%s'
-        self.cursor.execute(query, (field, ccdnum, quadrant, filter, self.pipeline_schema['schema_id']))
-        result = self.cursor.fetchall()
+def submit_coaddsub(template_dependencies, variance_dependencies, science_metatable, template_metatable,
+                    rolling=False, coadd_windowsize=3, batch_size=32, job_script_destination='.',
+                    log_destination='.', frame_destination='.', task_name=None):
 
-        if len(result) == 0:
-            raise ValueError('No template queued or on disk -- can\'t make coadd bins')
-        date = result[0][0]
 
-    else:
-        date = maxdate
+    log_destination = Path(log_destination)
+    frame_destination = Path(frame_destination)
+    job_script_destination = Path(job_script_destination)
+    job_list = []
 
-    startsci = pd.to_datetime(date) + pd.Timedelta(self.pipeline_schema['template_science_minsep_days'],
-                                                   unit='d')
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
+    coaddsub_exec = os.getenv('COADDSUB_EXEC')
 
-    if self.pipeline_schema['rolling']:
-        dates = pd.date_range(startsci, pd.to_datetime(datetime.date.today()), freq='1D')
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
+    for (field, quadrant, band, ccdnum), group in science_metatable.groupby(['field',
+                                                                             'qid',
+                                                                             'filtercode',
+                                                                             'ccdid']):
+
+        science_rows = group.copy()
+        science_rows = science_rows.sort_values('obsjd')
+
+        tc1 = template_metatable['field'] == field
+        tc2 = template_metatable['qid'] == quadrant
+        tc3 = template_metatable['filtercode'] == band
+        tc4 = template_metatable['ccdid'] == ccdnum
+
+        template_row = template_metatable[tc1 & tc2 & tc3 & tc4].iloc[0]
+        template_dependency_list = [template_dependencies[template_row['path']]]
+
+        if coadd_windowsize > 0:
+            bin_edges = make_coadd_bins(science_rows, window_size=coadd_windowsize, rolling=rolling)
+            for l, r in bin_edges:
+                frames_c1 = science_rows['obsdate'] >= l
+                frames_c2 = science_rows['obsdate'] < r
+                frames = science_rows[frames_c1 & frames_c2]
+                variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+                cdep_list = variance_dependency_list + template_dependency_list
+
+                coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
+                                                 f'{band:s}_{l:s}_{r:s}_coadd.fits'
+
+                job = {'type':'coaddsub', 'frames': frames['path'].tolist(),
+                       'template': template_row['path'], 'coadd_name': coadd_name,
+                       'dependencies': cdep_list}
+                job_list.append(job)
+
+        else:
+            # just run straight up subtractions
+            for i, row in science_rows.iterrows():
+                variance_dependency_list = [variance_dependencies[row['path']]]
+                cdep_list = variance_dependency_list + template_dependency_list
+                job = {'type': 'sub', 'frame': row['path'],
+                       'template': template_row['path'], 'dependencies': cdep_list}
+                job_list.append(job)
+
+    for i, ch in chunk(job_list, batch_size):
+
+        my_deps = []
+        for j in ch:
+            my_deps += j['dependencies']
+        my_deps = ':'.join(list(set(my_deps)))
+
+        jobstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J sub{task_name}.{i}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --exclusive
+#SBATCH -C haswell
+#SBATCH --volume="{volumes}"
+#SBATCH -o {log_destination.resolve()}/sub{task_name}.{i}.out
+#SBATCH --dependency=afterok:{my_deps}
+
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
+
+'''
+
+        for j in ch:
+
+            template = j['template']
+
+            if j['type'] == 'coaddsub':
+
+                frames = j['frames']
+                cats = [frame.replace('.fits', '.cat') for frame in frames]
+                coadd = j['coadd_name']
+                execstr = f'shifter bash {coaddsub_exec} {frames} {cats} {coadd} {template} &\n'
+            else:
+
+                frame = j['frame']
+                execstr = f'shifter python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
+                          f'--science-frames {frame} --templates {template} &\n'
+
+            jobstr += execstr
+
+        if job_script_destination is None:
+            job_script = tempfile.NamedTemporaryFile()
+            jobstr = jobstr.encode('ASCII')
+        else:
+            job_script = open(job_script_destination.resolve() / f'sub{task_name}.sh', 'w')
+
+        job_script.write(jobstr)
+        jobstr = jobstr.decode('ASCII')
+        job_script.seek(0)
+
+        syscall = f'sbatch {job_script.name}'
+        stdin, stdout, stderr = ssh_client.exec_command(syscall)
+
+        out = stdout.read()
+        err = stderr.read()
+
+        print(out, flush=True)
+        print(err, flush=True)
+
+        retcode = stdout.channel.recv_exit_status()
+        if retcode != 0:
+            raise RuntimeError(f'Unable to submit job with script: "{jobstr}", nonzero retcode')
+
+        job_script.close()
+        
+
+def make_coadd_bins(science_rows, window_size=3, rolling=False):
+
+    mindate = pd.to_datetime(science_rows['obsdate'].min())
+    maxdate = pd.to_datetime(science_rows['obsdate'].max())
+
+
+    if rolling:
+        dates = pd.date_range(mindate, maxdate, freq='1D')
         bins = []
         for i, date in enumerate(dates):
-            if i + self.pipeline_schema['scicoadd_window_size'] >= len(dates):
+            if i + window_size >= len(dates):
                 break
-            bins.append((date, dates[i + self.pipeline_schema['scicoadd_window_size']]))
+            bins.append((date, dates[i + window_size]))
 
     else:
-        binedges = pd.date_range(startsci, pd.to_datetime(datetime.datetime.today()),
-                                 freq=f'{self.pipeline_schema["scicoadd_window_size"]}D')
+        binedges = pd.date_range(mindate, freq=f'{window_size}D')
 
         bins = []
         for i, lbin in enumerate(binedges[:-1]):

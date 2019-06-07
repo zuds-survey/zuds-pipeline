@@ -64,7 +64,8 @@ environment_variables = {
     'LENSGRINDER_HOME': lensgrinder_home,
     'VOLUMES': vstring,
     'SHIFTER_IMAGE': shifter_image,
-    'OUTPUT_DIRECTORY': run_topdirectory
+    'OUTPUT_DIRECTORY': run_topdirectory,
+    'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'slurm', 'single_coaddsub.sh')
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])

@@ -32,7 +32,7 @@ def _read_clargs(val):
     return np.asarray(val)
 
 
-def submit_makevariance(frames, masks, batch_size=1024,  job_script_destination=None,
+def submit_makevariance(frames, masks, batch_size=1024, job_script_destination=None,
                         log_destination='.', frame_destination='.', task_name=None):
 
 

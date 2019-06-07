@@ -49,16 +49,8 @@ if __name__ == '__main__':
     options = task_spec['makevariance']
     batch_size = options['batch_size']
     from makevariance import submit_makevariance
-
-    if 'frames' in options and options['frames'] is not None:
-        frames = options['frames']
-        dependencies = None
-    elif 'hpss' in task_spec:
-        frames = [im for im in hpss_dependencies if 'msk' not in im]
-        dependencies = hpss_dependencies
-    else:
-        raise ValueError('No images specified')
-
+    frames = [im for im in hpss_dependencies if 'msk' not in im]
+    dependencies = hpss_dependencies
     masks = [im.replace('sciimg', 'mskimg') for im in frames]
     variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
                                                 batch_size=batch_size, log_destination=logs,
@@ -77,14 +69,28 @@ if __name__ == '__main__':
     template_nimages = options['nimages']
     template_start_date = options['start_date']
     template_end_date = options['end_date']
+    template_science_minsep_days = options['template_science_minsep_days']
 
-    template_dependencies, remaining_images = submit_template(variance_dependencies, metatable,
-                                                              template_destination=templates,
-                                                              task_name=task_name,
-                                                              log_destination=logs,
-                                                              job_script_destination=jobscripts,
-                                                              nimages=template_nimages,
-                                                              start_date=template_start_date,
-                                                              end_date=template_end_date)
+    template_dependencies, remaining_images, template_metatable = submit_template(variance_dependencies, metatable,
+                                                                                  template_destination=templates,
+                                                                                  task_name=task_name,
+                                                                                  log_destination=logs,
+                                                                                  job_script_destination=jobscripts,
+                                                                                  nimages=template_nimages,
+                                                                                  start_date=template_start_date,
+                                                                                  end_date=template_end_date,
+                                                                                  template_science_minsep_days=template_science_minsep_days)
+
+    from makesub import submit_coaddsub
+    options = task_spec['coaddsub']
+    rolling = options['rolling']
+    coadd_windowsize = options['coadd_windowsize']
+    batch_size = options['batch_size']
+
+    coaddsub_dependencies = submit_coaddsub(template_dependencies, variance_dependencies, remaining_images, template_metatable,
+                                            template_science_minsep_days=template_science_minsep_days,
+                                            rolling=rolling, coadd_windowsize=coadd_windowsize,
+                                            batch_size=batch_size, job_script_destination=jobscripts,
+                                            log_destination=logs, frame_destination=framepath, task_name=task_name)
 
 
