@@ -138,7 +138,7 @@ shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
     early_enough = remaining_images['obsdate'] < start_date - timedelta(days=template_science_minsep_days)
     late_enough = remaining_images['obsdate'] > end_date + timedelta(days=template_science_minsep_days)
 
-    remaining_images = remaining_images[early_enough & late_enough]
+    remaining_images = remaining_images[early_enough | late_enough]
     template_metatable = pd.DataFrame(template_metatable, columns=['field', 'qid', 'filtercode', 'ccdid', 'path'])
     return dependency_dict, remaining_images, template_metatable
 
