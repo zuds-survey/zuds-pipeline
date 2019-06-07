@@ -15,5 +15,5 @@ coaddsub:
   template_science_minsep_days: 0
   rolling: false
   coadd_windowsize: 3
-  batch_size = 32
+  batch_size : 32
 
