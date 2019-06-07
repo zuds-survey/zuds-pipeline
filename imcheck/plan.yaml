@@ -1,5 +1,0 @@
-template_minimages: 100
-template_science_minsep_days: 0
-scicoadd_window_size: 2
-rolling: false
-sql: FIELD=723 AND QID=3 AND CCDID=11
