@@ -123,7 +123,7 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
     hpssdb = HPSSDB()
 
     # this is the query to get the image paths
-    query = f'SELECT * FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL AND {whereclause}'
+    query = f'SELECT * FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL AND {whereclause} AND SEEING < 3 AND MAGLIMIT > 18.5'
     metatable = pd.read_sql(query, hpssdb.engine)
     df = metatable[['path', 'hpss_sci_path', 'hpss_mask_path']]
 
