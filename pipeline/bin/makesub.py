@@ -80,8 +80,11 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                 variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
                 cdep_list = variance_dependency_list + template_dependency_list
 
+                lstr = f'{l}'.split()[0].replace('-', '')
+                rstr = f'{r}'.split()[0].replace('-', '')
+
                 coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
-                                                 f'{band:s}_{l:s}_{r:s}_coadd.fits'
+                                                 f'{band:s}_{lstr}_{rstr}_coadd.fits'
 
                 job = {'type':'coaddsub', 'frames': frames['path'].tolist(),
                        'template': template_row['path'], 'coadd_name': coadd_name,
@@ -102,7 +105,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
         my_deps = []
         for j in ch:
             my_deps += j['dependencies']
-        my_deps = ':'.join(list(set(my_deps)))
+        my_deps = ':'.join(list(map(str, set(my_deps))))
 
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
@@ -132,7 +135,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 frames = j['frames']
                 cats = [frame.replace('.fits', '.cat') for frame in frames]
                 coadd = j['coadd_name']
-                execstr = f'shifter bash {coaddsub_exec} {frames} {cats} {coadd} {template} &\n'
+                execstr = f'shifter bash {coaddsub_exec} {" ".join(frames)} {" ".join(cats)} {coadd} {template} &\n'
             else:
 
                 frame = j['frame']
@@ -148,7 +151,6 @@ export USE_SIMPLE_THREADED_LEVEL3=1
             job_script = open(job_script_destination.resolve() / f'sub{task_name}.sh', 'w')
 
         job_script.write(jobstr)
-        jobstr = jobstr.decode('ASCII')
         job_script.seek(0)
 
         syscall = f'sbatch {job_script.name}'

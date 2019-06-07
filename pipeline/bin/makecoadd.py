@@ -130,7 +130,7 @@ shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
 
         jobid = int(out.strip().split()[-1])
 
-        dependency_dict[template_name] = jobid
+        dependency_dict[f'{template_name}'] = jobid
 
         indices_left = remaining_images.index.difference(template_rows.index)
         remaining_images = remaining_images.loc[indices_left, :]

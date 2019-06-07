@@ -88,7 +88,6 @@ if __name__ == '__main__':
     batch_size = options['batch_size']
 
     coaddsub_dependencies = submit_coaddsub(template_dependencies, variance_dependencies, remaining_images, template_metatable,
-                                            template_science_minsep_days=template_science_minsep_days,
                                             rolling=rolling, coadd_windowsize=coadd_windowsize,
                                             batch_size=batch_size, job_script_destination=jobscripts,
                                             log_destination=logs, frame_destination=framepath, task_name=task_name)
