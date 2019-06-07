@@ -30,6 +30,7 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
     shifter_image = os.getenv('SHIFTER_IMAGE')
     volumes = os.getenv('VOLUMES')
 
+    template_metatable = []
     template_destination = Path(template_destination)
     dependency_dict = {}
 
@@ -73,6 +74,7 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
                             f'{band:s}_{mindatestr:s}_{maxdatestr:s}_ztf_deepref.fits'
 
         template_name = template_destination / template_basename
+        template_metatable.append([field, quadrant, band, ccdnum, f'{template_name}'])
 
         incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
         inframestr = ' '.join(template_rows['full_path'])
@@ -137,7 +139,8 @@ shifter python /pipeline/bin/makecoadd.py --outfile-path {template_name} \
     late_enough = remaining_images['obsdate'] > end_date + timedelta(days=template_science_minsep_days)
 
     remaining_images = remaining_images[early_enough & late_enough]
-    return dependency_dict, remaining_images
+    template_metatable = pd.DataFrame(template_metatable, columns=['field', 'qid', 'filtercode', 'ccdid', 'path'])
+    return dependency_dict, remaining_images, template_metatable
 
 
 if __name__ == '__main__':
