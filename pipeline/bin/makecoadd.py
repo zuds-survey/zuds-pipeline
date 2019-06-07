@@ -163,13 +163,13 @@ if __name__ == '__main__':
         frames = np.genfromtxt(args.frames[0][1:], dtype=None, encoding='ascii')
         frames = np.atleast_1d(frames)
     else:
-        frames = args.frames
+        frames = args.frames.split()
 
     if args.cats[0].startswith('@'):
         cats = np.genfromtxt(args.cats[0][1:], dtype=None, encoding='ascii')
         cats = np.atleast_1d(cats)
     else:
-        cats = args.cats
+        cats = args.cats.split()
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
