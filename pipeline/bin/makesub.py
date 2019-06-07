@@ -77,6 +77,10 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                 frames_c1 = science_rows['obsdate'] >= l
                 frames_c2 = science_rows['obsdate'] < r
                 frames = science_rows[frames_c1 & frames_c2]
+
+                if len(frames) == 0:
+                    continue
+                
                 variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
                 cdep_list = variance_dependency_list + template_dependency_list
 
@@ -86,7 +90,10 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                 coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
                                                  f'{band:s}_{lstr}_{rstr}_coadd.fits'
 
-                job = {'type':'coaddsub', 'frames': frames['path'].tolist(),
+                framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
+
+                job = {'type':'coaddsub',
+                       'frames': [f'{framepath}' for framepath in framepaths],
                        'template': template_row['path'], 'coadd_name': coadd_name,
                        'dependencies': cdep_list}
                 job_list.append(job)
@@ -96,7 +103,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             for i, row in science_rows.iterrows():
                 variance_dependency_list = [variance_dependencies[row['path']]]
                 cdep_list = variance_dependency_list + template_dependency_list
-                job = {'type': 'sub', 'frame': row['path'],
+                job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
                        'template': template_row['path'], 'dependencies': cdep_list}
                 job_list.append(job)
 
@@ -109,7 +116,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
-#SBATCH -J sub{task_name}.{i}
+#SBATCH -J sub.{task_name}.{i}
 #SBATCH -t 00:30:00
 #SBATCH -L SCRATCH
 #SBATCH -A {nersc_account}
@@ -135,7 +142,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 frames = j['frames']
                 cats = [frame.replace('.fits', '.cat') for frame in frames]
                 coadd = j['coadd_name']
-                execstr = f'shifter bash {coaddsub_exec} {" ".join(frames)} {" ".join(cats)} {coadd} {template} &\n'
+                execstr = f'shifter bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\" \"{coadd}\" \"{template}\" &\n'
             else:
 
                 frame = j['frame']
