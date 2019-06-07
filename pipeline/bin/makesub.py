@@ -19,7 +19,6 @@ import paramiko
 from libztf.yao import yao_photometry_single
 
 from filterobjects import filter_sexcat
-from makecoadd import Fake
 from publish import load_catalog
 
 # split an iterable over some processes recursively
@@ -183,7 +182,7 @@ def make_coadd_bins(science_rows, window_size=3, rolling=False):
             bins.append((date, dates[i + window_size]))
 
     else:
-        binedges = pd.date_range(mindate, freq=f'{window_size}D')
+        binedges = pd.date_range(mindate, maxdate, freq=f'{window_size}D')
 
         bins = []
         for i, lbin in enumerate(binedges[:-1]):
