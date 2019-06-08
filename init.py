@@ -28,6 +28,7 @@ skyportal_dbport = 7777
 skyportal_dbusername = 'skyportal'
 skyportal_dbpassword = '***REMOVED***'
 skyportal_dbname = 'skyportal'
+skyportal_home = '/global/cscratch1/sd/dgold/skyportal_private'
 
 shifter_image = 'registry.services.nersc.gov/dgold/improc:latest'
 slurm_email = 'ztfcoadd@gmail.com'
@@ -41,7 +42,8 @@ volume_mounts = {
     os.path.join(lensgrinder_home, 'pipeline'): '/pipeline',
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
     os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic',
-    lensgrinder_home: '/lg'
+    lensgrinder_home: '/lg',
+    skyportal_home: '/skyportal'
 }
 
 vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
@@ -57,6 +59,7 @@ environment_variables = {
     'SKYPORTAL_DBUSERNAME': skyportal_dbusername,
     'SKYPORTAL_DBPASSWORD': skyportal_dbpassword,
     'SKYPORTAL_DBNAME': skyportal_dbname,
+    'SKYPORTAL_HOME': skyportal_home, 
     'NERSC_USERNAME': nersc_username,
     'NERSC_PASSWORD': nersc_password,
     'NERSC_HOST': nersc_host,
@@ -65,7 +68,7 @@ environment_variables = {
     'VOLUMES': vstring,
     'SHIFTER_IMAGE': shifter_image,
     'OUTPUT_DIRECTORY': run_topdirectory,
-    'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'slurm', 'single_coaddsub.sh')
+    'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'pipeline', 'slurm', 'single_coaddsub.sh')
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
