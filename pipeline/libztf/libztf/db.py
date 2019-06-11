@@ -2,10 +2,8 @@ from datetime import datetime
 import numpy as np
 
 import sqlalchemy as sa
-from sqlalchemy.ext.associationproxy import association_proxy
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm import sessionmaker, scoped_session, relationship
-from sqlalchemy.orm.exc import NoResultFound
 
 import os
 from pathlib import Path
@@ -13,8 +11,8 @@ from pathlib import Path
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.orm import backref, relationship
 
-from .json_util import to_json
-from .custom_exceptions import AccessError
+from baselayer.app.json_util import to_json
+from baselayer.app.custom_exceptions import AccessError
 
 
 DBSession = scoped_session(sessionmaker())
@@ -22,8 +20,15 @@ DBSession = scoped_session(sessionmaker())
 
 # The db has to be initialized later; this is done by the app itself
 # See `app_server.py`
-def init_db(user, database, password=None, host=None, port=None):
+def init_db():
     url = 'postgresql://{}:{}@{}:{}/{}'
+
+    user = os.getenv('HPSS_DBUSERNAME')
+    password = os.getenv('HPSS_DBPASSWORD')
+    port = os.getenv('HPSS_DBPORT')
+    database = os.getenv('HPSS_DBNAME')
+    host = os.getenv('HPSS_DBHOST')
+
     url = url.format(user, password or '', host or '', port or '', database)
 
     conn = sa.create_engine(url, client_encoding='utf8')

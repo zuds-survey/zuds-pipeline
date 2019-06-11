@@ -5,7 +5,7 @@ import requests
 import logging
 
 from sqlalchemy import and_
-from libztf.db import DBSession, Image
+from libztf.db import DBSession, Image, init_db
 
 suffix_dict = {'sub': 'scimrefdiffimg.fits.fz',
                'sci': 'sciimg.fits',
@@ -97,7 +97,10 @@ class IPACQueryManager(object):
                     DBSession().commit()
                     counter = 0
 
+
 if __name__ == '__main__':
+
+    init_db()
 
     logger = logging.getLogger('poll')
     logger.setLevel(logging.INFO)
