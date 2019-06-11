@@ -64,7 +64,7 @@ class IPACQueryManager(object):
             images = DBSession().query(Image) \
                                 .filter(and_(hpss == None, disk == None, Image.ipac_gid == 2)) \
                                 .order_by(Image.field, Image.ccdid, Image.qid, Image.filtercode, Image.obsjd) \
-                                .limit(1000).all()
+                                .all()
 
             my_images = _split(images, nchunks)[mychunk - 1]
             suffix = suffix_dict[itype]
@@ -101,7 +101,7 @@ class IPACQueryManager(object):
                 if counter == CHUNK_SIZE:
                     DBSession().commit()
                     counter = 0
-                    
+
             DBSession().commit()
 
 
