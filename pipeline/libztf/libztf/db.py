@@ -213,7 +213,7 @@ class Image(Base):
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
     def disk_path(self, suffix):
-        base = Path(os.getenv('FRAME_DESTINATION')) / \
+        base = Path(os.getenv('OUTPUT_DIRECTORY')) / \
                f'{self.field:06d}/c{self.ccdid:02d}/q{self.qid}/{self.filtercode}/' \
                f'{self.path.replace(".fits", suffix)}'
         return base
