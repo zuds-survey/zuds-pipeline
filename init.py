@@ -14,14 +14,17 @@ nersc_username = 'dgold'
 nersc_host = 'cori.nersc.gov'
 nersc_password = '***REMOVED***'
 
-lensgrinder_home = '/global/cscratch1/sd/dgold/lensgrinder'
-run_topdirectory = '/global/cscratch1/sd/dgold/coadd'
+lensgrinder_home = '/global/cscratch1/sd/ztfproc/lensgrinder'
+run_topdirectory = '/global/cscratch1/sd/ztfproc/coadd'
 
 hpss_dbhost = '***REMOVED***'
 hpss_dbport = 6666
 hpss_dbusername = '***REMOVED***'
 hpss_dbname = 'ztfimages'
 hpss_dbpassword = '***REMOVED***'
+
+ipac_username = 'dgold@berkeley.edu'
+ipac_password = '***REMOVED***'
 
 skyportal_dbhost = hpss_dbhost
 skyportal_dbport = 7777
@@ -66,6 +69,8 @@ environment_variables = {
     'SHIFTER_IMAGE': shifter_image,
     'OUTPUT_DIRECTORY': run_topdirectory,
     'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'slurm', 'single_coaddsub.sh')
+    'IPAC_USERNAME': ipac_username,
+    'IPAC_PASSWORD': ipac_password
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
