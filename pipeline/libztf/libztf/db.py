@@ -216,4 +216,4 @@ class Image(Base):
         base = Path(os.getenv('OUTPUT_DIRECTORY')) / \
                f'{self.field:06d}/c{self.ccdid:02d}/q{self.qid}/{self.filtercode}/' \
                f'{self.path.replace(".fits", suffix)}'
-        return base
+        return f'{base}'
