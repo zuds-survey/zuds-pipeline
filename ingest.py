@@ -3,6 +3,7 @@ import sys
 import time
 import requests
 import logging
+from pathlib import PurePosixPath
 
 from sqlalchemy import and_
 from libztf.db import DBSession, Image, init_db
@@ -71,6 +72,8 @@ class IPACQueryManager(object):
             for image in my_images:
                 ipac_path = image.ipac_path(suffix)
                 disk_path = image.disk_path(suffix)
+                dp = PurePosixPath(disk_path)
+                dp.parent.create(parents=True, exist_ok=True)
 
                 while True:
                     now = time.time()
@@ -97,6 +100,8 @@ class IPACQueryManager(object):
                 if counter == CHUNK_SIZE:
                     DBSession().commit()
                     counter = 0
+                    
+            DBSession().commit()
 
 
 if __name__ == '__main__':
