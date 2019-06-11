@@ -149,6 +149,9 @@ class NumpyArray(sa.types.TypeDecorator):
 
 
 class Image(Base):
+
+    __tablename__ = 'image'
+
     path = sa.Column(sa.Text)
     filtercode = sa.Column(sa.CHAR(2))
     qid = sa.Column(sa.Integer)
