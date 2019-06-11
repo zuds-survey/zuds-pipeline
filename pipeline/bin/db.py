@@ -11,8 +11,6 @@ from pathlib import Path
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.orm import backref, relationship
 
-from baselayer.app.json_util import to_json
-from baselayer.app.custom_exceptions import AccessError
 
 
 DBSession = scoped_session(sessionmaker())
@@ -50,9 +48,6 @@ class BaseMixin(object):
 
     __mapper_args__ = {'confirm_deleted_rows': False}
 
-    def __str__(self):
-        return to_json(self)
-
     def __repr__(self):
         attr_list = [f"{c.name}={getattr(self, c.name)}"
                      for c in self.__table__.columns]
@@ -62,15 +57,6 @@ class BaseMixin(object):
         if sa.inspection.inspect(self).expired:
             DBSession().refresh(self)
         return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
-
-    @classmethod
-    def get_if_owned_by(cls, ident, user, options=[]):
-        obj = cls.query.options(options).get(ident)
-
-        if obj is None or not obj.is_owned_by(user):
-            raise AccessError(f'No such {cls.__name__}')
-
-        return obj
 
     def is_owned_by(self, user):
         raise NotImplementedError("Ownership logic is application-specific")
