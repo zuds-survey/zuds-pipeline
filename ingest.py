@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from sqlalchemy import and_
-from libztf.db import DBSession, Image, init_db
+from db import DBSession, Image, init_db
 
 suffix_dict = {'sub': 'scimrefdiffimg.fits.fz',
                'sci': 'sciimg.fits',
@@ -119,7 +119,7 @@ if __name__ == '__main__':
     formatter = logging.Formatter(f'[%(asctime)s - {hostname} - %(levelname)s] - %(message)s')
     ch.setFormatter(formatter)
 
-    nchunks = 16
-    mychunk = 0 #int(hostname[-2:])
+    nchunks = 4
+    mychunk = int(hostname.split('.')[0][-2:])
     manager = IPACQueryManager(logger)
     manager(nchunks, mychunk)

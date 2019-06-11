@@ -95,5 +95,5 @@ with open('interactive.sh', 'w') as f:
 
 with open('ingest.sh', 'w') as f:
     f.write(f'''#!/bin/bash
-        {estring} /bin/bash''')
+        {estring.replace('-e', '')} /bin/bash''')
 
