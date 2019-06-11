@@ -62,7 +62,7 @@ environment_variables = {
     'SKYPORTAL_DBUSERNAME': skyportal_dbusername,
     'SKYPORTAL_DBPASSWORD': skyportal_dbpassword,
     'SKYPORTAL_DBNAME': skyportal_dbname,
-    'SKYPORTAL_HOME': skyportal_home, 
+    'SKYPORTAL_HOME': skyportal_home,
     'NERSC_USERNAME': nersc_username,
     'NERSC_PASSWORD': nersc_password,
     'NERSC_HOST': nersc_host,
@@ -92,3 +92,8 @@ with open('interactive.sh', 'w') as f:
     f.write(f'''salloc -N 1 -t 00:30:00 -L SCRATCH -A {nersc_account} \
 --partition=realtime --image={shifter_image} -C haswell --exclusive \
 --volume="{vstring}"''')
+
+with open('ingest.sh', 'w') as f:
+    f.write(f'''#!/bin/bash
+        {estring} /bin/bash''')
+

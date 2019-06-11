@@ -213,7 +213,10 @@ class Image(Base):
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
     def disk_path(self, suffix):
+        sffd = str(self.filefracday)
         base = Path(os.getenv('OUTPUT_DIRECTORY')) / \
                f'{self.field:06d}/c{self.ccdid:02d}/q{self.qid}/{self.filtercode}/' \
-               f'{self.path.replace(".fits", suffix)}'
+               f'ztf_{sffd}_{self.field:06d}_{self.filtercode}_c{self.ccdid:02d}_' \
+               f'{self.imgtypecode}_q{self.qid}_{suffix}'
+
         return f'{base}'

@@ -3,7 +3,7 @@ import sys
 import time
 import requests
 import logging
-from pathlib import PurePosixPath
+from pathlib import Path
 
 from sqlalchemy import and_
 from libztf.db import DBSession, Image, init_db
@@ -64,7 +64,7 @@ class IPACQueryManager(object):
             images = DBSession().query(Image) \
                                 .filter(and_(hpss == None, disk == None, Image.ipac_gid == 2)) \
                                 .order_by(Image.field, Image.ccdid, Image.qid, Image.filtercode, Image.obsjd) \
-                                .limit(1000).all()
+                                .all()
 
             my_images = _split(images, nchunks)[mychunk - 1]
             suffix = suffix_dict[itype]
@@ -72,8 +72,8 @@ class IPACQueryManager(object):
             for image in my_images:
                 ipac_path = image.ipac_path(suffix)
                 disk_path = image.disk_path(suffix)
-                dp = PurePosixPath(disk_path)
-                dp.parent.create(parents=True, exist_ok=True)
+                dp = Path(disk_path)
+                dp.parent.mkdir(parents=True, exist_ok=True)
 
                 while True:
                     now = time.time()
@@ -94,13 +94,14 @@ class IPACQueryManager(object):
                     logger.info(f'Retrieved {ipac_path}')
                     counter += 1
 
-                idiskpath = getattr(image, f'disk_{itype}_path')
-                idiskpath = disk_path
+                setattr(image, f'disk_{itype}_path', disk_path)
+
+                DBSession().add(image)
 
                 if counter == CHUNK_SIZE:
                     DBSession().commit()
                     counter = 0
-                    
+
             DBSession().commit()
 
 
@@ -118,7 +119,7 @@ if __name__ == '__main__':
     formatter = logging.Formatter(f'[%(asctime)s - {hostname} - %(levelname)s] - %(message)s')
     ch.setFormatter(formatter)
 
-    nchunks = 4
-    mychunk = int(hostname[-2:])
+    nchunks = 16
+    mychunk = 0 #int(hostname[-2:])
     manager = IPACQueryManager(logger)
     manager(nchunks, mychunk)
