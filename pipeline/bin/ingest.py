@@ -88,6 +88,7 @@ class IPACQueryManager(object):
 
                 with open(disk_path, 'wb') as f:
                     f.write(r.content)
+                    logger.info(f'Retrieved {ipac_path}')
                     counter += 1
 
                 disk = disk_path
