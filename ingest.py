@@ -53,7 +53,7 @@ class IPACQueryManager(object):
         self.cookie = ipac_authenticate()
         self.start_time = time.time()
 
-    def __call__(self, nchunks, mychunk, imagetypes=('sub',)):
+    def __call__(self, nchunks, mychunk, imagetypes=('psf', 'sub')):
 
         counter = 0
         for itype in imagetypes:
@@ -62,9 +62,9 @@ class IPACQueryManager(object):
             disk = getattr(Image, f'disk_{itype}_path')
 
             images = DBSession().query(Image) \
-                                .filter(and_(hpss == None, disk == None)) \
+                                .filter(and_(hpss == None, disk == None, Image.ipac_gid == 2)) \
                                 .order_by(Image.field, Image.ccdid, Image.qid, Image.filtercode, Image.obsjd) \
-                                .all()
+                                .limit(1000).all()
 
             my_images = _split(images, nchunks)[mychunk - 1]
             suffix = suffix_dict[itype]
@@ -94,7 +94,8 @@ class IPACQueryManager(object):
                     logger.info(f'Retrieved {ipac_path}')
                     counter += 1
 
-                disk = disk_path
+                idiskpath = getattr(image, f'disk_{itype}_path')
+                idiskpath = disk_path
 
                 if counter == CHUNK_SIZE:
                     DBSession().commit()
