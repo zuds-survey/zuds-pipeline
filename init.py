@@ -10,7 +10,7 @@ import shutil
 #########################################################################
 
 nersc_account = '***REMOVED***'
-nersc_username = 'dgold'
+nersc_username = 'ztfproc'
 nersc_host = 'cori.nersc.gov'
 nersc_password = '***REMOVED***'
 
