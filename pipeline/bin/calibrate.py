@@ -83,7 +83,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
                                                 ('mag','<f8'),
                                                 ('magerr', '<f8')])
 
-    pd.DataFrame(result).to_csv(cat.replace('.cat', '.phot.cat',), index=False)
+    pd.DataFrame(result).to_csv(image.replace('.fits', '.phot.cat',), index=False)
 
     zps = []
 
