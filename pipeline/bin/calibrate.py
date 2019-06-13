@@ -149,7 +149,7 @@ def calibrate(frame):
     # first run source extractor
     cat = frame.replace('.fits', '.cat')
     chk = frame.replace('.fits', '.noise.fits')
-    cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nnwfilt} -CHECK_IMAGE {chk} {frame}'
+    cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nnwfilt} -CHECKIMAGE_NAME {chk} {frame}'
     subprocess.check_call(cmd.split())
 
     # now run scamp to solve the astrometry
