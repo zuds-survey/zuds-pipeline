@@ -168,6 +168,15 @@ def calibrate(frame):
     # now solve for the zeropoint
     solve_zeropoint(frame, cat, psf, zp_fid=27.5)
 
+    with fits.open(frame) as hdul:
+        zp = hdul[0].header['MAGZP']
+
+    # now solve for the calibrated catalog
+    psf = frame.replace('.fits', '.psf')
+    cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} ' \
+          f'-MAG_ZEROPOINT {zp} {frame}'
+    subprocess.check_call(cmd.split())
+
     with fits.open(frame, mode='update', memmap=False) as f:
         if 'SATURATE' not in f[0].header:
             f[0].header['SATURATE'] = 5e4
