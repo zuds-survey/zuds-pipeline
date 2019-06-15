@@ -2,6 +2,7 @@ from astropy.io import fits
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy import units as u
+import pandas as pd
 
 import numpy as np
 import subprocess
@@ -9,7 +10,7 @@ import os
 
 abspath = os.path.abspath
 
-matchquery = "SELECT id, ra, dec, {flt} " \
+matchquery = "SELECT id, ra, dec, {flt}, {std} " \
     "from dr1.ps1 where q3c_poly_query(ra, dec, "\
     "'{{{ra_ll}, {dec_ll}, {ra_lr}, {dec_lr}, {ra_ur}, {dec_ur}, {ra_ul}, {dec_ul}}}') "\
     " and {flt} > 0.0"
@@ -36,6 +37,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
         band = f[0].header['FILTER'][-1].lower() + '_median'
         nax1 = f[0].header['NAXIS1']
         nax2 = f[0].header['NAXIS2']
+        std = f[0].header['FILTER'][-1].lower() + '_stdev'
 
     hd['NAXIS1'] = nax1
     hd['NAXIS2'] = nax2
@@ -68,7 +70,8 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
 
     query_dict = {'flt':band, 'ra_ll':ra_ll, 'dec_ll':dec_ll,
                   'ra_lr':ra_lr, 'dec_lr':dec_lr, 'ra_ul':ra_ul,
-                  'dec_ul':dec_ul, 'ra_ur':ra_ur, 'dec_ur':dec_ur}
+                  'dec_ul':dec_ul, 'ra_ur':ra_ur, 'dec_ur':dec_ur,
+                  'std': std}
 
     for key in query_dict:
         query_dict[key] = str(query_dict[key])
@@ -77,7 +80,10 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     result = np.array(cursor.fetchall(), dtype=[('id','<i8'),
                                                 ('ra','<f8'),
                                                 ('dec','<f8'),
-                                                ('mag','<f8')])
+                                                ('mag','<f8'),
+                                                ('magerr', '<f8')])
+
+    pd.DataFrame(result).to_csv(image.replace('.fits', '.phot.cat',), index=False)
 
     zps = []
 
@@ -148,7 +154,8 @@ def calibrate(frame):
 
     # first run source extractor
     cat = frame.replace('.fits', '.cat')
-    cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nnwfilt} {frame}'
+    chk = frame.replace('.fits', '.noise.fits')
+    cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nnwfilt} -CHECKIMAGE_NAME {chk} {frame}'
     subprocess.check_call(cmd.split())
 
     # now run scamp to solve the astrometry
@@ -166,6 +173,15 @@ def calibrate(frame):
 
     # now solve for the zeropoint
     solve_zeropoint(frame, cat, psf, zp_fid=27.5)
+
+    with fits.open(frame) as hdul:
+        zp = hdul[0].header['MAGZP']
+
+    # now solve for the calibrated catalog
+    psf = frame.replace('.fits', '.psf')
+    cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} ' \
+          f'-MAG_ZEROPOINT {zp} {frame}'
+    subprocess.check_call(cmd.split())
 
     with fits.open(frame, mode='update', memmap=False) as f:
         if 'SATURATE' not in f[0].header:
