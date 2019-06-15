@@ -23,6 +23,13 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
 
 CHUNK_SIZE = 1024
 
+FIELDS = [587, 634, 635, 680, 681, 682, 683, 684, 723,
+724, 725, 726, 761, 762, 763,
+764, 765, 766, 795, 796, 797, 798, 824, 825, 826, 827, 828, 846, 847, 848, 849,
+863, 864, 865, 633, 676, 677, 678, 679, 716, 717, 718, 719, 720, 721, 722, 756,
+757, 758, 759, 760, 789, 790, 791, 792, 793, 794, 819, 820, 821, 822, 823, 843,
+844, 845, 861, 862, 643, 691, 692, 736, 695]
+
 
 def ipac_authenticate():
     target = os.path.join(ipac_root, 'account', 'signon', 'login.do')
@@ -62,7 +69,7 @@ class IPACQueryManager(object):
             disk = getattr(Image, f'disk_{itype}_path')
 
             images = DBSession().query(Image) \
-                                .filter(and_(hpss == None, disk == None, Image.ipac_gid == 2)) \
+                                .filter(and_(hpss == None, disk == None, Image.ipac_gid == 2, Image.field.in_(FIELDS))) \
                                 .order_by(Image.field, Image.ccdid, Image.qid, Image.filtercode, Image.obsjd) \
                                 .all()
 
