@@ -3,6 +3,7 @@ from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy import units as u
 import pandas as pd
+from astroquery.vizier import Vizier
 
 import numpy as np
 import subprocess
@@ -50,6 +51,8 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
 
     hd['CTYPE1'] = 'RA---TPV'
     hd['CTYPE2'] = 'DEC--TPV'
+
+
 
     try:
         wcs = WCS(hd)
