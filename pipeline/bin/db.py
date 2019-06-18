@@ -1,16 +1,17 @@
 import sqlalchemy as sa
-from sqlalchemy.dialects import psql
+from sqlalchemy.dialects import postgresql as psql
+
+from sqlalchemy.orm import relationship
+
 from pathlib import Path
 import os
 from skyportal import models
-from skyportal.models import init_db, DBSession
-
-__all__ = ['Image', 'init_db', 'DBSession']
+from skyportal.models import (init_db, join_model, DBSession, ACL, Group,
+                              Role, User, Token)
 
 
 class Image(models.Base):
 
-    __tablename__ = 'image'
     path = sa.Column(sa.Text)
     filtercode = sa.Column(sa.CHAR(2))
     qid = sa.Column(sa.Integer)
