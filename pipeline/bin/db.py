@@ -2,6 +2,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 
 from sqlalchemy.orm import relationship
+from sqlalchemy import Index
+from sqlalchemy import func
 
 from pathlib import Path
 import os
@@ -11,6 +13,8 @@ from skyportal.models import (init_db, join_model, DBSession, ACL, Group,
 
 
 class Image(models.Base):
+
+    __tablename__ = 'Image'
 
     path = sa.Column(sa.Text)
     filtercode = sa.Column(sa.CHAR(2))
@@ -80,3 +84,14 @@ class Image(models.Base):
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
         return f'{base}'
+
+    q3c = Index('image_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
+    fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",  field, ccdid, qid, filtercode, obsjd)
+    hmi = Index("image_hpss_mask_path_idx", hpss_mask_path)
+    hpi = Index("image_hpss_psf_path_idx", hpss_psf_path)
+    hshmi = Index("image_hpss_sci_path_hpss_mask_path_idx" ,hpss_sci_path, hpss_mask_path)
+    hsci = Index("image_hpss_sci_path_idx" ,hpss_sci_path)
+    hsubi = Index("image_hpss_sub_path_idx", hpss_sub_path)
+    obsjdi = Index("image_obsjd_idx", obsjd)
+    pathi = Index("image_path_idx", path)
+
