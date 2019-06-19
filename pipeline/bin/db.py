@@ -15,10 +15,6 @@ from skyportal.model_util import create_tables, drop_tables
 
 
 
-Group.images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id',
-                            back_populates='groups')
-
-
 class Image(models.Base):
 
     __tablename__ = 'image'
@@ -104,6 +100,10 @@ class Image(models.Base):
 
     groups = relationship('Group', primaryjoin='Group.id <= Image.ipac_gid',
                           back_populates='images')
+
+
+Group.images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id',
+                            back_populates='groups')
 
 
 def create_ztf_groups_if_nonexistent():
