@@ -9,14 +9,14 @@ from pathlib import Path
 import os
 from skyportal import models
 from skyportal.models import (init_db, join_model, DBSession, ACL,
-                              Role, User, Token)
+                              Role, User, Token, Group)
 
 from skyportal.model_util import create_tables, drop_tables
 
 
-class Group(models.Group):
-    images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id',
-                          back_populates='groups')
+
+Group.images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id',
+                            back_populates='groups')
 
 
 class Image(models.Base):
