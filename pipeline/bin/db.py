@@ -14,7 +14,7 @@ from skyportal.models import (init_db, join_model, DBSession, ACL, Group,
 
 class Image(models.Base):
 
-    __tablename__ = 'Image'
+    __tablename__ = 'image'
 
     path = sa.Column(sa.Text)
     filtercode = sa.Column(sa.CHAR(2))
