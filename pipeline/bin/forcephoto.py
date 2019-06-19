@@ -1,11 +1,8 @@
 from astropy.io import fits
 from astropy.wcs import WCS
 import os
-from publish import make_stamp
 from astropy.visualization import ZScaleInterval
-from libztf.yao import yao_photometry_single
-from baselayer.app.env import load_env
-from skyportal.models import DBSession, Instrument, ForcedPhotometry, ForceThumb, Source, init_db
+import db
 
 from uuid import uuid4
 
@@ -23,7 +20,7 @@ DB_FTP_PORT = 222
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
-
+"""
 def force_photometry(sources, sub_list, psf_list):
 
     instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
@@ -94,42 +91,34 @@ def force_photometry(sources, sub_list, psf_list):
 
         DBSession().add_all(thumbs)
         DBSession().commit()
-
+"""
 
 if __name__ == '__main__':
-
-    from argparse import ArgumentParser
-    parser = ArgumentParser()
-    parser.add_argument('sub_names', nargs="+")
-    args = parser.parse_args()
 
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
 
-    sub_list = args.sub_names
+    env, cfg = db.load_env()
+    db.init_db(**cfg['database'])
 
-    if sub_list[0].startswith('@'):
-        with open(sub_list[0][1:], 'r') as f:
-            sub_list = f.read().split()
+    # get images
 
-    env, cfg = load_env()
-    init_db(**cfg['database'])
+    if rank == 0:
+        images = db.DBSession().query(db.Image)\
+                               .filter(db.sa.and_(db.Image.ipac_gid == 2,
+                                                  db.Image.disk_sub_path != None,
+                                                  db.Image.disk_psf_path != None))\
+                               .all()
+        simages = _split(images, size)
+    else:
+        simages = None
 
-    my_names = _split(sub_list, size)[rank]
+    images = comm.scatter(simages, root=0)
 
-    allstamps = []
-    allpoints = []
-
-    for sub in my_names:
-        with fits.open(sub) as f:
-            wcs = WCS(f[1].header)
-            footprint = wcs.calc_footprint().ravel()
-            source_ids = DBSession().execute('SELECT ID FROM SOURCES WHERE Q3C_POLY_QUERY(RA, DEC, '
-                                             '\'{%f,%f,%f,%f,%f,%f,%f,%f}\')' % tuple(footprint.tolist())).fetchall()
-            source_ids = [s[0] for s in source_ids]
-
-            sources = DBSession().query(Source).filter(Source.id.in_(source_ids)).all()
-
-            force_photometry(sources, [sub])
+    # bind the images to the session
+    for i, image in enumerate(images):
+        db.DBSession().add(image)
+        print(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
+        image.force_photometry()

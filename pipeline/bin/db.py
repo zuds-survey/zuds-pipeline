@@ -1,6 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
-
+import numpy as np
 
 from sqlalchemy.orm import relationship, column_property
 from sqlalchemy.dialects.postgresql import array
@@ -17,6 +17,11 @@ from skyportal.models import (init_db, join_model, DBSession, ACL,
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
 
+from astropy.io import fits
+from libztf.yao import yao_photometry_single
+
+from baselayer.app.env import load_env
+
 
 class IPACProgram(models.Base):
     groups = relationship('Group', secondary='ipacprogram_groups',  back_populates='ipacprograms', cascade='all')
@@ -24,7 +29,6 @@ class IPACProgram(models.Base):
 
 IPACProgramGroup = join_model('ipacprogram_groups', IPACProgram, Group)
 Group.ipacprograms = relationship('IPACProgram', secondary='ipacprogram_groups', back_populates='groups', cascade='all')
-
 
 
 class Image(models.Base):
@@ -85,6 +89,12 @@ class Image(models.Base):
     disk_sub_path = sa.Column(sa.Text)
     disk_psf_path = sa.Column(sa.Text)
 
+    instrument_id = sa.Column(sa.Integer, sa.ForeignKey('instruments.id', ondelete='RESTRICT'), default=1)
+    instrument = relationship('Instrument')
+
+    zp = sa.Column(sa.Float, default=None, nullable=True)
+    zpsys = sa.Column(sa.Text, default='ab')
+
 
     q3c = Index(f'image_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
@@ -122,6 +132,10 @@ class Image(models.Base):
         return array([self.ra1, self.dec1, self.ra2, self.dec2,
                       self.ra3, self.dec3, self.ra4, self.dec4])
 
+    @hybrid_property
+    def filter(self):
+        return 'ztf' + self.filtercode[-1]
+
     @property
     def sources(self):
         return DBSession().query(models.Source)\
@@ -133,6 +147,47 @@ class Image(models.Base):
 
     def provided_photometry(self, photometry):
         return photometry in self.photometry
+
+    def force_photometry(self):
+
+        sources_contained = self.sources
+        photometered_sources = set([phot_point.source for phot_point in self.photometry])
+
+        # reject sources where photometry has already been done
+        sources_remaining = np.setdiff1d(sources_contained, photometered_sources)
+
+        # get the paths to relevant files on disk
+        psf_path = self.disk_psf_path
+        sub_path = self.disk_sub_path
+
+        if self.zp is None:
+            with fits.open(sub_path) as hdul:
+                header = hdul[0].header
+            self.zp = header['MAGZPT']
+            DBSession().add(self)
+            DBSession().commit()
+
+
+        # for all the remaining sources do forced photometry
+
+        new_photometry = []
+        new_associations = []
+
+        for source in sources_remaining:
+            pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
+            phot_point = models.Photometry(image=self, flux=pobj.Fpsf, fluxerr=pobj.eFpsf,
+                                           zp=self.zp, zpsys='ab', lim_mag=self.maglimit,
+                                           filter=self.filter, source=source, instrument=self.instrument,
+                                           ra=source.ra, dec=source.dec)
+            new_photometry.append(phot_point)
+            assoc = ImagePhotometry(image=self, photometry=phot_point)
+            new_associations.append(assoc)
+
+        DBSession().add_all(new_photometry)
+        DBSession().commit()
+
+        DBSession().add_all(new_associations)
+        DBSession().commit()
 
 
 ImagePhotometry = join_model('image_photometry', Image, models.Photometry)
@@ -169,6 +224,20 @@ def create_ztf_groups_if_nonexistent():
                 DBSession.add(ipg)
     DBSession().commit()
 
+
+    # see if ZTF instrument and telescope exist
+    p48 = DBSession().query(models.Telescope).filter(models.Telescope.nickname.like('%p48%')).first()
+    if p48 is None:
+        p48 = models.Telescope(name='Palomar 48-inch', nickname='p48', lat=33.3581, lon=116.8663,
+                               elevation=1870.862, diameter=1.21)
+        DBSession().add(p48)
+        DBSession().commit()
+
+    ztf = DBSession().query(models.Instrument).get(1)
+    if ztf is None:
+        ztf = models.Instrument(name='ZTF', type='Camera', band='optical', telescope=p48)
+        DBSession().add(ztf)
+        DBSession().commit()
 
 def refresh_tables_groups():
     create_tables()
