@@ -8,8 +8,15 @@ from sqlalchemy import func
 from pathlib import Path
 import os
 from skyportal import models
-from skyportal.models import (init_db, join_model, DBSession, ACL, Group,
+from skyportal.models import (init_db, join_model, DBSession, ACL,
                               Role, User, Token)
+
+from skyportal.model_util import create_tables, drop_tables
+
+
+class Group(models.Group):
+    images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id',
+                          back_populates='groups')
 
 
 class Image(models.Base):
@@ -95,16 +102,24 @@ class Image(models.Base):
     obsjdi = Index("image_obsjd_idx", obsjd)
     pathi = Index("image_path_idx", path)
 
-    @property
-    def groups(self):
-        return [DBSession().query(Group).get(i + 1) for i in range(self.ipac_gid)]
+    groups = relationship('Group', primaryjoin='Group.id <= Image.ipac_gid',
+                          back_populates='images')
 
 
-def create_ztf_groups():
-    groups = DBSession().query(Image.ipac_gid).distinct().order_by(Image.ipac_gid.asc()).all()
+def create_ztf_groups_if_nonexistent():
+    groups = [1, 2, 3]
     group_names = ['MSIP/Public', 'Partnership', 'Caltech']
     for g, n in zip(groups, group_names):
-        dbg = Group(name=f'IPAC GID {g[0]} ({n})')
-        dbg.id = g[0]  # match group id to ipac gid
-        DBSession().add(dbg)
+        try:
+            DBSession().query(Group).get(g)
+        except:
+            dbg = Group(name=f'IPAC GID {g} ({n})')
+            dbg.id = g  # match group id to ipac gid
+            DBSession().add(dbg)
+
     DBSession().commit()
+
+
+def refresh_tables_groups():
+    create_tables()
+    create_ztf_groups_if_nonexistent()
