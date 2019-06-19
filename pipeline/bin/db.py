@@ -98,12 +98,9 @@ class Image(models.Base):
     obsjdi = Index("image_obsjd_idx", obsjd)
     pathi = Index("image_path_idx", path)
 
-    groups = relationship('Group', primaryjoin='Group.id <= Image.ipac_gid',
-                          back_populates='images')
 
-
-Group.images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id',
-                            back_populates='groups')
+Image.groups = relationship('Group', primaryjoin='Group.id <= Image.ipac_gid')
+Group.images = relationship('Image', primaryjoin='Image.ipac_gid >= Group.id')
 
 
 def create_ztf_groups_if_nonexistent():
