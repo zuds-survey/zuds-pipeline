@@ -95,12 +95,16 @@ class Image(models.Base):
     obsjdi = Index("image_obsjd_idx", obsjd)
     pathi = Index("image_path_idx", path)
 
+    @property
+    def groups(self):
+        return [DBSession().query(Group).get(i + 1) for i in range(self.ipac_gid)]
+
 
 def create_ztf_groups():
     groups = DBSession().query(Image.ipac_gid).distinct().order_by(Image.ipac_gid.asc()).all()
     group_names = ['MSIP/Public', 'Partnership', 'Caltech']
     for g, n in zip(groups, group_names):
         dbg = Group(name=f'IPAC GID {g[0]} ({n})')
-        dbg.id = g[0] # match group id to ipac gid
+        dbg.id = g[0]  # match group id to ipac gid
         DBSession().add(dbg)
     DBSession().commit()
