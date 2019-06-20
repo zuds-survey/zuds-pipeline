@@ -21,6 +21,7 @@ from astropy.io import fits
 from libztf.yao import yao_photometry_single
 
 from baselayer.app.env import load_env
+from datetime import datetime
 
 
 class IPACProgram(models.Base):
@@ -35,6 +36,7 @@ class Image(models.Base):
 
     __tablename__ = 'image'
 
+    created_at = sa.Column(sa.DateTime(), nullable=True, default=datetime.now)
     path = sa.Column(sa.Text)
     filtercode = sa.Column(sa.CHAR(2))
     qid = sa.Column(sa.Integer)
