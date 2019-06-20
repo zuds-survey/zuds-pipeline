@@ -36,7 +36,7 @@ class Image(models.Base):
 
     __tablename__ = 'image'
 
-    created_at = sa.Column(sa.DateTime(), nullable=True, default=datetime.now)
+    created_at = sa.Column(sa.DateTime(), nullable=True)
     path = sa.Column(sa.Text)
     filtercode = sa.Column(sa.CHAR(2))
     qid = sa.Column(sa.Integer)
