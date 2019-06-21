@@ -169,6 +169,7 @@ class Image(models.Base):
             with fits.open(sub_path) as hdul:
                 header = hdul[1].header
             self.zp = header['MAGZP']
+            self.zpsys = 'ab'
             DBSession().add(self)
             DBSession().commit()
 
@@ -176,7 +177,6 @@ class Image(models.Base):
         # for all the remaining sources do forced photometry
 
         new_photometry = []
-        new_associations = []
 
         for source in sources_remaining:
             pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
@@ -185,21 +185,16 @@ class Image(models.Base):
                                            filter=self.filter, source=source, instrument=self.instrument,
                                            ra=source.ra, dec=source.dec)
             new_photometry.append(phot_point)
-            assoc = ImagePhotometry(image=self, photometry=phot_point)
-            new_associations.append(assoc)
 
         DBSession().add_all(new_photometry)
         DBSession().commit()
 
-        DBSession().add_all(new_associations)
-        DBSession().commit()
 
-
-ImagePhotometry = join_model('image_photometry', Image, models.Photometry)
-models.Source.images = relationship('Image', secondary='join(ImagePhotometry, Photometry).join(sources)')
+models.Source.images = relationship('Image', secondary='join(Image, Photometry).join(sources)')
 
 # keep track of the images that the photometry came from
-models.Photometry.image = relationship('Image', back_populates='photometry', secondary='image_photometry')
+models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
+models.Photometry.image = relationship('Image', back_populates='photometry')
 
 
 Group.images = relationship('Image', back_populates='groups',
