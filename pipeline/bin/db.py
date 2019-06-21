@@ -153,10 +153,13 @@ class Image(models.Base):
     def force_photometry(self):
 
         sources_contained = self.sources
+        sources_contained_ids = [s.id for s in sources_contained]
         photometered_sources = set([phot_point.source for phot_point in self.photometry])
+        photometered_source_ids = set([s.id for s in photometered_sources])
 
         # reject sources where photometry has already been done
-        sources_remaining = np.setdiff1d(sources_contained, photometered_sources)
+        sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
+        sources_remaining = [s for s in sources_contained if s.id in sources_remaining_ids]
 
         # get the paths to relevant files on disk
         psf_path = self.disk_psf_path
