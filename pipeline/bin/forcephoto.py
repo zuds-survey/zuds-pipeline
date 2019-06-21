@@ -122,4 +122,8 @@ if __name__ == '__main__':
     for i, image in enumerate(images):
         db.DBSession().add(image)
         print(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
-        image.force_photometry()
+
+        try:
+            image.force_photometry()
+        except FileNotFoundError as e:
+            print(e)

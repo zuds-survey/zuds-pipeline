@@ -182,6 +182,8 @@ class Image(models.Base):
                 DBSession().add(self)
                 DBSession().commit()
                 return
+            except ValueError:
+                raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
             else:
                 self.zp = header['MAGZP']
                 self.zpsys = 'ab'
