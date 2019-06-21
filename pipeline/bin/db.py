@@ -135,6 +135,11 @@ class Image(models.Base):
                       self.ra3, self.dec3, self.ra4, self.dec4])
 
     @hybrid_property
+    def obsmjd(self):
+        return self.obsjd - 2400000.5
+
+
+    @hybrid_property
     def filter(self):
         return 'ztf' + self.filtercode[-1]
 
@@ -188,7 +193,7 @@ class Image(models.Base):
             phot_point = models.Photometry(image=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
                                            zp=self.zp, zpsys=self.zpsys, lim_mag=self.maglimit,
                                            filter=self.filter, source=source, instrument=self.instrument,
-                                           ra=source.ra, dec=source.dec)
+                                           ra=source.ra, dec=source.dec, mjd=self.obsmjd)
             new_photometry.append(phot_point)
 
         DBSession().add_all(new_photometry)
