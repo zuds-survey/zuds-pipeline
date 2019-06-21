@@ -112,6 +112,9 @@ if __name__ == '__main__':
                                                   db.Image.disk_psf_path != None,
                                                   db.Image.subtraction_exists != False))\
                                .limit(100).all()
+
+        # try flushing all the images from the session 
+        db.DBSession().flush()
         simages = _split(images, size)
     else:
         simages = None
@@ -120,6 +123,7 @@ if __name__ == '__main__':
 
     # bind the images to the session
     for i, image in enumerate(images):
+
         print(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
         try:
             image.force_photometry()
