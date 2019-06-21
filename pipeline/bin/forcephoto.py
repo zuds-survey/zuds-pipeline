@@ -111,7 +111,7 @@ if __name__ == '__main__':
                                                   db.Image.disk_sub_path != None,
                                                   db.Image.disk_psf_path != None,
                                                   db.Image.subtraction_exists != False))\
-                               .all()
+                               .limit(100).all()
         simages = _split(images, size)
     else:
         simages = None
