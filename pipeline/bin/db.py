@@ -173,6 +173,11 @@ class Image(models.Base):
             DBSession().add(self)
             DBSession().commit()
 
+        if self.instrument is None:
+            self.instrument_id = 1
+            DBSession().add(self)
+            DBSession().commit()
+
 
         # for all the remaining sources do forced photometry
 
