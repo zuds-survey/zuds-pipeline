@@ -190,11 +190,11 @@ class Image(models.Base):
         DBSession().commit()
 
 
-models.Source.images = relationship('Image', secondary='join(Image, Photometry).join(sources)')
-
 # keep track of the images that the photometry came from
 models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
 models.Photometry.image = relationship('Image', back_populates='photometry')
+
+models.Source.images = relationship('Image', secondary='join(Photometry, Source)')
 
 
 Group.images = relationship('Image', back_populates='groups',
