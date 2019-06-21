@@ -127,7 +127,7 @@ class Image(models.Base):
 
     groups = relationship('Group', back_populates='images', secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
     ipac_program = relationship('IPACProgram', back_populates='images', cascade='all')
-    photometry = relationship('Photometry', back_populates='image', secondary='image_photometry')
+    photometry = relationship('Photometry', cascade='all')
 
     @hybrid_property
     def poly(self):
