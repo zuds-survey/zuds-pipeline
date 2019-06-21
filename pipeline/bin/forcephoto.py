@@ -109,7 +109,8 @@ if __name__ == '__main__':
         images = db.DBSession().query(db.Image)\
                                .filter(db.sa.and_(db.Image.ipac_gid == 2,
                                                   db.Image.disk_sub_path != None,
-                                                  db.Image.disk_psf_path != None))\
+                                                  db.Image.disk_psf_path != None,
+                                                  db.Image.subtraction_exists != False))\
                                .all()
         simages = _split(images, size)
     else:

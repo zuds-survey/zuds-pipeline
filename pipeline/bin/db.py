@@ -97,6 +97,8 @@ class Image(models.Base):
     zp = sa.Column(sa.Float, default=None, nullable=True)
     zpsys = sa.Column(sa.Text, default='ab')
 
+    subtraction_exists = sa.Column(sa.Boolean)
+
 
     q3c = Index(f'image_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
@@ -170,12 +172,22 @@ class Image(models.Base):
         sub_path = self.disk_sub_path
 
         if self.zp is None:
-            with fits.open(sub_path) as hdul:
-                header = hdul[1].header
-            self.zp = header['MAGZP']
-            self.zpsys = 'ab'
-            DBSession().add(self)
-            DBSession().commit()
+            try:
+                with fits.open(sub_path) as hdul:
+                    header = hdul[1].header
+            except OSError:  # ipac didn't make a subtraction
+                self.disk_sub_path = None
+                self.disk_psf_path = None
+                self.subtraction_exists = False
+                DBSession().add(self)
+                DBSession().commit()
+                return
+            else:
+                self.zp = header['MAGZP']
+                self.zpsys = 'ab'
+                self.subtraction_exists = True
+                DBSession().add(self)
+                DBSession().commit()
 
         if self.instrument is None:
             self.instrument_id = 1
