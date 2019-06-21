@@ -160,8 +160,10 @@ class Image(models.Base):
 
         sources_contained = self.sources
         sources_contained_ids = [s.id for s in sources_contained]
-        photometered_sources = set([phot_point.source for phot_point in self.photometry])
-        photometered_source_ids = set([s.id for s in photometered_sources])
+        photometered_sources = list(set([phot_point.source for phot_point in self.photometry]))
+
+        # this must be list or setdiff1d will fail
+        photometered_source_ids = list(set([s.id for s in photometered_sources]))
 
         # reject sources where photometry has already been done
         sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
