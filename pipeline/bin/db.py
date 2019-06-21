@@ -167,8 +167,8 @@ class Image(models.Base):
 
         if self.zp is None:
             with fits.open(sub_path) as hdul:
-                header = hdul[0].header
-            self.zp = header['MAGZPT']
+                header = hdul[1].header
+            self.zp = header['MAGZP']
             DBSession().add(self)
             DBSession().commit()
 
