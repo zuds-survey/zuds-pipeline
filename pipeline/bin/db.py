@@ -181,7 +181,7 @@ class Image(models.Base):
                 self.subtraction_exists = False
                 DBSession().add(self)
                 DBSession().commit()
-                return
+                raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
             except ValueError:
                 raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
             else:
