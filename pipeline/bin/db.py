@@ -138,7 +138,6 @@ class Image(models.Base):
     def obsmjd(self):
         return self.obsjd - 2400000.5
 
-
     @hybrid_property
     def filter(self):
         return 'ztf' + self.filtercode[-1]
