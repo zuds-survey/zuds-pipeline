@@ -185,7 +185,7 @@ class Image(models.Base):
 
         for source in sources_remaining:
             pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
-            phot_point = models.Photometry(image=self, flux=pobj.Fpsf, fluxerr=pobj.eFpsf,
+            phot_point = models.Photometry(image=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
                                            zp=self.zp, zpsys=self.zpsys, lim_mag=self.maglimit,
                                            filter=self.filter, source=source, instrument=self.instrument,
                                            ra=source.ra, dec=source.dec)
