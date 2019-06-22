@@ -62,7 +62,7 @@ if __name__ == '__main__':
                                                   db.Image.disk_psf_path != None,
                                                   db.sa.or_(db.Image.subtraction_exists != False,
                                                             db.Image.subtraction_exists == None)))\
-                               .limit(64000).all()
+                               .all()
 
         #  expunge all the images from the session before sending them to other ranks
         db.DBSession().expunge_all()
@@ -103,7 +103,7 @@ if __name__ == '__main__':
             if tag == tags.START:
                 # Do the work here
                 images, task_index = task
-                subtask_max = task_index * CHUNK_SIZE
+                subtask_max = len(images)
 
                 # re-bind the images to this rank's session
                 for i, image in enumerate(images):
