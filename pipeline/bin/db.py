@@ -204,7 +204,10 @@ class Image(models.Base):
         new_photometry = []
 
         for source in sources_remaining:
-            pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
+            try:
+                pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
+            except IndexError:
+                continue
             phot_point = models.Photometry(image=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
                                            zp=self.zp, zpsys=self.zpsys, lim_mag=self.maglimit,
                                            filter=self.filter, source=source, instrument=self.instrument,
