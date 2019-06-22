@@ -38,10 +38,11 @@ tags = enum('READY', 'DONE', 'EXIT', 'START')
 
 if __name__ == '__main__':
 
-    from mpi4py import MPI, status
+    from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
+    status = MPI.Status()
 
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
