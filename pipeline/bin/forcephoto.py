@@ -47,7 +47,7 @@ if __name__ == '__main__':
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
 
-    logging.basicConfig(format=f'[Rank {rank:04d}//%(asctime)s] %(message)s',
+    logging.basicConfig(format=f'[(Rank {rank:04d}) %(asctime)s] %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S',
                         level=logging.INFO)
 
@@ -60,7 +60,8 @@ if __name__ == '__main__':
                                .filter(db.sa.and_(db.Image.ipac_gid == 2,
                                                   db.Image.disk_sub_path != None,
                                                   db.Image.disk_psf_path != None,
-                                                  db.Image.subtraction_exists != False))\
+                                                  db.sa.or_(db.Image.subtraction_exists != False,
+                                                            db.Imame.subtraction_exists == None)))\
                                .limit(64000).all()
 
         #  expunge all the images from the session before sending them to other ranks
@@ -77,7 +78,7 @@ if __name__ == '__main__':
         tasks = task_generator()
 
         while closed_workers < num_workers:
-            systems = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+            comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
             source = status.Get_source()
             tag = status.Get_tag()
             if tag == tags.READY:
