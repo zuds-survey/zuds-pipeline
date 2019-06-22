@@ -114,7 +114,7 @@ if __name__ == '__main__':
                                .limit(100).all()
 
         #  expunge all the images from the session before sending them to other ranks
-        db.DBSession().expunge_all(images)
+        db.DBSession().expunge_all()
         simages = _split(images, size)
     else:
         simages = None
