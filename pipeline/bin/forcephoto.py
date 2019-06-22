@@ -60,7 +60,7 @@ if __name__ == '__main__':
                                                   db.Image.disk_sub_path != None,
                                                   db.Image.disk_psf_path != None,
                                                   db.Image.subtraction_exists != False))\
-                               .all()
+                               .limit(64000).all()
 
         #  expunge all the images from the session before sending them to other ranks
         db.DBSession().expunge_all()
