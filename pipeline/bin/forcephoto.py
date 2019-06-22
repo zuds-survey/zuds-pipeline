@@ -46,7 +46,7 @@ if __name__ == '__main__':
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
 
-    logging.basicConfig(format=f'[Rank {rank} %(asctime)s:] %(message)s',
+    logging.basicConfig(format=f'[Rank {rank:04d}//%(asctime)s] %(message)s',
                         datefmt='%m/%d/%Y %I:%M:%S',
                         level=logging.INFO)
 
@@ -60,7 +60,7 @@ if __name__ == '__main__':
                                                   db.Image.disk_sub_path != None,
                                                   db.Image.disk_psf_path != None,
                                                   db.Image.subtraction_exists != False))\
-                               .limit(100).all()
+                               .all()
 
         #  expunge all the images from the session before sending them to other ranks
         db.DBSession().expunge_all()
@@ -101,11 +101,14 @@ if __name__ == '__main__':
             if tag == tags.START:
                 # Do the work here
                 images, task_index = task
+                subtask_max = task_index * CHUNK_SIZE
 
                 # re-bind the images to this rank's session
                 for i, image in enumerate(images):
                     db.DBSession().add(image)
-                    logging.info(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
+
+                    my_subtask = (task_index - 1) * CHUNK_SIZE + i + 1
+                    logging.info(f'Forcing photometry on image "{image.path}" ({my_subtask} / {subtask_max})')
                     try:
                         image.force_photometry()
                     except FileNotFoundError as e:
