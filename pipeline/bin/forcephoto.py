@@ -113,7 +113,7 @@ if __name__ == '__main__':
                                                   db.Image.subtraction_exists != False))\
                                .limit(100).all()
 
-        # try flushing all the images from the session 
+        #  flush all the images from the session before sending them to other ranks
         db.DBSession().flush()
         simages = _split(images, size)
     else:
@@ -121,9 +121,9 @@ if __name__ == '__main__':
 
     images = comm.scatter(simages, root=0)
 
-    # bind the images to the session
+    # re-bind the images to this rank's session 
     for i, image in enumerate(images):
-
+        db.DBSession().add(image)
         print(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
         try:
             image.force_photometry()
