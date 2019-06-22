@@ -73,6 +73,8 @@ if __name__ == '__main__':
             for i in range(n_tasks):
                 yield (images[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE],)
 
+        tasks = task_generator()
+
         while closed_workers < num_workers:
             systems = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
             source = status.Get_source()
@@ -80,7 +82,7 @@ if __name__ == '__main__':
             if tag == tags.READY:
                 # Worker is ready, so send it a task
                 if task_index <= n_tasks:
-                    task = next(task_generator) + (task_index,)
+                    task = next(tasks) + (task_index,)
                     comm.send(task, dest=source, tag=tags.START)
                     task_index += 1
                 else:
