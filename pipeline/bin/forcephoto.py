@@ -3,6 +3,7 @@ from astropy.wcs import WCS
 import os
 from astropy.visualization import ZScaleInterval
 import db
+import logging
 
 from uuid import uuid4
 
@@ -14,88 +15,30 @@ DB_FTP_USERNAME = 'root'
 DB_FTP_PASSWORD = 'root'
 DB_FTP_PORT = 222
 
+CHUNK_SIZE = 1000
 
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
-"""
-def force_photometry(sources, sub_list, psf_list):
 
-    instrument = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
+def enum(*sequential, **named):
+    """Handy way to fake an enumerated type in Python
+    http://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
+    """
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type('Enum', (), enums)
 
-    for im, psf in zip(sub_list, psf_list):
 
-        thumbs = []
-        points = []
+# Define MPI message tags
+tags = enum('READY', 'DONE', 'EXIT', 'START')
 
-        with fits.open(im) as hdulist:
-            hdu = hdulist[1]
-            zeropoint = hdu.header['MAGZP']
-            mjd = hdu.header['OBSMJD']
 
-            wcs = WCS(hdu.header)
-            maglim = hdu.header['MAGLIM']
-            band = hdu.header['FILTER'][-1].lower()
-
-            image = hdu.data
-            interval = ZScaleInterval().get_limits(image)
-
-        for source in sources:
-
-            # get the RA and DEC of the source
-            ra, dec = source.ra, source.dec
-
-            try:
-                pobj = yao_photometry_single(im, psf, ra, dec)
-            except IndexError:
-                continue
-            if not pobj.status:
-                continue
-
-            flux = pobj.Fpsf
-            fluxerr = pobj.eFpsf
-
-            force_point = ForcedPhotometry(mjd=mjd, flux=float(flux), fluxerr=float(fluxerr),
-                                           zp=zeropoint, lim_mag=maglim, filter=band,
-                                           source=source, instrument=instrument,
-                                           ra=ra, dec=dec)
-
-            points.append(force_point)
-
-        DBSession().add_all(points)
-        DBSession().commit()
-
-        for source, force_point in zip(sources, points):
-            for key in ['sub', 'new']:
-                name = f'/stamps/{uuid4().hex}.force.{key}.png'
-                if key == 'new':
-                    fname = im.replace('scimrefdiffimg.fits', 'sciimg.fits').replace('.fz', '')
-                    if not os.path.exists(fname):
-                        continue
-                    with fits.open(fname) as hdul:
-                        newimage = hdul[0].data
-                        newimage = newimage.byteswap().newbyteorder()
-                        newwcs = WCS(hdul[0].header)
-                        newinterval = ZScaleInterval().get_limits(newimage)
-                    make_stamp(name, force_point.ra, force_point.dec, newinterval[0], newinterval[1], newimage,
-                               newwcs)
-                else:
-                    make_stamp(name, force_point.ra, force_point.dec, interval[0], interval[1], image,
-                               wcs)
-
-                thumb = ForceThumb(type=key, forcedphotometry_id=force_point.id, file_uri=None,
-                                   public_url='http://portal.nersc.gov/project/astro250'+ name)
-                thumbs.append(thumb)
-
-        DBSession().add_all(thumbs)
-        DBSession().commit()
-"""
 
 if __name__ == '__main__':
 
-    from mpi4py import MPI
+    from mpi4py import MPI, status
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
@@ -103,9 +46,15 @@ if __name__ == '__main__':
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
 
-    # get images
+    logging.basicConfig(format=f'[Rank {rank} %(asctime)s:] %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S',
+                        level=logging.INFO)
 
     if rank == 0:
+        num_workers = size - 1
+        task_index = 1
+        closed_workers = 0
+
         images = db.DBSession().query(db.Image)\
                                .filter(db.sa.and_(db.Image.ipac_gid == 2,
                                                   db.Image.disk_sub_path != None,
@@ -115,17 +64,53 @@ if __name__ == '__main__':
 
         #  expunge all the images from the session before sending them to other ranks
         db.DBSession().expunge_all()
-        simages = _split(images, size)
+
+        div = len(images) // CHUNK_SIZE
+        mod = len(images) % CHUNK_SIZE
+        n_tasks = div if mod == 0 else div + 1
+
+        def task_generator():
+            for i in range(n_tasks):
+                yield (images[i * CHUNK_SIZE:(i + 1) * CHUNK_SIZE],)
+
+        while closed_workers < num_workers:
+            systems = comm.recv(source=MPI.ANY_SOURCE, tag=MPI.ANY_TAG, status=status)
+            source = status.Get_source()
+            tag = status.Get_tag()
+            if tag == tags.READY:
+                # Worker is ready, so send it a task
+                if task_index <= n_tasks:
+                    task = next(task_generator) + (task_index,)
+                    comm.send(task, dest=source, tag=tags.START)
+                    task_index += 1
+                else:
+                    comm.send(None, dest=source, tag=tags.EXIT)
+
+            elif tag == tags.EXIT:
+                closed_workers += 1
+                logging.info('Closing worker %d.' % source)
+
     else:
-        simages = None
 
-    images = comm.scatter(simages, root=0)
+        while True:
+            comm.send(None, dest=0, tag=tags.READY)
+            task = comm.recv(source=0, tag=MPI.ANY_TAG, status=status)
+            tag = status.Get_tag()
+            if tag == tags.START:
+                # Do the work here
+                images, task_index = task
 
-    # re-bind the images to this rank's session
-    for i, image in enumerate(images):
-        db.DBSession().add(image)
-        print(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
-        try:
-            image.force_photometry()
-        except FileNotFoundError as e:
-            print(e)
+                # re-bind the images to this rank's session
+                for i, image in enumerate(images):
+                    db.DBSession().add(image)
+                    logging.info(f'[Rank {rank:04d}]: Forcing photometry on image "{image.path}" ({i + 1} / {len(images)})')
+                    try:
+                        image.force_photometry()
+                    except FileNotFoundError as e:
+                        logging.error(e)
+
+            elif tag == tags.EXIT:
+                break
+
+        comm.send(None, dest=0, tag=tags.EXIT)
+        MPI.Finalize()
