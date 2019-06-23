@@ -219,9 +219,9 @@ class Image(models.Base):
 
 
 def images(self):
-    DBSession().execute('SET enable_seqscan = OFF')
-    return DBSession().query(Image).filter(func.q3c_poly_query(self.ra, self.dec, Image.poly)).all()
-
+    candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec,
+                                                                       self.ra, self.dec, 0.9426)).all()
+    return [i for i in candidates if i.contains_source(self)]
 
 models.Source.images = property(images)
 
