@@ -234,7 +234,7 @@ class Image(models.Base):
 def images(self):
     candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec,
                                                                        self.ra, self.dec, 1.32822)).all()
-    return [i.contains_source(self) for i in candidates]
+    return [i for i in candidates if i.contains_source(self)]
 
 
 # keep track of the images that the photometry came from
