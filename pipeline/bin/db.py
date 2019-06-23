@@ -218,6 +218,13 @@ class Image(models.Base):
         DBSession().commit()
 
 
+def images(self):
+    DBSession().execute('SET enable_seqscan = OFF')
+    return DBSession().query(Image).filter(func.q3c_poly_query(self.ra, self.dec, Image.poly)).all()
+
+
+models.Source.images = property(images)
+
 # keep track of the images that the photometry came from
 models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
 models.Photometry.image = relationship('Image', back_populates='photometry')
