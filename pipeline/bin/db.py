@@ -233,16 +233,15 @@ class Image(models.Base):
 
 def images(self):
     candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec,
-                                                                       self.ra, self.dec, 0.9426)).all()
-    return [i for i in candidates if i.contains_source(self)]
+                                                                       self.ra, self.dec, 1.32822)).all()
+    return [i.contains_source(self) for i in candidates]
 
-models.Source.images = images
 
 # keep track of the images that the photometry came from
 models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
 models.Photometry.image = relationship('Image', back_populates='photometry')
 
-models.Source.images = relationship('Image', secondary='join(Photometry, Source)')
+models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
 
 
