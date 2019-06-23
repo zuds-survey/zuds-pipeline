@@ -20,6 +20,11 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from astropy.io import fits
 from libztf.yao import yao_photometry_single
 
+from spherical_geometry.vector import radec_to_vector
+from spherical_geometry.polygon import SphericalPolygon
+from astropy.coordinates import SkyCoord
+
+
 from baselayer.app.env import load_env
 from datetime import datetime
 
@@ -99,7 +104,6 @@ class Image(models.Base):
 
     subtraction_exists = sa.Column(sa.Boolean)
 
-
     q3c = Index(f'image_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
     def ipac_path(self, suffix):
@@ -136,6 +140,13 @@ class Image(models.Base):
         return array([self.ra1, self.dec1, self.ra2, self.dec2,
                       self.ra3, self.dec3, self.ra4, self.dec4])
 
+    @property
+    def poly_astropy(self):
+        region = SphericalPolygon.from_radec([self.ra1, self.ra2, self.ra3, self.ra4, self.ra1],
+                                             [self.dec1, self.dec2, self.dec3, self.dec4, self.dec1],
+                                             degrees=True)
+        return region
+
     @hybrid_property
     def obsmjd(self):
         return self.obsjd - 2400000.5
@@ -151,7 +162,9 @@ class Image(models.Base):
                           .all()
 
     def contains_source(self, source):
-        return DBSession().execute(sa.select([func.q3c_poly_query(source.ra, source.dec, self.poly)])).first()[0]
+        polygon = self.poly_astropy
+        source_vector = radec_to_vector(source.ra, source.dec, degrees=True)
+        return polygon.contains_point(source_vector)
 
     def provided_photometry(self, photometry):
         return photometry in self.photometry
@@ -223,13 +236,14 @@ def images(self):
                                                                        self.ra, self.dec, 0.9426)).all()
     return [i for i in candidates if i.contains_source(self)]
 
-models.Source.images = property(images)
+models.Source.images = images
 
 # keep track of the images that the photometry came from
 models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
 models.Photometry.image = relationship('Image', back_populates='photometry')
 
 models.Source.images = relationship('Image', secondary='join(Photometry, Source)')
+models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
 
 
 Group.images = relationship('Image', back_populates='groups',
