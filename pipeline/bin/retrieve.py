@@ -3,8 +3,8 @@ import psycopg2
 import pandas as pd
 from argparse import ArgumentParser
 import tempfile, io
-import paramiko
 from pathlib import Path
+import subprocess
 from sqlalchemy import create_engine
 
 
@@ -23,16 +23,11 @@ class HPSSDB(object):
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     nersc_username = os.getenv('NERSC_USERNAME')
     nersc_password = os.getenv('NERSC_PASSWORD')
     nersc_host = os.getenv('NERSC_HOST')
     nersc_account = os.getenv('NERSC_ACCOUNT')
-
-    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
-
 
 
     if job_script_destination is None:
@@ -93,7 +88,7 @@ rm {os.path.basename(tarfile)}
     subscript.seek(0)
 
     command = f'/bin/bash {Path(subscript.name).resolve()}'
-    stdin, stdout, stderr = ssh_client.exec_command(command)
+    stdout, stderr = subprocess.check_call(command.split())
 
     retcode = stdout.channel.recv_exit_status()
 
@@ -111,7 +106,6 @@ rm {os.path.basename(tarfile)}
 
     jobid = int(out[0].strip().split()[-1])
 
-    ssh_client.close()
 
     return jobid
 
