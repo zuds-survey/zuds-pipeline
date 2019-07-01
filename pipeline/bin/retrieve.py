@@ -150,17 +150,8 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         # sort tarball retrieval by location on tape
         sortexec = Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/hpsssort.sh'
 
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-        nersc_username = os.getenv('NERSC_USERNAME')
-        nersc_password = os.getenv('NERSC_PASSWORD')
-        nersc_host = os.getenv('NERSC_HOST')
-
-        ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
-
         syscall = f'bash {sortexec} {f.name}'
-        _, stdout, _ = ssh_client.exec_command(syscall)
+        _, stdout, _ = subprocess.check_call(syscall)
 
         # read it into pandas
         ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
