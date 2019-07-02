@@ -3,8 +3,8 @@ import psycopg2
 import pandas as pd
 from argparse import ArgumentParser
 import tempfile, io
+import paramiko
 from pathlib import Path
-import subprocess
 from sqlalchemy import create_engine
 
 
@@ -23,9 +23,16 @@ class HPSSDB(object):
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
     nersc_account = os.getenv('NERSC_ACCOUNT')
+
+    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
 
 
     if job_script_destination is None:
@@ -41,9 +48,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
         subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
     substr =  f'''#!/usr/bin/env bash
-#module load esslurm
-export PATH=/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH
-export LD_LIBRARY_PATH=/opt/esslurm/lib64:$LD_LIBRARY_PATH
+module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 '''
 
@@ -88,7 +93,7 @@ rm {os.path.basename(tarfile)}
     subscript.seek(0)
 
     command = f'/bin/bash {Path(subscript.name).resolve()}'
-    stdout, stderr = subprocess.check_call(command.split())
+    stdin, stdout, stderr = ssh_client.exec_command(command)
 
     retcode = stdout.channel.recv_exit_status()
 
@@ -106,6 +111,7 @@ rm {os.path.basename(tarfile)}
 
     jobid = int(out[0].strip().split()[-1])
 
+    ssh_client.close()
 
     return jobid
 
@@ -150,8 +156,17 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         # sort tarball retrieval by location on tape
         sortexec = Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/hpsssort.sh'
 
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        nersc_username = os.getenv('NERSC_USERNAME')
+        nersc_password = os.getenv('NERSC_PASSWORD')
+        nersc_host = os.getenv('NERSC_HOST')
+
+        ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
         syscall = f'bash {sortexec} {f.name}'
-        _, stdout, _ = subprocess.check_call(syscall)
+        _, stdout, _ = ssh_client.exec_command(syscall)
 
         # read it into pandas
         ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
