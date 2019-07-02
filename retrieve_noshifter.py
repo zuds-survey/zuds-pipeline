@@ -1,3 +1,4 @@
+import time
 import os
 import psycopg2
 import pandas as pd
@@ -87,9 +88,18 @@ rm {os.path.basename(tarfile)}
     subscript.seek(0)
 
     command = f'/bin/bash {Path(subscript.name).resolve()}'
-    stdout, stderr = subprocess.check_call(command.split())
-
-    retcode = stdout.channel.recv_exit_status()
+    p = subprocess.Popen(command.split(), stdout=subprocess.PIPE, 
+                         stderr=subprocess.PIPE)
+    #stdout, stderr = p.communicate()
+    
+    while True:
+        if p.poll() is not None:
+            break
+        else:
+            time.sleep(0.01)
+    
+    stdout, stderr = p.stdout, p.stderr
+    retcode = p.returncode
 
     out = stdout.readlines()
     err = stderr.readlines()
@@ -104,7 +114,6 @@ rm {os.path.basename(tarfile)}
     subscript.close()
 
     jobid = int(out[0].strip().split()[-1])
-
 
     return jobid
 
@@ -150,7 +159,21 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         sortexec = Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/hpsssort.sh'
 
         syscall = f'bash {sortexec} {f.name}'
-        _, stdout, _ = subprocess.check_call(syscall)
+        p = subprocess.Popen(syscall.split(), stdout=subprocess.PIPE, 
+                             stderr=subprocess.PIPE)
+        
+        #stdout, stderr = p.communicate()
+        while True:
+            if p.poll() is not None:
+                break
+            else:
+                time.sleep(0.01)
+                
+        retcode = p.returncode
+        stderr, stdout = p.stderr, p.stdout
+
+        if retcode != 0:
+            raise subprocess.CalledProcessError(stderr.read())
 
         # read it into pandas
         ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
