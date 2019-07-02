@@ -24,9 +24,7 @@ class HPSSDB(object):
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
 
-    nersc_username = os.getenv('NERSC_USERNAME')
-    nersc_password = os.getenv('NERSC_PASSWORD')
-    nersc_host = os.getenv('NERSC_HOST')
+
     nersc_account = os.getenv('NERSC_ACCOUNT')
 
 
@@ -43,7 +41,9 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
         subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
     substr =  f'''#!/usr/bin/env bash
-module load esslurm
+#module load esslurm
+export PATH=/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH
+export LD_LIBRARY_PATH=/opt/esslurm/lib64:$LD_LIBRARY_PATH
 sbatch {Path(jobscript.name).resolve()}
 '''
 

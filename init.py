@@ -46,7 +46,9 @@ volume_mounts = {
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
     os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic',
     lensgrinder_home: '/lg',
-    skyportal_home: '/skyportal'
+    skyportal_home: '/skyportal',
+    '/usr/common/mss/bin':'/usr/common/mss/bin',
+    '/opt/esslurm':'/opt/esslurm'
 }
 
 vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
