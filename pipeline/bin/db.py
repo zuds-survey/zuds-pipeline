@@ -24,6 +24,8 @@ from spherical_geometry.vector import radec_to_vector
 from spherical_geometry.polygon import SphericalPolygon
 from astropy.coordinates import SkyCoord
 
+from astropy.table import Table
+
 
 from baselayer.app.env import load_env
 from datetime import datetime
@@ -231,10 +233,60 @@ class Image(models.Base):
         DBSession().commit()
 
 
+class StackDetection(models.Base):
+
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
+    stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
+    stack = relationship('Stack', back_populates='detections', cascade='all')
+    flux = sa.Column(sa.Float)
+    fluxerr = sa.Column(sa.Float)
+    flags = sa.Column(sa.Integer)
+    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
+    source = relationship('Source', back_populates='stack_detections', cascade='all')
+
+    q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
+
+
+class Stack(models.Base):
+
+    path = sa.Column(sa.Text)
+    hpss_path = sa.Column(sa.Text)
+
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
+    images = relationship('Image', back_populates='stacks', cascade='all', secondary='join(StackTask, StackTaskImage).join(stacks)')
+
+    type = sa.Column(sa.Text)
+
+    ra1 = sa.Column(psql.DOUBLE_PRECISION)
+    ra2 = sa.Column(psql.DOUBLE_PRECISION)
+    ra3 = sa.Column(psql.DOUBLE_PRECISION)
+    ra4 = sa.Column(psql.DOUBLE_PRECISION)
+
+    dec1 = sa.Column(psql.DOUBLE_PRECISION)
+    dec2 = sa.Column(psql.DOUBLE_PRECISION)
+    dec3 = sa.Column(psql.DOUBLE_PRECISION)
+    dec4 = sa.Column(psql.DOUBLE_PRECISION)
+
+    min_mjdobs = sa.Column(sa.Float)
+    max_mjdobs = sa.Column(sa.Float)
+    med_mjdobs = sa.Column(sa.Float)
+
+    tasks = relationship('StackTask', cascade='all')
+    detections = relationship('StackDetection', cascade='all')
+
+    q3c = Index('stack_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
+
+
+Image.stacks = relationship('Stack', secondary='join(StackTask, StackTaskImage).join(image)',
+                            back_populates='images', cascade='all')
+
+
 def images(self):
-    candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec,
-                                                                       self.ra, self.dec, 1.32822)).all()
-    return [i for i in candidates if i.contains_source(self)]
+    candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec, self.ra, self.dec, 0.64))\
+                                         .filter(func.q3c_poly_query(self.ra, self.dec, Image.poly))
+    return candidates.all()
 
 
 # keep track of the images that the photometry came from
@@ -243,10 +295,82 @@ models.Photometry.image = relationship('Image', back_populates='photometry')
 
 models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
+models.Source.stack_detections = relationship('StackDetection', cascade='all')
+
+
+def light_curve(self):
+    photometry = self.photometry
+    lc_raw = []
+
+    for photpoint in photometry:
+        photd = {'mjd': photpoint.mjd,
+                 'filter': photpoint.filter,
+                 'zp': photpoint.zp,
+                 'zpsys': photpoint.zpsys,
+                 'flux': photpoint.flux,
+                 'fluxerr': photpoint.fluxerr}
+        lc_raw.append(photd)
+
+    return Table(lc_raw)
+
+models.source.light_curve = light_curve
+
 
 
 Group.images = relationship('Image', back_populates='groups',
                             secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
+
+
+class HPSSTask(models.Base):
+
+    target_path = sa.Column(sa.Text, nullable=False)
+    status = sa.Column(sa.Boolean, default=None)
+    reason = sa.Column(sa.Text, nullable=True)
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='SET NULL'))
+
+
+class StackTask(models.Base):
+
+    stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='SET NULL'), default=None)
+    stack = relationship('Stack', back_populates='tasks', cascade='all')
+    status = sa.Column(sa.Boolean, default=None)
+    reason = sa.Column(sa.Text, nullable=True)
+    outfile_name = sa.Column(sa.Text)
+    image_type = sa.Column(sa.Text)
+    images = relationship('Image', secondary='stacktask_images')
+
+StackTaskImage = join_model('stacktask_images', StackTask, Image)
+
+class DownloadTask(models.Base):
+
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('images.id', ondelete='SET NULL'), default=None)
+    image = relationship('Image', )
+
+
+class FilterRun(models.Base):
+    tstart = sa.Column(sa.DateTime)
+    tend = sa.Column(sa.DateTime)
+    status = sa.Column(sa.Boolean, default=None)
+    reason = sa.Column(sa.Text, nullable=True)
+
+
+
+
+class Fit(models.Base):
+    success = sa.Column(sa.Boolean)
+    message = sa.Column(sa.Text)
+    ncall = sa.Column(sa.Integer)
+    chisq = sa.Column(sa.Float)
+    ndof = sa.Column(sa.Integer)
+    param_names = sa.Column(psql.ARRAY(sa.Text))
+    parameters = sa.Column(models.NumpyArray)
+    vparam_names = sa.Column(psql.ARRAY(sa.Text))
+    covariance = sa.Column(models.NumpyArray)
+    errors = sa.Column(models.NumpyArray)
+    nfit = sa.Column(sa.Integer)
+    data_mask = sa.Column(psql.ARRAY(sa.Boolean))
+    source_id = sa.Column(sa.Text, sa.ForeignKey('source.id', ondelete='SET NULL'))
+    source = relationship('Source')
 
 
 def create_ztf_groups_if_nonexistent():

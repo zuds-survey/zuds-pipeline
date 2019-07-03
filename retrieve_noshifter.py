@@ -1,9 +1,8 @@
 import time
 import os
-import psycopg2
 import pandas as pd
 from argparse import ArgumentParser
-import tempfile, io
+import tempfile
 from pathlib import Path
 import subprocess
 from sqlalchemy import create_engine
@@ -24,10 +23,7 @@ class HPSSDB(object):
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
-
-
     nersc_account = os.getenv('NERSC_ACCOUNT')
-
 
     if job_script_destination is None:
         # then just use temporary files
@@ -88,16 +84,16 @@ rm {os.path.basename(tarfile)}
     subscript.seek(0)
 
     command = f'/bin/bash {Path(subscript.name).resolve()}'
-    p = subprocess.Popen(command.split(), stdout=subprocess.PIPE, 
+    p = subprocess.Popen(command.split(), stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
     #stdout, stderr = p.communicate()
-    
+
     while True:
         if p.poll() is not None:
             break
         else:
             time.sleep(0.01)
-    
+
     stdout, stderr = p.stdout, p.stderr
     retcode = p.returncode
 
@@ -159,16 +155,16 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         sortexec = Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/hpsssort.sh'
 
         syscall = f'bash {sortexec} {f.name}'
-        p = subprocess.Popen(syscall.split(), stdout=subprocess.PIPE, 
+        p = subprocess.Popen(syscall.split(), stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
-        
+
         #stdout, stderr = p.communicate()
         while True:
             if p.poll() is not None:
                 break
             else:
                 time.sleep(0.01)
-                
+
         retcode = p.returncode
         stderr, stdout = p.stderr, p.stdout
 
