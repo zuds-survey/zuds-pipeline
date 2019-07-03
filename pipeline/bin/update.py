@@ -31,7 +31,7 @@ if __name__ == '__main__':
                              f'{max_nid + QUERY_WINDOWSIZE * (i + 1)}')
         metatable = zquery.metatable
         metatables.append(metatable)
-        
+
     metatable = pd.concat(metatables)
     current_paths = db.DBSession().query(db.Image.path).all()
     meta_images = [db.Image(row.to_dict()) for _, row in metatable.iterrows()]
