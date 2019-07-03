@@ -56,6 +56,7 @@ class Image(models.Base):
     dec = sa.Column(psql.DOUBLE_PRECISION)
     infobits = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
+    rcid = sa.Column(sa.Integer)
     pid = sa.Column(psql.BIGINT)
     nid = sa.Column(sa.Integer)
     expid = sa.Column(sa.Integer)
