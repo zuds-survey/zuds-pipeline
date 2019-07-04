@@ -36,6 +36,9 @@ skyportal_home = '/global/cscratch1/sd/dgold/skyportal_private'
 shifter_image = 'registry.services.nersc.gov/dgold/improc:latest'
 slurm_email = 'ztfcoadd@gmail.com'
 
+staging_directory = f'{Path(os.getenv("SCRATCH")) / "staging/xfer/data" / os.getenv("HOSTNAME")}'
+staging_cmddir = f'{Path(os.getenv("SCRATCH")) / "staging/cmdlist"}'
+
 
 #########################################################################
 # Don't change the values of anything after this line
@@ -73,7 +76,9 @@ environment_variables = {
     'OUTPUT_DIRECTORY': run_topdirectory,
     'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'slurm', 'single_coaddsub.sh'),
     'IPAC_USERNAME': ipac_username,
-    'IPAC_PASSWORD': ipac_password
+    'IPAC_PASSWORD': ipac_password,
+    'STAGING_DIRECTORY': staging_directory,
+    'STAGING_CMDDIR': staging_cmddir
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])

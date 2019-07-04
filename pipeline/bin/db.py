@@ -124,6 +124,15 @@ class Image(models.Base):
 
         return f'{base}'
 
+    def hpss_staging_path(self, suffix):
+        sffd = str(self.filefracday)
+        base = Path(os.getenv('STAGING_DIRECTORY')) / \
+               f'{self.field:06d}/c{self.ccdid:02d}/q{self.qid}/{self.filtercode}/' \
+               f'ztf_{sffd}_{self.field:06d}_{self.filtercode}_c{self.ccdid:02d}_' \
+               f'{self.imgtypecode}_q{self.qid}_{suffix}'
+
+        return f'{base}'
+
 
     fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",  field, ccdid, qid, filtercode, obsjd)
     hmi = Index("image_hpss_mask_path_idx", hpss_mask_path)
