@@ -20,8 +20,6 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from astropy.io import fits
 from libztf.yao import yao_photometry_single
 
-from spherical_geometry.vector import radec_to_vector
-from spherical_geometry.polygon import SphericalPolygon
 from astropy.coordinates import SkyCoord
 
 from astropy.table import Table
@@ -152,13 +150,6 @@ class Image(models.Base):
         return array([self.ra1, self.dec1, self.ra2, self.dec2,
                       self.ra3, self.dec3, self.ra4, self.dec4])
 
-    @property
-    def poly_astropy(self):
-        region = SphericalPolygon.from_radec([self.ra1, self.ra2, self.ra3, self.ra4, self.ra1],
-                                             [self.dec1, self.dec2, self.dec3, self.dec4, self.dec1],
-                                             degrees=True)
-        return region
-
     @hybrid_property
     def obsmjd(self):
         return self.obsjd - 2400000.5
@@ -172,11 +163,6 @@ class Image(models.Base):
         return DBSession().query(models.Source)\
                           .filter(func.q3c_poly_query(models.Source.ra, models.Source.dec, self.poly))\
                           .all()
-
-    def contains_source(self, source):
-        polygon = self.poly_astropy
-        source_vector = radec_to_vector(source.ra, source.dec, degrees=True)
-        return polygon.contains_point(source_vector)
 
     def provided_photometry(self, photometry):
         return photometry in self.photometry
