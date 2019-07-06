@@ -286,7 +286,7 @@ def images(self):
 
 
 # keep track of the images that the photometry came from
-models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
+models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'), index=True)
 models.Photometry.image = relationship('Image', back_populates='photometry')
 
 models.Source.images = property(images)
@@ -339,8 +339,8 @@ StackTaskImage = join_model('stacktask_images', StackTask, Image)
 
 class DownloadTask(models.Base):
 
-    image_id = sa.Column(sa.Integer, sa.ForeignKey('images.id', ondelete='SET NULL'), default=None)
-    image = relationship('Image', )
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='SET NULL'), default=None)
+    image = relationship('Image')
 
 
 class FilterRun(models.Base):
@@ -365,7 +365,7 @@ class Fit(models.Base):
     errors = sa.Column(models.NumpyArray)
     nfit = sa.Column(sa.Integer)
     data_mask = sa.Column(psql.ARRAY(sa.Boolean))
-    source_id = sa.Column(sa.Text, sa.ForeignKey('source.id', ondelete='SET NULL'))
+    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source')
 
 
