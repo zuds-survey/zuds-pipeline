@@ -309,7 +309,7 @@ def light_curve(self):
 
     return Table(lc_raw)
 
-models.source.light_curve = light_curve
+models.Source.light_curve = light_curve
 
 
 
