@@ -134,12 +134,12 @@ if __name__ == '__main__':
             db.sa.and_(
                 db.Image.disk_sub_path == None,
                 db.Image.subtraction_exists != False
-                )
-            ),
+                ),
             db.sa.and_(
                 db.Image.disk_psf_path == None,
                 db.Image.subtraction_exists != False
             )
+        )
         ).with_for_update(skip_locked=True).order_by(db.Image.field,
                                                      db.Image.ccdid,
                                                      db.Image.qid,
