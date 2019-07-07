@@ -16,6 +16,7 @@ nersc_password = '***REMOVED***'
 
 lensgrinder_home = '/global/cscratch1/sd/ztfproc/lensgrinder'
 run_topdirectory = '/global/cscratch1/sd/ztfproc/coadd'
+staging_topdir = '/global/cscratch1/sd/ztfproc/staging'
 
 hpss_dbhost = '***REMOVED***'
 hpss_dbport = 6666
@@ -36,8 +37,8 @@ skyportal_home = '/global/cscratch1/sd/dgold/skyportal_private'
 shifter_image = 'registry.services.nersc.gov/dgold/improc:latest'
 slurm_email = 'ztfcoadd@gmail.com'
 
-staging_directory = f'{Path(os.getenv("SCRATCH")) / "staging/xfer/data" / os.getenv("HOSTNAME")}'
-staging_cmddir = f'{Path(os.getenv("SCRATCH")) / "staging/cmdlist"}'
+staging_directory = f'{Path(staging_topdir) / "xfer/data" / os.getenv("HOSTNAME")}'
+staging_cmddir = f'{Path(staging_topdir) / "cmdlist"}'
 
 
 #########################################################################
@@ -98,7 +99,7 @@ with open('interactive.sh', 'w') as f:
 --partition=realtime --image={shifter_image} -C haswell --exclusive \
 --volume="{vstring}"''')
 
-with open('ingest.sh', 'w') as f:
+with open('env.sh', 'w') as f:
     f.write(f'''#!/bin/bash
         {estring.replace('-e', '')} /bin/bash''')
 
