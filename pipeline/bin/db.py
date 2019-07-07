@@ -30,7 +30,7 @@ from datetime import datetime
 
 
 class IPACProgram(models.Base):
-    groups = relationship('Group', secondary='ipacprogram_groups',  back_populates='ipacprograms', cascade='all')
+    groups = relationship('Group', secondary='ipacprogram_groups',  back_populates='ipacprograms')#, cascade='all')
     images = relationship('Image', back_populates='ipac_program', cascade='all')
 
 IPACProgramGroup = join_model('ipacprogram_groups', IPACProgram, Group)
@@ -41,7 +41,7 @@ class Image(models.Base):
 
     __tablename__ = 'image'
 
-    created_at = sa.Column(sa.DateTime(), nullable=True)
+    created_at = sa.Column(sa.DateTime(), nullable=True, default=func.now())
     path = sa.Column(sa.Text, unique=True)
     filtercode = sa.Column(sa.CHAR(2))
     qid = sa.Column(sa.Integer)
@@ -141,8 +141,8 @@ class Image(models.Base):
     obsjdi = Index("image_obsjd_idx", obsjd)
     pathi = Index("image_path_idx", path)
 
-    groups = relationship('Group', back_populates='images', secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
-    ipac_program = relationship('IPACProgram', back_populates='images', cascade='all')
+    #groups = relationship('Group', back_populates='images', secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
+    ipac_program = relationship('IPACProgram', back_populates='images')
     photometry = relationship('Photometry', cascade='all')
 
     @hybrid_property
@@ -313,8 +313,8 @@ models.Source.light_curve = light_curve
 
 
 
-Group.images = relationship('Image', back_populates='groups',
-                            secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
+#Group.images = relationship('Image', back_populates='groups',
+#                            secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
 
 
 class HPSSTask(models.Base):
