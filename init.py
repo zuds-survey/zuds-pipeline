@@ -40,6 +40,8 @@ slurm_email = 'ztfcoadd@gmail.com'
 staging_directory = f'{Path(staging_topdir) / "xfer/data" / os.getenv("HOSTNAME")}'
 staging_cmddir = f'{Path(staging_topdir) / "cmdlist"}'
 
+ssh_keyfile = f'{Path(os.getenv("HOME")) / ".ssh/id_rsa"}'
+
 
 #########################################################################
 # Don't change the values of anything after this line
@@ -79,7 +81,8 @@ environment_variables = {
     'IPAC_USERNAME': ipac_username,
     'IPAC_PASSWORD': ipac_password,
     'STAGING_DIRECTORY': staging_directory,
-    'STAGING_CMDDIR': staging_cmddir
+    'STAGING_CMDDIR': staging_cmddir,
+    'SSH_KEYFILE': ssh_keyfile
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])

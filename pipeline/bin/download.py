@@ -9,6 +9,7 @@ from uuid import uuid4
 from libztf import ipac_authenticate
 import paramiko
 from pathlib import Path
+from sqlalchemy.sql.expression import case
 
 # write images and masks to tape
 # write difference images to disk
@@ -47,6 +48,8 @@ def submit_to_tape(items, tarname):
 
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_key = paramiko.RSAKey.from_private_key_file(os.getenv("SSH_KEYFILE"))
+    ssh_client.connect(hostname=os.getenv("NERSC_HOST"), pkey=ssh_key)
 
     with tempfile.NamedTemporaryFile() as f:
         f.write(script.encode('ASCII'))
@@ -121,6 +124,10 @@ if __name__ == '__main__':
     handler.setFormatter(fmter)
     logger.addHandler(handler)
 
+    # download the partnership images first, caltech second, public last
+    _gid_priorities = {2: 1, 3: 2, 1: 3}
+    sort_order = case(value=db.Image.ipac_gid, whens=_gid_priorities)
+
     while True:
 
         # check if the cookies need to be reset
@@ -141,7 +148,8 @@ if __name__ == '__main__':
                 db.Image.subtraction_exists != False
             )
         )
-        ).with_for_update(skip_locked=True).order_by(db.Image.field,
+        ).with_for_update(skip_locked=True).order_by(sort_order,
+                                                     db.Image.field,
                                                      db.Image.ccdid,
                                                      db.Image.qid,
                                                      db.Image.filtercode,
