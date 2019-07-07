@@ -23,7 +23,8 @@ TAR_SIZE = 2024
 
 def submit_to_tape(items, tarname):
 
-    cmdlist = f'{os.path.abspath(tarname)}.cmd'
+    cmdlist = Path(os.getenv("STAGING_CMDDIR")) / f'{os.path.basename(tarname)}.cmd'
+    cmdlist.parent.mkdir(parents=True, exist_ok=True)
 
     with open(cmdlist, 'w') as f:
         for destination in items:
@@ -36,7 +37,7 @@ def submit_to_tape(items, tarname):
     #SBATCH -t 48:00:00
     #SBATCH -L project,SCRATCH
     #SBATCH -C haswell
-    #SBATCH -J {Path(tarname).basename}
+    #SBATCH -J {Path(tarname).name}
 
     /usr/common/mss/bin/htar cvf {tarname} -L {cmdlist}
     for f in `cat {cmdlist}`; do
@@ -48,7 +49,7 @@ def submit_to_tape(items, tarname):
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     with tempfile.NamedTemporaryFile() as f:
-        f.write(script)
+        f.write(script.encode('ASCII'))
         f.seek(0)
 
         submit_command = f'PATH="/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH" ' \
@@ -112,7 +113,7 @@ if __name__ == '__main__':
     tstart = time.time()
     icookie = ipac_authenticate()
 
-    FORMAT = '[%(level) - %(asctime)-15s]: %(message)s'
+    FORMAT = '[%(asctime)-15s]: %(message)s'
     logger = logging.getLogger('main')
     logger.setLevel(logging.DEBUG)
     fmter = logging.Formatter(fmt=FORMAT)
