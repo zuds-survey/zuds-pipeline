@@ -48,8 +48,8 @@ def submit_to_tape(items, tarname):
 
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh_key = paramiko.RSAKey.from_private_key_file(os.getenv("SSH_KEYFILE"))
-    ssh_client.connect(hostname=os.getenv("NERSC_HOST"), pkey=ssh_key)
+    ssh_client.connect(hostname=os.getenv("NERSC_HOST"), password=os.getenv("NERSC_PASSWORD"),
+                       username=os.getenv('NERSC_USERNAME'))
 
     with tempfile.NamedTemporaryFile() as f:
         f.write(script.encode('ASCII'))
