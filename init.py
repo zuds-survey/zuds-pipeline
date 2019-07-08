@@ -13,6 +13,7 @@ nersc_account = '***REMOVED***'
 nersc_username = 'ztfproc'
 nersc_host = 'cori.nersc.gov'
 nersc_password = '***REMOVED***'
+nersc_xfer_username = 'dgold'
 
 lensgrinder_home = '/global/cscratch1/sd/ztfproc/lensgrinder'
 run_topdirectory = '/global/cscratch1/sd/ztfproc/coadd'
@@ -73,6 +74,7 @@ environment_variables = {
     'NERSC_PASSWORD': nersc_password,
     'NERSC_HOST': nersc_host,
     'NERSC_ACCOUNT': nersc_account,
+    'NERSC_XFER_USERNAME': nersc_xfer_username,
     'LENSGRINDER_HOME': lensgrinder_home,
     'VOLUMES': vstring,
     'SHIFTER_IMAGE': shifter_image,
