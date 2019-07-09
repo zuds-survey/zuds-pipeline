@@ -48,7 +48,7 @@ staging_directory = f'{Path(staging_topdir) / "xfer/data" / os.getenv("HOSTNAME"
 staging_cmddir = f'{Path(staging_topdir) / "cmdlist"}'
 
 ssh_keyfile = f'{Path(os.getenv("HOME")) / ".ssh/id_rsa"}'
-pythonpath = "/global/cscratch1/sd/ztfproc/dtn-python:" \
+pythonpath = "/global/cscratch1/sd/ztfproc/shifter-python:" \
              "/global/cscratch1/sd/ztfproc/skyportal:" \
              "/global/cscratch1/sd/ztfproc/lensgrinder/pipeline/bin"
 
