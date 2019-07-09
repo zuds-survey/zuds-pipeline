@@ -1,7 +1,7 @@
 import db
 import os
 import sqlalchemy as sa
-import sfdmap
+#import sfdmap
 
 from sqlalchemy import func
 from sncosmo.photdata import PhotometricData
