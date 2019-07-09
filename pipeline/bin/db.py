@@ -383,8 +383,10 @@ class PittObject(models.Base):
 
     @hybrid_property
     def lens_cand(self):
-        return sa.and_(self.gaiamatch, self.milliquasmatch,
-                       self.wisematch, self.hitsmatch)
+        return sa.and_(self.gaiamatch == False,
+                       self.milliquasmatch == False,
+                       self.wisematch == False,
+                       self.hitsmatch == False)
 
     q3c = Index('dr6object_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
