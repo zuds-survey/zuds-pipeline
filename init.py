@@ -53,6 +53,10 @@ pythonpath = "/global/cscratch1/sd/ztfproc/shifter-python:" \
              "/global/cscratch1/sd/ztfproc/lensgrinder/pipeline/bin"
 
 
+kowalski_username = 'danny'
+kowalski_password = '***REMOVED***'
+
+
 #########################################################################
 # Don't change the values of anything after this line
 #########################################################################
@@ -99,7 +103,9 @@ environment_variables = {
     'HITS_DBPASSWORD': hits_dbpassword,
     'HITS_DBUSERNAME': hits_dbusername,
     'HITS_DBNAME': hits_dbname,
-    'PYTHONPATH': pythonpath
+    'PYTHONPATH': pythonpath,
+    'KOWALSKI_USERNAME': kowalski_username,
+    'KOWALSKI_PASSWORD': kowalski_password
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
