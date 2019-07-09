@@ -35,7 +35,6 @@ class Hit(Base):
     jdmax = sa.Column(psql.DOUBLE_PRECISION)
     cnt = sa.Column(sa.Integer)
     days = sa.Column(sa.Integer)
-
     q3c = sa.Index("hits_q3c_idx", sa.func.q3c_ang2ipix(ra, dec))
 
 
