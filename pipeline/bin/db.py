@@ -4,6 +4,8 @@ import numpy as np
 
 from sqlalchemy.orm import relationship, column_property
 from sqlalchemy.dialects.postgresql import array
+from sqlalchemy.ext.declarative import declared_attr
+
 
 from sqlalchemy import Index
 from sqlalchemy import func
@@ -32,6 +34,7 @@ from datetime import datetime
 class IPACProgram(models.Base):
     groups = relationship('Group', secondary='ipacprogram_groups',  back_populates='ipacprograms')#, cascade='all')
     images = relationship('Image', back_populates='ipac_program', cascade='all')
+
 
 IPACProgramGroup = join_model('ipacprogram_groups', IPACProgram, Group)
 Group.ipacprograms = relationship('IPACProgram', secondary='ipacprogram_groups', back_populates='groups', cascade='all')
@@ -145,6 +148,10 @@ class Image(models.Base):
     ipac_program = relationship('IPACProgram', back_populates='images')
     photometry = relationship('Photometry', cascade='all')
 
+    subtraction = relationship('Subtraction', back_populates='image', cascade='all')
+    references = relationship('Reference', back_populates='images', cascade='all', secondary='reference_images')
+    stacks = relationship('Stack', back_populates='images', cascade='all', secondary='stack_images')
+
     @hybrid_property
     def poly(self):
         return array([self.ra1, self.dec1, self.ra2, self.dec2,
@@ -244,37 +251,6 @@ class StackDetection(models.Base):
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
 
-class Stack(models.Base):
-
-    path = sa.Column(sa.Text)
-    hpss_path = sa.Column(sa.Text)
-
-    ra = sa.Column(psql.DOUBLE_PRECISION)
-    dec = sa.Column(psql.DOUBLE_PRECISION)
-    images = relationship('Image', back_populates='stacks', cascade='all', secondary='join(StackTask, StackTaskImage).join(stacks)')
-
-    type = sa.Column(sa.Text)
-
-    ra1 = sa.Column(psql.DOUBLE_PRECISION)
-    ra2 = sa.Column(psql.DOUBLE_PRECISION)
-    ra3 = sa.Column(psql.DOUBLE_PRECISION)
-    ra4 = sa.Column(psql.DOUBLE_PRECISION)
-
-    dec1 = sa.Column(psql.DOUBLE_PRECISION)
-    dec2 = sa.Column(psql.DOUBLE_PRECISION)
-    dec3 = sa.Column(psql.DOUBLE_PRECISION)
-    dec4 = sa.Column(psql.DOUBLE_PRECISION)
-
-    min_mjdobs = sa.Column(sa.Float)
-    max_mjdobs = sa.Column(sa.Float)
-    med_mjdobs = sa.Column(sa.Float)
-
-    tasks = relationship('StackTask', cascade='all')
-    detections = relationship('StackDetection', cascade='all')
-
-    q3c = Index('stack_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
-
-
 Image.stacks = relationship('Stack', secondary='join(StackTask, StackTaskImage).join(image)',
                             back_populates='images', cascade='all')
 
@@ -312,11 +288,6 @@ def light_curve(self):
 models.Source.light_curve = light_curve
 
 
-
-#Group.images = relationship('Image', back_populates='groups',
-#                            secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
-
-
 class HPSSTask(models.Base):
 
     target_path = sa.Column(sa.Text, nullable=False)
@@ -336,11 +307,6 @@ class StackTask(models.Base):
     images = relationship('Image', secondary='stacktask_images')
 
 StackTaskImage = join_model('stacktask_images', StackTask, Image)
-
-class DownloadTask(models.Base):
-
-    image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='SET NULL'), default=None)
-    image = relationship('Image')
 
 
 class FilterRun(models.Base):
@@ -406,6 +372,126 @@ class Fit(models.Base):
     data_mask = sa.Column(psql.ARRAY(sa.Boolean))
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source')
+
+
+class File(object):
+
+    """Any tracked file (something that resides on disk or on tape) should implement these columns"""
+
+    disk_path = sa.Column(sa.Text)
+    hpss_path = sa.Column(sa.Text)
+
+
+class FITSBase(File):
+
+    """Base class for any FITS image. Any tracked pipeline image product must implement these columns """
+
+    simple = sa.Column(sa.Boolean)
+    bitpix = sa.Column(sa.Integer)
+    naxis = sa.Column(sa.Integer)
+    naxis1 = sa.Column(sa.Integer)
+    naxis2 = sa.Column(sa.Integer)
+    equinox = sa.Column(sa.Float)
+    ctype1 = sa.Column(sa.Text)
+    cunit1 = sa.Column(sa.Text)
+    crval1 = sa.Column(sa.Float)
+    crpix1 = sa.Column(sa.Float)
+    cd1_1 = sa.Column(sa.Float)
+    cd1_2 = sa.Column(sa.Float)
+    ctype2 = sa.Column(sa.Text)
+    cunit2 = sa.Column(sa.Text)
+    crval2 = sa.Column(sa.Float)
+    crpix2 = sa.Column(sa.Float)
+    cd2_1 = sa.Column(sa.Float)
+    cd2_2 = sa.Column(sa.Float)
+    exptime = sa.Column(sa.Float)
+    gain = sa.Column(sa.Float)
+    saturate = sa.Column(sa.Float)
+    filter = sa.Column(sa.Text)
+    pixscale = sa.Column(sa.Float)
+    magzp = sa.Column(sa.Float)
+    seeing = sa.Column(sa.Float)
+    medsky = sa.Column(sa.Float)
+    lmt_mg = sa.Column(sa.Float)
+    lmg_nsigma = sa.Column(sa.Float)
+
+
+class SubtractionMixin(FITSBase):
+
+    """Anything Produced by hotpants should implement these columns"""
+
+    bzero = sa.Column(sa.Float)
+    bscale = sa.Column(sa.Float)
+    region00 = sa.Column(sa.Text)
+    convol00 = sa.Column(sa.Text)
+    ksum00 = sa.Column(sa.Float)
+    sssig00 = sa.Column(sa.Float)
+    ssscat00 = sa.Column(sa.Float)
+    fsig00 = sa.Column(sa.Float)
+    fscat00 = sa.Column(sa.Float)
+    x2nrm00 = sa.Column(sa.Float)
+    nx2nrm00 = sa.Column(sa.Integer)
+    dmean00 = sa.Column(sa.Float)
+    dsige00 = sa.Column(sa.Float)
+    dsig00 = sa.Column(sa.Float)
+    dmeano00 = sa.Column(sa.Float)
+    dsigeo00 = sa.Column(sa.Float)
+    dsigo00 = sa.Column(sa.Float)
+    diffcmd = sa.Column(sa.Text)
+    photnorm = sa.Column(sa.Text)
+    target = sa.Column(sa.Text)
+    template = sa.Column(sa.Text)
+    diffim = sa.Column(sa.Text)
+    nregion = sa.Column(sa.Integer)
+    maskval = sa.Column(sa.Float)
+    kerinfo = sa.Column(sa.Float)
+
+    @declared_attr
+    def reference_id(self):
+        return sa.Column('reference_id', sa.Integer, sa.ForeignKey('reference.id', ondelete='CASCADE'))
+
+    @declared_attr
+    def reference(self):
+        return relationship('Reference')
+
+
+class SingleEpochSubtraction(SubtractionMixin, models.Base):
+
+    """These correspond to one science image - one reference"""
+
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
+    image = relationship('image', back_populates='subtraction')
+
+
+class StackMixin(FITSBase):
+
+    combinet = sa.Column(sa.Text)
+    resampt1 = sa.Column(sa.Text)
+    centert1 = sa.Column(sa.Text)
+    pscalet1 = sa.Column(sa.Text)
+    resampt2 = sa.Column(sa.Text)
+    centert2 = sa.Column(sa.Text)
+    pscalet2 = sa.Column(sa.Text)
+
+
+class Stack(StackMixin, models.Base):
+
+    subtraction = relationship('MultiEpochSubtraction', back_populates='stack', cascade='all')
+    images = relationship('Image', cascade='all', secondary='stack_images')
+
+
+class Reference(StackMixin, models.Base):
+    images = relationship('Image', cascade='all', secondary='reference_images')
+
+
+ReferenceImage = join_model('reference_images', Reference, Image)
+StackImage = join_model('stack_images', Stack, Image)
+
+
+class MultiEpochSubtraction(StackMixin, SubtractionMixin, models.Base):
+
+    stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
+    stack = relationship('Stack', back_populates='subtraction', cascade='all')
 
 
 def create_ztf_groups_if_nonexistent():
