@@ -48,6 +48,9 @@ staging_directory = f'{Path(staging_topdir) / "xfer/data" / os.getenv("HOSTNAME"
 staging_cmddir = f'{Path(staging_topdir) / "cmdlist"}'
 
 ssh_keyfile = f'{Path(os.getenv("HOME")) / ".ssh/id_rsa"}'
+pythonpath = "/global/cscratch1/sd/ztfproc/dtn-python:" \
+             "/global/cscratch1/sd/ztfproc/skyportal:" \
+             "/global/cscratch1/sd/ztfproc/lensgrinder/pipeline/bin"
 
 
 #########################################################################
@@ -95,7 +98,8 @@ environment_variables = {
     'HITS_DBPORT':hits_dbport,
     'HITS_DBPASSWORD': hits_dbpassword,
     'HITS_DBUSERNAME': hits_dbusername,
-    'HITS_DBNAME': hits_dbname
+    'HITS_DBNAME': hits_dbname,
+    'PYTHONPATH': pythonpath
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])

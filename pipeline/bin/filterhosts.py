@@ -4,17 +4,8 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.dialects import postgresql as psql
-
-#import sfdmap
-
-from sqlalchemy import func
-from sncosmo.photdata import PhotometricData
-
 import penquins
 
-import sncosmo
-
-from datetime import datetime, timedelta
 
 ARCSEC = 0.0002777
 C_BOUNDS = [-0.2, 0.2]
