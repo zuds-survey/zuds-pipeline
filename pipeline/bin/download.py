@@ -1,6 +1,7 @@
 import db
 import os
 import time
+import stat
 import requests
 import logging
 import tempfile
@@ -11,12 +12,14 @@ import paramiko
 from pathlib import Path
 from sqlalchemy.sql.expression import case
 
+# read/write for group
+os.umask(0o007)
+
 # write images and masks to tape
 # write difference images to disk
 
-CHUNK_SIZE = 5000
-TAR_SIZE = 2024
-
+CHUNK_SIZE = 512
+TAR_SIZE = 2048
 
 # this script does not use shifter
 # it is meant to be run on the data transfer nodes
@@ -32,36 +35,36 @@ def submit_to_tape(items, tarname):
             f.write(f'{destination}\n')
 
     script = f"""#!/bin/bash
-    #SBATCH -q xfer
-    #SBATCH -N 1
-    #SBATCH -A {os.getenv("NERSC_ACCOUNT")}
-    #SBATCH -t 48:00:00
-    #SBATCH -L project,SCRATCH
-    #SBATCH -C haswell
-    #SBATCH -J {Path(tarname).name}
+#SBATCH -q xfer
+#SBATCH -N 1
+#SBATCH -A {os.getenv("NERSC_ACCOUNT")}
+#SBATCH -t 48:00:00
+#SBATCH -L project,SCRATCH
+#SBATCH -C haswell
+#SBATCH -J {Path(tarname).name}
 
-    /usr/common/mss/bin/htar cvf {tarname} -L {cmdlist}
-    for f in `cat {cmdlist}`; do
-        rm $f
-    done
-    """
+/usr/common/mss/bin/htar cvf {tarname} -L {cmdlist}
+for f in `cat {cmdlist}`; do
+    rm -v $f
+done
+"""
 
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh_client.connect(hostname=os.getenv("NERSC_HOST"), password=os.getenv("NERSC_PASSWORD"),
-                       username=os.getenv('NERSC_USERNAME'))
+                       username=os.getenv('NERSC_XFER_USERNAME'))
 
-    with tempfile.NamedTemporaryFile() as f:
-        f.write(script.encode('ASCII'))
-        f.seek(0)
+    shfile = f'{cmdlist.resolve()}.sh'
+    with open(shfile, 'w') as f:
+        f.write(script)
 
-        submit_command = f'PATH="/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH" ' \
-                         f'LD_LIBRARY_PATH="/opt/esslurm/lib64" sbatch {f.name}'
+    submit_command = f'PATH="/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH" ' \
+                     f'LD_LIBRARY_PATH="/opt/esslurm/lib64" sbatch {Path(shfile).resolve()}'
 
-        stdin, stdout, stderr = ssh_client.exec_command(submit_command)
-        print(stdout.readlines())
-        print(stderr.readlines())
-        ssh_client.close()
+    stdin, stdout, stderr = ssh_client.exec_command(submit_command)
+    print(stdout.readlines())
+    print(stderr.readlines())
+    ssh_client.close()
 
 
 def reset_tarball():
@@ -92,6 +95,10 @@ def download_file(target, destination, cookie):
         try:
             with open(destination, 'wb') as f:
                 f.write(r.content)
+
+            # make group-writable
+            st = os.stat(destination)
+            os.chmod(destination, st.st_mode | stat.S_IWGRP)
         except OSError:
             continue
         else:
@@ -194,7 +201,7 @@ if __name__ == '__main__':
                 safe_download(target, destination, icookie, logger)
                 image.disk_psf_path = destination
 
-            if len(current_tarball) == TAR_SIZE:
+            if len(current_tarball) >= TAR_SIZE:
                 submit_to_tape(current_tarball, tar_name)
                 current_tarball, tar_name = reset_tarball()
 
