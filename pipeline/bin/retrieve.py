@@ -22,7 +22,8 @@ class HPSSDB(object):
         del self.engine
 
 
-def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number):
+def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
+                    preserve_dirs):
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -73,12 +74,16 @@ cd {Path(frame_destination).resolve()}
 
 '''
 
+    sc = 12 if not preserve_dirs else 8
+
     for tarfile, imlist in zip(tarfiles, images):
         wildimages = '\n'.join([f'*{p}' for p in imlist])
 
+
+
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
-echo "{wildimages}" | tar --strip-components=12 -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
+echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
@@ -116,8 +121,8 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(whereclause, exclude_masks=False, job_script_destination=None, frame_destination='.',
-                    log_destination='.'):
+def retrieve_images(whereclause, exclude_masks=False, preserve_dirs=False, job_script_destination=None,
+                    frame_destination='.', log_destination='.'):
 
     # interface to HPSS and database
     hpssdb = HPSSDB()
@@ -181,7 +186,8 @@ def retrieve_images(whereclause, exclude_masks=False, job_script_destination=Non
         tarnames = group['hpsspath'].tolist()
         images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
-        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape)
+        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape,
+                                preserve_dirs)
         for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
@@ -195,5 +201,7 @@ if __name__ == '__main__':
                         help='SQL where clause that tells the program which images to retrieve.')
     parser.add_argument('--exclude-masks', default=False, action='store_true',
                         help='Only retrieve the science images.')
+    parser.add_argument('--preserve-directories', default=False, action='store_true',
+                        help='If true, write files out in directories organized by field, chip, quad, filter.')
     args = parser.parse_args()
-    retrieve_images(args.whereclause, exclude_masks=args.exclude_masks)
+    retrieve_images(args.whereclause, exclude_masks=args.exclude_masks, preserve_dirs=args.preserve_directories)
