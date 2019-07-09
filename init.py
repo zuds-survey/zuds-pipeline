@@ -35,6 +35,12 @@ skyportal_dbpassword = '***REMOVED***'
 skyportal_dbname = 'skyportal'
 skyportal_home = '/global/cscratch1/sd/dgold/skyportal_private'
 
+hits_dbhost = '***REMOVED***'
+hits_dbport = 5432
+hits_dbusername = '***REMOVED***'
+hits_dbpassword = '***REMOVED***'
+hits_dbname = 'iptf'
+
 shifter_image = 'registry.services.nersc.gov/dgold/improc:latest'
 slurm_email = 'ztfcoadd@gmail.com'
 
@@ -84,7 +90,12 @@ environment_variables = {
     'IPAC_PASSWORD': ipac_password,
     'STAGING_DIRECTORY': staging_directory,
     'STAGING_CMDDIR': staging_cmddir,
-    'SSH_KEYFILE': ssh_keyfile
+    'SSH_KEYFILE': ssh_keyfile,
+    'HITS_DBHOST': hits_dbhost,
+    'HITS_DBPORT':hits_dbport,
+    'HITS_DBPASSWORD': hits_dbpassword,
+    'HITS_DBUSERNAME': hits_dbusername,
+    'HITS_DBNAME': hits_dbname
 }
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])

@@ -350,6 +350,43 @@ class FilterRun(models.Base):
     reason = sa.Column(sa.Text, nullable=True)
 
 
+class PittObject(models.Base):
+
+    type = sa.Column(sa.Text)
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
+    gmag = sa.Column(sa.Float)
+    rmag = sa.Column(sa.Float)
+    zmag = sa.Column(sa.Float)
+    w1mag = sa.Column(sa.Float)
+    w2mag = sa.Column(sa.Float)
+    gmagerr = sa.Column(sa.Float)
+    rmagerr = sa.Column(sa.Float)
+    zmagerr = sa.Column(sa.Float)
+    w1magerr = sa.Column(sa.Float)
+    w2magerr = sa.Column(sa.Float)
+    z_phot = sa.Column(sa.Float)
+    z_phot_err = sa.Column(sa.Float)
+    z_spec = sa.Column(sa.Float)
+
+    gaiamatch = sa.Column(sa.Boolean)
+    milliquasmatch = sa.Column(sa.Boolean)
+    wisematch = sa.Column(sa.Boolean)
+    hitsmatch = sa.Column(sa.Boolean)
+
+    @hybrid_property
+    def needs_check(self):
+        return sa.or_(self.gaiamatch == None,
+                      self.milliquasmatch == None,
+                      self.wisematch == None,
+                      self.hitsmatch == None)
+
+    @hybrid_property
+    def lens_cand(self):
+        return sa.and_(self.gaiamatch, self.milliquasmatch,
+                       self.wisematch, self.hitsmatch)
+
+    q3c = Index('dr6object_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
 
 class Fit(models.Base):
