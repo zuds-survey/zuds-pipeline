@@ -7,6 +7,9 @@ import shutil
 from pathlib import Path
 from argparse import ArgumentParser
 
+# read/write for group
+os.umask(0o007)
+
 __whatami__ = 'Run a lensgrinder ZTF task.'
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 
