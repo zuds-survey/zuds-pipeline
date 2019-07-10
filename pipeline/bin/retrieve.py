@@ -27,7 +27,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
     ssh_client = paramiko.SSHClient()
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_username = os.getenv('NERSC_XFER_USERNAME')
     nersc_password = os.getenv('NERSC_PASSWORD')
     nersc_host = os.getenv('NERSC_HOST')
     nersc_account = os.getenv('NERSC_ACCOUNT')
