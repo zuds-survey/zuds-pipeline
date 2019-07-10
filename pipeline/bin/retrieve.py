@@ -1,25 +1,17 @@
 import os
-import psycopg2
+import db
 import pandas as pd
 from argparse import ArgumentParser
 import tempfile, io
 import paramiko
 from pathlib import Path
-from sqlalchemy import create_engine
+
 
 
 class HPSSDB(object):
 
     def __init__(self):
-        dbname = os.getenv('HPSS_DBNAME')
-        password = os.getenv('HPSS_DBPASSWORD')
-        username = os.getenv('HPSS_DBUSERNAME')
-        port = os.getenv('HPSS_DBPORT')
-        host = os.getenv('HPSS_DBHOST')
-        self.engine = create_engine(f'postgresql://{username}:{password}@{host}:{port}/{dbname}')
-
-    def __del__(self):
-        del self.engine
+        self.engine = db.DBSession().engine
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
@@ -35,18 +27,8 @@ def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination,
     ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
 
 
-
-    if job_script_destination is None:
-        # then just use temporary files
-
-        jobscript = tempfile.NamedTemporaryFile()
-        subscript = tempfile.NamedTemporaryFile()
-
-
-    else:
-
-        jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
-        subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
+    jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
+    subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
     substr =  f'''#!/usr/bin/env bash
 module load esslurm
@@ -154,7 +136,9 @@ def retrieve_images(whereclause, exclude_masks=False, preserve_dirs=False, job_s
 
     instr = '\n'.join(tars.tolist())
 
-    with tempfile.NamedTemporaryFile() as f:
+    tlfile = Path(job_script_destination) / f'tarlist.dat'
+
+    with open(tlfile, 'w') as f:
         f.write(f"{instr}\n".encode('ASCII'))
 
         # rewind the file
