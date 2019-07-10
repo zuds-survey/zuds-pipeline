@@ -70,7 +70,7 @@ if __name__ == '__main__':
     while True:
         deps = list(set(hpss_dependencies.values()))
         done = db.DBSession().query(db.sa.func.bool_and(db.HPSSJob.status)) \
-                             .filter(db.HPSSJob.id.in_(hpss_dependencies)) \
+                             .filter(db.HPSSJob.id.in_(deps)) \
                              .first()[0]
         if done:
             break
