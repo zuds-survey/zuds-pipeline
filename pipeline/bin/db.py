@@ -251,10 +251,6 @@ class StackDetection(models.Base):
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
 
-Image.stacks = relationship('Stack', secondary='join(StackTask, StackTaskImage).join(image)',
-                            back_populates='images', cascade='all')
-
-
 def images(self):
     candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec, self.ra, self.dec, 0.64))\
                                          .filter(func.q3c_poly_query(self.ra, self.dec, Image.poly))
@@ -448,7 +444,7 @@ class SubtractionMixin(FITSBase):
 
     @declared_attr
     def reference_id(self):
-        return sa.Column('reference_id', sa.Integer, sa.ForeignKey('reference.id', ondelete='CASCADE'))
+        return sa.Column('reference_id', sa.Integer, sa.ForeignKey('references.id', ondelete='CASCADE'))
 
     @declared_attr
     def reference(self):
