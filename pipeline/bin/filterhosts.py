@@ -29,6 +29,10 @@ def init_db(user, database, password=None, host=None, port=None):
 
 
 class Hit(Base):
+    
+    __tablename__ = 'hits'
+
+    id = sa.Column(sa.Integer, primary_key=True)
     ra = sa.Column(psql.DOUBLE_PRECISION)
     dec = sa.Column(psql.DOUBLE_PRECISION)
     jdmin = sa.Column(psql.DOUBLE_PRECISION)
