@@ -1,11 +1,11 @@
 import db
 import os
 import yaml
+import time
+from itertools import chain
 import shutil
 from pathlib import Path
 from argparse import ArgumentParser
-
-
 
 __whatami__ = 'Run a lensgrinder ZTF task.'
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
@@ -21,6 +21,9 @@ if __name__ == '__main__':
     task_name = '.'.join(os.path.basename(task_file).split('.')[:-1])
     task_spec = yaml.load(open(task_file, 'r'))
 
+    # connect to the database
+    env, cfg = db.load_env()
+    db.init_db(**cfg['database'])
 
     # prepare the output directory for this particular task
     outdir = os.getenv('OUTPUT_DIRECTORY')
@@ -35,25 +38,49 @@ if __name__ == '__main__':
     framepath = task_output / 'frames'
     templates = task_output / 'templates'
 
-    jobscripts.mkdir()
-    logs.mkdir()
-    framepath.mkdir()
-    templates.mkdir()
+    jobscripts.mkdir(exist_ok=True, parents=True)
+    logs.mkdir(exist_ok=True, parents=True)
+    framepath.mkdir(exist_ok=True, parents=True)
+    templates.mkdir(exist_ok=True, parents=True)
 
+    # if an object name is provided then we must infer the query
     # retrieve the images off of tape
+
     from retrieve import retrieve_images
-    whereclause = task_spec['hpss']['whereclause']
+
+    if task_spec['hpss']['object_name'] is None:
+        whereclause = task_spec['hpss']['whereclause']
+    else:
+        object = db.DBSession().query(db.models.Source).get(task_spec['hpss']['object_name'])
+
+        ra = object.ra
+        dec = object.dec
+
+        whereclause = f'Q3C_POLY_QUERY({ra}, {dec}, ARRAY[ra1, dec1, ra2, dec2, ' \
+                      f'ra3, dec3, ra4, dec4])'
+
     exclude_masks = task_spec['hpss']['exclude_masks']
     hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
                                                    job_script_destination=jobscripts,
                                                    frame_destination=framepath, log_destination=logs)
+
+    # check to see if hpss jobs have finished
+    while True:
+        deps = list(set(chain(*hpss_dependencies.values())))
+        done = db.DBSession().query(db.sa.func.bool_and(db.HPSSJob.status)) \
+                             .filter(db.HPSSJob.id.in_(hpss_dependencies)) \
+                             .first()[0]
+        if done:
+            break
+        else:
+            time.sleep(3.)
+
 
     # make the variance maps
     options = task_spec['makevariance']
     batch_size = options['batch_size']
     from makevariance import submit_makevariance
     frames = [im for im in hpss_dependencies if 'msk' not in im]
-    dependencies = hpss_dependencies
     masks = [im.replace('sciimg', 'mskimg') for im in frames]
     variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
                                                 batch_size=batch_size, log_destination=logs,

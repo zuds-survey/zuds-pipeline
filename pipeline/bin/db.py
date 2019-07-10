@@ -148,7 +148,7 @@ class Image(models.Base):
     ipac_program = relationship('IPACProgram', back_populates='images')
     photometry = relationship('Photometry', cascade='all')
 
-    subtraction = relationship('Subtraction', back_populates='image', cascade='all')
+    subtraction = relationship('SingleEpochSubtraction', back_populates='image', cascade='all')
     references = relationship('Reference', back_populates='images', cascade='all', secondary='reference_images')
     stacks = relationship('Stack', back_populates='images', cascade='all', secondary='stack_images')
 
@@ -238,7 +238,7 @@ class Image(models.Base):
 
 class HPSSJob(models.Base):
     user = sa.Column(sa.Text)
-    status = sa.Column(sa.Boolean)
+    status = sa.Column(sa.Boolean, default=False)
     reason = sa.Column(sa.Text)
 
 
@@ -289,19 +289,10 @@ def light_curve(self):
 
 models.Source.light_curve = light_curve
 
-
-class HPSSTask(models.Base):
-
-    target_path = sa.Column(sa.Text, nullable=False)
-    status = sa.Column(sa.Boolean, default=None)
-    reason = sa.Column(sa.Text, nullable=True)
-    image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='SET NULL'))
-
-
 class StackTask(models.Base):
 
     stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='SET NULL'), default=None)
-    stack = relationship('Stack', back_populates='tasks', cascade='all')
+    #stack = relationship('Stack', back_populates='tasks', cascade='all')
     status = sa.Column(sa.Boolean, default=None)
     reason = sa.Column(sa.Text, nullable=True)
     outfile_name = sa.Column(sa.Text)
@@ -462,7 +453,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
     """These correspond to one science image - one reference"""
 
     image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
-    image = relationship('image', back_populates='subtraction')
+    image = relationship('Image', back_populates='subtraction')
 
 
 class StackMixin(FITSBase):
@@ -480,6 +471,8 @@ class Stack(StackMixin, models.Base):
 
     subtraction = relationship('MultiEpochSubtraction', back_populates='stack', cascade='all')
     images = relationship('Image', cascade='all', secondary='stack_images')
+
+    detections = relationship('StackDetection', cascade='all')
 
 
 class Reference(StackMixin, models.Base):
