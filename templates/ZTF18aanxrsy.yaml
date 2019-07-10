@@ -1,6 +1,6 @@
 
 hpss:
-  object_name: 'ZTF19aatqzim'
+  object_name: 'ZTF18aanxrsy'
   whereclause: "FIELD=716 AND FID=1 AND CCDID=1 AND QID=1"
   exclude_masks: false
 
