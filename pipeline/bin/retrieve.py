@@ -68,10 +68,13 @@ cd {Path(frame_destination).resolve()}
 echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
-PYTHONPATH={os.getenv('PYTHONPATH').replace('shifter', 'dtn')} /global/cscratch1/sd/ztfproc/miniconda3/bin/python {Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/finish_hpssjob.py'} $SLURM_JOB_ID
-
 '''
         jobstr += directive
+
+    jobstr += f"PYTHONPATH={os.getenv('PYTHONPATH').replace('shifter', 'dtn')} " \
+              f"/global/cscratch1/sd/ztfproc/miniconda3/bin/python " \
+              f"{Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/finish_hpssjob.py'} " \
+              f"$SLURM_JOB_ID"
 
     if job_script_destination is None:
         jobstr = jobstr.encode('ASCII')
