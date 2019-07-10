@@ -53,11 +53,10 @@ if __name__ == '__main__':
     else:
         object = db.DBSession().query(db.models.Source).get(task_spec['hpss']['object_name'])
 
-        ra = object.ra
-        dec = object.dec
+        # should take  <10s
+        images = object.images
 
-        whereclause = f'Q3C_POLY_QUERY({ra}, {dec}, ARRAY[ra1, dec1, ra2, dec2, ' \
-                      f'ra3, dec3, ra4, dec4])'
+        whereclause = f'ID IN {tuple([image.id for image in images])}'
 
     exclude_masks = task_spec['hpss']['exclude_masks']
     hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
