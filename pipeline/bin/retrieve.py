@@ -166,7 +166,7 @@ def retrieve_images(whereclause, exclude_masks=False, preserve_dirs=False, job_s
         ssh_client = paramiko.SSHClient()
         ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        nersc_username = os.getenv('NERSC_USERNAME')
+        nersc_username = os.getenv('NERSC_XFER_USERNAME')
         nersc_password = os.getenv('NERSC_PASSWORD')
         nersc_host = os.getenv('NERSC_HOST')
 
