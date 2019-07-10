@@ -7,7 +7,17 @@ __all__ = ['make_rms', 'medg', 'mkivar']
 
 def mkivar(frame, mask, chkname, wgtname):
     with fits.open(frame) as f, fits.open(mask) as m, fits.open(chkname) as rms:
-        ind = m[0].data == 0
+
+        # For example, to find all science - image pixels which are uncontaminated, but
+        # which may contain clean extracted - source signal(bits 1 or 11), one
+        # would “logically AND” the corresponding mask - image
+        # with the template value 6141 (= 2^0 + 2^2 +2^3 + 2^4 + 2^5 + 2^6 + 2^7 + 2^8 + 2^9 + 2^10 + 21^2)
+        # #and retain pixels where this operation yields zero.
+        # To then find which of these pixels contain source signal,
+        # one would “AND” the resulting image with 2050 (= 21 + 211)
+        # and retain pixels where this operation is non-zero.
+
+        ind = (m[0].data & 6141) == 0
         havesat = False
         try:
             saturval = f[0].header['SATURATE']
