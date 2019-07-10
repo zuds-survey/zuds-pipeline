@@ -11,7 +11,7 @@ from pathlib import Path
 class HPSSDB(object):
 
     def __init__(self):
-        self.engine = db.DBSession().engine
+        self.engine = db.DBSession().get_bind()
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
