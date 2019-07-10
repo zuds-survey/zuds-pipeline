@@ -8,7 +8,11 @@ if __name__ == '__main__':
 
     jobid = int(sys.argv[1])
 
-    hpssjob = db.DBSession().query(db.HPSSJob).get(jobid)
+    hpssjob = None
+
+    while hpssjob is None:
+        hpssjob = db.DBSession().query(db.HPSSJob).get(jobid)
+
     hpssjob.status = True
     db.DBSession().add(hpssjob)
     db.DBSession().commit()

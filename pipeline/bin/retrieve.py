@@ -68,7 +68,7 @@ cd {Path(frame_destination).resolve()}
 echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
-python {Path(os.getenv('LENSGRINDER_HOME') / 'pipeline/bin/finish_hpssjob.py')} $SLURM_JOB_ID
+python {Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/finish_hpssjob.py'} $SLURM_JOB_ID
 
 '''
         jobstr += directive
@@ -99,6 +99,10 @@ python {Path(os.getenv('LENSGRINDER_HOME') / 'pipeline/bin/finish_hpssjob.py')} 
     subscript.close()
 
     jobid = int(out[0].strip().split()[-1])
+
+    hpssjob = db.HPSSJob(id=jobid, user=nersc_username)
+    db.DBSession().add(hpssjob)
+    db.DBSession().commit()
 
     ssh_client.close()
 
