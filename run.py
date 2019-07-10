@@ -51,6 +51,8 @@ if __name__ == '__main__':
 
     from retrieve import retrieve_images
 
+    preserve_dirs = task_spec['hpss']['preserve_directories']
+
     if task_spec['hpss']['object_name'] is None:
         whereclause = task_spec['hpss']['whereclause']
     else:
@@ -64,7 +66,8 @@ if __name__ == '__main__':
     exclude_masks = task_spec['hpss']['exclude_masks']
     hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
                                                    job_script_destination=jobscripts,
-                                                   frame_destination=framepath, log_destination=logs)
+                                                   frame_destination=framepath, log_destination=logs,
+                                                   preserve_dirs=preserve_dirs)
 
     # check to see if hpss jobs have finished
     while True:
@@ -93,7 +96,14 @@ if __name__ == '__main__':
 
     # todo: add fakes
 
-    # create templates
+
+    # first check to see if we have templates
+
+
+
+    # create templates if needed
+
+
 
     from makecoadd import submit_template
     options = task_spec['template']
