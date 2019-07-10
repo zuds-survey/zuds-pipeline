@@ -236,6 +236,12 @@ class Image(models.Base):
         DBSession().commit()
 
 
+class HPSSJob(models.Base):
+    user = sa.Column(sa.Text)
+    status = sa.Column(sa.Boolean)
+    reason = sa.Column(sa.Text)
+
+
 class StackDetection(models.Base):
 
     ra = sa.Column(psql.DOUBLE_PRECISION)

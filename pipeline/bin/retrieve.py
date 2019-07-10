@@ -86,6 +86,8 @@ cd {Path(frame_destination).resolve()}
 echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
+python {Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/finish_hpssjob.py')} $SLURM_JOB_ID
+
 '''
         jobstr += directive
 
