@@ -68,7 +68,7 @@ if __name__ == '__main__':
 
     # check to see if hpss jobs have finished
     while True:
-        deps = list(set(chain(*hpss_dependencies.values())))
+        deps = list(set(hpss_dependencies.values()))
         done = db.DBSession().query(db.sa.func.bool_and(db.HPSSJob.status)) \
                              .filter(db.HPSSJob.id.in_(hpss_dependencies)) \
                              .first()[0]
