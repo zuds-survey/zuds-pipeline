@@ -107,7 +107,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                                              f'{band:s}_{lstr}_{rstr}_coadd.fits'
 
             # log the stack to the database
-            stack = db.Stack(disk_path=coadd_name, field=int(field), ccdid=int(ccdnum), qid=int(quadrant),
+            stack = db.Stack(disk_path=f'{coadd_name}', field=int(field), ccdid=int(ccdnum), qid=int(quadrant),
                              filtercode=band)
             db.DBSession().add(stack)
             db.DBSession().commit()
