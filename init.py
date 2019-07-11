@@ -92,7 +92,7 @@ environment_variables = {
     'VOLUMES': vstring,
     'SHIFTER_IMAGE': shifter_image,
     'OUTPUT_DIRECTORY': run_topdirectory,
-    'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'slurm', 'single_coaddsub.sh'),
+    'COADDSUB_EXEC': os.path.join(lensgrinder_home, 'slurm', 'pipeline', 'single_coaddsub.sh'),
     'IPAC_USERNAME': ipac_username,
     'IPAC_PASSWORD': ipac_password,
     'STAGING_DIRECTORY': staging_directory,

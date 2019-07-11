@@ -120,7 +120,9 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
 
             mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
-                                             disk_path=sub_name(stack.disk_path, ref.disk_path))
+                                             disk_path=sub_name(stack.disk_path, ref.disk_path),
+                                             qid=int(quadrant), ccdid=int(ccdnum), field=int(field),
+                                             filtercode=band)
             db.DBSession().add(mesub)
             db.DBSession().commit()
 
@@ -140,7 +142,10 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 
             image = db.DBSession().query(db.Image).get(int(row['id']))
             sesub = db.SingleEpochSubtraction(image=image, reference=ref,
-                                              disk_path=sub_name(row['full_path'], ref.disk_path))
+                                              disk_path=sub_name(row['full_path'], ref.disk_path),
+                                              qid=int(quadrant), ccdid=int(ccdnum), field=int(field),
+                                              filtercode=band)
+
             db.DBSession().add(sesub)
             db.DBSession().commit()
 
