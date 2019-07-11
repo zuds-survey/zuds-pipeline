@@ -142,7 +142,10 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
     else:
         # just run straight up subtractions
         for i, row in science_rows.iterrows():
-            variance_dependency_list = [variance_dependencies[row['path']]]
+            if len(variance_dependencies) > 0:
+                variance_dependency_list = [variance_dependencies[row['path']]]
+            else:
+                variance_dependency_list = []
             cdep_list = variance_dependency_list + template_dependency_list
 
             image = db.DBSession().query(db.Image).get(int(row['id']))
