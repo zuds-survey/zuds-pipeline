@@ -97,7 +97,12 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             if len(frames) == 0:
                 continue
 
-            variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+            if len(variance_dependencies) > 0:
+                variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+            else:
+                variance_dependency_list = []
+
+
             cdep_list = variance_dependency_list + template_dependency_list
 
             lstr = f'{l}'.split()[0].replace('-', '')

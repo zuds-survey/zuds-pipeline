@@ -64,7 +64,11 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
     template_rows = template_rows.iloc[:nimages]
     template_rows = template_rows.sort_values(by='obsjd')
 
-    dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+    if len(variance_dependencies) > 0:
+        dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+    else:
+        dependency_list = []
+
     jobname = f'ref.{task_name}.{field}.{quadrant}.{band}.{ccdnum}'
     dependency_string = ':'.join(list(map(str, dependency_list)))
 
