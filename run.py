@@ -190,7 +190,7 @@ if __name__ == '__main__':
                                                            db.Image.obsdate >= maxdate)
                                                 )
 
-            remaining_images = pd.read_sql(remaining_q, db.DBSession().get_bind())
+            remaining_images = pd.read_sql(remaining_q.statement, db.DBSession().get_bind())
 
 
         from makesub import submit_coaddsub
