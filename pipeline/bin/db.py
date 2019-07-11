@@ -408,6 +408,22 @@ class FITSBase(File):
     lmt_mg = sa.Column(sa.Float)
     lmg_nsigma = sa.Column(sa.Float)
 
+    @declared_attr
+    def field(self):
+        return sa.Column(sa.Integer)
+
+    @declared_attr
+    def ccdid(self):
+        return sa.Column(sa.Integer)
+
+    @declared_attr
+    def qid(self):
+        return sa.Column(sa.Integer)
+
+    @declared_attr
+    def filtercode(self):
+        return sa.Column(sa.Text)
+
 
 class SubtractionMixin(FITSBase):
 
@@ -477,6 +493,10 @@ class Stack(StackMixin, models.Base):
 
 class Reference(StackMixin, models.Base):
     images = relationship('Image', cascade='all', secondary='reference_images')
+    idx = Index('ref_field_idx',(super().field,
+                                 super().ccdid,
+                                 super().qid,
+                                 super().filtercode))
 
 
 ReferenceImage = join_model('reference_images', Reference, Image)

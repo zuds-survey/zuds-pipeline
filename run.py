@@ -7,11 +7,19 @@ import shutil
 from pathlib import Path
 from argparse import ArgumentParser
 
+import pandas as pd
+
 # read/write for group
 os.umask(0o007)
 
 __whatami__ = 'Run a lensgrinder ZTF task.'
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
+
+def df_from_sa_objects(sa_objects):
+    try:
+        return pd.DataFrame([o.to_dict() for o in sa_objects])
+    except TypeError:
+        return pd.DataFrame([sa_objects.to_dict()])
 
 if __name__ == '__main__':
 
@@ -58,7 +66,7 @@ if __name__ == '__main__':
     else:
         object = db.DBSession().query(db.models.Source).get(task_spec['hpss']['object_name'])
 
-        # should take  <10s
+        # does a q3c query - should take  <10s
         images = object.images
 
         whereclause = f'ID IN {tuple([image.id for image in images])}'
@@ -68,6 +76,14 @@ if __name__ == '__main__':
                                                    job_script_destination=jobscripts,
                                                    frame_destination=framepath, log_destination=logs,
                                                    preserve_dirs=preserve_dirs)
+
+    # ensure the full paths are propagated if desired
+    if preserve_dirs:
+        new_hpss_dependencies = {}
+        for i, row in metatable.iterrows():
+            np = f"{row['field']:06d}/c{row['ccdid']:02d}/q{row['qid']}/{row['filtercode']}/{row['path']}"
+            new_hpss_dependencies[np] = hpss_dependencies[row['path']]
+        hpss_dependencies = new_hpss_dependencies
 
     # check to see if hpss jobs have finished
     while True:
@@ -97,14 +113,6 @@ if __name__ == '__main__':
     # todo: add fakes
 
 
-    # first check to see if we have templates
-
-
-
-    # create templates if needed
-
-
-
     from makecoadd import submit_template
     options = task_spec['template']
 
@@ -113,6 +121,41 @@ if __name__ == '__main__':
     template_end_date = options['end_date']
     template_science_minsep_days = options['template_science_minsep_days']
 
+    # first check to see if we have templates
+
+    # create templates if needed
+
+    # now go one field, chip, quad, filter at a time:
+
+    for (field, ccdid, qid, filtercode), group in metatable.groupby(['field', 'ccdid', 'qid', 'filtercode']):
+
+        # check for template
+
+        match = db.sa.and_(db.Reference.field == field,
+                           db.Reference.ccdid == ccdid,
+                           db.Reference.qid == qid,
+                           db.Reference.filtercode == filtercode)
+
+        filt = db.sa.and_(db.sa.func.count(db.Image.id) >= template_nimages,
+                          db.sa.func.min(db.Image.obsdate) >= template_start_date,
+                          db.sa.func.max(db.Image.obsdate) <= template_end_date)
+
+        ref = db.DBSession().query(db.Reference)\
+                            .join(db.Image)\
+                            .filter(match)\
+                            .group_by(db.Reference.id)\
+                            .having(filt)\
+                            .order_by(db.Reference.id.desc())\
+                            .first()
+
+        if ref is None:
+            # we need a reference
+            pass
+        else:
+            pass
+
+"""
+            
     template_dependencies, remaining_images, template_metatable = submit_template(variance_dependencies, metatable,
                                                                                   template_destination=templates,
                                                                                   task_name=task_name,
@@ -135,3 +178,4 @@ if __name__ == '__main__':
                                             log_destination=logs, frame_destination=framepath, task_name=task_name)
 
 
+"""
