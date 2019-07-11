@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     if task_output.exists() and task_spec['clobber']:
         shutil.rmtree(task_output)
-    task_output.mkdir()
+    task_output.mkdir(exists_ok=True, parents=True)
 
     # make all the subdirectories that will be needed
 
