@@ -185,12 +185,15 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 cats = [frame.replace('.fits', '.cat') for frame in frames]
                 coadd = j['coadd_name']
                 execstr = f'shifter bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\"' \
-                          f'\"{coadd}\" \"{template}\" \"{j["sub"].id}\" \"{j["sub"].stack.id}\"&\n'
+                          f'\"{coadd}\" \"{template}\" \"{j["sub"].id}\" \"{j["sub"].stack.id}\"' \
+                          f' \"{j["sub"].disk_path}\"&\n'
             else:
 
                 frame = j['frame']
                 execstr = f'shifter python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
-                          f'--science-frames {frame} --templates {template}  &\n'
+                          f'--science-frames {frame} --templates {template} &&' \
+                          f'shifter python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
+                          f'{j["sub"].disk_path} {j["sub"].id} SingleEpochSubtraction &\n'
 
             jobstr += execstr
         jobstr += 'wait\n'
