@@ -179,7 +179,7 @@ def make_variance(frames, masks, logger=None, extra={}):
         make_rms(frame, wgtname)
 
         # now model the PSF
-        syscall = f'psfex -c {psfconf} {outcat}'
+        syscall = f'psfex -c {psfconf} {catname}'
         libztf.execute(syscall, capture=False)
         psf = frame.replace('.fits', '.psf')
 
