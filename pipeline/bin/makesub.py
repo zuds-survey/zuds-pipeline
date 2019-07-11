@@ -65,7 +65,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
     science_rows = science_rows.sort_values('obsjd')
 
     if len(template_dependencies) > 0:
-        template_dependency_list = [template_dependencies[ref.path]]
+        template_dependency_list = [template_dependencies[ref.disk_path]]
     else:
         template_dependency_list = []
 
@@ -92,7 +92,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 
             job = {'type':'coaddsub',
                    'frames': [f'{framepath}' for framepath in framepaths],
-                   'template': ref.path, 'coadd_name': coadd_name,
+                   'template': ref.disk_path, 'coadd_name': coadd_name,
                    'dependencies': cdep_list}
             job_list.append(job)
 
@@ -102,7 +102,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             variance_dependency_list = [variance_dependencies[row['path']]]
             cdep_list = variance_dependency_list + template_dependency_list
             job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
-                   'template': ref.path, 'dependencies': cdep_list}
+                   'template': ref.disk_path, 'dependencies': cdep_list}
             job_list.append(job)
 
     for i, ch in chunk(job_list, batch_size):
