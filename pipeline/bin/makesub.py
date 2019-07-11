@@ -172,7 +172,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 #SBATCH --exclusive
 #SBATCH -C haswell
 #SBATCH --volume="{volumes}"
-#SBATCH -o {log_destination.resolve()}/sub.{task_name}.{i}.out
+#SBATCH -o {log_destination.resolve()}/sub.{task_name}.bin{coadd_windowsize}.{i}.out
 #SBATCH --dependency=afterok:{my_deps}
 
 export OMP_NUM_THREADS=1
