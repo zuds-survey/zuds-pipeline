@@ -207,7 +207,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
             job_script = tempfile.NamedTemporaryFile()
             jobstr = jobstr.encode('ASCII')
         else:
-            job_script = open(job_script_destination.resolve() / f'sub.{task_name}.{i}.sh', 'w')
+            job_script = open(job_script_destination.resolve() / f'sub.{task_name}.bin{coadd_windowsize}.{i}.sh', 'w')
 
         job_script.write(jobstr)
         job_script.seek(0)

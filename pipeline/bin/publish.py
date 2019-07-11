@@ -105,7 +105,10 @@ def load_catalog(catpath, refpath, newpath, subpath):
             dec = row['Y_WORLD']
             mag = row['MAG_BEST']
             e_mag = row['MAGERR_BEST']
-            obsmjd = imheader['MJDEFF']
+            try:
+                obsmjd = imheader['MJDEFF']
+            except KeyError:
+                obsmjd = imheader['OBSMJD']
             obstime = Time(obsmjd, format='mjd', scale='utc').tcb.datetime
             filter = imheader['FILTER']
             limmag = imheader['LMT_MG']
