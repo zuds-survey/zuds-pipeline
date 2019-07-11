@@ -131,16 +131,19 @@ if __name__ == '__main__':
 
         # check for template
 
-        match = db.sa.and_(db.Reference.field == field,
-                           db.Reference.ccdid == ccdid,
-                           db.Reference.qid == qid,
-                           db.Reference.filtercode == filtercode)
+        # converting to python types to avoid psycopg2 coersion error
+
+        match = db.sa.and_(db.Reference.field == int(field),
+                           db.Reference.ccdid == int(ccdid),
+                           db.Reference.qid == int(qid),
+                           db.Reference.filtercode == str(filtercode))
 
         filt = db.sa.and_(db.sa.func.count(db.Image.id) >= template_nimages,
                           db.sa.func.min(db.Image.obsdate) >= template_start_date,
                           db.sa.func.max(db.Image.obsdate) <= template_end_date)
 
         ref = db.DBSession().query(db.Reference)\
+                            .join(db.ReferenceImage)\
                             .join(db.Image)\
                             .filter(match)\
                             .group_by(db.Reference.id)\
@@ -150,21 +153,23 @@ if __name__ == '__main__':
 
         if ref is None:
             # we need a reference
-            pass
+
+            template_dependencies, remaining_images, template_metatable = submit_template(variance_dependencies,
+                                                                                          group,
+                                                                                          template_destination=templates,
+                                                                                          task_name=task_name,
+                                                                                          log_destination=logs,
+                                                                                          job_script_destination=jobscripts,
+                                                                                          nimages=template_nimages,
+                                                                                          start_date=template_start_date,
+                                                                                          end_date=template_end_date,
+                                                                                          template_science_minsep_days=template_science_minsep_days)
+
+
         else:
             pass
 
 """
-            
-    template_dependencies, remaining_images, template_metatable = submit_template(variance_dependencies, metatable,
-                                                                                  template_destination=templates,
-                                                                                  task_name=task_name,
-                                                                                  log_destination=logs,
-                                                                                  job_script_destination=jobscripts,
-                                                                                  nimages=template_nimages,
-                                                                                  start_date=template_start_date,
-                                                                                  end_date=template_end_date,
-                                                                                  template_science_minsep_days=template_science_minsep_days)
 
     from makesub import submit_coaddsub
     options = task_spec['coaddsub']
