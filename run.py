@@ -77,7 +77,7 @@ if __name__ == '__main__':
 
     exclude_masks = task_spec['hpss']['exclude_masks']
 
-    if not task_spec['rerun']:
+    if not task_spec['hpss']['rerun']:
         hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
                                                        job_script_destination=jobscripts,
                                                        frame_destination=framepath, log_destination=logs,
@@ -92,8 +92,9 @@ if __name__ == '__main__':
         new_hpss_dependencies = {}
         for i, row in metatable.iterrows():
             np = f"{row['field']:06d}/c{row['ccdid']:02d}/q{row['qid']}/{row['filtercode']}/{row['path']}"
-            new_hpss_dependencies[np] = hpss_dependencies[row['path']]
             metatable.loc[i, 'path'] = np
+            if len(hpss_dependencies) > 0:
+                new_hpss_dependencies[np] = hpss_dependencies[row['path']]
         hpss_dependencies = new_hpss_dependencies
 
     # check to see if hpss jobs have finished
@@ -115,7 +116,7 @@ if __name__ == '__main__':
     options = task_spec['makevariance']
     batch_size = options['batch_size']
     from makevariance import submit_makevariance
-    frames = [im for _, im in metatable['path'] if 'msk' not in im]
+    frames = [im for im in metatable['path'] if 'msk' not in im]
     masks = [im.replace('sciimg', 'mskimg') for im in frames]
     variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
                                                 batch_size=batch_size, log_destination=logs,
