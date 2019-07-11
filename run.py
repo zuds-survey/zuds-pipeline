@@ -185,7 +185,7 @@ if __name__ == '__main__':
             mindate = template_start_date - timedelta(days=template_science_minsep_days)
             maxdate = template_end_date + timedelta(days=template_science_minsep_days)
             remaining_ids = numpy.setdiff1d(group['id'], [i.id for i in ref.images]).tolist()
-            remaining_images = metatable.loc[remaining_ids, :].copy()
+            remaining_images = metatable[metatable['id'].isin(remaining_ids)]
 
 
         from makesub import submit_coaddsub
