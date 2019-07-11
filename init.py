@@ -10,20 +10,20 @@ import shutil
 #########################################################################
 
 nersc_account = '***REMOVED***'
-nersc_username = 'ztfproc'
+nersc_username = 'dgold'
 nersc_host = 'cori.nersc.gov'
 nersc_password = '***REMOVED***'
 nersc_xfer_username = 'dgold'
 
-lensgrinder_home = '/global/cscratch1/sd/ztfproc/lensgrinder'
-run_topdirectory = '/global/cscratch1/sd/ztfproc/coadd'
-staging_topdir = '/global/cscratch1/sd/ztfproc/staging'
+lensgrinder_home = '/global/cscratch1/sd/dgold/lensgrinder'
+run_topdirectory = '/global/cscratch1/sd/dgold/coadd'
+staging_topdir = '/global/cscratch1/sd/dgold/staging'
 
 hpss_dbhost = '***REMOVED***'
 hpss_dbport = 6666
 hpss_dbusername = '***REMOVED***'
 hpss_dbname = 'ztfimages'
-hpss_dbpassword = '***REMOVED***'
+hpss_dbpassword = 'q2uuG$2y9&#8yNUlMxqb'
 
 ipac_username = 'dgold@berkeley.edu'
 ipac_password = '***REMOVED***'
@@ -50,7 +50,7 @@ staging_cmddir = f'{Path(staging_topdir) / "cmdlist"}'
 ssh_keyfile = f'{Path(os.getenv("HOME")) / ".ssh/id_rsa"}'
 pythonpath = "/global/cscratch1/sd/ztfproc/shifter-python:" \
              "/global/cscratch1/sd/ztfproc/skyportal:" \
-             "/global/cscratch1/sd/ztfproc/lensgrinder/pipeline/bin"
+             "/global/cscratch1/sd/dgold/lensgrinder/pipeline/bin"
 
 
 kowalski_username = 'danny'

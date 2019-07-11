@@ -97,7 +97,12 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             if len(frames) == 0:
                 continue
 
-            variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+            if len(variance_dependencies) > 0:
+                variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+            else:
+                variance_dependency_list = []
+
+
             cdep_list = variance_dependency_list + template_dependency_list
 
             lstr = f'{l}'.split()[0].replace('-', '')
@@ -137,7 +142,10 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
     else:
         # just run straight up subtractions
         for i, row in science_rows.iterrows():
-            variance_dependency_list = [variance_dependencies[row['path']]]
+            if len(variance_dependencies) > 0:
+                variance_dependency_list = [variance_dependencies[row['path']]]
+            else:
+                variance_dependency_list = []
             cdep_list = variance_dependency_list + template_dependency_list
 
             image = db.DBSession().query(db.Image).get(int(row['id']))
@@ -179,6 +187,9 @@ export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
 '''
+
+        if len(my_deps) == 0:
+            jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
 
         for j in ch:
 

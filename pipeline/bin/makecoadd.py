@@ -64,7 +64,11 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
     template_rows = template_rows.iloc[:nimages]
     template_rows = template_rows.sort_values(by='obsjd')
 
-    dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+    if len(variance_dependencies) > 0:
+        dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+    else:
+        dependency_list = []
+
     jobname = f'ref.{task_name}.{field}.{quadrant}.{band}.{ccdnum}'
     dependency_string = ':'.join(list(map(str, dependency_list)))
 
@@ -117,9 +121,16 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 shifter python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
 
+if [ $? -eq 0 ]; then 
+
 shifter python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
 
+fi
+
 '''
+
+    if len(dependency_list) == 0:
+        jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
 
     if job_script_destination is None:
         jobscript = tempfile.NamedTemporaryFile()
@@ -204,6 +215,19 @@ if __name__ == '__main__':
     swarpconf = os.path.join(confdir, 'default.swarp') if not args.template else os.path.join(confdir, 'template.swarp')
     psfconf = os.path.join(confdir, 'psfex.conf')
 
+    # first scamp everything together
+
+    # make a random dir for the output catalogs
+    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
+    os.makedirs(scamp_outpath)
+
+    syscall = 'scamp -c %s %s' % (scampconf, " ".join(cats))
+    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
+    if args.template:
+        syscall += ' -NTHREADS 64'
+    libztf.execute(syscall, capture=False)
+
+    # set these up for later
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
     allims = ' '.join(frames)

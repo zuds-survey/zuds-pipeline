@@ -229,7 +229,8 @@ class Image(models.Base):
             phot_point = models.Photometry(image=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
                                            zp=self.zp, zpsys=self.zpsys, lim_mag=self.maglimit,
                                            filter=self.filter, source=source, instrument=self.instrument,
-                                           ra=source.ra, dec=source.dec, mjd=self.obsmjd)
+                                           ra=source.ra, dec=source.dec, mjd=self.obsmjd, provenance='ipac',
+                                           method='yao')
             new_photometry.append(phot_point)
 
         DBSession().add_all(new_photometry)
@@ -266,6 +267,8 @@ def images(self):
 # keep track of the images that the photometry came from
 models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'), index=True)
 models.Photometry.image = relationship('Image', back_populates='photometry')
+models.Photometry.provenance = sa.Column(sa.Text)
+models.Photometry.method = sa.Column(sa.Text)
 
 models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))

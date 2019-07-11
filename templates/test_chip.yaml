@@ -1,11 +1,11 @@
 clobber: false
 
 hpss:
-  object_name: 'ZTF18aanxrsy'
+  object_name: null 
   preserve_directories: true
-  whereclause: "FIELD=716 AND FID=1 AND CCDID=1 AND QID=1"
+  whereclause: "FIELD=764 AND CCDID=1"
   exclude_masks: false
-  skip: true
+  skip: false
 
 makevariance:
   batch_size: 128
@@ -19,6 +19,6 @@ template:
 
 coaddsub:
   rolling: false
-  coadd_windowsize: 3
+  coadd_windowsize: 7
   batch_size : 32
 
