@@ -129,6 +129,9 @@ fi
 
 '''
 
+    if len(dependency_list) == 0:
+        jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
+
     if job_script_destination is None:
         jobscript = tempfile.NamedTemporaryFile()
     else:
