@@ -186,8 +186,8 @@ if __name__ == '__main__':
 
             remaining_q = db.DBSession().query(db.Image)\
                                         .filter(db.sa.and_(db.sa.not_(db.Image.id.in_([i.id for i in ref.images])),
-                                                           db.Image.obsdate <= mindate,  # note the logic here
-                                                           db.Image.obsdate >= maxdate)
+                                                           db.sa.or_(db.Image.obsdate <= mindate,  # note the logic here
+                                                           db.Image.obsdate >= maxdate))
                                                 )
 
             remaining_images = pd.read_sql(remaining_q.statement, db.DBSession().get_bind())
