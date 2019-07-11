@@ -474,68 +474,6 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
     image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
     image = relationship('Image', back_populates='subtraction')
 
-    def force_photometry(self):
-
-        sources_contained = self.sources
-        sources_contained_ids = [s.id for s in sources_contained]
-        photometered_sources = list(set([phot_point.source for phot_point in self.photometry]))
-
-        # this must be list or setdiff1d will fail
-        photometered_source_ids = list(set([s.id for s in photometered_sources]))
-
-        # reject sources where photometry has already been done
-        sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
-        sources_remaining = [s for s in sources_contained if s.id in sources_remaining_ids]
-
-        # get the paths to relevant files on disk
-        psf_path = self.disk_psf_path
-        sub_path = self.disk_sub_path
-
-        if self.zp is None:
-            try:
-                with fits.open(sub_path) as hdul:
-                    header = hdul[1].header
-            except OSError:  # ipac didn't make a subtraction
-                self.disk_sub_path = None
-                self.disk_psf_path = None
-                self.subtraction_exists = False
-                DBSession().add(self)
-                DBSession().commit()
-                raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
-            except ValueError:
-                raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
-            else:
-                self.zp = header['MAGZP']
-                self.zpsys = 'ab'
-                self.subtraction_exists = True
-                DBSession().add(self)
-                DBSession().commit()
-
-        if self.instrument is None:
-            self.instrument_id = 1
-            DBSession().add(self)
-            DBSession().commit()
-
-
-        # for all the remaining sources do forced photometry
-
-        new_photometry = []
-
-        for source in sources_remaining:
-            try:
-                pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
-            except IndexError:
-                continue
-            phot_point = models.Photometry(image=self.image, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
-                                           zp=self.image.zp, zpsys=self.image.zpsys, lim_mag=self.maglimit,
-                                           filter=self.filter, source=source, instrument=self.image.instrument,
-                                           ra=source.ra, dec=source.dec, mjd=self.image.obsmjd)
-            new_photometry.append(phot_point)
-
-        DBSession().add_all(new_photometry)
-        DBSession().commit()
-
-
 
 class StackMixin(FITSBase):
 
