@@ -15,11 +15,13 @@ os.umask(0o007)
 __whatami__ = 'Run a lensgrinder ZTF task.'
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 
+
 def df_from_sa_objects(sa_objects):
     try:
         return pd.DataFrame([o.to_dict() for o in sa_objects])
     except TypeError:
         return pd.DataFrame([sa_objects.to_dict()])
+
 
 if __name__ == '__main__':
 
@@ -39,11 +41,13 @@ if __name__ == '__main__':
     # prepare the output directory for this particular task
     outdir = os.getenv('OUTPUT_DIRECTORY')
     task_output = Path(outdir) / task_name
-    if task_output.exists():
+
+    if task_output.exists() and task_spec['clobber']:
         shutil.rmtree(task_output)
     task_output.mkdir()
 
     # make all the subdirectories that will be needed
+
     jobscripts = task_output / 'job_scripts'
     logs = task_output / 'logs'
     framepath = task_output / 'frames'
@@ -57,7 +61,7 @@ if __name__ == '__main__':
     # if an object name is provided then we must infer the query
     # retrieve the images off of tape
 
-    from retrieve import retrieve_images
+    from retrieve import retrieve_images, full_query
 
     preserve_dirs = task_spec['hpss']['preserve_directories']
 
@@ -72,10 +76,16 @@ if __name__ == '__main__':
         whereclause = f'ID IN {tuple([image.id for image in images])}'
 
     exclude_masks = task_spec['hpss']['exclude_masks']
-    hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
-                                                   job_script_destination=jobscripts,
-                                                   frame_destination=framepath, log_destination=logs,
-                                                   preserve_dirs=preserve_dirs)
+
+    if not task_spec['rerun']:
+        hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
+                                                       job_script_destination=jobscripts,
+                                                       frame_destination=framepath, log_destination=logs,
+                                                       preserve_dirs=preserve_dirs)
+    else:
+        hpss_dependencies = {}
+        query = full_query(whereclause)
+        metatable = pd.read_sql(query, db.DBSession().get_bind())
 
     # ensure the full paths are propagated if desired
     if preserve_dirs:
@@ -87,15 +97,18 @@ if __name__ == '__main__':
         hpss_dependencies = new_hpss_dependencies
 
     # check to see if hpss jobs have finished
-    while True:
-        deps = list(set(hpss_dependencies.values()))
-        done = db.DBSession().query(db.sa.func.bool_and(db.HPSSJob.status)) \
-                             .filter(db.HPSSJob.id.in_(deps)) \
-                             .first()[0]
-        if done:
-            break
-        else:
-            time.sleep(3.)
+
+    deps = list(set(hpss_dependencies.values()))
+    if len(deps) > 0:
+        while True:
+
+            done = db.DBSession().query(db.sa.func.bool_and(db.HPSSJob.status)) \
+                                 .filter(db.HPSSJob.id.in_(deps)) \
+                                 .first()[0]
+            if done:
+                break
+            else:
+                time.sleep(3.)
 
 
     # make the variance maps
