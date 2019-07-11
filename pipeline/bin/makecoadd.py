@@ -84,7 +84,7 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
         incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
         inframestr = ' '.join(template_rows['full_path'])
 
-        ref = db.Reference(field=field, filtercode=band, qid=quadrant, ccdid=ccdnum, disk_path=template_name)
+        ref = db.Reference(field=field, filtercode=band, qid=quadrant, ccdid=ccdnum, disk_path=f'{template_name}')
         db.DBSession().add(ref)
         db.DBSession().commit()
 
