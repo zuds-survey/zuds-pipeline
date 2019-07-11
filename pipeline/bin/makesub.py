@@ -188,6 +188,9 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 '''
 
+        if len(my_deps) == 0:
+            jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
+
         for j in ch:
 
             template = j['template']
