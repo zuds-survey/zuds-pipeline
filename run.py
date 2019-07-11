@@ -204,4 +204,8 @@ if __name__ == '__main__':
                                                 batch_size=batch_size, job_script_destination=jobscripts,
                                                 log_destination=logs, frame_destination=framepath, task_name=task_name)
 
-
+        if coadd_windowsize > 0:
+            sub_dependencies = submit_coaddsub(template_dependencies, variance_dependencies, remaining_images, ref,
+                                               rolling=rolling, coadd_windowsize=0,
+                                               batch_size=batch_size, job_script_destination=jobscripts,
+                                               log_destination=logs, frame_destination=framepath, task_name=task_name)
