@@ -6,7 +6,7 @@ from itertools import chain
 import shutil
 from pathlib import Path
 from argparse import ArgumentParser
-
+from datetime import timedelta
 import pandas as pd
 
 # read/write for group
@@ -169,33 +169,39 @@ if __name__ == '__main__':
         if ref is None:
             # we need a reference
 
-            template_dependencies, remaining_images, template_metatable = submit_template(variance_dependencies,
-                                                                                          group,
-                                                                                          template_destination=templates,
-                                                                                          task_name=task_name,
-                                                                                          log_destination=logs,
-                                                                                          job_script_destination=jobscripts,
-                                                                                          nimages=template_nimages,
-                                                                                          start_date=template_start_date,
-                                                                                          end_date=template_end_date,
-                                                                                          template_science_minsep_days=template_science_minsep_days)
-
-
+            template_dependencies, remaining_images, ref = submit_template(variance_dependencies,
+                                                                           group,
+                                                                           template_destination=templates,
+                                                                           task_name=task_name,
+                                                                           log_destination=logs,
+                                                                           job_script_destination=jobscripts,
+                                                                           nimages=template_nimages,
+                                                                           start_date=template_start_date,
+                                                                           end_date=template_end_date,
+                                                                           template_science_minsep_days=template_science_minsep_days)
         else:
-            pass
+            template_dependencies = {}
+            mindate = template_start_date - timedelta(days=template_science_minsep_days)
+            maxdate = template_end_date + timedelta(days=template_science_minsep_days)
 
-"""
+            remaining_q = db.DBSession().query(db.Image)\
+                                        .filter(db.sa.and_(db.sa.not_(db.Image.id.in_([i.id for i in ref.images])),
+                                                           db.Image.obsdate <= mindate,  # note the logic here
+                                                           db.Image.obsdate >= maxdate)
+                                                )
 
-    from makesub import submit_coaddsub
-    options = task_spec['coaddsub']
-    rolling = options['rolling']
-    coadd_windowsize = options['coadd_windowsize']
-    batch_size = options['batch_size']
-
-    coaddsub_dependencies = submit_coaddsub(template_dependencies, variance_dependencies, remaining_images, template_metatable,
-                                            rolling=rolling, coadd_windowsize=coadd_windowsize,
-                                            batch_size=batch_size, job_script_destination=jobscripts,
-                                            log_destination=logs, frame_destination=framepath, task_name=task_name)
+            remaining_images = pd.read_sql(remaining_q, db.DBSession().get_bind())
 
 
-"""
+        from makesub import submit_coaddsub
+        options = task_spec['coaddsub']
+        rolling = options['rolling']
+        coadd_windowsize = options['coadd_windowsize']
+        batch_size = options['batch_size']
+
+        coaddsub_dependencies = submit_coaddsub(template_dependencies, variance_dependencies, remaining_images, ref,
+                                                rolling=rolling, coadd_windowsize=coadd_windowsize,
+                                                batch_size=batch_size, job_script_destination=jobscripts,
+                                                log_destination=logs, frame_destination=framepath, task_name=task_name)
+
+

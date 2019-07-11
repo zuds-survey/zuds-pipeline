@@ -41,62 +41,64 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
                                                                      'qid',
                                                                      'filtercode',
                                                                      'ccdid']):
-        template_rows = group.copy()
+        pass
 
-        if end_date is not None:
-            template_rows = template_rows[template_rows['obsdate'] < end_date]
+    template_rows = group.copy()
 
-        if start_date is not None:
-            template_rows = template_rows[template_rows['obsdate'] > start_date]
+    if end_date is not None:
+        template_rows = template_rows[template_rows['obsdate'] < end_date]
 
-        # make cuts on seeing
-        template_rows = template_rows[template_rows['seeing'] > 1.8]
-        template_rows = template_rows[template_rows['seeing'] < 3.0]
+    if start_date is not None:
+        template_rows = template_rows[template_rows['obsdate'] > start_date]
 
-        if len(template_rows) < nimages:
-            raise ValueError(f'Not enough images to create requested template (Requested {nimages}, '
-                             f'got {len(template_rows)}).')
+    # make cuts on seeing
+    template_rows = template_rows[template_rows['seeing'] > 1.8]
+    template_rows = template_rows[template_rows['seeing'] < 3.0]
 
-
-        template_rows = template_rows.sort_values(by='maglimit', ascending=False)
-        template_rows = template_rows.iloc[:nimages]
-        template_rows = template_rows.sort_values(by='obsjd')
-
-        dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
-        jobname = f'ref.{task_name}.{field}.{quadrant}.{band}.{ccdnum}'
-        dependency_string = ':'.join(list(map(str, dependency_list)))
-
-        minjd = template_rows.iloc[0]['obsjd']
-        maxjd = template_rows.iloc[-1]['obsjd']
-
-        mintime = Time(minjd, format='jd', scale='utc')
-        maxtime = Time(maxjd, format='jd', scale='utc')
-
-        mindatestr = mintime.iso.split()[0].replace('-', '')
-        maxdatestr = maxtime.iso.split()[0].replace('-', '')
+    if len(template_rows) < nimages:
+        raise ValueError(f'Not enough images to create requested template (Requested {nimages}, '
+                         f'got {len(template_rows)}).')
 
 
-        template_basename = f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
-                            f'{band:s}_{mindatestr:s}_{maxdatestr:s}_ztf_deepref.fits'
+    template_rows = template_rows.sort_values(by='maglimit', ascending=False)
+    template_rows = template_rows.iloc[:nimages]
+    template_rows = template_rows.sort_values(by='obsjd')
 
-        template_name = template_destination / template_basename
-        template_metatable.append([field, quadrant, band, ccdnum, f'{template_name}'])
+    dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+    jobname = f'ref.{task_name}.{field}.{quadrant}.{band}.{ccdnum}'
+    dependency_string = ':'.join(list(map(str, dependency_list)))
 
-        incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
-        inframestr = ' '.join(template_rows['full_path'])
+    minjd = template_rows.iloc[0]['obsjd']
+    maxjd = template_rows.iloc[-1]['obsjd']
 
-        ref = db.Reference(field=int(field), filtercode=str(band), qid=int(quadrant), ccdid=int(ccdnum),
-                           disk_path=f'{template_name}')
-        db.DBSession().add(ref)
-        db.DBSession().commit()
+    mintime = Time(minjd, format='jd', scale='utc')
+    maxtime = Time(maxjd, format='jd', scale='utc')
 
-        for imid in template_rows['id']:
-            im = db.DBSession().query(db.Image).get(int(imid))
-            refim = db.ReferenceImage(reference_id=ref.id, imag_id=im.id)
-            db.DBSession().add(refim)
-        db.DBSession().commit()
+    mindatestr = mintime.iso.split()[0].replace('-', '')
+    maxdatestr = maxtime.iso.split()[0].replace('-', '')
 
-        jobstr = f'''#!/bin/bash
+
+    template_basename = f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
+                        f'{band:s}_{mindatestr:s}_{maxdatestr:s}_ztf_deepref.fits'
+
+    template_name = template_destination / template_basename
+    template_metatable.append([field, quadrant, band, ccdnum, f'{template_name}'])
+
+    incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
+    inframestr = ' '.join(template_rows['full_path'])
+
+    ref = db.Reference(field=int(field), filtercode=str(band), qid=int(quadrant), ccdid=int(ccdnum),
+                       disk_path=f'{template_name}')
+    db.DBSession().add(ref)
+    db.DBSession().commit()
+
+    for imid in template_rows['id']:
+        im = db.DBSession().query(db.Image).get(int(imid))
+        refim = db.ReferenceImage(reference_id=ref.id, imag_id=im.id)
+        db.DBSession().add(refim)
+    db.DBSession().commit()
+
+    jobstr = f'''#!/bin/bash
 #SBATCH -N 1
 #SBATCH -J {jobname}
 #SBATCH -t 00:30:00
@@ -119,46 +121,46 @@ shifter python /pipeline/bin/log_template.py {template_name}
 
 '''
 
-        if job_script_destination is None:
-            jobscript = tempfile.NamedTemporaryFile()
-        else:
-            jobscript = open(Path(job_script_destination / f'{jobname}.sh').resolve(), 'w')
+    if job_script_destination is None:
+        jobscript = tempfile.NamedTemporaryFile()
+    else:
+        jobscript = open(Path(job_script_destination / f'{jobname}.sh').resolve(), 'w')
 
-        jobscript.write(jobstr)
-        jobscript.seek(0)
+    jobscript.write(jobstr)
+    jobscript.seek(0)
 
-        ssh_client = paramiko.SSHClient()
-        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh_client.connect(hostname=nersc_host, password=nersc_password, username=nersc_username)
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(hostname=nersc_host, password=nersc_password, username=nersc_username)
 
-        command = f'sbatch {jobscript.name}'
-        stdin, stdout, stderr = ssh_client.exec_command(command)
+    command = f'sbatch {jobscript.name}'
+    stdin, stdout, stderr = ssh_client.exec_command(command)
 
-        if stdout.channel.recv_exit_status() != 0:
-            raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
+    if stdout.channel.recv_exit_status() != 0:
+        raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
 
-        out = stdout.read()
-        err = stderr.read()
+    out = stdout.read()
+    err = stderr.read()
 
-        print(out, flush=True)
-        print(err, flush=True)
+    print(out, flush=True)
+    print(err, flush=True)
 
-        jobscript.close()
-        ssh_client.close()
+    jobscript.close()
+    ssh_client.close()
 
-        jobid = int(out.strip().split()[-1])
+    jobid = int(out.strip().split()[-1])
 
-        dependency_dict[f'{template_name}'] = jobid
+    dependency_dict[f'{template_name}'] = jobid
 
-        indices_left = remaining_images.index.difference(template_rows.index)
-        remaining_images = remaining_images.loc[indices_left, :]
+    indices_left = remaining_images.index.difference(template_rows.index)
+    remaining_images = remaining_images.loc[indices_left, :]
 
     early_enough = remaining_images['obsdate'] < start_date - timedelta(days=template_science_minsep_days)
     late_enough = remaining_images['obsdate'] > end_date + timedelta(days=template_science_minsep_days)
 
     remaining_images = remaining_images[early_enough | late_enough]
     template_metatable = pd.DataFrame(template_metatable, columns=['field', 'qid', 'filtercode', 'ccdid', 'path'])
-    return dependency_dict, remaining_images, template_metatable
+    return dependency_dict, remaining_images, ref
 
 
 if __name__ == '__main__':

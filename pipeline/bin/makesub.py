@@ -33,7 +33,7 @@ def chunk(iterable, chunksize):
         yield i, iterable[i * chunksize : (i + 1) * chunksize]
 
 
-def submit_coaddsub(template_dependencies, variance_dependencies, science_metatable, template_metatable,
+def submit_coaddsub(template_dependencies, variance_dependencies, science_metatable, ref,
                     rolling=False, coadd_windowsize=3, batch_size=32, job_script_destination='.',
                     log_destination='.', frame_destination='.', task_name=None):
 
@@ -59,53 +59,51 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                                                                              'qid',
                                                                              'filtercode',
                                                                              'ccdid']):
+        pass
 
-        science_rows = group.copy()
-        science_rows = science_rows.sort_values('obsjd')
+    science_rows = group.copy()
+    science_rows = science_rows.sort_values('obsjd')
 
-        tc1 = template_metatable['field'] == field
-        tc2 = template_metatable['qid'] == quadrant
-        tc3 = template_metatable['filtercode'] == band
-        tc4 = template_metatable['ccdid'] == ccdnum
+    if len(template_dependencies) > 0:
+        template_dependency_list = [template_dependencies[ref.path]]
+    else:
+        template_dependency_list = []
 
-        template_row = template_metatable[tc1 & tc2 & tc3 & tc4].iloc[0]
-        template_dependency_list = [template_dependencies[template_row['path']]]
+    if coadd_windowsize > 0:
+        bin_edges = make_coadd_bins(science_rows, window_size=coadd_windowsize, rolling=rolling)
+        for l, r in bin_edges:
+            frames_c1 = science_rows['obsdate'] >= l
+            frames_c2 = science_rows['obsdate'] < r
+            frames = science_rows[frames_c1 & frames_c2]
 
-        if coadd_windowsize > 0:
-            bin_edges = make_coadd_bins(science_rows, window_size=coadd_windowsize, rolling=rolling)
-            for l, r in bin_edges:
-                frames_c1 = science_rows['obsdate'] >= l
-                frames_c2 = science_rows['obsdate'] < r
-                frames = science_rows[frames_c1 & frames_c2]
+            if len(frames) == 0:
+                continue
 
-                if len(frames) == 0:
-                    continue
+            variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+            cdep_list = variance_dependency_list + template_dependency_list
 
-                variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
-                cdep_list = variance_dependency_list + template_dependency_list
+            lstr = f'{l}'.split()[0].replace('-', '')
+            rstr = f'{r}'.split()[0].replace('-', '')
 
-                lstr = f'{l}'.split()[0].replace('-', '')
-                rstr = f'{r}'.split()[0].replace('-', '')
+            coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
+                                             f'{band:s}_{lstr}_{rstr}_coadd.fits'
 
-                coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
-                                                 f'{band:s}_{lstr}_{rstr}_coadd.fits'
+            framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
 
-                framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
+            job = {'type':'coaddsub',
+                   'frames': [f'{framepath}' for framepath in framepaths],
+                   'template': ref.path, 'coadd_name': coadd_name,
+                   'dependencies': cdep_list}
+            job_list.append(job)
 
-                job = {'type':'coaddsub',
-                       'frames': [f'{framepath}' for framepath in framepaths],
-                       'template': template_row['path'], 'coadd_name': coadd_name,
-                       'dependencies': cdep_list}
-                job_list.append(job)
-
-        else:
-            # just run straight up subtractions
-            for i, row in science_rows.iterrows():
-                variance_dependency_list = [variance_dependencies[row['path']]]
-                cdep_list = variance_dependency_list + template_dependency_list
-                job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
-                       'template': template_row['path'], 'dependencies': cdep_list}
-                job_list.append(job)
+    else:
+        # just run straight up subtractions
+        for i, row in science_rows.iterrows():
+            variance_dependency_list = [variance_dependencies[row['path']]]
+            cdep_list = variance_dependency_list + template_dependency_list
+            job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
+                   'template': ref.path, 'dependencies': cdep_list}
+            job_list.append(job)
 
     for i, ch in chunk(job_list, batch_size):
 
