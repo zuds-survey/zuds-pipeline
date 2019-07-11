@@ -115,7 +115,7 @@ if __name__ == '__main__':
     options = task_spec['makevariance']
     batch_size = options['batch_size']
     from makevariance import submit_makevariance
-    frames = [im for im in hpss_dependencies if 'msk' not in im]
+    frames = [im for _, im in metatable['path'] if 'msk' not in im]
     masks = [im.replace('sciimg', 'mskimg') for im in frames]
     variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
                                                 batch_size=batch_size, log_destination=logs,
