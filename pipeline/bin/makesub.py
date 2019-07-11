@@ -119,15 +119,16 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 
             framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
 
-            job = {'type':'coaddsub',
-                   'frames': [f'{framepath}' for framepath in framepaths],
-                   'template': ref.disk_path, 'coadd_name': coadd_name,
-                   'dependencies': cdep_list}
-
             mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
                                              disk_path=sub_name(stack.disk_path, ref.disk_path))
             db.DBSession().add(mesub)
             db.DBSession().commit()
+
+            job = {'type':'coaddsub',
+                   'frames': [f'{framepath}' for framepath in framepaths],
+                   'template': ref.disk_path, 'coadd_name': coadd_name,
+                   'sub': mesub,
+                   'dependencies': cdep_list}
 
             job_list.append(job)
 
@@ -136,14 +137,15 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
         for i, row in science_rows.iterrows():
             variance_dependency_list = [variance_dependencies[row['path']]]
             cdep_list = variance_dependency_list + template_dependency_list
-            job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
-                   'template': ref.disk_path, 'dependencies': cdep_list}
 
             image = db.DBSession().query(db.Image).get(int(row['id']))
             sesub = db.SingleEpochSubtraction(image=image, reference=ref,
                                               disk_path=sub_name(row['full_path'], ref.disk_path))
             db.DBSession().add(sesub)
             db.DBSession().commit()
+
+            job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
+                   'template': ref.disk_path, 'dependencies': cdep_list, 'sub': sesub}
 
             job_list.append(job)
 
@@ -182,12 +184,13 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 frames = j['frames']
                 cats = [frame.replace('.fits', '.cat') for frame in frames]
                 coadd = j['coadd_name']
-                execstr = f'shifter bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\" \"{coadd}\" \"{template}\" \"{stack.id}\"&\n'
+                execstr = f'shifter bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\"' \
+                          f'\"{coadd}\" \"{template}\" \"{j["sub"].id}\" \"{j["sub"].stack.id}\"&\n'
             else:
 
                 frame = j['frame']
                 execstr = f'shifter python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
-                          f'--science-frames {frame} --templates {template} &\n'
+                          f'--science-frames {frame} --templates {template}  &\n'
 
             jobstr += execstr
         jobstr += 'wait\n'

@@ -117,7 +117,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 shifter python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
 
-shifter python /pipeline/bin/log_template.py {template_name} {ref.id}
+shifter python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
 
 '''
 
