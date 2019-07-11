@@ -207,6 +207,9 @@ if __name__ == '__main__':
     with fits.open(frames[0]) as f:
         h0 = f[0].header
         band = h0['FILTER']
+        field = h0['FIELDID']
+        ccdid = h0['CCDID']
+        qid = h0['QID']
 
     mjds = []
     for frame in frames:
@@ -225,8 +228,15 @@ if __name__ == '__main__':
         else:
             raise ValueError('Invalid filter "%s."' % band)
 
+        # add in the basic stuff
+        header['FILTERCODE'] = 'z' + header['FILTER']
+        header['FIELD'] = field
+        header['CCDID'] = ccdid
+        header['QID'] = qid
+
+
         # TODO make this more general
-        header['PIXSCALE'] = 1.0
+        header['PIXSCALE'] = 1.01
         header['MJDEFF'] = np.median(mjds)
 
         # Add the sky back in as a constant
