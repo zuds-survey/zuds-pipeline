@@ -204,6 +204,19 @@ if __name__ == '__main__':
     swarpconf = os.path.join(confdir, 'default.swarp') if not args.template else os.path.join(confdir, 'template.swarp')
     psfconf = os.path.join(confdir, 'psfex.conf')
 
+    # first scamp everything together
+
+    # make a random dir for the output catalogs
+    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
+    os.makedirs(scamp_outpath)
+
+    syscall = 'scamp -c %s %s' % (scampconf, cats)
+    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
+    if args.template:
+        syscall += ' -NTHREADS 64'
+    libztf.execute(syscall, capture=False)
+
+    # set these up for later
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
     allims = ' '.join(frames)
