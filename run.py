@@ -78,7 +78,7 @@ if __name__ == '__main__':
 
     exclude_masks = task_spec['hpss']['exclude_masks']
 
-    if not task_spec['hpss']['rerun']:
+    if not task_spec['hpss']['skip']:
         hpss_dependencies, metatable = retrieve_images(whereclause, exclude_masks=exclude_masks,
                                                        job_script_destination=jobscripts,
                                                        frame_destination=framepath, log_destination=logs,
@@ -119,10 +119,14 @@ if __name__ == '__main__':
     from makevariance import submit_makevariance
     frames = [im for im in metatable['path'] if 'msk' not in im]
     masks = [im.replace('sciimg', 'mskimg') for im in frames]
-    variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
-                                                batch_size=batch_size, log_destination=logs,
-                                                frame_destination=framepath,
-                                                job_script_destination=jobscripts)
+    
+    if not task_spec['makevariance']['skip']:
+        variance_dependencies = submit_makevariance(frames, masks, task_name=task_name,
+                                                    batch_size=batch_size, log_destination=logs,
+                                                    frame_destination=framepath,
+                                                    job_script_destination=jobscripts)
+    else:
+        variance_dependencies = {}
 
     metatable['full_path'] = [f'{(framepath / frame).resolve()}' for frame in frames]
 
@@ -169,17 +173,20 @@ if __name__ == '__main__':
 
         if ref is None:
             # we need a reference
-
-            template_dependencies, remaining_images, ref = submit_template(variance_dependencies,
-                                                                           group,
-                                                                           template_destination=templates,
-                                                                           task_name=task_name,
-                                                                           log_destination=logs,
-                                                                           job_script_destination=jobscripts,
-                                                                           nimages=template_nimages,
-                                                                           start_date=template_start_date,
-                                                                           end_date=template_end_date,
-                                                                           template_science_minsep_days=template_science_minsep_days)
+            try:
+                template_dependencies, remaining_images, ref = submit_template(variance_dependencies,
+                                                                               group,
+                                                                               template_destination=templates,
+                                                                               task_name=task_name,
+                                                                               log_destination=logs,
+                                                                               job_script_destination=jobscripts,
+                                                                               nimages=template_nimages,
+                                                                               start_date=template_start_date,
+                                                                               end_date=template_end_date,
+                                                                               template_science_minsep_days=template_science_minsep_days)
+            except ValueError:
+                continue
+                
         else:
             template_dependencies = {}
             mindate = template_start_date - timedelta(days=template_science_minsep_days)

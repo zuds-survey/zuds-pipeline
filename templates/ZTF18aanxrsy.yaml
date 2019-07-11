@@ -5,10 +5,11 @@ hpss:
   preserve_directories: true
   whereclause: "FIELD=716 AND FID=1 AND CCDID=1 AND QID=1"
   exclude_masks: false
-  rerun: true
+  skip: true
 
 makevariance:
-  batch_size: 1024
+  batch_size: 128
+  skip: false
 
 template:
   nimages: 50
