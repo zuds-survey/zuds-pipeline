@@ -493,7 +493,7 @@ class Stack(StackMixin, models.Base):
 
 class Reference(StackMixin, models.Base):
     images = relationship('Image', cascade='all', secondary='reference_images')
-    idx = Index('ref_field_idx', ('field', 'ccdid', 'qid', 'filtercode'))
+    idx = Index('ref_field_idx', 'field', 'ccdid', 'qid', 'filtercode')
 
 
 ReferenceImage = join_model('reference_images', Reference, Image)
