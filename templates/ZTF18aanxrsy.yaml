@@ -1,6 +1,5 @@
 clobber: false
 
-
 hpss:
   object_name: 'ZTF18aanxrsy'
   preserve_directories: true

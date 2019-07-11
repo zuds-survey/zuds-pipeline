@@ -1,4 +1,5 @@
 import os
+import db
 import numpy as np
 import libztf
 import uuid
@@ -83,6 +84,16 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
         incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
         inframestr = ' '.join(template_rows['full_path'])
 
+        ref = db.Reference(field=field, filtercode=band, qid=quadrant, ccdid=ccdnum, disk_path=template_name)
+        db.DBSession().add(ref)
+        db.DBSession().commit()
+
+        for imid in template_rows['id']:
+            im = db.DBSession().query(db.Image).get(int(imid))
+            refim = db.ReferenceImage(reference_id=ref.id, imag_id=im.id)
+            db.DBSession().add(refim)
+        db.DBSession().commit()
+
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
 #SBATCH -J {jobname}
@@ -102,7 +113,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 shifter python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
 
-shifter python /pipeline/bin/log_template.py {template_name}
+shifter python /pipeline/bin/log_template.py {template_name} 
 
 '''
 
