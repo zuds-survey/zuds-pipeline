@@ -1,4 +1,5 @@
 import os
+import db
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -88,6 +89,17 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
                                              f'{band:s}_{lstr}_{rstr}_coadd.fits'
 
+            # log the stack to the database
+            stack = db.Stack(disk_path=coadd_name, field=int(field), ccdid=int(ccdnum), qid=int(quadrant),
+                             filtercode=band)
+            db.DBSession().add(stack)
+            db.DBSession().commit()
+
+            for imid in frames['id']:
+                stackimage = db.StackImage(imag_id=int(imid), stack_id=stack.id)
+                db.DBSession().add(stackimage)
+            db.DBSession().commit()
+
             framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
 
             job = {'type':'coaddsub',
@@ -140,7 +152,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 frames = j['frames']
                 cats = [frame.replace('.fits', '.cat') for frame in frames]
                 coadd = j['coadd_name']
-                execstr = f'shifter bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\" \"{coadd}\" \"{template}\" &\n'
+                execstr = f'shifter bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\" \"{coadd}\" \"{template}\" \"{stack.id}\"&\n'
             else:
 
                 frame = j['frame']
