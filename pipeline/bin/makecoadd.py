@@ -214,7 +214,7 @@ if __name__ == '__main__':
     scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
     os.makedirs(scamp_outpath)
 
-    syscall = 'scamp -c %s %s' % (scampconf, cats)
+    syscall = 'scamp -c %s %s' % (scampconf, " ".join(cats))
     syscall += f' -REFOUT_CATPATH {scamp_outpath}'
     if args.template:
         syscall += ' -NTHREADS 64'
