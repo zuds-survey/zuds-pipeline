@@ -83,6 +83,7 @@ if __name__ == '__main__':
         for i, row in metatable.iterrows():
             np = f"{row['field']:06d}/c{row['ccdid']:02d}/q{row['qid']}/{row['filtercode']}/{row['path']}"
             new_hpss_dependencies[np] = hpss_dependencies[row['path']]
+            metatable.loc[i, 'path'] = np
         hpss_dependencies = new_hpss_dependencies
 
     # check to see if hpss jobs have finished
