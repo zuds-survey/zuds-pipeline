@@ -48,12 +48,16 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
         if start_date is not None:
             template_rows = template_rows[template_rows['obsdate'] > start_date]
 
+        # make cuts on seeing
+        template_rows = template_rows[template_rows['seeing'] > 1.8]
+        template_rows = template_rows[template_rows['seeing'] < 3.0]
 
         if len(template_rows) < nimages:
             raise ValueError(f'Not enough images to create requested template (Requested {nimages}, '
                              f'got {len(template_rows)}).')
 
-        template_rows = template_rows.sort_values(by='obsjd')
+
+        template_rows = template_rows.sort_values(by='maglimit', ascending=False)
         template_rows = template_rows.iloc[:nimages]
 
         dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
