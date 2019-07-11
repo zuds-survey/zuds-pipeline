@@ -15,9 +15,12 @@ q = db.DBSession().query(db.Reference)
 ref = q.get(refid)
 d = {}
 
-for col in q.column_descriptions:
-    if col['name'] not in ['id', 'created_at', 'modified']:
-        setattr(ref, col['name'], header[col['name'].upper()])
+
+#for col in ref.__table__.columns.keys():
+for key in header:
+    dbkey = key.lower()
+    if dbkey in ref.__table__.columns.keys():
+        setattr(ref, dbkey, header[key])
 
 db.DBSession().add(ref)
 db.DBSession().commit()
