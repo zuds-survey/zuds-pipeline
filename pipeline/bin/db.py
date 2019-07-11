@@ -504,7 +504,6 @@ class MultiEpochSubtraction(StackMixin, SubtractionMixin, models.Base):
     stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
     stack = relationship('Stack', back_populates='subtraction', cascade='all')
 
-
 def create_ztf_groups_if_nonexistent():
     groups = [1, 2, 3]
     group_names = ['MSIP/Public', 'Partnership', 'Caltech']

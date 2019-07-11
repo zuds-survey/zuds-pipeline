@@ -17,6 +17,23 @@ from pathlib import Path
 import paramiko
 
 
+def sub_name(frame, template):
+
+    frame = f'{frame}'
+    template = f'{template}'
+
+    refp = os.path.basename(template)[:-5]
+    newp = os.path.basename(frame)[:-5]
+
+    outdir = os.path.dirname(frame)
+
+    subp = '_'.join([newp, refp])
+
+    sub = os.path.join(outdir, 'sub.%s.fits' % subp)
+    return sub
+
+
+
 from libztf.yao import yao_photometry_single
 
 from filterobjects import filter_sexcat
@@ -106,6 +123,12 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                    'frames': [f'{framepath}' for framepath in framepaths],
                    'template': ref.disk_path, 'coadd_name': coadd_name,
                    'dependencies': cdep_list}
+
+            mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
+                                             disk_path=sub_name(stack.disk_path, ref.disk_path))
+            db.DBSession().add(mesub)
+            db.DBSession().commit()
+
             job_list.append(job)
 
     else:
@@ -115,6 +138,13 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             cdep_list = variance_dependency_list + template_dependency_list
             job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
                    'template': ref.disk_path, 'dependencies': cdep_list}
+
+            image = db.DBSession().query(db.Image).get(int(row['id']))
+            sesub = db.SingleEpochSubtraction(image=image, reference=ref,
+                                              disk_path=sub_name(row['full_path'], ref.disk_path))
+            db.DBSession().add(sesub)
+            db.DBSession().commit()
+
             job_list.append(job)
 
     for i, ch in chunk(job_list, batch_size):
