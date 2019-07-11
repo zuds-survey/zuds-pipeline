@@ -3,7 +3,7 @@ import os
 import yaml
 import time
 from itertools import chain
-import numpy as np
+import numpy
 import shutil
 from pathlib import Path
 from argparse import ArgumentParser
@@ -184,7 +184,7 @@ if __name__ == '__main__':
             template_dependencies = {}
             mindate = template_start_date - timedelta(days=template_science_minsep_days)
             maxdate = template_end_date + timedelta(days=template_science_minsep_days)
-            remaining_ids = np.setdiff1d(group['id'], [i.id for i in ref.images]).tolist()
+            remaining_ids = numpy.setdiff1d(group['id'], [i.id for i in ref.images]).tolist()
 
             remaining_q = db.DBSession().query(db.Image)\
                                         .filter(db.sa.and_(db.Image.id.in_(remaining_ids),
