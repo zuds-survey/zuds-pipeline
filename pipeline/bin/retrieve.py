@@ -114,7 +114,7 @@ rm {os.path.basename(tarfile)}
 
 def full_query(whereclause):
     query = f'SELECT * FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL AND ' \
-            f'{whereclause} AND SEEING < 3 AND MAGLIMIT > 18.5'
+            f'{whereclause} AND SEEING < 2.5 AND MAGLIMIT > 18.5'
     return query
 
 

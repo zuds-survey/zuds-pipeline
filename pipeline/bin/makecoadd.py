@@ -53,7 +53,7 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
 
     # make cuts on seeing
     template_rows = template_rows[template_rows['seeing'] > 1.8]
-    template_rows = template_rows[template_rows['seeing'] < 3.0]
+    template_rows = template_rows[template_rows['seeing'] < 2.3]
 
     if len(template_rows) < nimages:
         raise ValueError(f'Not enough images to create requested template (Requested {nimages}, '

@@ -10,14 +10,17 @@ import os
 from pathlib import Path
 from matplotlib import pyplot as plt
 
-from baselayer.app.env import load_env
+#from baselayer.app.env import load_env
 from baselayer.app.model_util import status
 from social_tornado.models import TornadoStorage
 
-from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
-                              Instrument, Group, GroupUser, Photometry, Role,
-                              Source, Spectrum, Telescope, Thumbnail, User,
-                              Token)
+#from skyportal.models import (init_db, Base, DBSession, ACL, Comment,
+#                              Instrument, Group, GroupUser, Photometry, Role,
+##                              Source, Spectrum, Telescope, Thumbnail, User,
+#                             Token)
+
+#from db import DBSession
+import db
 
 from astropy.coordinates import SkyCoord
 from astropy.nddata.utils import Cutout2D
@@ -57,11 +60,13 @@ def make_stamp(name, ra, dec, vmin, vmax, data, wcs):
 
 def load_catalog(catpath, refpath, newpath, subpath):
     """Insert test data"""
-    env, cfg = load_env()
+    env, cfg = db.load_env()
     basedir = Path(os.path.dirname(__file__))/'..'
 
     with status(f"Connecting to database {cfg['database']['database']}"):
-        init_db(**cfg['database'])
+        db.init_db(**cfg['database'])
+
+    ztf = db.DBSession().query(db.models.Instrument).get(1)
 
     with status("Loading in photometry"):
 
@@ -70,18 +75,6 @@ def load_catalog(catpath, refpath, newpath, subpath):
             imheader = new[0].header
 
         gooddata = data[data['GOODCUT'] == 1]
-
-        ztf = DBSession().query(Instrument).filter(Instrument.name.like('%ZTF%')).first()
-        if ztf is None:
-            # insert into DB
-
-            p48 = DBSession().query(Telescope).filter(Telescope.nickname.like('p48')).first()
-            if p48 is None:
-                p48 = Telescope(name='Palmoar 48-inch', nickname='p48',
-                                lat=33.3633675, lon=-116.8361345, elevation=1870,
-                                diameter=1.21)
-                DBSession().add(p48)
-            ztf = Instrument(telescope=p48, name='ZTF Camera', type='phot', band='optical')
 
         photpoints = []
         triplets = []
@@ -113,9 +106,8 @@ def load_catalog(catpath, refpath, newpath, subpath):
             filter = imheader['FILTER']
             limmag = imheader['LMT_MG']
 
-            photpoint = Photometry(instrument=ztf, ra=ra, dec=dec, mag=mag,
-                                   e_mag=e_mag, filter=filter,
-                                   lim_mag=limmag, observed_at=obstime)
+            photpoint = db.StackDetection()
+
             photpoints.append(photpoint)
             DBSession().add(photpoint)
             DBSession().commit()

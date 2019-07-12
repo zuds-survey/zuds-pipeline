@@ -94,6 +94,12 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             frames_c2 = science_rows['obsdate'] < r
             frames = science_rows[frames_c1 & frames_c2]
 
+            seeing = frames['seeing']
+            med = np.median(seeing)
+            std = 1.4826 * np.median(np.abs(seeing - med))
+
+            frames = frames[seeing < med + 2 * std]
+
             if len(frames) == 0:
                 continue
 
@@ -125,7 +131,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
 
             mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
-                                             disk_path=sub_name(stack.disk_path, ref.disk_path),
+                                             disk_path=f'{frame_destination / sub_name(stack.disk_path, ref.disk_path)}',
                                              qid=int(quadrant), ccdid=int(ccdnum), field=int(field),
                                              filtercode=band)
             db.DBSession().add(mesub)
