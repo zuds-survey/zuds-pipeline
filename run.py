@@ -52,7 +52,7 @@ if __name__ == '__main__':
     jobscripts = task_output / 'job_scripts'
     logs = task_output / 'logs'
     framepath = task_output / 'frames'
-    templates = task_output / 'templates'
+    templates = Path(outdir) / 'templates'
 
     jobscripts.mkdir(exist_ok=True, parents=True)
     logs.mkdir(exist_ok=True, parents=True)
