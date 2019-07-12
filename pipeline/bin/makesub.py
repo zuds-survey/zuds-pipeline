@@ -94,11 +94,12 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             frames_c2 = science_rows['obsdate'] < r
             frames = science_rows[frames_c1 & frames_c2]
 
-            seeing = frames['seeing']
-            med = np.median(seeing)
-            std = 1.4826 * np.median(np.abs(seeing - med))
+            if len(frames) > 3:
+                seeing = frames['seeing']
+                med = np.median(seeing)
+                std = 1.4826 * np.median(np.abs(seeing - med))
 
-            frames = frames[seeing < med + 2 * std]
+                frames = frames[seeing < med + 2 * std]
 
             if len(frames) == 0:
                 continue
