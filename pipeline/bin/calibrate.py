@@ -166,7 +166,7 @@ def calibrate(frame):
     subprocess.check_call(cmd.split())
 
     # now get a model of the psf
-    cmd = f'psfex -c {psfconf} {cat}'
+    cmd = f'psfex -c {psfconf} {cat} -XML_NAME {cat.replace(".cat",".psf")}.xml'
     subprocess.check_call(cmd.split())
 
     # now do photometry by fitting the psf model to the image
