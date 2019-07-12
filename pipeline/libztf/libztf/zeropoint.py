@@ -89,7 +89,7 @@ def zpsee(image, psf, cat, cursor, meas_image):
 
     psfex_output = f'{psf[:-5]}.xml'
     t = parse(psfex_output).get_first_table()
-    seeing = t.array['FWHM_WCS_Mean']  # arcsec
+    seeing = t.array['FWHM_WCS_Mean'][0]  # arcsec
     zp = np.median(these_zps) if len(these_zps) > 2 else 31.9999
 
     return zp, seeing
