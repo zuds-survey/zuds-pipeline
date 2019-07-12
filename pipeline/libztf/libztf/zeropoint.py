@@ -3,6 +3,7 @@ import numpy as np
 from .shellcmd import execute
 from .yao import yao_photometry_single
 from astropy.io import fits
+from astropy.io.votable import parse
 
 
 __all__ = ['solve_zeropoint']
@@ -86,9 +87,9 @@ def zpsee(image, psf, cat, cursor, meas_image):
             zp = 27.5 + (mps1 - mag_c)
             these_zps.append(zp)
 
-    psfex_output = psf[:-5]
-    with fits.open(psfex_output) as f:
-        seeing = f[1].header['PSF_FWHM'] * 1.013
+    psfex_output = f'{psf[:-5]}.xml'
+    t = parse(psfex_output).get_first_table()
+    seeing = t.array['FWHM_WCS_Mean']  # arcsec
     zp = np.median(these_zps) if len(these_zps) > 2 else 31.9999
 
     return zp, seeing
