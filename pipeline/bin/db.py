@@ -249,8 +249,14 @@ class StackDetection(models.Base):
     dec = sa.Column(psql.DOUBLE_PRECISION)
     stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
     stack = relationship('Stack', back_populates='detections', cascade='all')
+
     flux = sa.Column(sa.Float)
     fluxerr = sa.Column(sa.Float)
+    zp = sa.Column(sa.Float)
+    zpsys = sa.Column(sa.Text)
+
+    mjd = sa.Column(sa.Float)
+
     flags = sa.Column(sa.Integer)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source', back_populates='stack_detections', cascade='all')

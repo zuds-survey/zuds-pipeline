@@ -291,7 +291,7 @@ if __name__ == '__main__':
     libztf.execute(syscall, capture=False)
 
     # now model the PSF
-    syscall = f'psfex -c {psfconf} {outcat}'
+    syscall = f'psfex -c {psfconf} {outcat} -XML_NAME {out.replace(".fits", ".psf.xml")}'
     libztf.execute(syscall, capture=False)
     psf = out.replace('.fits', '.psf')
 
