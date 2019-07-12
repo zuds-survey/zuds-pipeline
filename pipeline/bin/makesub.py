@@ -115,7 +115,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             lstr = f'{l}'.split()[0].replace('-', '')
             rstr = f'{r}'.split()[0].replace('-', '')
 
-            coadd_name = frame_destination / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
+            coadd_name = frame_destination / Path(frames['path'].iloc[0]).parent / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
                                              f'{band:s}_{lstr}_{rstr}_coadd.fits'
 
             # log the stack to the database
