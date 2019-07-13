@@ -217,11 +217,15 @@ def calibrate(frame, reuse_psf=False):
     with fits.open(frame) as hdul:
         zp = hdul[0].header['MAGZP']
 
+    # get the difference between the true zeropoint and the fiducial zeropoint
+    zpdiff = zp - 27.5
+
     # now solve for the calibrated catalog
-    psf = frame.replace('.fits', '.psf')
-    cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} ' \
-          f'-MAG_ZEROPOINT {zp} {frame}'
-    subprocess.check_call(cmd.split())
+    with fits.open(cat, mode='update') as hdul:
+        keys = hdul[2].data.dtype.names
+        for key in keys:
+            if key.startswith('MAG_'):
+                hdul[2].data[key] += zpdiff
 
     # now write the calibrated star catalog
     write_starcat(cat)
