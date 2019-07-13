@@ -74,6 +74,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
 
     cat = parse_sexcat(cat, bin=True)
     cat = cat[cat['FLAGS'] == 0]
+    cat = cat[cat['FLUX_PSF'] / cat['FLUXERR_PSF'] > 20]
 
     query_dict = {'flt':band, 'ra_ll':ra_ll, 'dec_ll':dec_ll,
                   'ra_lr':ra_lr, 'dec_lr':dec_lr, 'ra_ul':ra_ul,
@@ -142,9 +143,7 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
         f[0].header['SEEING'] = seeing
 
 
-def calc_maglimit(cat):
-    # calculate the magnitude of a 5 sigma point source
-    # assumes the catalog is calibrated and has a PSF model
+def write_starcat(cat):
 
     with fits.open(cat) as hdul:
         data = hdul[2].data
@@ -162,6 +161,20 @@ def calc_maglimit(cat):
     data['SNR'] = data['FLUX_PSF'] / data['FLUXERR_PSF']
     ind = data['SNR'] >= 5
     data = data[ind]
+
+    hdul[2].data = data
+    outname = cat.replace('.cat', '.star.cat')
+    hdul.writeto(outname, overwrite=True)
+
+
+def calc_maglimit(cat):
+    # calculate the magnitude of a 5 sigma point source
+    # assumes the catalog is calibrated and has a PSF model
+
+    with fits.open(cat) as hdul:
+        data = hdul[2].data
+
+    # keep stellar sources only
 
     data = np.sort(data, order=['SNR'])
     maglimit = data['MAG_PSF'][0]
@@ -203,8 +216,12 @@ def calibrate(frame):
     cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} {frame}'
     subprocess.check_call(cmd.split())
 
-    # now solve for the zeropoint
-    solve_zeropoint(frame, cat, psf, zp_fid=27.5)
+    # write a catalog of the stellar sources only
+    write_starcat(cat)
+    starcat = cat.replace('.cat', '.star.cat')
+
+    # now solve for the zeropoint using the stellar sources
+    solve_zeropoint(frame, starcat, psf, zp_fid=27.5)
 
     with fits.open(frame) as hdul:
         zp = hdul[0].header['MAGZP']
@@ -214,6 +231,9 @@ def calibrate(frame):
     cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} ' \
           f'-MAG_ZEROPOINT {zp} {frame}'
     subprocess.check_call(cmd.split())
+
+    # now write the calibrated star catalog
+    write_starcat(cat)
 
     # now make the inverse variance map using fortran
     wgtname = frame.replace('fits', 'weight.fits')
@@ -248,7 +268,7 @@ def calibrate(frame):
     medg(frame)
 
     # and calculate the limiting magnitude
-    lmt_mg = calc_maglimit(cat)
+    lmt_mg = calc_maglimit(starcat)
 
     with fits.open(frame, mode='update', memmap=False) as f:
         f[0].header['LMT_MG'] = lmt_mg
