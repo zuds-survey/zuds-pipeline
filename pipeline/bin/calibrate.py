@@ -192,7 +192,16 @@ def calibrate(frame, reuse_psf=False):
 
     # now run scamp to solve the astrometry
     cmd = f'scamp -c {scampconf} {cat}'
-    subprocess.check_call(cmd.split())
+
+    # handle vizier
+    while True:
+        try:
+            subprocess.check_call(cmd.split())
+        except subprocess.CalledProcessError:
+            continue
+        else:
+            break
+
 
     # now get a model of the psf
     cmd = f'psfex -c {psfconf} {cat}'
