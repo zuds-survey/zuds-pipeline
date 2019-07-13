@@ -155,10 +155,6 @@ def calc_maglimit(cat):
     # https://des.ncsa.illinois.edu/easyweb/db-examples
     # "Select stars from M2 Globular Cluster"
 
-    ind = data['SPREAD_MODEL'] + 3 * data['SPREADERR_MODEL'] < 0.005
-    ind = ind & (data['SPREAD_MODEL'] > -1)
-    data = data[ind]
-
     data['SNR'] = data['FLUX_PSF'] / data['FLUXERR_PSF']
     ind = data['SNR'] >= 5
     data = data[ind]
@@ -168,7 +164,7 @@ def calc_maglimit(cat):
 
     return maglimit
 
-def calibrate(frame, mask=None):
+def calibrate(frame):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
 
@@ -195,7 +191,8 @@ def calibrate(frame, mask=None):
     subprocess.check_call(cmd.split())
 
     # now get a model of the psf
-    cmd = f'psfex -c {psfconf} {cat}'
+    psfcat = cat.replace('.cat', '.psf.cat')
+    cmd = f'psfex -c {psfconf} {cat} -OUTCAT_TYPE FITS_LDAC -OUTCAT_NAME {psfcat}'
     subprocess.check_call(cmd.split())
 
     # now do photometry by fitting the psf model to the image
@@ -204,7 +201,7 @@ def calibrate(frame, mask=None):
     subprocess.check_call(cmd.split())
 
     # now solve for the zeropoint
-    solve_zeropoint(frame, cat, psf, zp_fid=27.5)
+    solve_zeropoint(frame, psfcat, psf, zp_fid=27.5)
 
     with fits.open(frame) as hdul:
         zp = hdul[0].header['MAGZP']
@@ -219,15 +216,9 @@ def calibrate(frame, mask=None):
     wgtname = frame.replace('fits', 'weight.fits')
     chkname = frame.replace('.fits', '.noise.fits')
 
-    if mask is None:
-        try:
-            mkivar(frame, mask, chkname, wgtname)
-        except FileNotFoundError:
-            mask = frame.replace('.fits', '.bpm.fits')
+    if frame.endswith('sciimg.fits'):
+        mask = frame.replace('sciimg.fits', 'mskimg.fits')
         mkivar(frame, mask, chkname, wgtname)
-    else:
-        mkivar(frame, mask, chkname, wgtname)
-
 
     # and make the bad pixel masks and rms images
     make_rms(frame, wgtname)
