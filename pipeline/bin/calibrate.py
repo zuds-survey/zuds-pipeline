@@ -168,7 +168,7 @@ def calc_maglimit(cat):
 
     return maglimit
 
-def calibrate(frame):
+def calibrate(frame, mask=None):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
 
@@ -215,7 +215,19 @@ def calibrate(frame):
           f'-MAG_ZEROPOINT {zp} {frame}'
     subprocess.check_call(cmd.split())
 
-    wgtname = frame.replace('.fits', '.weight.fits')
+    # now make the inverse variance map using fortran
+    wgtname = frame.replace('fits', 'weight.fits')
+    chkname = frame.replace('.fits', '.noise.fits')
+
+    if mask is None:
+        try:
+            mkivar(frame, mask, chkname, wgtname)
+        except FileNotFoundError:
+            mask = frame.replace('.fits', '.bpm.fits')
+        mkivar(frame, mask, chkname, wgtname)
+    else:
+        mkivar(frame, mask, chkname, wgtname)
+
 
     # and make the bad pixel masks and rms images
     make_rms(frame, wgtname)

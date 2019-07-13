@@ -129,11 +129,6 @@ def make_variance(frames, masks, logger=None, extra={}):
         if logger is not None:
             logger.info('Working image %s' % frame, extra=extra)
 
-        # now make the inverse variance map using fortran
-        wgtname = frame.replace('fits', 'weight.fits')
-        chkname = frame.replace('.fits', '.noise.fits')
-        mkivar(frame, mask, chkname, wgtname)
-
         # get the zeropoint from the fits header using fortran
         calibrate(frame)
 
