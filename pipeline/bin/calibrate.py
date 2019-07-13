@@ -136,6 +136,8 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
     with con:
         cursor = con.cursor()
         inhdr = image.replace('.fits', '.head')
+        if not os.path.exists(inhdr):
+            inhdr = None
         zp, seeing = zpsee(image, cat, cursor, zp_fid, inhdr=inhdr)
 
     with fits.open(image, mode='update', memmap=False) as f:
