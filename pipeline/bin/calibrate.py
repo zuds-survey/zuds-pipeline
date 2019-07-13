@@ -145,8 +145,8 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
 
 def write_starcat(cat):
 
-    with fits.open(cat) as hdul:
-        data = hdul[2].data
+    hdul = fits.open(cat)
+    data = hdul[2].data
 
     # keep stellar sources only
 
@@ -165,6 +165,7 @@ def write_starcat(cat):
     hdul[2].data = data
     outname = cat.replace('.cat', '.star.cat')
     hdul.writeto(outname, overwrite=True)
+    hdul.close()
 
 
 def calc_maglimit(cat):
