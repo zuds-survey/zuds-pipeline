@@ -66,8 +66,6 @@ def load_catalog(catpath, refpath, newpath, subpath):
     with status(f"Connecting to database {cfg['database']['database']}"):
         db.init_db(**cfg['database'])
 
-    ztf = db.DBSession().query(db.models.Instrument).get(1)
-
     with status("Loading in photometry"):
 
         with fits.open(catpath) as f, fits.open(newpath) as new:
@@ -96,21 +94,26 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
             ra = row['X_WORLD']
             dec = row['Y_WORLD']
-            mag = row['MAG_BEST']
-            e_mag = row['MAGERR_BEST']
+            flux = row['FLUX_PSF']
+            fluxerr = row['FLUXERR_PSF']
+            zp = row['MAGZP']
+            zpsys = 'ab'
+
             try:
                 obsmjd = imheader['MJDEFF']
             except KeyError:
                 obsmjd = imheader['OBSMJD']
-            obstime = Time(obsmjd, format='mjd', scale='utc').tcb.datetime
-            filter = imheader['FILTER']
+            filter = 'ztf' + imheader['FILTERCODE'][-1].lower()
             limmag = imheader['LMT_MG']
 
-            photpoint = db.StackDetection()
+            photpoint = db.StackDetection(ra=ra, dec=dec, flux=flux,
+                                          fluxerr=fluxerr, zp=zp, zpsys=zpsys,
+                                          filter=filter, mjd=obsmjd, maglimit=limmag,
+                                          provenance='gn', method='psf')
 
             photpoints.append(photpoint)
-            DBSession().add(photpoint)
-            DBSession().commit()
+            db.DBSession().add(photpoint)
+            db.DBSession().commit()
 
             # do stamps
 
@@ -126,13 +129,13 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
     with status('Grouping detections into sources'):
         srcquery = 'SELECT ID FROM SOURCES WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554)'
-        detquery = 'SELECT ID FROM PHOTOMETRY WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554) AND ' \
+        detquery = 'SELECT ID FROM STACKDETECTIONS WHERE Q3C_RADIAL_QUERY(RA, DEC, :ra, :dec, 0.0005554) AND ' \
                    'ID != :id'
-        g = Group.query.first()
+        g = db.models.Group.query.first()
         for point in photpoints:
-            result = DBSession().execute(srcquery, {'ra': point.ra, 'dec': point.dec}).fetchall()
+            result = db.DBSession().execute(srcquery, {'ra': point.ra, 'dec': point.dec}).fetchall()
             if len(result) > 0:
-                source = Source.query.get(result[0]['id'])
+                source = db.Source.query.get(result[0]['id'])
                 point.source = source
 
                 # update source RA and DEC
@@ -141,36 +144,36 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
 
             else:
-                result = [a[0] for a in DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
-                                                                       'id': point.id}).fetchall()]
+                result = [a[0] for a in db.DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
+                                                                          'id': point.id}).fetchall()]
                 if len(result) > 2:
                     # create a new source
-                    points = list(DBSession().query(Photometry).filter(Photometry.id.in_(result)).all())
+                    points = list(db.DBSession().query(db.StackDetection).filter(db.StackDetection.id.in_(result)).all())
                     points = points + [point]
                     ra = np.median([p.ra for p in points])
                     dec = np.median([p.dec for p in points])
 
                     seqquery = "SELECT nextval('namenum')"
-                    num = DBSession().execute(seqquery).fetchone()[0]
+                    num = db.DBSession().execute(seqquery).fetchone()[0]
                     name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
-                    s = Source(id=name, ra=ra, dec=dec, groups=[g])
+                    s = db.models.Source(id=name, ra=ra, dec=dec, groups=[g])
 
                     for point in points:
                         point.source = s
 
-                    DBSession().add(s)
-                    DBSession().commit()
+                    db.DBSession().add(s)
+                    db.DBSession().commit()
 
                     firstpoint = sorted(points, key=lambda p: p.observed_at)[0]
 
                     for t in ['ref', 'new', 'sub']:
-                        thumb = Thumbnail(type=t, photometry_id=firstpoint.id,
+                        thumb = db.models.Thumbnail(type=t, photometry_id=firstpoint.id,
                                           public_url=f'http://portal.nersc.gov/project/astro250/stamps/{firstpoint.id}.{t}.png')
-                        DBSession().add(thumb)
+                        db.DBSession().add(thumb)
 
                     s.add_linked_thumbnails()
 
-    DBSession().commit()
+    db.DBSession().commit()
 
 
 if __name__ == '__main__':

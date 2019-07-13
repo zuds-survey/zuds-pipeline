@@ -1,7 +1,6 @@
 import os
 import string
 import numpy as np
-from libztf import medg, mkivar, execute, make_rms, solve_zeropoint
 from astropy.io import fits
 import time
 import libztf
@@ -124,17 +123,6 @@ srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames $news --i
 
 def make_variance(frames, masks, logger=None, extra={}):
 
-    # now set up a few pointers to auxiliary files read by sextractor
-    wd = os.path.dirname(__file__)
-    confdir = os.path.join(wd, '..', 'astromatic', 'makevariance')
-    sexconf = os.path.join(confdir, 'scamp.sex')
-    nnwname = os.path.join(confdir, 'default.nnw')
-    filtname = os.path.join(confdir, 'default.conv')
-    paramname = os.path.join(confdir, 'scamp.param')
-    psfconf = os.path.join(confdir, 'psfex.conf')
-
-    clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (paramname, filtname, nnwname)
-
     for frame, mask in zip(frames, masks):
 
         if logger is not None:
@@ -142,42 +130,6 @@ def make_variance(frames, masks, logger=None, extra={}):
 
         # get the zeropoint from the fits header using fortran
         calibrate(frame)
-
-        with fits.open(frame) as f:
-            zp = f[0].header['MAGZP']
-
-        # calculate some properties of the image (skysig, lmtmag, etc.)
-        # and store them in the header. note: this call is to compiled fortran
-        medg(frame)
-
-        # now get ready to call source extractor
-        syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
-        catname = frame.replace('fits', 'cat')
-        chkname = frame.replace('fits', 'noise.fits')
-        syscall = syscall % (sexconf, catname, chkname, zp, frame)
-        syscall = ' '.join([syscall, clargs])
-
-        # do it
-        stdout, stderr = execute(syscall)
-
-        # parse the results into something legible
-        stderr = str(stderr, encoding='ascii')
-        filtered_string = ''.join(list(filter(lambda x: x in string.printable, stderr)))
-        splf = filtered_string.split('\n')
-        splf = [line for line in splf if '[1M>' not in line]
-        filtered_string = '\n'.join(splf)
-        filtered_string = '\n' + filtered_string.replace('[1A', '')
-
-        # log it
-        if logger is not None:
-            logger.info(filtered_string, extra=extra)
-
-        # now make the inverse variance map using fortran
-        wgtname = frame.replace('fits', 'weight.fits')
-        mkivar(frame, mask, chkname, wgtname)
-
-        # and make the bad pixel masks and rms images
-        make_rms(frame, wgtname)
 
 
 

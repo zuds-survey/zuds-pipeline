@@ -6,6 +6,8 @@ import pandas as pd
 import galsim
 from galsim import des
 
+
+
 import numpy as np
 import subprocess
 import os
@@ -139,6 +141,13 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
         f[0].header['SEEING'] = seeing
 
 
+def calc_maglimit(cat):
+    # calculate the magnitude of a 5 sigma point source
+    # assumes the catalog is calibrated and has a PSF model
+
+    with fits.open(cat) as hdul:
+
+
 
 def calibrate(frame):
     # astrometrically and photometrically calibrate a ZTF frame using
@@ -187,6 +196,14 @@ def calibrate(frame):
           f'-MAG_ZEROPOINT {zp} {frame}'
     subprocess.check_call(cmd.split())
 
+    # and calculate the limiting magnitude
+
+    # now make the inverse variance map using fortran
+    wgtname = frame.replace('fits', 'weight.fits')
+    mkivar(frame, mask, chkname, wgtname)
+
+    # and make the bad pixel masks and rms images
+    make_rms(frame, wgtname)
 
     # and save it as a fits model
     gsmod = des.DES_PSFEx(psf)

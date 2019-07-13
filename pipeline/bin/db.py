@@ -254,14 +254,24 @@ class StackDetection(models.Base):
     fluxerr = sa.Column(sa.Float)
     zp = sa.Column(sa.Float)
     zpsys = sa.Column(sa.Text)
+    maglimit = sa.Column(sa.Float)
 
     mjd = sa.Column(sa.Float)
-
-    flags = sa.Column(sa.Integer)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source', back_populates='stack_detections', cascade='all')
 
+    provenance = sa.Column(sa.Text)
+    method = sa.Column(sa.Text)
+
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
+
+    @hybrid_property
+    def mag(self):
+        return -2.5 * sa.func.log(self.flux) + self.zp
+
+    @hybrid_property
+    def magerr(self):
+        return 1.08573620476 * self.fluxerr / self.flux
 
 
 def images(self):

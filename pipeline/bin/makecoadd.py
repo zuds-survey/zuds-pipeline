@@ -8,6 +8,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 import galsim
 from makevariance import make_variance
+from calibrate import calibrate
 from astropy.time import Time
 import logging
 from galsim import des
@@ -281,50 +282,4 @@ if __name__ == '__main__':
         # Add the sky back in as a constant
         f[0].data += 150.
 
-    # Make a new catalog
-    outcat = out.replace('.fits', '.cat')
-    noise = out.replace('.fits', '.noise.fits')
-    bkgsub =out.replace('.fits', '.bkgsub.fits')
-    syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
-              f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
-    syscall = ' '.join([syscall, clargs])
-    libztf.execute(syscall, capture=False)
-
-    # now model the PSF
-    syscall = f'psfex -c {psfconf} {outcat}'
-    libztf.execute(syscall, capture=False)
-    psf = out.replace('.fits', '.psf')
-
-    # and save it as a fits model
-    gsmod = des.DES_PSFEx(psf)
-    with fits.open(psf) as f:
-        xcen = f[1].header['POLZERO1']
-        ycen = f[1].header['POLZERO2']
-        psfsamp = f[1].header['PSF_SAMP']
-
-    cpos = galsim.PositionD(xcen, ycen)
-    psfmod = gsmod.getPSF(cpos)
-    psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-    # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-    psfimg.wcs = None
-    psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-    psfimpath = f'{psf}.fits'
-    # save it to the D
-    psfimg.write(psfimpath)
-
-    # And zeropoint the coadd, putting results in the header
-    libztf.solve_zeropoint(out, psfimpath, outcat, bkgsub)
-
-    # Now retrieve the zeropoint
-    with fits.open(out) as f:
-        zp = f[0].header['MAGZP']
-
-    # redo sextractor
-    syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
-    syscall = syscall % (sexconf, outcat, noise, zp, out)
-    syscall = ' '.join([syscall, clargs])
-    libztf.execute(syscall, capture=False)
-    libztf.make_rms(out, oweight)
-    libztf.medg(out)
+    calibrate(out)
