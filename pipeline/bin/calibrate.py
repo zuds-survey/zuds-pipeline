@@ -158,8 +158,8 @@ def write_starcat(cat):
     ind = ind & (data['SPREAD_MODEL'] > -1)
     data = data[ind]
 
-    data['SNR'] = data['FLUX_PSF'] / data['FLUXERR_PSF']
-    ind = data['SNR'] >= 5
+    snr = data['FLUX_PSF'] / data['FLUXERR_PSF']
+    ind = snr >= 5
     data = data[ind]
 
     hdul[2].data = data
@@ -176,8 +176,8 @@ def calc_maglimit(cat):
 
     # keep stellar sources only
 
-    data = np.sort(data, order=['SNR'])
-    maglimit = data['MAG_PSF'][0]
+    sortinds = np.argsort(data['FLUX_PSF'] / data['FLUXERR_PSF'])
+    maglimit = data['MAG_PSF'][sortinds[0]]
 
     return maglimit
 
