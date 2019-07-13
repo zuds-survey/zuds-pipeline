@@ -178,7 +178,7 @@ def calc_maglimit(cat):
     # keep stellar sources only
 
     sortinds = np.argsort(data['FLUX_PSF'] / data['FLUXERR_PSF'])
-    maglimit = data['MAG_PSF'][sortinds[0]]
+    maglimit = data['MAG_PSF'][sortinds[-1]]
 
     return maglimit
 
