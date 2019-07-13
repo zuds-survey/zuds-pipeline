@@ -168,7 +168,7 @@ def write_starcat(cat):
     hdul.close()
 
 
-def calibrate(frame, reuse_psf=False):
+def calibrate(frame, astrometry=True, reuse_psf=False):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
 
@@ -190,17 +190,19 @@ def calibrate(frame, reuse_psf=False):
     cmd = f'sex -c {sexconf} -PARAMETERS_NAME {sexparam} -CATALOG_NAME {cat} {nnwfilt} -CHECKIMAGE_NAME {chk} {frame}'
     subprocess.check_call(cmd.split())
 
-    # now run scamp to solve the astrometry
-    cmd = f'scamp -c {scampconf} {cat}'
 
-    # handle vizier
-    while True:
-        try:
-            subprocess.check_call(cmd.split())
-        except subprocess.CalledProcessError:
-            continue
-        else:
-            break
+    if astrometry:
+        # now run scamp to solve the astrometry
+        cmd = f'scamp -c {scampconf} {cat}'
+
+        # handle vizier
+        while True:
+            try:
+                subprocess.check_call(cmd.split())
+            except subprocess.CalledProcessError:
+                continue
+            else:
+                break
 
 
     # now get a model of the psf
