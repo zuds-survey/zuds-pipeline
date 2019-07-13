@@ -181,7 +181,7 @@ def calc_maglimit(cat):
 
     return maglimit
 
-def calibrate(frame):
+def calibrate(frame, reuse_psf=False):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
 
@@ -209,10 +209,14 @@ def calibrate(frame):
 
     # now get a model of the psf
     cmd = f'psfex -c {psfconf} {cat}'
-    subprocess.check_call(cmd.split())
+    psf = frame.replace('.fits', '.psf')
+
+    # if the psf already exists then use it if requested
+    if not (reuse_psf and os.path.exists(psf)):
+        subprocess.check_call(cmd.split())
 
     # now do photometry by fitting the psf model to the image
-    psf = frame.replace('.fits', '.psf')
+
     cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} {frame}'
     subprocess.check_call(cmd.split())
 
