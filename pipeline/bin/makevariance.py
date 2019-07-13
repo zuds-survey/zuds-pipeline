@@ -9,6 +9,7 @@ import galsim
 import paramiko
 import tempfile
 from galsim import des
+from calibrate import calibrate
 
 from pathlib import Path
 
@@ -140,7 +141,7 @@ def make_variance(frames, masks, logger=None, extra={}):
             logger.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
-        #calibrate(frame)
+        calibrate(frame)
 
         with fits.open(frame) as f:
             zp = f[0].header['MAGZP']
@@ -177,30 +178,6 @@ def make_variance(frames, masks, logger=None, extra={}):
 
         # and make the bad pixel masks and rms images
         make_rms(frame, wgtname)
-
-        # now model the PSF
-        syscall = f'psfex -c {psfconf} {catname} -XML_NAME {catname.replace(".cat",".psf")}.xml'
-        libztf.execute(syscall, capture=False)
-        psf = frame.replace('.fits', '.psf')
-
-        # and save it as a fits model
-        gsmod = des.DES_PSFEx(psf)
-        with fits.open(psf) as f:
-            xcen = f[1].header['POLZERO1']
-            ycen = f[1].header['POLZERO2']
-            psfsamp = f[1].header['PSF_SAMP']
-
-        cpos = galsim.PositionD(xcen, ycen)
-        psfmod = gsmod.getPSF(cpos)
-        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-        psfimg.wcs = None
-        psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-        psfimpath = f'{psf}.fits'
-        # save it to the D
-        psfimg.write(psfimpath)
 
 
 

@@ -3,7 +3,8 @@ from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
 from astropy import units as u
 import pandas as pd
-from astroquery.vizier import Vizier
+import galsim
+from galsim import des
 
 import numpy as np
 import subprocess
@@ -89,6 +90,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     pd.DataFrame(result).to_csv(image.replace('.fits', '.phot.cat',), index=False)
 
     zps = []
+    seeings = []
 
     cat_coords = SkyCoord(ra=cat['X_WORLD'] * u.degree, dec=cat['Y_WORLD'] * u.degree)
     db_coords = SkyCoord(ra=result['ra'] * u.degree, dec=result['dec'] * u.degree)
@@ -109,10 +111,12 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
             ps1_mag = result[i]['mag']
             sex_mag = cat_row['MAG_PSF']
             zp = zp_fid + ps1_mag - sex_mag
-            seeing = cat_row['FWHM_IMAGE']
+            seeing = cat_row['FWHM_IMAGE'] * 1.013
             zps.append(zp)
+            seeings.append(seeing)
 
-    return np.median(zps)
+
+    return np.median(zps), np.median(seeings)
 
 
 def solve_zeropoint(image, cat, psf, zp_fid=27.5):
@@ -128,10 +132,7 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
     with con:
         cursor = con.cursor()
         inhdr = image.replace('.fits', '.head')
-        zp = zpsee(image, cat, cursor, zp_fid, inhdr=inhdr)
-
-    with fits.open(psf) as f, fits.open(image) as im:
-        seeing = f[1].header['PSF_FWHM'] * im[0].header['PIXSCALE']
+        zp, seeing = zpsee(image, cat, cursor, zp_fid, inhdr=inhdr)
 
     with fits.open(image, mode='update', memmap=False) as f:
         f[0].header['MAGZP'] = zp
@@ -166,7 +167,7 @@ def calibrate(frame):
     subprocess.check_call(cmd.split())
 
     # now get a model of the psf
-    cmd = f'psfex -c {psfconf} {cat} -XML_NAME {cat.replace(".cat",".psf")}.xml'
+    cmd = f'psfex -c {psfconf} {cat}'
     subprocess.check_call(cmd.split())
 
     # now do photometry by fitting the psf model to the image
@@ -185,6 +186,26 @@ def calibrate(frame):
     cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} ' \
           f'-MAG_ZEROPOINT {zp} {frame}'
     subprocess.check_call(cmd.split())
+
+
+    # and save it as a fits model
+    gsmod = des.DES_PSFEx(psf)
+    with fits.open(psf) as f:
+        xcen = f[1].header['POLZERO1']
+        ycen = f[1].header['POLZERO2']
+        psfsamp = f[1].header['PSF_SAMP']
+
+    cpos = galsim.PositionD(xcen, ycen)
+    psfmod = gsmod.getPSF(cpos)
+    psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
+
+    # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
+    psfimg.wcs = None
+    psfimg = galsim.Image(np.fliplr(psfimg.array))
+
+    psfimpath = f'{psf}.fits'
+    # save it to the D
+    psfimg.write(psfimpath)
 
     with fits.open(frame, mode='update', memmap=False) as f:
         if 'SATURATE' not in f[0].header:

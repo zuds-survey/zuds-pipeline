@@ -51,7 +51,7 @@ def medg(frame, weight=None):
         med = np.median(data.compressed())
         res = data - med
         var = np.median(np.abs(res.compressed()))
-        lmt = -2.5 * np.log10(3.0 * np.sqrt(3.14159 * seepix * seepix) * var * 1.48) + zp
+        lmt = -2.5 * np.log10(5.0 * np.sqrt(3.14159 * seepix * seepix) * var * 1.48) + zp
 
         f[0].header['LMT_MG'] = lmt
         f[0].header['SKYSIG'] = var
