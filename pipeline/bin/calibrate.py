@@ -5,6 +5,7 @@ from astropy import units as u
 import pandas as pd
 import galsim
 from galsim import des
+from libztf import mkivar, make_rms, medg
 
 
 
@@ -146,8 +147,26 @@ def calc_maglimit(cat):
     # assumes the catalog is calibrated and has a PSF model
 
     with fits.open(cat) as hdul:
+        data = hdul[2].data
 
+    # keep stellar sources only
 
+    # this is a star/galaxy cut from DES DR1
+    # https://des.ncsa.illinois.edu/easyweb/db-examples
+    # "Select stars from M2 Globular Cluster"
+
+    ind = data['SPREAD_MODEL'] + 3 * data['SPREADERR_MODEL'] < 0.005
+    ind = ind & (data['SPREAD_MODEL'] > -1)
+    data = data[ind]
+
+    data['SNR'] = data['FLUX_PSF'] / data['FLUXERR_PSF']
+    ind = data['SNR'] >= 5
+    data = data[ind]
+
+    data = np.sort(data, order=['SNR'])
+    maglimit = data['MAG_PSF'][0]
+
+    return maglimit
 
 def calibrate(frame):
     # astrometrically and photometrically calibrate a ZTF frame using
@@ -196,11 +215,7 @@ def calibrate(frame):
           f'-MAG_ZEROPOINT {zp} {frame}'
     subprocess.check_call(cmd.split())
 
-    # and calculate the limiting magnitude
-
-    # now make the inverse variance map using fortran
-    wgtname = frame.replace('fits', 'weight.fits')
-    mkivar(frame, mask, chkname, wgtname)
+    wgtname = frame.replace('.fits', '.weight.fits')
 
     # and make the bad pixel masks and rms images
     make_rms(frame, wgtname)
@@ -224,6 +239,12 @@ def calibrate(frame):
     # save it to the D
     psfimg.write(psfimpath)
 
+    medg(frame)
+
+    # and calculate the limiting magnitude
+    lmt_mg = calc_maglimit(cat)
+
     with fits.open(frame, mode='update', memmap=False) as f:
+        f[0].header['LMT_MG'] = lmt_mg
         if 'SATURATE' not in f[0].header:
             f[0].header['SATURATE'] = 5e4
