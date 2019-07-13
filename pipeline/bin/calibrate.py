@@ -168,20 +168,6 @@ def write_starcat(cat):
     hdul.close()
 
 
-def calc_maglimit(cat):
-    # calculate the magnitude of a 5 sigma point source
-    # assumes the catalog is calibrated and has a PSF model
-
-    with fits.open(cat) as hdul:
-        data = hdul[2].data
-
-    # keep stellar sources only
-
-    sortinds = np.argsort(data['FLUX_PSF'] / data['FLUXERR_PSF'])
-    maglimit = data['MAG_PSF'][sortinds[0]]
-
-    return maglimit
-
 def calibrate(frame, reuse_psf=False):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
@@ -272,10 +258,6 @@ def calibrate(frame, reuse_psf=False):
 
     medg(frame)
 
-    # and calculate the limiting magnitude
-    lmt_mg = calc_maglimit(starcat)
-
     with fits.open(frame, mode='update', memmap=False) as f:
-        f[0].header['LMT_MG'] = lmt_mg
         if 'SATURATE' not in f[0].header:
             f[0].header['SATURATE'] = 5e4
