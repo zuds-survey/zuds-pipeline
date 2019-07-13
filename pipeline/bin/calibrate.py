@@ -195,10 +195,20 @@ def calibrate(frame):
     cmd = f'psfex -c {psfconf} {cat} -OUTCAT_TYPE FITS_LDAC -OUTCAT_NAME {psfcat}'
     subprocess.check_call(cmd.split())
 
+    # get a list of sources that are "psf-like"
+    source_ids = parse_sexcat(psfcat)['SOURCE_NUMBER']
+
     # now do photometry by fitting the psf model to the image
     psf = frame.replace('.fits', '.psf')
     cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} {frame}'
     subprocess.check_call(cmd.split())
+
+    # get only the psf-like sources for calibration
+    psfcalibcat = psfcat.replace('.cat', '.calib.cat')
+    with fits.open(cat) as hdul1:
+        data = hdul[2].data
+        hdul1[2].data = data[np.isin(data['NUMBER'], source_ids)]
+        
 
     # now solve for the zeropoint
     solve_zeropoint(frame, psfcat, psf, zp_fid=27.5)
