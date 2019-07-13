@@ -57,7 +57,7 @@ def medg(frame, weight=None):
         f[0].header['SKYSIG'] = var
         f[0].header['MEDSKY'] = med
 
-        f[0].header.comments['LMT_MG'] = '3-sig limiting mag'
+        f[0].header.comments['LMT_MG'] = '5-sig limiting mag'
         f[0].header.comments['SKYSIG'] = 'Median skysig in cts'
         f[0].header.comments['MEDSKY'] = 'Median sky in cts'
 
