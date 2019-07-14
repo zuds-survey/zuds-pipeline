@@ -74,7 +74,8 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None, method='psf'):
 
     cat = parse_sexcat(cat, bin=True)
     cat = cat[cat['FLAGS'] == 0]
-    cat = cat[cat['FLUX_PSF'] / cat['FLUXERR_PSF'] > 20]
+    key = 'PSF' if method == 'psf' else 'AUTO'
+    cat = cat[cat[f'FLUX_{key}'] / cat[f'FLUXERR_{key}'] > 20]
 
     query_dict = {'flt':band, 'ra_ll':ra_ll, 'dec_ll':dec_ll,
                   'ra_lr':ra_lr, 'dec_lr':dec_lr, 'ra_ul':ra_ul,
