@@ -130,7 +130,7 @@ def make_variance(frames, masks, logger=None, extra={}):
             logger.info('Working image %s' % frame, extra=extra)
 
         # get the zeropoint from the fits header using fortran
-        calibrate(frame)
+        calibrate(frame, astrometry=False)
 
 
 
