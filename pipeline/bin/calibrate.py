@@ -83,7 +83,12 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
 
     for key in query_dict:
         query_dict[key] = str(query_dict[key])
-    cursor.execute(matchquery.format(**query_dict))
+
+    try:
+        cursor.execute(matchquery.format(**query_dict))
+    except Exception as e:
+        print(matchquery, image, cat, flush=True)
+        raise e
 
     result = np.array(cursor.fetchall(), dtype=[('id','<i8'),
                                                 ('ra','<f8'),

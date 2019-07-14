@@ -171,7 +171,7 @@ if __name__ == '__main__':
                             .order_by(db.Reference.id.desc())\
                             .first()
 
-        if ref is None:
+        if ref is None or options['force']:
             # we need a reference
             try:
                 template_dependencies, remaining_images, ref = submit_template(variance_dependencies,
