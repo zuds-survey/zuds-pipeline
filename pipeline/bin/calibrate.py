@@ -31,7 +31,7 @@ def parse_sexcat(cat, bin=False):
     return data
 
 
-def zpsee(image, cat, cursor, zp_fid, inhdr=None):
+def zpsee(image, cat, cursor, zp_fid, inhdr=None, method='psf'):
     """Compute the median zeropoint of an image or images (path/paths:
     `im_or_ims`) using the Pan-STARRS photometric database (cursor:
     `cursor`)."""
@@ -102,7 +102,10 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     seeings = []
 
     cat_coords = SkyCoord(ra=cat['X_WORLD'] * u.degree, dec=cat['Y_WORLD'] * u.degree)
+
+    # this SHOULD be all stars
     db_coords = SkyCoord(ra=result['ra'] * u.degree, dec=result['dec'] * u.degree)
+
     try:
         idx, d2d, _ = cat_coords.match_to_catalog_sky(db_coords)
     except ValueError as e:
@@ -118,7 +121,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     for cat_row, i, d in zip(cat, idx, d2d):
         if d <= 1 * u.arcsec:
             ps1_mag = result[i]['mag']
-            sex_mag = cat_row['MAG_PSF']
+            sex_mag = cat_row[f'MAG_{"PSF" if method == "psf" else "AUTO"}']
             zp = zp_fid + ps1_mag - sex_mag
             seeing = cat_row['FWHM_IMAGE'] * 1.013
             zps.append(zp)
@@ -128,7 +131,7 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     return np.median(zps), np.median(seeings)
 
 
-def solve_zeropoint(image, cat, psf, zp_fid=27.5):
+def solve_zeropoint(image, cat, zp_fid=27.5, method='psf'):
 
     import psycopg2
 
@@ -143,7 +146,7 @@ def solve_zeropoint(image, cat, psf, zp_fid=27.5):
         inhdr = image.replace('.fits', '.head')
         if not os.path.exists(inhdr):
             inhdr = None
-        zp, seeing = zpsee(image, cat, cursor, zp_fid, inhdr=inhdr)
+        zp, seeing = zpsee(image, cat, cursor, zp_fid, inhdr=inhdr, method=method)
 
     with fits.open(image, mode='update', memmap=False) as f:
         f[0].header['MAGZP'] = zp
@@ -175,7 +178,7 @@ def write_starcat(cat):
     hdul.close()
 
 
-def calibrate(frame, astrometry=True, reuse_psf=False):
+def calibrate(frame, astrometry=True, psf=True, reuse_psf=False):
     # astrometrically and photometrically calibrate a ZTF frame using
     # PSF fitting and gaia
 
@@ -211,26 +214,34 @@ def calibrate(frame, astrometry=True, reuse_psf=False):
             else:
                 break
 
+    if psf:
 
-    # now get a model of the psf
-    cmd = f'psfex -c {psfconf} {cat}'
-    psf = frame.replace('.fits', '.psf')
+        # now get a model of the psf
+        cmd = f'psfex -c {psfconf} {cat}'
+        psf = frame.replace('.fits', '.psf')
 
-    # if the psf already exists then use it if requested
-    if not (reuse_psf and os.path.exists(psf)):
-        subprocess.check_call(cmd.split())
+        # if the psf already exists then use it if requested
+        if not (reuse_psf and os.path.exists(psf)):
+            subprocess.check_call(cmd.split())
 
     # now do photometry by fitting the psf model to the image
 
-    cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PSF_NAME {psf} -PARAMETERS_NAME {photparams} {nnwfilt} {frame}'
+    cmd = f'sex -c {sexphotconf} -CATALOG_NAME {cat} -PARAMETERS_NAME {photparams if psf else sexparam} ' \
+          f'{nnwfilt} {frame}'
+
+    if psf:
+        cmd += f' -PSF_NAME {psf}'
+
     subprocess.check_call(cmd.split())
 
-    # write a catalog of the stellar sources only
-    write_starcat(cat)
-    starcat = cat.replace('.cat', '.star.cat')
+    if psf:
+        # write a catalog of the stellar sources only
+        write_starcat(cat)
+        starcat = cat.replace('.cat', '.star.cat')
 
     # now solve for the zeropoint using the stellar sources
-    solve_zeropoint(frame, starcat, psf, zp_fid=27.5)
+    solve_zeropoint(frame, cat if not psf else starcat,
+                    zp_fid=27.5, method='psf' if psf else 'auto')
 
     with fits.open(frame) as hdul:
         zp = hdul[0].header['MAGZP']
@@ -245,8 +256,9 @@ def calibrate(frame, astrometry=True, reuse_psf=False):
             if key.startswith('MAG_'):
                 hdul[2].data[key] += zpdiff
 
-    # now write the calibrated star catalog
-    write_starcat(cat)
+    if psf:
+        # now write the calibrated star catalog
+        write_starcat(cat)
 
     # now make the inverse variance map using fortran
     wgtname = frame.replace('fits', 'weight.fits')
@@ -259,24 +271,25 @@ def calibrate(frame, astrometry=True, reuse_psf=False):
     # and make the bad pixel masks and rms images
     make_rms(frame, wgtname)
 
-    # and save it as a fits model
-    gsmod = des.DES_PSFEx(psf)
-    with fits.open(psf) as f:
-        xcen = f[1].header['POLZERO1']
-        ycen = f[1].header['POLZERO2']
-        psfsamp = f[1].header['PSF_SAMP']
+    if psf:
 
-    cpos = galsim.PositionD(xcen, ycen)
-    psfmod = gsmod.getPSF(cpos)
-    psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
+        # and save it as a fits model
+        gsmod = des.DES_PSFEx(psf)
+        with fits.open(psf) as f:
+            xcen = f[1].header['POLZERO1']
+            ycen = f[1].header['POLZERO2']
 
-    # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-    psfimg.wcs = None
-    psfimg = galsim.Image(np.fliplr(psfimg.array))
+        cpos = galsim.PositionD(xcen, ycen)
+        psfmod = gsmod.getPSF(cpos)
+        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
 
-    psfimpath = f'{psf}.fits'
-    # save it to the D
-    psfimg.write(psfimpath)
+        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
+        psfimg.wcs = None
+        psfimg = galsim.Image(np.fliplr(psfimg.array))
+
+        psfimpath = f'{psf}.fits'
+        # save it to the D
+        psfimg.write(psfimpath)
 
     medg(frame)
 

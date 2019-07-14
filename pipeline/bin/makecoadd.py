@@ -282,4 +282,4 @@ if __name__ == '__main__':
         # Add the sky back in as a constant
         f[0].data += 150.
 
-    calibrate(out, astrometry=False)
+    calibrate(out, astrometry=False, psf=False)
