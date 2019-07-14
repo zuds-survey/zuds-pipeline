@@ -461,37 +461,6 @@ def make_sub(myframes, mytemplates, publish=True):
             subpix = f[0].data
             wcs = WCS(header)
 
-        subpixvar = (0.5 * (np.percentile(subpix, 84) - np.percentile(subpix, 16.)))**2
-
-        # estimate the variance in psf fit fluxes
-        subcorners = wcs.calc_footprint()
-        subminra = subcorners[:, 0].min()
-        submaxra = subcorners[:, 0].max()
-        dra = submaxra - subminra
-        submindec = subcorners[:, 1].min()
-        submaxdec = subcorners[:, 1].max()
-        ddec = submaxdec - submindec
-
-        subminra += 0.1 * dra
-        submaxra -= 0.1 * dra
-        submindec += 0.1 * ddec
-        submaxdec -= 0.1 * ddec
-
-        psfimpath = frame.replace('.fits', '.psf.fits')
-
-        fluxes = []
-        for i in range(1000):
-            ra = np.random.uniform(subminra, submaxra)
-            dec = np.random.uniform(submindec, submaxdec)
-            pobj = yao_photometry_single(sub, psfimpath, ra, dec)
-            fluxes.append(pobj.Fpsf)
-
-        subpsffluxvar = (0.5 * (np.percentile(fluxes, 84) - np.percentile(fluxes, 16.)))**2
-        beta = subpsffluxvar / subpixvar
-
-        with fits.open(sub, mode='update') as f:
-            f[0].header['BETA'] = beta
-
         # Make the subtraction catalogs
         clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
 
