@@ -36,26 +36,26 @@ def zpsee(image, cat, cursor, zp_fid, inhdr=None):
     `im_or_ims`) using the Pan-STARRS photometric database (cursor:
     `cursor`)."""
 
-    hd = fits.Header()
-
     with fits.open(image) as f:
         band = f[0].header['FILTER'][-1].lower() + '_median'
         nax1 = f[0].header['NAXIS1']
         nax2 = f[0].header['NAXIS2']
         std = f[0].header['FILTER'][-1].lower() + '_stdev'
-
-    hd['NAXIS1'] = nax1
-    hd['NAXIS2'] = nax2
+        hd = f[0].header
 
     if inhdr is not None:
+        hd = fits.Header()
+
+        hd['NAXIS1'] = nax1
+        hd['NAXIS2'] = nax2
+
         with open(inhdr, 'r') as f:
             for line in list(f.read().split('\n')):
                 card = fits.Card.fromstring(line.strip())
                 hd.append(card)
 
-    hd['CTYPE1'] = 'RA---TPV'
-    hd['CTYPE2'] = 'DEC--TPV'
-
+        hd['CTYPE1'] = 'RA---TPV'
+        hd['CTYPE2'] = 'DEC--TPV'
 
 
     try:
