@@ -524,7 +524,7 @@ class MultiEpochSubtraction(StackMixin, SubtractionMixin, models.Base):
     stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
     stack = relationship('Stack', back_populates='subtraction', cascade='all')
 
-    detections = relationship('StackDetections', cascade='all')
+    detections = relationship('StackDetection', cascade='all')
 
 
 class StackThumbnail(models.Base):
