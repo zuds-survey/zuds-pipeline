@@ -90,14 +90,18 @@ def load_catalog(catpath, refpath, newpath, subpath):
                 wcs.append(WCS(hdu[0].header))
                 vdict[t] = zscale.get_limits(data)
 
+                if t == 'sub':
+                    zp = hdu[0].header['MAGZP']
+                
+
         for row in gooddata:
 
             ra = row['X_WORLD']
             dec = row['Y_WORLD']
             flux = row['FLUX_AUTO']
             fluxerr = row['FLUXERR_AUTO']
-            zp = row['MAGZP']
             zpsys = 'ab'
+            
 
             try:
                 obsmjd = imheader['MJDEFF']
