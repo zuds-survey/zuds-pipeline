@@ -292,7 +292,7 @@ models.Photometry.method = sa.Column(sa.Text)
 models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
 models.Source.stack_detections = relationship('StackDetection', cascade='all')
-
+models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all')
 
 def light_curve(self):
     photometry = self.photometry
@@ -526,7 +526,7 @@ class StackThumbnail(models.Base):
     origin = sa.Column(sa.String, nullable=True)
     stackdetection_id = sa.Column(sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
                                   nullable=False, index=True)
-    stackdetection = relationship('StackDetection', back_populates='stack_thumbnails', cascade='all')
+    stackdetection = relationship('StackDetection', back_populates='thumbnails', cascade='all')
     source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
                           secondary='stackdetections', cascade='all')
 
