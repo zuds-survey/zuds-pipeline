@@ -259,7 +259,7 @@ class StackDetection(models.Base):
 
     mjd = sa.Column(sa.Float)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
-    source = relationship('Source', back_populates='stack_detections', cascade='all')
+    source = relationship('Source', back_populates='stackdetections', cascade='all')
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
@@ -534,7 +534,7 @@ class StackThumbnail(models.Base):
     file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     origin = sa.Column(sa.String, nullable=True)
-    stackdetection_id = sa.Column(sa.ForeignKey('stack_detections.id', ondelete='CASCADE'),
+    stackdetection_id = sa.Column(sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
                                   nullable=False, index=True)
     stackdetection = relationship('StackDetection', back_populates='thumbnails', cascade='all')
     source = relationship('Source', back_populates='thumbnails', uselist=False,
