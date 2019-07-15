@@ -256,6 +256,8 @@ class StackDetection(models.Base):
     zp = sa.Column(sa.Float)
     zpsys = sa.Column(sa.Text)
     maglimit = sa.Column(sa.Float)
+    filter = sa.Column(sa.Text)
+
 
     mjd = sa.Column(sa.Float)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
@@ -265,6 +267,8 @@ class StackDetection(models.Base):
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
+
+
 
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
