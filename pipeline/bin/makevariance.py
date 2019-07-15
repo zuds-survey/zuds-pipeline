@@ -82,7 +82,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 news="{gframes}"
 masks="{gmasks}"
-srun -n 64 shifter python /pipeline/bin/makevariance.py --input-frames $news --input-masks $masks --wait
+srun -n 64 shifter {os.getenv("ESTRING")} python /pipeline/bin/makevariance.py --input-frames $news --input-masks $masks --wait
 '''
 
         if job_script_destination is None:

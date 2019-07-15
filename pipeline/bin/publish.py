@@ -142,7 +142,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
         for point in photpoints:
             result = db.DBSession().execute(srcquery, {'ra': point.ra, 'dec': point.dec}).fetchall()
             if len(result) > 0:
-                source = db.Source.query.get(result[0]['id'])
+                source = db.models.Source.query.get(result[0]['id'])
                 point.source = source
 
                 # update source RA and DEC

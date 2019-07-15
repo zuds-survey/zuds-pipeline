@@ -115,6 +115,9 @@ environment_variables = {
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 
+environment_variables['ESTRING'] = estring
+
+estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 
 with open('shifter.sh', 'w') as f:
     f.write(f'''#!/bin/bash

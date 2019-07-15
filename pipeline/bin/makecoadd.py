@@ -120,11 +120,11 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-shifter python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
+shifter {os.getenv("ESTRING")} python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
 
 if [ $? -eq 0 ]; then 
 
-shifter python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
+shifter {os.getenv("ESTRING")} python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
 
 fi
 
