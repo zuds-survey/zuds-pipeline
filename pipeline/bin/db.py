@@ -448,7 +448,6 @@ class SubtractionMixin(FITSBase):
     fsig00 = sa.Column(sa.Float)
     fscat00 = sa.Column(sa.Float)
     x2nrm00 = sa.Column(sa.Float)
-    nx2nrm00 = sa.Column(sa.Integer)
     dmean00 = sa.Column(sa.Float)
     dsige00 = sa.Column(sa.Float)
     dsig00 = sa.Column(sa.Float)
@@ -529,7 +528,7 @@ class StackThumbnail(models.Base):
     source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
                           secondary='stackdetections', cascade='all')
 
-    models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
+models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
 models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id', ondelete='CASCADE'))
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
