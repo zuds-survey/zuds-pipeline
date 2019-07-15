@@ -288,8 +288,6 @@ models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ond
 models.Photometry.image = relationship('Image', back_populates='photometry')
 models.Photometry.provenance = sa.Column(sa.Text)
 models.Photometry.method = sa.Column(sa.Text)
-models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtraction.id', ondelete='CASCADE'))
-models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
 models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
@@ -533,6 +531,8 @@ class StackThumbnail(models.Base):
                           secondary='stackdetections', cascade='all')
 
 
+models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtraction.id', ondelete='CASCADE'))
+models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
 
 def create_ztf_groups_if_nonexistent():
