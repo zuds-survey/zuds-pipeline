@@ -94,8 +94,8 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
             ra = row['X_WORLD']
             dec = row['Y_WORLD']
-            flux = row['FLUX_PSF']
-            fluxerr = row['FLUXERR_PSF']
+            flux = row['FLUX_AUTO']
+            fluxerr = row['FLUXERR_AUTO']
             zp = row['MAGZP']
             zpsys = 'ab'
 
@@ -106,10 +106,13 @@ def load_catalog(catpath, refpath, newpath, subpath):
             filter = 'ztf' + imheader['FILTERCODE'][-1].lower()
             limmag = imheader['LMT_MG']
 
+            sub_id = os.getenv('subid')
+
             photpoint = db.StackDetection(ra=ra, dec=dec, flux=flux,
                                           fluxerr=fluxerr, zp=zp, zpsys=zpsys,
                                           filter=filter, mjd=obsmjd, maglimit=limmag,
-                                          provenance='gn', method='psf')
+                                          provenance='gn', method='auto',
+                                          subtraction_id=int(sub_id))
 
             photpoints.append(photpoint)
             db.DBSession().add(photpoint)
@@ -139,8 +142,11 @@ def load_catalog(catpath, refpath, newpath, subpath):
                 point.source = source
 
                 # update source RA and DEC
-                source.ra = np.median([p.ra for p in source.photometry])
-                source.dec = np.median([p.dec for p in source.photometry])
+
+
+
+                source.ra = np.median([p.ra for p in source.stack_detections])
+                source.dec = np.median([p.dec for p in source.stack_detections])
 
 
             else:
@@ -164,11 +170,11 @@ def load_catalog(catpath, refpath, newpath, subpath):
                     db.DBSession().add(s)
                     db.DBSession().commit()
 
-                    firstpoint = sorted(points, key=lambda p: p.observed_at)[0]
+                    bestpoint = sorted(points, key=lambda p: p.flux / p.fluxerr)[-1]
 
                     for t in ['ref', 'new', 'sub']:
-                        thumb = db.models.Thumbnail(type=t, photometry_id=firstpoint.id,
-                                          public_url=f'http://portal.nersc.gov/project/astro250/stamps/{firstpoint.id}.{t}.png')
+                        thumb = db.StackThumbnail(type=t, stackdetection_id=bestpoint.id,
+                                                  public_url=f'http://portal.nersc.gov/project/astro250/stamps/{firstpoint.id}.{t}.png')
                         db.DBSession().add(thumb)
 
                     s.add_linked_thumbnails()

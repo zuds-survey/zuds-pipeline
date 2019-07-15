@@ -121,6 +121,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             # log the stack to the database
             stack = db.Stack(disk_path=f'{coadd_name}', field=int(field), ccdid=int(ccdnum), qid=int(quadrant),
                              filtercode=band)
+
             db.DBSession().add(stack)
             db.DBSession().commit()
 
@@ -214,7 +215,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
                 frame = j['frame']
                 execstr = f'shifter python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
-                          f'--science-frames {frame} --templates {template} &&' \
+                          f'--science-frames {frame} --templates {template}  --no-publish &&' \
                           f'shifter python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
                           f'{j["sub"].disk_path} {j["sub"].id} SingleEpochSubtraction &\n'
 

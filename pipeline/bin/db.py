@@ -247,8 +247,9 @@ class StackDetection(models.Base):
 
     ra = sa.Column(psql.DOUBLE_PRECISION)
     dec = sa.Column(psql.DOUBLE_PRECISION)
-    stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
-    stack = relationship('Stack', back_populates='detections', cascade='all')
+
+    subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('multiepochsubtractions.id', ondelete='CASCADE'))
+    subtraction = relationship('MultiEpochSubtraction', back_populates='detections', cascade='all')
 
     flux = sa.Column(sa.Float)
     fluxerr = sa.Column(sa.Float)
@@ -490,6 +491,8 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
     image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
     image = relationship('Image', back_populates='subtraction')
 
+    photometry = relationship('Photometry', cascade='all')
+
 
 class StackMixin(FITSBase):
 
@@ -507,8 +510,6 @@ class Stack(StackMixin, models.Base):
     subtraction = relationship('MultiEpochSubtraction', back_populates='stack', cascade='all')
     images = relationship('Image', cascade='all', secondary='stack_images')
 
-    detections = relationship('StackDetection', cascade='all')
-
 
 class Reference(StackMixin, models.Base):
     images = relationship('Image', cascade='all', secondary='reference_images')
@@ -522,6 +523,25 @@ class MultiEpochSubtraction(StackMixin, SubtractionMixin, models.Base):
 
     stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
     stack = relationship('Stack', back_populates='subtraction', cascade='all')
+
+    detections = relationship('StackDetections', cascade='all')
+
+
+class StackThumbnail(models.Base):
+    type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'ps1', "new_gz",
+                             'ref_gz', 'sub_gz',
+                             name='thumbnail_types', validate_strings=True))
+    file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
+    public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
+    origin = sa.Column(sa.String, nullable=True)
+    stackdetection_id = sa.Column(sa.ForeignKey('stack_detections.id', ondelete='CASCADE'),
+                                  nullable=False, index=True)
+    stackdetection = relationship('StackDetection', back_populates='thumbnails', cascade='all')
+    source = relationship('Source', back_populates='thumbnails', uselist=False,
+                          secondary='photometry', cascade='all')
+
+
+
 
 def create_ztf_groups_if_nonexistent():
     groups = [1, 2, 3]
@@ -560,6 +580,7 @@ def create_ztf_groups_if_nonexistent():
         ztf = models.Instrument(name='ZTF', type='Camera', band='optical', telescope=p48)
         DBSession().add(ztf)
         DBSession().commit()
+
 
 def refresh_tables_groups():
     create_tables()
