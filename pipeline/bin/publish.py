@@ -92,7 +92,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
                 if t == 'sub':
                     zp = hdu[0].header['MAGZP']
-                
+
 
         for row in gooddata:
 
@@ -101,7 +101,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
             flux = row['FLUX_AUTO']
             fluxerr = row['FLUXERR_AUTO']
             zpsys = 'ab'
-            
+
 
             try:
                 obsmjd = imheader['MJDEFF']
@@ -127,7 +127,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
             stamps = {}
 
             for key, p, w in zip(['ref', 'new', 'sub'], pix, wcs):
-                name = os.path.join(os.getenv('STAMP_DIR'), f'{photpoint.id}.{key}.png')
+                name = os.path.join(os.getenv('STAMP_DIRECTORY'), f'{photpoint.id}.{key}.png')
                 make_stamp(name, photpoint.ra, photpoint.dec, vdict[key][0], vdict[key][1], p, w)
                 stamps[f'{key}file'] = name
             triplets.append(stamps)
