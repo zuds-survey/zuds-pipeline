@@ -531,7 +531,7 @@ class StackThumbnail(models.Base):
                           secondary='stackdetections', cascade='all')
 
 
-models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtraction.id', ondelete='CASCADE'))
+models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id', ondelete='CASCADE'))
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
 
