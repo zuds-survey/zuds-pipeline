@@ -127,7 +127,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
             stamps = {}
 
             for key, p, w in zip(['ref', 'new', 'sub'], pix, wcs):
-                name = f'/stamps/{photpoint.id}.{key}.png'
+                name = os.path.join(os.getenv('STAMP_DIR'), f'{photpoint.id}.{key}.png')
                 make_stamp(name, photpoint.ra, photpoint.dec, vdict[key][0], vdict[key][1], p, w)
                 stamps[f'{key}file'] = name
             triplets.append(stamps)

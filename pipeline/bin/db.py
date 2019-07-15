@@ -248,7 +248,7 @@ class StackDetection(models.Base):
     ra = sa.Column(psql.DOUBLE_PRECISION)
     dec = sa.Column(psql.DOUBLE_PRECISION)
 
-    subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('multiepochsubtractions.id', ondelete='CASCADE'))
+    subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('multiepochsubtractions.id', ondelete='CASCADE', index=True))
     subtraction = relationship('MultiEpochSubtraction', back_populates='detections', cascade='all')
 
     flux = sa.Column(sa.Float)
@@ -260,7 +260,7 @@ class StackDetection(models.Base):
 
 
     mjd = sa.Column(sa.Float)
-    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
+    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='CASCADE', index=True))
     source = relationship('Source', back_populates='stack_detections', cascade='all')
 
     thumbnails = relationship('StackThumbnail', cascade='all')
@@ -533,7 +533,8 @@ class StackThumbnail(models.Base):
                           secondary='stackdetections', cascade='all')
 
 models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
-models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id', ondelete='CASCADE'))
+models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id',
+                                                                       ondelete='CASCADE', index=True))
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
 
