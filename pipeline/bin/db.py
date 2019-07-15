@@ -288,7 +288,7 @@ models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ond
 models.Photometry.image = relationship('Image', back_populates='photometry')
 models.Photometry.provenance = sa.Column(sa.Text)
 models.Photometry.method = sa.Column(sa.Text)
-models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtraction.id', cascade='all'))
+models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtraction.id', ondelete='CASCADE'))
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
 models.Source.images = property(images)
