@@ -261,7 +261,7 @@ class StackDetection(models.Base):
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source', back_populates='stack_detections', cascade='all')
 
-    thumbnail_id = sa.Column(sa.Integer, sa.ForeignKey)
+    thumbnails = relationship('StackThumbnail', cascade='all')
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
