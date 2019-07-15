@@ -462,7 +462,7 @@ class SubtractionMixin(FITSBase):
     diffim = sa.Column(sa.Text)
     nregion = sa.Column(sa.Integer)
     maskval = sa.Column(sa.Float)
-    kerinfo = sa.Column(sa.Float)
+    kerinfo = sa.Column(sa.Boolean)
 
     @declared_attr
     def reference_id(self):
@@ -529,7 +529,7 @@ class StackThumbnail(models.Base):
     source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
                           secondary='stackdetections', cascade='all')
 
-models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
+    models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
 models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id', ondelete='CASCADE'))
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
