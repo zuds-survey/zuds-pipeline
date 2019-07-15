@@ -530,7 +530,7 @@ class MultiEpochSubtraction(StackMixin, SubtractionMixin, models.Base):
 class StackThumbnail(models.Base):
     type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'ps1', "new_gz",
                              'ref_gz', 'sub_gz',
-                             name='thumbnail_types', validate_strings=True))
+                             name='stackthumbnail_types', validate_strings=True))
     file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
     origin = sa.Column(sa.String, nullable=True)
