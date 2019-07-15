@@ -52,6 +52,8 @@ pythonpath = "/global/cscratch1/sd/ztfproc/shifter-python:" \
              "/global/cscratch1/sd/ztfproc/skyportal:" \
              "/global/cscratch1/sd/dgold/lensgrinder/pipeline/bin"
 
+stamp_directory = '/global/project/projectdirs/astro250/www/stamps'
+
 
 kowalski_username = 'danny'
 kowalski_password = '***REMOVED***'
@@ -66,7 +68,8 @@ volume_mounts = {
     f'/global/homes/{nersc_username[0].lower()}/{nersc_username}': '/home/desi',
     os.path.join(lensgrinder_home, 'pipeline', 'astromatic'): '/astromatic',
     lensgrinder_home: '/lg',
-    skyportal_home: '/skyportal'
+    skyportal_home: '/skyportal',
+    stamp_directory: '/stamps'
 }
 
 vstring = ';'.join([f'{k}:{volume_mounts[k]}' for k in volume_mounts])
@@ -105,11 +108,12 @@ environment_variables = {
     'HITS_DBNAME': hits_dbname,
     'PYTHONPATH': pythonpath,
     'KOWALSKI_USERNAME': kowalski_username,
-    'KOWALSKI_PASSWORD': kowalski_password
+    'KOWALSKI_PASSWORD': kowalski_password,
+    'STAMP_DIRECTORY': stamp_directory
 }
 
-estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 
+estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 
 
 with open('shifter.sh', 'w') as f:
