@@ -115,7 +115,7 @@ environment_variables = {
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 
-environment_variables['ESTRING'] = estring
+environment_variables['ESTRING'] = estring.replace('\'', '\\\'')
 
 estring = ' '.join([f" -e {k}='{environment_variables[k]}'" for k in environment_variables])
 
