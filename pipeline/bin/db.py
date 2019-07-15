@@ -259,7 +259,9 @@ class StackDetection(models.Base):
 
     mjd = sa.Column(sa.Float)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
-    source = relationship('Source', back_populates='stackdetections', cascade='all')
+    source = relationship('Source', back_populates='stack_detections', cascade='all')
+
+    thumbnail_id = sa.Column(sa.Integer, sa.ForeignKey)
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
@@ -308,18 +310,6 @@ def light_curve(self):
     return Table(lc_raw)
 
 models.Source.light_curve = light_curve
-
-class StackTask(models.Base):
-
-    stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='SET NULL'), default=None)
-    #stack = relationship('Stack', back_populates='tasks', cascade='all')
-    status = sa.Column(sa.Boolean, default=None)
-    reason = sa.Column(sa.Text, nullable=True)
-    outfile_name = sa.Column(sa.Text)
-    image_type = sa.Column(sa.Text)
-    images = relationship('Image', secondary='stacktask_images')
-
-StackTaskImage = join_model('stacktask_images', StackTask, Image)
 
 
 class FilterRun(models.Base):
@@ -536,9 +526,9 @@ class StackThumbnail(models.Base):
     origin = sa.Column(sa.String, nullable=True)
     stackdetection_id = sa.Column(sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
                                   nullable=False, index=True)
-    stackdetection = relationship('StackDetection', back_populates='thumbnails', cascade='all')
-    source = relationship('Source', back_populates='thumbnails', uselist=False,
-                          secondary='photometry', cascade='all')
+    stackdetection = relationship('StackDetection', back_populates='stack_thumbnails', cascade='all')
+    source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
+                          secondary='stackdetections', cascade='all')
 
 
 
