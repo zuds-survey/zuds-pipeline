@@ -539,6 +539,25 @@ models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleep
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
 
+def add_linked_thumbnails(self):
+
+    bestpoint = max(self.stack_detections, key=lambda p: p.flux / p.fluxerr)
+
+    sdss_thumb = StackThumbnail(stackdetection=bestpoint,
+                                public_url=self.get_sdss_url(),
+                                type='sdss')
+
+    ps1_thumb = StackThumbnail(stackdetection=bestpoint,
+                               public_url=self.get_panstarrs_url(),
+                               type='ps1')
+
+    DBSession().add_all([sdss_thumb, ps1_thumb])
+    DBSession().commit()
+
+
+models.Source.add_linked_thumbnails = add_linked_thumbnails
+
+
 def create_ztf_groups_if_nonexistent():
     groups = [1, 2, 3]
     group_names = ['MSIP/Public', 'Partnership', 'Caltech']
