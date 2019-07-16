@@ -26,6 +26,10 @@ from astropy.coordinates import SkyCoord
 
 from astropy.table import Table
 
+import requests
+
+from download import safe_download
+
 
 from baselayer.app.env import load_env
 from datetime import datetime
@@ -503,10 +507,21 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
         psf_path = self.image.disk_psf_path
         sub_path = self.disk_path
 
+        # we want a model of the PSF on the science image only. we download this here from ipac
+        # note the difference image psfs are not correct as they use a convolved science image
 
         if self.image.instrument is None:
             self.image.instrument_id = 1
             DBSession().add(self)
+            DBSession().commit()
+
+        if psf_path is None or psf_path.endswith('diffimgpsf.fits'):
+            # need to download the psf
+            target = self.image.ipac_path('sciimgdaopsfcent.fits')
+            dest = self.image.disk_path('sciimgdaopsfcent.fits')
+            safe_download(target, dest)
+            self.image.disk_psf_path = dest
+            DBSession().add(self.image)
             DBSession().commit()
 
         # for all the remaining sources do forced photometry
