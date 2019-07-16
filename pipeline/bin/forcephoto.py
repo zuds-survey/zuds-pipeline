@@ -62,7 +62,7 @@ def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_dest
 
     estring = os.getenv("ESTRING").replace(r"\x27", "'")
 
-    for i, ch in chunk(subtraction_dependencies.keys(), batch_size):
+    for i, ch in chunk(list(subtraction_dependencies.keys()), batch_size):
 
         my_deps = list(set([subtraction_dependencies[key] for key in ch]))
         dependency_string = ':'.join(list(map(str, set(my_deps))))
