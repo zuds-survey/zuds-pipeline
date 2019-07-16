@@ -130,6 +130,7 @@ if __name__ == '__main__':
     rank = comm.Get_rank()
     size = comm.Get_size()
     status = MPI.Status()
+    from libztf import ipac_authenticate
 
     import sys
     sub_ids = list(map(int, sys.argv[1:]))
@@ -137,11 +138,18 @@ if __name__ == '__main__':
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
 
-    logging.basicConfig(format=f'[(Rank {rank:04d}) %(asctime)s] %(message)s',
-                        datefmt='%m/%d/%Y %I:%M:%S',
-                        level=logging.INFO)
+    FORMAT = '[%(asctime)-15s]: %(message)s'
+    logger = logging.getLogger('main')
+    logger.setLevel(logging.DEBUG)
+    fmter = logging.Formatter(fmt=FORMAT)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(fmter)
+    logger.addHandler(handler)
+
+    cookie = ipac_authenticate()
 
     if rank == 0:
+
         num_workers = size - 1
         task_index = 1
         closed_workers = 0
@@ -199,7 +207,7 @@ if __name__ == '__main__':
                     my_subtask = (task_index - 1) * CHUNK_SIZE + i + 1
                     logging.info(f'Forcing photometry on image "{image.disk_path}"')
                     try:
-                        image.force_photometry()
+                        image.force_photometry(cookie, logger)
                     except FileNotFoundError as e:
                         logging.error(e)
 

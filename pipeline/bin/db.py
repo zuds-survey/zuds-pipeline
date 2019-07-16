@@ -490,7 +490,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
 
     photometry = relationship('Photometry', cascade='all')
 
-    def force_photometry(self):
+    def force_photometry(self, cookie, logger):
 
         sources_contained = self.image.sources
         sources_contained_ids = [s.id for s in sources_contained]
@@ -519,7 +519,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
             # need to download the psf
             target = self.image.ipac_path('sciimgdaopsfcent.fits')
             dest = self.image.disk_path('sciimgdaopsfcent.fits')
-            safe_download(target, dest)
+            safe_download(target, dest, cookie, logger)
             self.image.disk_psf_path = dest
             DBSession().add(self.image)
             DBSession().commit()
