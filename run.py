@@ -215,5 +215,6 @@ if __name__ == '__main__':
 
         from forcephoto import submit_forcephoto
 
-        submit_forcephoto(sub_dependencies, job_script_destination=jobscripts, log_destination=logs,
+        submit_forcephoto(sub_dependencies, coaddsub_dependencies,
+                          job_script_destination=jobscripts, log_destination=logs,
                           frame_destination=framepath, task_name=task_name)

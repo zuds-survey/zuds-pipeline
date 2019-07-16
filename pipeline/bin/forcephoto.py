@@ -44,7 +44,7 @@ def enum(*sequential, **named):
 # Define MPI message tags
 tags = enum('READY', 'DONE', 'EXIT', 'START')
 
-def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_destination='.',
+def submit_forcephoto(subtraction_dependencies, detect_dependencies, batch_size=1024, job_script_destination='.',
                       log_destination='.', frame_destination='.', task_name=None):
 
 
@@ -66,6 +66,7 @@ def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_dest
     for i, ch in chunk(list(subtraction_dependencies.keys()), batch_size):
 
         my_deps = list(set([subtraction_dependencies[key] for key in ch]))
+        my_deps += list(set(detect_dependencies.values()))
         dependency_string = ':'.join(list(map(str, set(my_deps))))
         sublist = ch
         jobname = f'forcephoto.{task_name}.{sesub.field}.{sesub.ccdid}.{sesub.qid}.{sesub.filtercode}.{i}'
