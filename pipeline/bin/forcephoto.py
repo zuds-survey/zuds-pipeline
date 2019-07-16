@@ -59,6 +59,7 @@ def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_dest
     shifter_image = os.getenv('SHIFTER_IMAGE')
     volumes = os.getenv('VOLUMES')
 
+    sesub = db.DBSession().query(db.SingleEpochSubtraction).get(list(subtraction_dependencies.keys())[0])
 
     estring = os.getenv("ESTRING").replace(r"\x27", "'")
 
@@ -67,7 +68,7 @@ def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_dest
         my_deps = list(set([subtraction_dependencies[key] for key in ch]))
         dependency_string = ':'.join(list(map(str, set(my_deps))))
         sublist = ch
-        jobname = f'forcephoto.{task_name}.{i}'
+        jobname = f'forcephoto.{task_name}.{sesub.field}.{sesub.ccdid}.{sesub.qid}.{sesub.filtercode}.{i}'
 
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
