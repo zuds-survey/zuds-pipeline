@@ -503,6 +503,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
         psf_path = self.image.disk_psf_path
         sub_path = self.disk_path
 
+
         if self.image.instrument is None:
             self.image.instrument_id = 1
             DBSession().add(self)
@@ -517,6 +518,11 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
                 pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
             except IndexError:
                 continue
+            except OSError as e:
+                print(f'failing frame was {sub_path}')
+                print(f'failing psf was {psf_path}')
+                print(f'error was {e}')
+                raise e
             phot_point = models.Photometry(subtraction=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
                                            zp=self.magzp, zpsys='ab', lim_mag=self.image.maglimit,
                                            filter=self.filter, source=source, instrument=self.image.instrument,
