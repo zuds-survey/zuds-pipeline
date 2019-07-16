@@ -64,6 +64,8 @@ def submit_makevariance(frames, masks, batch_size=1024, job_script_destination=N
         gframes = '\n'.join(absframes)
         gmasks = '\n'.join(absmasks)
 
+        estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
         scriptstr = f'''#!/bin/bash
 #SBATCH -N 1
 #SBATCH -J var.{task_name}.{i}
@@ -82,7 +84,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 news="{gframes}"
 masks="{gmasks}"
-srun -n 64 shifter {os.getenv("ESTRING")} python /pipeline/bin/makevariance.py --input-frames $news --input-masks $masks --wait
+srun -n 64 shifter {estring} python /pipeline/bin/makevariance.py --input-frames $news --input-masks $masks --wait
 '''
 
         if job_script_destination is None:

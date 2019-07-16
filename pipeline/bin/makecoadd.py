@@ -103,6 +103,8 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
         db.DBSession().add(refim)
     db.DBSession().commit()
 
+    estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
     jobstr = f'''#!/bin/bash
 #SBATCH -N 1
 #SBATCH -J {jobname}
@@ -120,7 +122,7 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-shifter {os.getenv("ESTRING")} python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
+shifter {estring} python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
 
 if [ $? -eq 0 ]; then 
 

@@ -196,6 +196,8 @@ export USE_SIMPLE_THREADED_LEVEL3=1
 
 '''
 
+        estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
         if len(my_deps) == 0:
             jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
 
@@ -208,13 +210,13 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 frames = j['frames']
                 cats = [frame.replace('.fits', '.cat') for frame in frames]
                 coadd = j['coadd_name']
-                execstr = f'shifter {os.getenv("ESTRING")} bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\"' \
+                execstr = f'shifter {estring} bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\"' \
                           f' \"{coadd}\" \"{template}\" \"{j["sub"].id}\" \"{j["sub"].stack.id}\"' \
                           f' \"{j["sub"].disk_path}\"&\n'
             else:
 
                 frame = j['frame']
-                execstr = f'shifter {os.getenv("ESTRING")} python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
+                execstr = f'shifter {estring} python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
                           f'--science-frames {frame} --templates {template}  --no-publish &&' \
                           f'shifter python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
                           f'{j["sub"].disk_path} {j["sub"].id} SingleEpochSubtraction &\n'
