@@ -73,6 +73,8 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
 
+    dependency_dict = {}
+
     for (field, quadrant, band, ccdnum), group in science_metatable.groupby(['field',
                                                                              'qid',
                                                                              'filtercode',
