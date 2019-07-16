@@ -18,7 +18,7 @@ DB_FTP_USERNAME = 'root'
 DB_FTP_PASSWORD = 'root'
 DB_FTP_PORT = 222
 
-CHUNK_SIZE = 1000
+CHUNK_SIZE = 1
 
 
 # split an iterable over some processes recursively
@@ -86,7 +86,7 @@ def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_dest
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {sublist}  
+srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {' '.join(sublist)}  
 
 '''
 
@@ -131,6 +131,9 @@ if __name__ == '__main__':
     size = comm.Get_size()
     status = MPI.Status()
 
+    import sys
+    sub_ids = list(map(int, sys.argv[1:]))
+
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
 
@@ -143,12 +146,9 @@ if __name__ == '__main__':
         task_index = 1
         closed_workers = 0
 
-        images = db.DBSession().query(db.Image)\
-                               .filter(db.sa.and_(db.Image.ipac_gid == 2,
-                                                  db.Image.disk_sub_path != None,
-                                                  db.Image.disk_psf_path != None,
-                                                  db.sa.or_(db.Image.subtraction_exists != False,
-                                                            db.Image.subtraction_exists == None)))\
+        images = db.DBSession().query(db.SingleEpochSubtraction)\
+                               .filter(db.sa.and_(db.SingleEpochSubtraction.id.in_(sub_ids),
+                                                  db.SingleEpochSubtraction.image.has(db.Image.disk_psf_path != None)))\
                                .all()
 
         #  expunge all the images from the session before sending them to other ranks
@@ -197,7 +197,7 @@ if __name__ == '__main__':
                     db.DBSession().add(image)
 
                     my_subtask = (task_index - 1) * CHUNK_SIZE + i + 1
-                    logging.info(f'Forcing photometry on image "{image.path}" ({my_subtask} / {subtask_max})')
+                    logging.info(f'Forcing photometry on image "{image.disk_path}"')
                     try:
                         image.force_photometry()
                     except FileNotFoundError as e:
