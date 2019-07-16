@@ -179,7 +179,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             my_deps += j['dependencies']
         my_deps = ':'.join(list(map(str, set(my_deps))))
 
-        job_name = f'sub.{task_name}.{field}.{ccdnum}.{quadrant}.{filter}.bin{coadd_windowsize}.{i}'
+        job_name = f'sub.{task_name}.{field}.{ccdnum}.{quadrant}.{band}.bin{coadd_windowsize}.{i}'
 
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
