@@ -86,7 +86,7 @@ def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_dest
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {' '.join(sublist)}  
+srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {' '.join(list(map(str, sublist)))}  
 
 '''
 
