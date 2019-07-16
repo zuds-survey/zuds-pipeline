@@ -1,24 +1,25 @@
 clobber: false
 
 hpss:
-  object_name: null 
+  object_name: null
   preserve_directories: true
-  whereclause: "FIELD=764 AND CCDID=2"
+  whereclause: "FIELD=764 OR FIELD=792"
   exclude_masks: false
   skip: false
 
 makevariance:
-  batch_size: 128
+  batch_size: 1024
   skip: false
 
 template:
   nimages: 50
   start_date: 2017-12-20T00:00:00.0Z
-  end_date: 2018-05-21T00:00:00.0Z
+  end_date: 2018-10-21T00:00:00.0Z
   template_science_minsep_days: 0
+  force: false
 
 coaddsub:
   rolling: false
   coadd_windowsize: 7
-  batch_size : 32
+  batch_size : 64
 
