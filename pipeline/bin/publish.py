@@ -147,11 +147,20 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
                 # update source RA and DEC
 
+                points = source.stack_detections
+                bestpoint = max(points, key=lambda p: p.flux / p.fluxerr)
 
+                if point.id == bestpoint.id:
 
-                source.ra = np.median([p.ra for p in source.stack_detections])
-                source.dec = np.median([p.dec for p in source.stack_detections])
+                    for t in ['ref', 'new', 'sub']:
+                        thumb = db.StackThumbnail(type=t, stackdetection_id=bestpoint.id,
+                                                  public_url=f'http://portal.nersc.gov/project/astro250/stamps/{bestpoint.id}.{t}.png')
+                        db.DBSession().add(thumb)
 
+                    s.add_linked_thumbnails()
+    
+                    source.ra = bestpoint.ra
+                    source.dec = bestpoint.dec
 
             else:
                 result = [a[0] for a in db.DBSession().execute(detquery, {'ra':point.ra, 'dec':point.dec,
@@ -160,8 +169,11 @@ def load_catalog(catpath, refpath, newpath, subpath):
                     # create a new source
                     points = list(db.DBSession().query(db.StackDetection).filter(db.StackDetection.id.in_(result)).all())
                     points = points + [point]
-                    ra = np.median([p.ra for p in points])
-                    dec = np.median([p.dec for p in points])
+
+                    bestpoint = max(points, key=lambda p: p.flux / p.fluxerr)
+
+                    ra = bestpoint.ra
+                    dec = bestpoint.dec
 
                     seqquery = "SELECT nextval('namenum')"
                     num = db.DBSession().execute(seqquery).fetchone()[0]
@@ -174,11 +186,9 @@ def load_catalog(catpath, refpath, newpath, subpath):
                     db.DBSession().add(s)
                     db.DBSession().commit()
 
-                    bestpoint = sorted(points, key=lambda p: p.flux / p.fluxerr)[-1]
-
                     for t in ['ref', 'new', 'sub']:
                         thumb = db.StackThumbnail(type=t, stackdetection_id=bestpoint.id,
-                                                  public_url=f'http://portal.nersc.gov/project/astro250/stamps/{firstpoint.id}.{t}.png')
+                                                  public_url=f'http://portal.nersc.gov/project/astro250/stamps/{bestpoint.id}.{t}.png')
                         db.DBSession().add(thumb)
 
                     s.add_linked_thumbnails()

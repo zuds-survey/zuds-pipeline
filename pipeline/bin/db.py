@@ -297,6 +297,7 @@ models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
 models.Source.stack_detections = relationship('StackDetection', cascade='all')
 
+
 def light_curve(self):
     photometry = self.photometry
     lc_raw = []
