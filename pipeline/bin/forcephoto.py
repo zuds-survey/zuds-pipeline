@@ -146,7 +146,12 @@ if __name__ == '__main__':
     handler.setFormatter(fmter)
     logger.addHandler(handler)
 
-    cookie = ipac_authenticate()
+    if rank == 0:
+        cookie = ipac_authenticate()
+    else:
+        cookie = None
+
+    cookie = comm.bcast(cookie, root=0)
 
     if rank == 0:
 
