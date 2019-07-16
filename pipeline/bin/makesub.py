@@ -179,9 +179,11 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             my_deps += j['dependencies']
         my_deps = ':'.join(list(map(str, set(my_deps))))
 
+        job_name = f'sub.{task_name}.{field}.{ccdnum}.{quadrant}.{filter}.bin{coadd_windowsize}.{i}'
+
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
-#SBATCH -J sub.{task_name}.{i}
+#SBATCH -J {job_name}
 #SBATCH -t 00:30:00
 #SBATCH -L SCRATCH
 #SBATCH -A {nersc_account}
@@ -190,7 +192,7 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 #SBATCH --exclusive
 #SBATCH -C haswell
 #SBATCH --volume="{volumes}"
-#SBATCH -o {log_destination.resolve()}/sub.{task_name}.bin{coadd_windowsize}.{i}.out
+#SBATCH -o {log_destination.resolve()}/{job_name}.out
 #SBATCH --dependency=afterok:{my_deps}
 
 export OMP_NUM_THREADS=1

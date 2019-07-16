@@ -523,6 +523,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
             self.image.disk_psf_path = dest
             DBSession().add(self.image)
             DBSession().commit()
+            psf_path = dest
 
         # for all the remaining sources do forced photometry
 
