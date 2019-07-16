@@ -4,6 +4,9 @@ import os
 from astropy.visualization import ZScaleInterval
 import db
 import logging
+from pathlib import Path
+import paramiko
+import tempfile
 
 from uuid import uuid4
 
@@ -23,6 +26,13 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
+def chunk(iterable, chunksize):
+    isize = len(iterable)
+    nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
+    for i in range(nchunks):
+        yield i, iterable[i * chunksize : (i + 1) * chunksize]
+
+
 def enum(*sequential, **named):
     """Handy way to fake an enumerated type in Python
     http://stackoverflow.com/questions/36932/how-can-i-represent-an-enum-in-python
@@ -33,6 +43,83 @@ def enum(*sequential, **named):
 
 # Define MPI message tags
 tags = enum('READY', 'DONE', 'EXIT', 'START')
+
+def submit_forcephoto(subtraction_dependencies, batch_size=1024, job_script_destination='.',
+                      log_destination='.', frame_destination='.', task_name=None):
+
+
+    log_destination = Path(log_destination)
+    frame_destination = Path(frame_destination)
+    job_script_destination = Path(job_script_destination)
+
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
+
+
+    estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
+    for i, ch in chunk(subtraction_dependencies.keys(), batch_size):
+
+        my_deps = list(set([subtraction_dependencies[key] for key in ch]))
+        dependency_string = ':'.join(list(map(str, set(my_deps))))
+        sublist = ch
+        jobname = f'forcephoto.{task_name}.{i}'
+
+        jobstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J {jobname}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --dependency=afterok:{dependency_string}
+#SBATCH -C haswell
+#SBATCH --exclusive
+#SBATCH --volume="{volumes}"
+#SBATCH -o {Path(log_destination).resolve() / jobname}.out
+
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
+
+srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {sublist}  
+
+'''
+
+        if len(my_deps) == 0:
+            jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
+
+        if job_script_destination is None:
+            jobscript = tempfile.NamedTemporaryFile()
+        else:
+            jobscript = open(Path(job_script_destination / f'{jobname}.sh').resolve(), 'w')
+
+        jobscript.write(jobstr)
+        jobscript.seek(0)
+
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
+
+        command = f'sbatch {jobscript.name}'
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+
+        if stdout.channel.recv_exit_status() != 0:
+            raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
+
+        out = stdout.read()
+        err = stderr.read()
+
+        print(out, flush=True)
+        print(err, flush=True)
+
+        jobscript.close()
+        ssh_client.close()
 
 
 

@@ -212,3 +212,8 @@ if __name__ == '__main__':
                                                batch_size=batch_size, job_script_destination=jobscripts,
                                                log_destination=logs, frame_destination=framepath, task_name=task_name)
 
+
+        from forcephoto import submit_forcephoto
+
+        submit_forcephoto(sub_dependencies, job_script_destination=jobscripts, log_destination=logs,
+                          frame_destination=framepath, task_name=task_name)
