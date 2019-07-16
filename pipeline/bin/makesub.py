@@ -223,6 +223,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                           f'shifter python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
                           f'{j["sub"].disk_path} {j["sub"].id} SingleEpochSubtraction &\n'
 
+
             jobstr += execstr
         jobstr += 'wait\n'
 
@@ -241,6 +242,11 @@ export USE_SIMPLE_THREADED_LEVEL3=1
         out = stdout.read()
         err = stderr.read()
 
+        jobid = int(out.strip().split()[-1])
+
+        for j in ch:
+            dependency_dict[j['sub'].id] = jobid
+
         print(out, flush=True)
         print(err, flush=True)
 
@@ -249,6 +255,8 @@ export USE_SIMPLE_THREADED_LEVEL3=1
             raise RuntimeError(f'Unable to submit job with script: "{jobstr}", nonzero retcode')
 
         job_script.close()
+
+    return dependency_dict
 
 
 def make_coadd_bins(science_rows, window_size=3, rolling=False):
