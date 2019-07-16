@@ -193,7 +193,13 @@ if __name__ == '__main__':
             maxdate = template_end_date + timedelta(days=template_science_minsep_days)
             remaining_ids = numpy.setdiff1d(group['id'], [i.id for i in ref.images]).tolist()
             remaining_images = metatable[metatable['id'].isin(remaining_ids)]
+            late_enough = remaining_images['obsdate'] > maxdate
+            early_enough = remaining_images['obsdate'] < mindate
+            remaining_images = remaining_images[late_enough | early_enough]
 
+        # we only want fields with at least 5 non-template images
+        if len(remaining_images) < 5:
+            continue
 
         from makesub import submit_coaddsub
         options = task_spec['coaddsub']
