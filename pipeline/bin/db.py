@@ -271,7 +271,8 @@ class StackDetection(models.Base):
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
-
+#    instrument_id = sa.Column(sa.Integer, sa.ForeignKey('instruments.id', ondelete='CASCADE'))
+#    instrument = relationship('Instrument', cascade='all')
 
 
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
@@ -479,6 +480,22 @@ class SubtractionMixin(FITSBase):
     @declared_attr
     def reference(self):
         return relationship('Reference')
+
+
+def redundantly_declare_thumbnails(source):
+    stack_thumbs = source.stack_thumbnails
+    photometry = source.photometry
+
+    if len(source.photometry) == 0:
+        return
+
+    highsnr = max(photometry, key=lambda p: p.flux / p.fluxerr)
+
+    for thumb in stack_thumbs:
+        nthumb = models.Thumbnail(type=thumb.type, file_uri=thumb.file_uri,
+                                  public_url=thumb.public_url, photometry_id=highsnr.id)
+        DBSession().add(nthumb)
+    DBSession().commit()
 
 
 class SingleEpochSubtraction(SubtractionMixin, models.Base):
