@@ -195,6 +195,12 @@ class Image(models.Base):
         psf_path = self.disk_psf_path
         sub_path = self.disk_sub_path
 
+        if psf_path.endswith('sciimgdaopsfcent.fits'):
+            self.disk_psf_path = sub_path.replace('scimrefdiffimg.fits.fz', 'diffimgpsf.fits')
+            psf_path = self.disk_psf_path
+            DBSession().add(self)
+            DBSession().commit()
+
         if self.zp is None:
             try:
                 with fits.open(sub_path) as hdul:
@@ -491,10 +497,18 @@ def redundantly_declare_thumbnails(source):
 
     highsnr = max(photometry, key=lambda p: p.flux / p.fluxerr)
 
+    seen = []
+
     for thumb in stack_thumbs:
-        nthumb = models.Thumbnail(type=thumb.type, file_uri=thumb.file_uri,
-                                  public_url=thumb.public_url, photometry_id=highsnr.id)
-        DBSession().add(nthumb)
+
+        if thumb.type not in seen:
+
+            nthumb = models.Thumbnail(type=thumb.type, file_uri=thumb.file_uri,
+                                      public_url=thumb.public_url, photometry_id=highsnr.id)
+            DBSession().add(nthumb)
+
+            seen.append(thumb.type)
+
     DBSession().commit()
 
 
