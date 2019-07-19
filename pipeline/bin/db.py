@@ -19,6 +19,8 @@ from skyportal.models import (init_db, join_model, DBSession, ACL,
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
 
+from photometry import phot_sex_auto
+
 from astropy.io import fits
 from libztf.yao import yao_photometry_single
 
@@ -268,7 +270,6 @@ class StackDetection(models.Base):
     maglimit = sa.Column(sa.Float)
     filter = sa.Column(sa.Text)
 
-
     mjd = sa.Column(sa.Float)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='CASCADE'), index=True)
     source = relationship('Source', back_populates='stack_detections', cascade='all')
@@ -277,10 +278,11 @@ class StackDetection(models.Base):
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
-#    instrument_id = sa.Column(sa.Integer, sa.ForeignKey('instruments.id', ondelete='CASCADE'))
-#    instrument = relationship('Instrument', cascade='all')
+    a_image = sa.Column(sa.Float)
+    b_image = sa.Column(sa.Float)
+    theta_image = sa.Column(sa.Float)
 
-
+    photometry = relationship('Photometry', cascade='all')
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
     @hybrid_property
@@ -627,11 +629,16 @@ class StackThumbnail(models.Base):
     source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
                           secondary='stackdetections', cascade='all')
 
+
 models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
 models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id',
                                                                        ondelete='CASCADE'), index=True)
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
+models.Photometry.stack_detection_id = sa.Column(sa.Integer,
+                                                 sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
+                                                 index=True)
+models.Photometry.stack_detection = relationship('StackDetection', back_populates='photometry', cascade='all')
 
 
 def create_ztf_groups_if_nonexistent():
