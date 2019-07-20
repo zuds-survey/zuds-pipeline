@@ -122,7 +122,7 @@ def submit_template(variance_dependencies, metatable, nimages=100, start_date=da
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-shifter {estring} python /pipeline/bin/makecoadd.py --outfile-path "{template_name}"  --input-catalogs "{incatstr}"  --input-frames "{inframestr}" --template
+shifter {estring} python /pipeline/bin/makecoadd.py --outfile-path {template_name}  --input-catalogs {incatstr}  --input-frames {inframestr} --template
 
 if [ $? -eq 0 ]; then 
 
@@ -199,13 +199,13 @@ if __name__ == '__main__':
         frames = np.genfromtxt(args.frames[0][1:], dtype=None, encoding='ascii')
         frames = np.atleast_1d(frames)
     else:
-        frames = args.frames[0].split()
+        frames = args.frames
 
     if args.cats[0].startswith('@'):
         cats = np.genfromtxt(args.cats[0][1:], dtype=None, encoding='ascii')
         cats = np.atleast_1d(cats)
     else:
-        cats = args.cats[0].split()
+        cats = args.cats
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -248,8 +248,8 @@ if __name__ == '__main__':
     print(syscall, flush=True)
     
 
-    # now delete all the .head files as they are not needed anymore and can mess things up 
-    
+    # now delete all the .head files as they are not needed anymore and can mess things up
+
     for c in cats:
         head = c.replace('.cat', '.head')
         os.remove(head)
@@ -287,7 +287,7 @@ if __name__ == '__main__':
 
 
         # TODO make this more general
-        header['PIXSCALE'] = 1.01
+        header['PIXSCALE'] = 1.013
         header['MJDEFF'] = np.median(mjds)
 
         # Add the sky back in as a constant
