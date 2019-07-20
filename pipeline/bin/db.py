@@ -508,7 +508,7 @@ def redundantly_declare_thumbnails(source):
     if len(source.photometry) == 0:
         return
 
-    highsnr = max(photometry, key=lambda p: p.flux / p.fluxerr)
+    highsnr = photometry[0]
 
     seen = []
 
