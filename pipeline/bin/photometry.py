@@ -18,18 +18,20 @@ def phot_sex_auto(img_meas, stack_detection, mask_path=None):
     else:
         mask = None
 
+    mask = mask.astype(float)
+
     if mask.dtype.byteorder == '>':
         mask = mask.byteswap().newbyteorder()
 
     if meas_pix.dtype.byteorder == '>':
         meas_pix = meas_pix.byteswap().newbyteorder()
 
-    meas_x, meas_y = meas_wcs.all_world2pix([[stack_detection.ra, stack_detection.dec]], 1)[0]
+    meas_x, meas_y = meas_wcs.all_world2pix([[stack_detection.ra, stack_detection.dec]], 0)[0]
 
     # shape parameters
     det_a = stack_detection.a_image
     det_b = stack_detection.b_image
-    det_theta = stack_detection.theta_image
+    det_theta = stack_detection.theta_image * np.pi / 180.
 
     # do the photometry (FLUX_AUTO equivalent)
     kronrad, krflag = sep.kron_radius(meas_pix, meas_x, meas_y, det_a, det_b, det_theta, 6.0)
