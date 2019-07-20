@@ -117,8 +117,11 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
             lstr = f'{l}'.split()[0].replace('-', '')
             rstr = f'{r}'.split()[0].replace('-', '')
 
-            coadd_name = frame_destination / Path(frames['path'].iloc[0]).parent / f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
-                                             f'{band:s}_{lstr}_{rstr}_coadd.fits'
+            coadd_base = f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_{band:s}_{lstr}_{rstr}_coadd'
+            coadd_dir = frame_destination / Path(frames['path'].iloc[0]).parent / coadd_base
+            coadd_dir.mkdir(parents=True, exist_ok=True)
+
+            coadd_name = coadd_dir / f'{coadd_base}.fits'
 
             # log the stack to the database
             stack = db.Stack(disk_path=f'{coadd_name}', field=int(field), ccdid=int(ccdnum), qid=int(quadrant),
@@ -132,17 +135,21 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
                 db.DBSession().add(stackimage)
             db.DBSession().commit()
 
-            framepaths = [(frame_destination / frame).resolve() for frame in frames['path']]
+            framepaths_in = [(frame_destination / frame).resolve() for frame in frames['path']]
+            framepaths_out = [(coadd_dir / os.path.basename(frame)) for frame in frames['path']]
+
+            for i, o in zip(framepaths_in, framepaths_out):
+                shutil.copy(i, o)
 
             mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
-                                             disk_path=f'{frame_destination / sub_name(stack.disk_path, ref.disk_path)}',
+                                             disk_path=f'{coadd_dir / sub_name(stack.disk_path, ref.disk_path)}',
                                              qid=int(quadrant), ccdid=int(ccdnum), field=int(field),
                                              filtercode=band)
             db.DBSession().add(mesub)
             db.DBSession().commit()
 
             job = {'type':'coaddsub',
-                   'frames': [f'{framepath}' for framepath in framepaths],
+                   'frames': [f'{framepath}' for framepath in framepaths_out],
                    'template': ref.disk_path, 'coadd_name': coadd_name,
                    'sub': mesub,
                    'dependencies': cdep_list}
@@ -471,7 +478,7 @@ def make_sub(myframes, mytemplates, publish=True):
 
         with fits.open(sub, mode='update') as f:
             f[0].header['MAGZP'] = subzp = refzp
-            
+
         # Make the subtraction catalogs
         clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
 

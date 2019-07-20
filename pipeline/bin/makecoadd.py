@@ -126,7 +126,7 @@ shifter {estring} python /pipeline/bin/makecoadd.py --outfile-path {template_nam
 
 if [ $? -eq 0 ]; then 
 
-shifter {os.getenv("ESTRING")} python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
+shifter {estring} python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
 
 fi
 

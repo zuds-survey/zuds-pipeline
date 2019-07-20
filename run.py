@@ -173,7 +173,7 @@ if __name__ == '__main__':
                             .filter(match)\
                             .group_by(db.Reference.id)\
                             .having(filt)\
-                            .order_by(db.Reference.id.desc())\
+                            .order_by(db.Reference.lmt_mg.desc())\
                             .first()
 
         if ref is None or task_spec['template']['force']:
@@ -211,6 +211,7 @@ if __name__ == '__main__':
         rolling = options['rolling']
         coadd_windowsize = options['coadd_windowsize']
         batch_size = options['batch_size']
+
 
         coaddsub_dependencies = submit_coaddsub(template_dependencies, variance_dependencies, remaining_images, ref,
                                                 rolling=rolling, coadd_windowsize=coadd_windowsize,
