@@ -312,7 +312,7 @@ models.Source.stack_detections = relationship('StackDetection', cascade='all')
 
 def best_stack_detection(self):
     sds = self.stack_detections
-    return max(sds, key=lambda sd: sd.flux / sd.flux_err)
+    return max(sds, key=lambda sd: sd.flux / sd.fluxerr)
 
 
 models.Source.best_stack_detection = property(best_stack_detection)
