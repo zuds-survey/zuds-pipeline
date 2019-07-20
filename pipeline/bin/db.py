@@ -312,6 +312,9 @@ models.Source.stack_detections = relationship('StackDetection', cascade='all')
 
 def best_stack_detection(self):
     sds = self.stack_detections
+
+    # only keep stack detections that have shape parameters
+    sds = [s for s in sds if (s.a_image is not None and s.b_image is not None and s.theta_image is not None)]
     return max(sds, key=lambda sd: sd.flux / sd.fluxerr)
 
 
@@ -496,6 +499,8 @@ class SubtractionMixin(FITSBase):
         return relationship('Reference')
 
 
+
+
 def redundantly_declare_thumbnails(source):
     stack_thumbs = source.stack_thumbnails
     photometry = source.photometry
@@ -571,6 +576,11 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
                                            filter=self.filter, source=source, instrument=self.image.instrument,
                                            ra=source.ra, dec=source.dec, mjd=self.image.obsmjd, provenance='gn',
                                            method='sep')
+
+            if len(source.thumbnails) == 0:
+                redundantly_declare_thumbnails(source)
+                source.add_linked_thumbnails()
+
             new_photometry.append(phot_point)
 
         DBSession().add_all(new_photometry)
