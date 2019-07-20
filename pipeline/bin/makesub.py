@@ -140,10 +140,6 @@ def submit_coaddsub(template_dependencies, variance_dependencies, science_metata
 
             for i, o in zip(framepaths_in, framepaths_out):
                 shutil.copy(i, o)
-                mskin = f'{i}'.replace('sciimg.fits', 'mskimg.fits')
-                mskout = f'{o}'.replace('sciimg.fits', 'mskimg.fits')
-                shutil.copy(mskin, mskout)
-
 
             mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
                                              disk_path=f'{coadd_dir / sub_name(stack.disk_path, ref.disk_path)}',
