@@ -560,7 +560,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
             # get the best stack detection of the source
             bestpoint = source.best_stack_detection
 
-            flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint, mask=mask_path)
+            flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint, mask_path=mask_path)
 
             phot_point = models.Photometry(subtraction=self, stack_detection=bestpoint,
                                            flux=float(flux), fluxerr=float(fluxerr),
