@@ -11,5 +11,9 @@ def clean(dir):
             c5 = fname.endswith('coadd.fits')
             c6 = fname.endswith('.weight.fits')
             c7 = fname.endswith('.mask.fits')
-            if not any([c1, c2, c3, c4, c5, c6, c7]):
+            c8 = fname.endswith('.bpm.fits')
+            c9 = fname.endswith('.noise.fits')
+            c10 = fname.endswith('.rms.fits')
+            if not any([c1, c2, c3, c4, c5, c6, c7,
+                        c8, c9, c10]):
                 os.remove(fname)
