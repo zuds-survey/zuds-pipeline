@@ -196,6 +196,12 @@ if __name__ == '__main__':
                 closed_workers += 1
                 logging.info('Closing worker %d.' % source)
 
+        image = db.DBSession().get(images[0].id)
+        for source in image.sources:
+            if len(source.thumbnails) == 0:
+                db.redundantly_declare_thumbnails(source)
+                source.add_linked_thumbnails()
+
     else:
 
         while True:

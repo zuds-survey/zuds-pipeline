@@ -566,7 +566,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
             try:
                 bestpoint = source.best_stack_detection
             except ValueError:
-                continue # this source has no stack detections 
+                continue # this source has no stack detections
 
             flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint, mask_path=mask_path)
 
@@ -576,10 +576,6 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
                                            filter=self.filter, source=source, instrument=self.image.instrument,
                                            ra=source.ra, dec=source.dec, mjd=self.image.obsmjd, provenance='gn',
                                            method='sep')
-
-            if len(source.thumbnails) == 0:
-                redundantly_declare_thumbnails(source)
-                source.add_linked_thumbnails()
 
             new_photometry.append(phot_point)
 
