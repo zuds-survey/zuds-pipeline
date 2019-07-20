@@ -29,6 +29,9 @@ def phot_sex_auto(img_meas, stack_detection, mask_path=None):
     if meas_pix.dtype.byteorder == '>':
         meas_pix = meas_pix.byteswap().newbyteorder()
 
+    if rms_pix.dtype.byteorder == '>':
+        rms_pix = rms_pix.byteswap().newbyteorder()
+
     meas_x, meas_y = meas_wcs.all_world2pix([[stack_detection.ra, stack_detection.dec]], 0)[0]
 
     # shape parameters
