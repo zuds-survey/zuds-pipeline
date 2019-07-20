@@ -16,7 +16,7 @@ RESCALE_WEIGHTS        Y               # Rescale input weights/variances (Y/N)?
 WEIGHT_SUFFIX          .weight.fits    # Suffix to use for weight-maps
 WEIGHT_IMAGE                           # Weightmap filename if suffix not used
                                        # (all or for each weight-map)
-WEIGHT_THRESH          1.0e-30               # Bad pixel weight-threshold
+WEIGHT_THRESH                          # Bad pixel weight-threshold
  
 #------------------------------- Co-addition ----------------------------------
  
@@ -44,8 +44,8 @@ PROJECTION_ERR         0.001           # Maximum projection error (in output
                                        # pixels), or 0 for no approximation
 CENTER_TYPE            ALL             # MANUAL, ALL or MOST
 CENTER         00:00:00.0, +00:00:00.0 # Coordinates of the image center
-PIXELSCALE_TYPE        MANUAL          # MANUAL,FIT,MIN,MAX or MEDIAN
-PIXEL_SCALE            1.0             # Pixel scale
+PIXELSCALE_TYPE        MEDIAN          # MANUAL,FIT,MIN,MAX or MEDIAN
+PIXEL_SCALE            0.0             # Pixel scale
 IMAGE_SIZE             0               # Image size (0 = AUTOMATIC)
  
 #-------------------------------- Resampling ----------------------------------
@@ -81,7 +81,7 @@ BACK_TYPE              AUTO            # AUTO or MANUAL
                                        # (all or for each image)
 BACK_DEFAULT           0.0             # Default background value in MANUAL
                                        # (all or for each image)
-BACK_SIZE              128             # Background mesh size (pixels)
+BACK_SIZE              256             # Background mesh size (pixels)
                                        # (all or for each image)
 BACK_FILTERSIZE        3               # Background map filter range (meshes)
                                        # (all or for each image)
