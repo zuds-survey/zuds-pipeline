@@ -197,7 +197,7 @@ if __name__ == '__main__':
                 logging.info('Closing worker %d.' % source)
 
         image = db.DBSession().query(db.SingleEpochSubtraction).get(images[0].id)
-        for source in image.sources:
+        for source in image.image.sources:
             if len(source.thumbnails) == 0:
                 db.redundantly_declare_thumbnails(source)
                 source.add_linked_thumbnails()
