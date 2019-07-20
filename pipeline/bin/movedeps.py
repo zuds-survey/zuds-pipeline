@@ -9,5 +9,7 @@ coadd_dir = os.path.dirname(coadd)
 
 for new in news:
     for suffix in ['.weight.fits', '.bpm.fits', '.rms.fits', '.cat']:
-        inf = new.replace('.fits', suffix)
+        basename = os.path.basename(new).replace('.fits', suffix)
+        dirname = os.path.dirname(new)
+        inf = os.path.join(dirname, '..', basename)
         shutil.copy(inf, coadd_dir)
