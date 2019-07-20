@@ -312,6 +312,9 @@ models.Source.stack_detections = relationship('StackDetection', cascade='all')
 
 def best_stack_detection(self):
     sds = self.stack_detections
+
+    # only keep stack detections that have shape parameters
+    sds = [s for s in sds if (s.a_image is not None and s.b_image is not None and s.theta_image is not None)]
     return max(sds, key=lambda sd: sd.flux / sd.fluxerr)
 
 
