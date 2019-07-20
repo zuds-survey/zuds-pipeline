@@ -563,7 +563,10 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
         for source in sources_remaining:
 
             # get the best stack detection of the source
-            bestpoint = source.best_stack_detection
+            try:
+                bestpoint = source.best_stack_detection
+            except ValueError:
+                continue # this source has no stack detections 
 
             flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint, mask_path=mask_path)
 
