@@ -57,7 +57,7 @@ if __name__ == '__main__':
         closed_workers = 0
 
         images = db.DBSession().query(db.Image)\
-                               .filter(db.sa.and_(db.Image.ipac_gid == 2,
+                               .filter(db.sa.and_(db.Image.field.in_([792, 764]),
                                                   db.Image.disk_sub_path != None,
                                                   db.Image.disk_psf_path != None,
                                                   db.sa.or_(db.Image.subtraction_exists != False,

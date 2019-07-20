@@ -459,7 +459,7 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsy))
 
         convolve_target = 't'
-        syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
+        syscall = f'hotpants -inim %s -hki -n t -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
                   f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
@@ -469,13 +469,9 @@ def make_sub(myframes, mytemplates, publish=True):
 
         # Calibrate the subtraction
 
-        with fits.open(sub, mode='update') as f, fits.open(frame) as fr:
-            header = f[0].header
-            subzp = fr[0].header['MAGZP']  # normalized to photometric system of new image
-            header['MAGZP'] = subzp
-            subpix = f[0].data
-            wcs = WCS(header)
-
+        with fits.open(sub, mode='update') as f:
+            f[0].header['MAGZP'] = subzp = refzp
+            
         # Make the subtraction catalogs
         clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
 

@@ -100,7 +100,13 @@ def load_catalog(catpath, refpath, newpath, subpath):
             dec = row['Y_WORLD']
             flux = row['FLUX_AUTO']
             fluxerr = row['FLUXERR_AUTO']
+
+            a_image = float(row['A_IMAGE'])
+            b_image = float(row['B_IMAGE'])
+            theta_image = float(row['THETA_IMAGE'])
+
             zpsys = 'ab'
+
 
 
             try:
@@ -116,7 +122,10 @@ def load_catalog(catpath, refpath, newpath, subpath):
                                           fluxerr=fluxerr, zp=zp, zpsys=zpsys,
                                           filter=filter, mjd=obsmjd, maglimit=limmag,
                                           provenance='gn', method='auto',
-                                          subtraction_id=int(sub_id))
+                                          subtraction_id=int(sub_id),
+                                          a_image=a_image, b_image=b_image,
+                                          theta_image=theta_image)
+
 
             photpoints.append(photpoint)
             db.DBSession().add(photpoint)

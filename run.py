@@ -9,6 +9,7 @@ from pathlib import Path
 from argparse import ArgumentParser
 from datetime import timedelta
 import pandas as pd
+from clean import clean
 
 # read/write for group
 os.umask(0o007)
@@ -58,6 +59,10 @@ if __name__ == '__main__':
     logs.mkdir(exist_ok=True, parents=True)
     framepath.mkdir(exist_ok=True, parents=True)
     templates.mkdir(exist_ok=True, parents=True)
+
+    # clean out old frames that are not needed
+    print('cleaning out old files...')
+    clean(framepath)
 
     # if an object name is provided then we must infer the query
     # retrieve the images off of tape

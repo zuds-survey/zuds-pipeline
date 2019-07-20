@@ -19,6 +19,8 @@ from skyportal.models import (init_db, join_model, DBSession, ACL,
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
 
+from photometry import phot_sex_auto
+
 from astropy.io import fits
 from libztf.yao import yao_photometry_single
 
@@ -195,6 +197,12 @@ class Image(models.Base):
         psf_path = self.disk_psf_path
         sub_path = self.disk_sub_path
 
+        if psf_path.endswith('sciimgdaopsfcent.fits'):
+            self.disk_psf_path = sub_path.replace('scimrefdiffimg.fits.fz', 'diffimgpsf.fits')
+            psf_path = self.disk_psf_path
+            DBSession().add(self)
+            DBSession().commit()
+
         if self.zp is None:
             try:
                 with fits.open(sub_path) as hdul:
@@ -262,7 +270,6 @@ class StackDetection(models.Base):
     maglimit = sa.Column(sa.Float)
     filter = sa.Column(sa.Text)
 
-
     mjd = sa.Column(sa.Float)
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='CASCADE'), index=True)
     source = relationship('Source', back_populates='stack_detections', cascade='all')
@@ -271,10 +278,11 @@ class StackDetection(models.Base):
 
     provenance = sa.Column(sa.Text)
     method = sa.Column(sa.Text)
-#    instrument_id = sa.Column(sa.Integer, sa.ForeignKey('instruments.id', ondelete='CASCADE'))
-#    instrument = relationship('Instrument', cascade='all')
+    a_image = sa.Column(sa.Float)
+    b_image = sa.Column(sa.Float)
+    theta_image = sa.Column(sa.Float)
 
-
+    photometry = relationship('Photometry', cascade='all')
     q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
     @hybrid_property
@@ -302,6 +310,12 @@ models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
 models.Source.stack_detections = relationship('StackDetection', cascade='all')
 
+def best_stack_detection(self):
+    sds = self.stack_detections
+    return max(sds, key=lambda sd: sd.flux / sd.flux_err)
+
+
+models.Source.best_stack_detection = property(best_stack_detection)
 
 def light_curve(self):
     photometry = self.photometry
@@ -491,10 +505,18 @@ def redundantly_declare_thumbnails(source):
 
     highsnr = max(photometry, key=lambda p: p.flux / p.fluxerr)
 
+    seen = []
+
     for thumb in stack_thumbs:
-        nthumb = models.Thumbnail(type=thumb.type, file_uri=thumb.file_uri,
-                                  public_url=thumb.public_url, photometry_id=highsnr.id)
-        DBSession().add(nthumb)
+
+        if thumb.type not in seen:
+
+            nthumb = models.Thumbnail(type=thumb.type, file_uri=thumb.file_uri,
+                                      public_url=thumb.public_url, photometry_id=highsnr.id)
+            DBSession().add(nthumb)
+
+            seen.append(thumb.type)
+
     DBSession().commit()
 
 
@@ -507,7 +529,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
 
     photometry = relationship('Photometry', cascade='all')
 
-    def force_photometry(self, cookie, logger):
+    def force_photometry(self):
 
         sources_contained = self.image.sources
         sources_contained_ids = [s.id for s in sources_contained]
@@ -520,10 +542,6 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
         sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
         sources_remaining = [s for s in sources_contained if s.id in sources_remaining_ids]
 
-        # get the paths to relevant files on disk
-        psf_path = self.image.disk_psf_path
-        sub_path = self.disk_path
-
         # we want a model of the PSF on the science image only. we download this here from ipac
         # note the difference image psfs are not correct as they use a convolved science image
 
@@ -532,35 +550,22 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
             DBSession().add(self)
             DBSession().commit()
 
-        if psf_path is None or psf_path.endswith('diffimgpsf.fits'):
-            # need to download the psf
-            target = self.image.ipac_path('sciimgdaopsfcent.fits')
-            dest = self.image.disk_path('sciimgdaopsfcent.fits')
-            safe_download(target, dest, cookie, logger)
-            self.image.disk_psf_path = dest
-            DBSession().add(self.image)
-            DBSession().commit()
-            psf_path = dest
-
         # for all the remaining sources do forced photometry
 
         new_photometry = []
 
         for source in sources_remaining:
-            try:
-                pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
-            except IndexError:
-                continue
-            except OSError as e:
-                print(f'failing frame was {sub_path}')
-                print(f'failing psf was {psf_path}')
-                print(f'error was {e}')
-                raise e
-            phot_point = models.Photometry(subtraction=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
+
+            # get the best stack detection of the source
+            bestpoint = source.best_stack_detection
+            flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint)
+
+            phot_point = models.Photometry(subtraction=self, stack_detection=bestpoint,
+                                           flux=float(flux), fluxerr=float(fluxerr),
                                            zp=self.magzp, zpsys='ab', lim_mag=self.image.maglimit,
                                            filter=self.filter, source=source, instrument=self.image.instrument,
                                            ra=source.ra, dec=source.dec, mjd=self.image.obsmjd, provenance='gn',
-                                           method='yao')
+                                           method='sep')
             new_photometry.append(phot_point)
 
         DBSession().add_all(new_photometry)
@@ -613,29 +618,16 @@ class StackThumbnail(models.Base):
     source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
                           secondary='stackdetections', cascade='all')
 
+
 models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
 models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id',
                                                                        ondelete='CASCADE'), index=True)
 models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
 
-
-def add_linked_thumbnails(self):
-
-    bestpoint = max(self.stack_detections, key=lambda p: p.flux / p.fluxerr)
-
-    sdss_thumb = StackThumbnail(stackdetection=bestpoint,
-                                public_url=self.get_sdss_url(),
-                                type='sdss')
-
-    ps1_thumb = StackThumbnail(stackdetection=bestpoint,
-                               public_url=self.get_panstarrs_url(),
-                               type='ps1')
-
-    DBSession().add_all([sdss_thumb, ps1_thumb])
-    DBSession().commit()
-
-
-models.Source.add_linked_thumbnails = add_linked_thumbnails
+models.Photometry.stack_detection_id = sa.Column(sa.Integer,
+                                                 sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
+                                                 index=True)
+models.Photometry.stack_detection = relationship('StackDetection', back_populates='photometry', cascade='all')
 
 
 def create_ztf_groups_if_nonexistent():
