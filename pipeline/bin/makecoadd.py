@@ -225,7 +225,8 @@ if __name__ == '__main__':
     os.makedirs(scamp_outpath)
 
     syscall = 'scamp -c %s %s' % (scampconf, " ".join(cats))
-    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
+    band = cats[0].split('_z')[1][1]
+    syscall += f' -REFOUT_CATPATH {scamp_outpath} -ASTREF_BAND {band}'
     if args.template:
         syscall += ' -NTHREADS 64'
     libztf.execute(syscall, capture=False)
