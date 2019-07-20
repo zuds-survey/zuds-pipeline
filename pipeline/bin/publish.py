@@ -166,7 +166,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
                                                   public_url=f'http://portal.nersc.gov/project/astro250/stamps/{bestpoint.id}.{t}.png')
                         db.DBSession().add(thumb)
 
-                    source.add_linked_thumbnails()
+                    #source.add_linked_thumbnails()
 
                     source.ra = bestpoint.ra
                     source.dec = bestpoint.dec
