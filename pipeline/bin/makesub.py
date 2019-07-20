@@ -419,6 +419,10 @@ def make_sub(myframes, mytemplates, publish=True):
 
         execute(syscall, capture=False)
 
+        # get rid of the headers
+        os.remove(refremaphead)
+        os.remove(newhead)
+
         # Make the noise and bpm images
         make_rms(refremap, refremapweight)
 
