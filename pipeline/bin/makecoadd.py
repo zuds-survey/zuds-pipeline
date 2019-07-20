@@ -246,6 +246,12 @@ if __name__ == '__main__':
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
     libztf.execute(syscall, capture=False)
 
+    # now delete all the .head files as they are not needed anymore and can mess things up 
+    
+    for c in cats:
+        head = c.replace('.cat', '.head')
+        os.remove(head)
+
     # Now postprocess it a little bit
     with fits.open(frames[0]) as f:
         h0 = f[0].header
