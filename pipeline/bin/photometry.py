@@ -36,14 +36,14 @@ def phot_sex_auto(img_meas, stack_detection, mask_path=None):
     # do the photometry (FLUX_AUTO equivalent)
     kronrad, krflag = sep.kron_radius(meas_pix, meas_x, meas_y, det_a, det_b, det_theta, 6.0)
     flux, fluxerr, flag = sep.sum_ellipse(meas_pix, meas_x, meas_y, det_a, det_b, det_theta,
-                                          2.5*kronrad, subpix=1, gain=gain, mask=mask)
+                                          2.5*kronrad, subpix=1, mask=mask)
 
     flag |= krflag  # combine flags into 'flag'
 
     r_min = 1.75  # minimum diameter = 3.5
     use_circle = kronrad * np.sqrt(det_a * det_b) < r_min
     cflux, cfluxerr, cflag = sep.sum_circle(meas_pix, meas_x[use_circle], meas_y[use_circle], r_min, subpix=1,
-                                            gain=gain, mask=mask)
+                                            mask=mask)
     flux[use_circle] = cflux
     fluxerr[use_circle] = cfluxerr
     flag[use_circle] = cflag
