@@ -310,6 +310,12 @@ models.Source.images = property(images)
 models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
 models.Source.stack_detections = relationship('StackDetection', cascade='all')
 
+def best_stack_detection(self):
+    sds = self.stack_detections
+    return max(sds, key=lambda sd: sd.flux / sd.flux_err)
+
+
+models.Source.best_stack_detection = property(best_stack_detection)
 
 def light_curve(self):
     photometry = self.photometry
@@ -523,7 +529,7 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
 
     photometry = relationship('Photometry', cascade='all')
 
-    def force_photometry(self, cookie, logger):
+    def force_photometry(self):
 
         sources_contained = self.image.sources
         sources_contained_ids = [s.id for s in sources_contained]
@@ -536,10 +542,6 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
         sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
         sources_remaining = [s for s in sources_contained if s.id in sources_remaining_ids]
 
-        # get the paths to relevant files on disk
-        psf_path = self.image.disk_psf_path
-        sub_path = self.disk_path
-
         # we want a model of the PSF on the science image only. we download this here from ipac
         # note the difference image psfs are not correct as they use a convolved science image
 
@@ -548,35 +550,22 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
             DBSession().add(self)
             DBSession().commit()
 
-        if psf_path is None or psf_path.endswith('diffimgpsf.fits'):
-            # need to download the psf
-            target = self.image.ipac_path('sciimgdaopsfcent.fits')
-            dest = self.image.disk_path('sciimgdaopsfcent.fits')
-            safe_download(target, dest, cookie, logger)
-            self.image.disk_psf_path = dest
-            DBSession().add(self.image)
-            DBSession().commit()
-            psf_path = dest
-
         # for all the remaining sources do forced photometry
 
         new_photometry = []
 
         for source in sources_remaining:
-            try:
-                pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
-            except IndexError:
-                continue
-            except OSError as e:
-                print(f'failing frame was {sub_path}')
-                print(f'failing psf was {psf_path}')
-                print(f'error was {e}')
-                raise e
-            phot_point = models.Photometry(subtraction=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
+
+            # get the best stack detection of the source
+            bestpoint = source.best_stack_detection
+            flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint)
+
+            phot_point = models.Photometry(subtraction=self, stack_detection=bestpoint,
+                                           flux=float(flux), fluxerr=float(fluxerr),
                                            zp=self.magzp, zpsys='ab', lim_mag=self.image.maglimit,
                                            filter=self.filter, source=source, instrument=self.image.instrument,
                                            ra=source.ra, dec=source.dec, mjd=self.image.obsmjd, provenance='gn',
-                                           method='yao')
+                                           method='sep')
             new_photometry.append(phot_point)
 
         DBSession().add_all(new_photometry)
