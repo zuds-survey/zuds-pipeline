@@ -6,10 +6,13 @@ import numpy as np
 
 def phot_sex_auto(img_meas, stack_detection, mask_path=None):
 
-    with fits.open(img_meas) as hdul:
+    rms_meas = img_meas.replace('.fits', '.rms.fits')
+
+    with fits.open(img_meas) as hdul, fits.open(rms_meas) as hdulr:
         hd = hdul[0].header
         meas_pix = hdul[0].data
         meas_wcs = WCS(hd)
+        rms_pix = hdulr[0].data
         gain = hd['GAIN']
 
     if mask_path is not None:
@@ -36,14 +39,14 @@ def phot_sex_auto(img_meas, stack_detection, mask_path=None):
     # do the photometry (FLUX_AUTO equivalent)
     kronrad, krflag = sep.kron_radius(meas_pix, meas_x, meas_y, det_a, det_b, det_theta, 6.0)
     flux, fluxerr, flag = sep.sum_ellipse(meas_pix, meas_x, meas_y, det_a, det_b, det_theta,
-                                          2.5*kronrad, subpix=1, mask=mask)
+                                          2.5*kronrad, subpix=1, mask=mask, err=rms_pix, gain=gain)
 
     flag |= krflag  # combine flags into 'flag'
 
     r_min = 1.75  # minimum diameter = 3.5
     use_circle = kronrad * np.sqrt(det_a * det_b) < r_min
     cflux, cfluxerr, cflag = sep.sum_circle(meas_pix, meas_x[use_circle], meas_y[use_circle], r_min, subpix=1,
-                                            mask=mask)
+                                            mask=mask, gain=gain, err=rms_pix)
     flux[use_circle] = cflux
     fluxerr[use_circle] = cfluxerr
     flag[use_circle] = cflag
