@@ -229,7 +229,7 @@ export USE_SIMPLE_THREADED_LEVEL3=1
                 frame = j['frame']
                 execstr = f'shifter {estring} python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
                           f'--science-frames {frame} --templates {template}  --no-publish &&' \
-                          f'shifter python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
+                          f'shifter {estring} python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
                           f'{j["sub"].disk_path} {j["sub"].id} SingleEpochSubtraction &\n'
 
 
