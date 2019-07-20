@@ -245,6 +245,8 @@ if __name__ == '__main__':
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
     libztf.execute(syscall, capture=False)
+    print(syscall, flush=True)
+    
 
     # now delete all the .head files as they are not needed anymore and can mess things up
 
