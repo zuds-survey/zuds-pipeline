@@ -496,6 +496,8 @@ class SubtractionMixin(FITSBase):
         return relationship('Reference')
 
 
+
+
 def redundantly_declare_thumbnails(source):
     stack_thumbs = source.stack_thumbnails
     photometry = source.photometry
@@ -568,6 +570,11 @@ class SingleEpochSubtraction(SubtractionMixin, models.Base):
                                            filter=self.filter, source=source, instrument=self.image.instrument,
                                            ra=source.ra, dec=source.dec, mjd=self.image.obsmjd, provenance='gn',
                                            method='sep')
+
+            if len(source.thumbnails) == 0:
+                redundantly_declare_thumbnails(source)
+                source.add_linked_thumbnails()
+
             new_photometry.append(phot_point)
 
         DBSession().add_all(new_photometry)
