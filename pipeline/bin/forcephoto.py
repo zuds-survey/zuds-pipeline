@@ -214,7 +214,7 @@ if __name__ == '__main__':
                     my_subtask = (task_index - 1) * CHUNK_SIZE + i + 1
                     logging.info(f'Forcing photometry on image "{image.disk_path}"')
                     try:
-                        image.force_photometry(cookie, logger)
+                        image.force_photometry()
                     except FileNotFoundError as e:
                         logging.error(e)
 
