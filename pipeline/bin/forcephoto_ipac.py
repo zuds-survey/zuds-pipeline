@@ -4,6 +4,10 @@ import os
 from astropy.visualization import ZScaleInterval
 import db
 import logging
+import tempfile
+from pathlib import Path
+import paramiko
+import sys
 
 from uuid import uuid4
 
@@ -16,6 +20,15 @@ DB_FTP_PASSWORD = 'root'
 DB_FTP_PORT = 222
 
 CHUNK_SIZE = 1000
+
+
+
+def chunk(iterable, chunksize):
+    isize = len(iterable)
+    nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
+    for i in range(nchunks):
+        yield i, iterable[i * chunksize : (i + 1) * chunksize]
+
 
 
 # split an iterable over some processes recursively
@@ -35,6 +48,88 @@ def enum(*sequential, **named):
 tags = enum('READY', 'DONE', 'EXIT', 'START')
 
 
+def submit_forcephoto(field, ccdid, qid, filtercode, detect_dependencies, batch_size=1024, job_script_destination='.',
+                      log_destination='.', frame_destination='.', task_name=None):
+
+
+    log_destination = Path(log_destination)
+    frame_destination = Path(frame_destination)
+    job_script_destination = Path(job_script_destination)
+
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
+
+    #sesub = db.DBSession().query(db.SingleEpochSubtraction).get(list(subtraction_dependencies.keys())[0])
+    images = db.DBSession().query(db.Image).filter(db.Image.field == field, db.Image.ccdid == ccdid,
+                                                   db.Image.qid == qid, db.Image.filtercode == filtercode,
+                                                   db.Image.disk_sub_path != None, db.Image.disk_psf_path != None)\
+                                                   .all()
+
+
+    estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
+    for i, ch in chunk([i.id for i in images], batch_size):
+        my_deps = list(set(detect_dependencies.values()))
+        dependency_string = ':'.join(list(map(str, set(my_deps))))
+        sublist = ch
+        jobname = f'forcephoto.{task_name}.{field}.{ccdid}.{qid}.{filtercode}.{i}'
+
+        jobstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J {jobname}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --dependency=afterok:{dependency_string}
+#SBATCH -C haswell
+#SBATCH --exclusive
+#SBATCH --volume="{volumes}"
+#SBATCH -o {Path(log_destination).resolve() / jobname}.out
+
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
+
+srun -n 64 shifter {estring} python /pipeline/bin/forcephoto_ipac.py {' '.join(list(map(str, sublist)))}  
+
+'''
+
+        if len(my_deps) == 0:
+            jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
+
+        if job_script_destination is None:
+            jobscript = tempfile.NamedTemporaryFile()
+        else:
+            jobscript = open(Path(job_script_destination / f'{jobname}.sh').resolve(), 'w')
+
+        jobscript.write(jobstr)
+        jobscript.seek(0)
+
+        ssh_client = paramiko.SSHClient()
+        ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
+
+        command = f'sbatch {jobscript.name}'
+        stdin, stdout, stderr = ssh_client.exec_command(command)
+
+        if stdout.channel.recv_exit_status() != 0:
+            raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
+
+        out = stdout.read()
+        err = stderr.read()
+
+        print(out, flush=True)
+        print(err, flush=True)
+
+        jobscript.close()
+        ssh_client.close()
+
 
 if __name__ == '__main__':
 
@@ -51,17 +146,15 @@ if __name__ == '__main__':
                         datefmt='%m/%d/%Y %I:%M:%S',
                         level=logging.INFO)
 
+    image_ids = list(map(int, sys.argv[1:]))
+
     if rank == 0:
         num_workers = size - 1
         task_index = 1
         closed_workers = 0
 
         images = db.DBSession().query(db.Image)\
-                               .filter(db.sa.and_(db.Image.field.in_([792, 764]),
-                                                  db.Image.disk_sub_path != None,
-                                                  db.Image.disk_psf_path != None,
-                                                  db.sa.or_(db.Image.subtraction_exists != False,
-                                                            db.Image.subtraction_exists == None)))\
+                               .filter(db.Image.id.in_(image_ids))\
                                .all()
 
         #  expunge all the images from the session before sending them to other ranks
@@ -93,6 +186,12 @@ if __name__ == '__main__':
             elif tag == tags.EXIT:
                 closed_workers += 1
                 logging.info('Closing worker %d.' % source)
+
+        for source in images[0].sources:
+            if len(source.thumbnails) == 0:
+                db.redundantly_declare_thumbnails(source)
+                source.add_linked_thumbnails()
+
 
     else:
 
