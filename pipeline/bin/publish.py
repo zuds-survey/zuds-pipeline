@@ -21,6 +21,7 @@ from social_tornado.models import TornadoStorage
 
 #from db import DBSession
 import db
+from penquins import Kowalski
 
 from astropy.coordinates import SkyCoord
 from astropy.nddata.utils import Cutout2D
@@ -56,6 +57,64 @@ def make_stamp(name, ra, dec, vmin, vmax, data, wcs):
     cutout = Cutout2D(data, coord, CUTOUT_SIZE, wcs=wcs, fill_value=0.)
     plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax, cmap='gray')
     os.chmod(name, 0o774)
+
+
+def annotate(source):
+    # currsource = source
+    # for source in sources[sources.index(currsource):]:
+
+    kusername = os.getenv('KOWALSKI_USERNAME')
+    kpassword = os.getenv('KOWALSKI_PASSWORD')
+    authtoken = os.getenv('SKYPORTAL_TOKEN')
+    headers = {'Authorization': f'token {authtoken}'}
+    k = Kowalski(username=kusername, password=kpassword)
+
+    result = k.query({"query_type": "cone_search",
+                      "object_coordinates": {
+                          "radec": f"[({source.ra}, {source.dec})]",
+                          "cone_search_radius": "1.5",
+                          "cone_search_unit": "arcsec"
+                      }, "catalogs": {
+            "Gaia_DR2": {"filter": {}, "projection": {"parallax": 1, "ra": 1, "dec": 1}}
+        }})
+    rset = result['result_data']['Gaia_DR2'][f'({source.ra}, {source.dec})'.replace('.', '_')]
+    if len(rset) > 0:
+        parallax = rset[0]['parallax']
+        if parallax is not None:
+            # this is a variable star
+            source.varstar = True
+            source.score = -1
+            db.DBSession().add(source)
+            db.DBSession().commit()
+
+            # write a comment to this effect
+            comment = f"Matched to GAIA source id={rset[0]['_id']}"
+            r = requests.post('http://***REMOVED***:5000/api/comment', headers=headers,
+                              json={'source_id': source.id, 'text': comment, 'attachment': ''})
+            if r.status_code != 200:
+                raise RuntimeError(r.content)
+            else:
+                print(r.content)
+
+    result = k.query({"query_type": "cone_search",
+                 "object_coordinates": {
+                     "radec": f"[({source.ra}, {source.dec})]",
+                 "cone_search_radius": "1.5",
+                 "cone_search_unit": "arcsec"
+             }, "catalogs": {
+                 "milliquas_v6": {"filter": {}, "projection": {"ra":1, "dec":1}}
+             }})
+    rset = result['result_data']['milliquas_v6'][f'({source.ra}, {source.dec})'.replace('.', '_')]
+    if len(rset) > 0:
+
+        # write a comment to this effect
+        comment = f"Matched to milliquas source id={rset[0]['_id']}"
+        r = requests.post('http://***REMOVED***:5000/api/comment', headers=headers,
+                          json={'source_id' : source.id, 'text': comment, 'attachment':''})
+        if r.status_code != 200:
+            raise RuntimeError(r.content)
+        else:
+            print(r.content)
 
 
 def load_catalog(catpath, refpath, newpath, subpath):
@@ -194,6 +253,8 @@ def load_catalog(catpath, refpath, newpath, subpath):
 
                     db.DBSession().add(s)
                     db.DBSession().commit()
+
+                    annotate(s)
 
                     for t in ['ref', 'new', 'sub']:
                         thumb = db.StackThumbnail(type=t, stackdetection_id=bestpoint.id,

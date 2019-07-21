@@ -58,6 +58,8 @@ stamp_directory = '/global/project/projectdirs/astro250/www/stamps'
 kowalski_username = 'danny'
 kowalski_password = '***REMOVED***'
 
+skyportal_token = '***REMOVED***'
+
 
 #########################################################################
 # Don't change the values of anything after this line
@@ -109,7 +111,8 @@ environment_variables = {
     'PYTHONPATH': pythonpath,
     'KOWALSKI_USERNAME': kowalski_username,
     'KOWALSKI_PASSWORD': kowalski_password,
-    'STAMP_DIRECTORY': stamp_directory
+    'STAMP_DIRECTORY': stamp_directory,
+    'SKYPORTAL_TOKEN': skyportal_token
 }
 
 
