@@ -64,8 +64,8 @@ def submit_forcephoto(field, ccdid, qid, filtercode, detect_dependencies, batch_
     volumes = os.getenv('VOLUMES')
 
     #sesub = db.DBSession().query(db.SingleEpochSubtraction).get(list(subtraction_dependencies.keys())[0])
-    images = db.DBSession().query(db.Image).filter(db.Image.field == field, db.Image.ccdid == ccdid,
-                                                   db.Image.qid == qid, db.Image.filtercode == filtercode,
+    images = db.DBSession().query(db.Image).filter(db.Image.field == int(field), db.Image.ccdid == int(ccdid),
+                                                   db.Image.qid == int(qid), db.Image.filtercode == str(filtercode),
                                                    db.Image.disk_sub_path != None, db.Image.disk_psf_path != None)\
                                                    .all()
 
