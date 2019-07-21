@@ -246,7 +246,7 @@ def load_catalog(catpath, refpath, newpath, subpath):
                     seqquery = "SELECT nextval('namenum')"
                     num = db.DBSession().execute(seqquery).fetchone()[0]
                     name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
-                    s = db.models.Source(id=name, ra=ra, dec=dec, groups=[g])
+                    s = db.models.Source(id=name, ra=ra, dec=dec, groups=[g], score=0)
 
                     for point in points:
                         point.source = s

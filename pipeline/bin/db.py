@@ -403,7 +403,6 @@ class Fit(models.Base):
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source')
 
-models.Source.score = sa.Column(sa.Float, nullable=True, default=0.)
 
 class File(object):
 
