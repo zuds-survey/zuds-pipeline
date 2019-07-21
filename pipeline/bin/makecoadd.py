@@ -226,7 +226,7 @@ if __name__ == '__main__':
 
     syscall = 'scamp -c %s %s' % (scampconf, " ".join(cats))
     band = cats[0].split('_z')[1][0]
-    syscall += f' -REFOUT_CATPATH {scamp_outpath} -ASTREF_BAND {band}'
+    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
     if args.template:
         syscall += ' -NTHREADS 64'
     libztf.execute(syscall, capture=False)
@@ -246,7 +246,7 @@ if __name__ == '__main__':
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
     libztf.execute(syscall, capture=False)
     print(syscall, flush=True)
-    
+
 
     # now delete all the .head files as they are not needed anymore and can mess things up
 
