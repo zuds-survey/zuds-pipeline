@@ -470,7 +470,7 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsy))
 
         convolve_target = 't'
-        syscall = f'hotpants -inim %s -hki -n t -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
+        syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
                   f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
@@ -493,7 +493,13 @@ def make_sub(myframes, mytemplates, publish=True):
         execute(syscall, capture=False)
 
         # Subtraction catalog
-        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s -WEIGHT_IMAGE %s -WEIGHT_TYPE MAP_RMS'
+
+        # make a new background map
+
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s ' \
+                  '-CHECKIMAGE_TYPE BACKGROUND_RMS -CHECKIMAGE_NAME %s'
+                  #'-WEIGHT_IMAGE %s -WEIGHT_TYPE MAP_RMS'
+        # try making rms
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub, subrms)
         syscall += clargs % defparsub
         syscall += f' -FLAG_IMAGE {submask}'
