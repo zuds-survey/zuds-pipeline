@@ -197,12 +197,6 @@ class Image(models.Base):
         psf_path = self.disk_psf_path
         sub_path = self.disk_sub_path
 
-        if psf_path.endswith('sciimgdaopsfcent.fits'):
-            self.disk_psf_path = sub_path.replace('scimrefdiffimg.fits.fz', 'diffimgpsf.fits')
-            psf_path = self.disk_psf_path
-            DBSession().add(self)
-            DBSession().commit()
-
         if self.zp is None:
             try:
                 with fits.open(sub_path) as hdul:
@@ -222,6 +216,13 @@ class Image(models.Base):
                 self.subtraction_exists = True
                 DBSession().add(self)
                 DBSession().commit()
+
+
+        if psf_path.endswith('sciimgdaopsfcent.fits'):
+            self.disk_psf_path = sub_path.replace('scimrefdiffimg.fits.fz', 'diffimgpsf.fits')
+            psf_path = self.disk_psf_path
+            DBSession().add(self)
+            DBSession().commit()
 
         if self.instrument is None:
             self.instrument_id = 1
