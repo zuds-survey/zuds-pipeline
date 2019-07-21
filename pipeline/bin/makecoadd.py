@@ -18,6 +18,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
 import paramiko
+import subprocess
 import tempfile
 
 
@@ -229,7 +230,19 @@ if __name__ == '__main__':
     syscall += f' -REFOUT_CATPATH {scamp_outpath}'
     if args.template:
         syscall += ' -NTHREADS 64'
-    libztf.execute(syscall, capture=False)
+
+    while True:
+        try:
+            libztf.execute(syscall, capture=False)
+        except subprocess.CalledProcessError as e:
+            print(f'there was a called process error on "{syscall}"', flush=True)
+            print(e, flush=True)
+            print('trying again...')
+            continue
+        else:
+            break
+
+
 
     # set these up for later
     clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
