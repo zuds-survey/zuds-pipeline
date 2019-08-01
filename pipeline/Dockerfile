@@ -342,8 +342,4 @@ ADD astromatic /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
-RUN pip install sncosmo image_registration ztfquery
-
-
-ENTRYPOINT ["/bin/bash", "-c"]
-CMD ["python /daemon/run.py"]
+RUN pip install sncosmo image_registration ztfquery noaodatalab sfdmap
