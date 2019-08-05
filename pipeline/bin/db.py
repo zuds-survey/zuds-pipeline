@@ -15,7 +15,7 @@ from pathlib import Path
 import os
 from skyportal import models
 from skyportal.models import (join_model, DBSession, ACL,
-                              Role, User, Token, Group)
+                              Role, User, Token, Group, init_db)
 
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -775,7 +775,7 @@ class DR8Object(models.Base):
     z_phot_l95 = sa.Column('z_phot_l95', psql.DOUBLE_PRECISION)
     z_phot_u95 = sa.Column('z_phot_u95', psql.DOUBLE_PRECISION)
     z_spec = sa.Column('z_spec', psql.DOUBLE_PRECISION)
-    survey = sa.Column('survey', psql.DOUBLE_PRECISION)
+    survey = sa.Column('survey', sa.Text)
     training = sa.Column('training', sa.Boolean)
 
 
