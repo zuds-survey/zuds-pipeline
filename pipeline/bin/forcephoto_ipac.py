@@ -4,9 +4,10 @@ import os
 from astropy.visualization import ZScaleInterval
 import db
 import logging
+import tempfile
 from pathlib import Path
 import paramiko
-import tempfile
+import sys
 
 from uuid import uuid4
 
@@ -21,16 +22,18 @@ DB_FTP_PORT = 222
 CHUNK_SIZE = 1
 
 
-# split an iterable over some processes recursively
-_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
-             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
-
 
 def chunk(iterable, chunksize):
     isize = len(iterable)
     nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
     for i in range(nchunks):
         yield i, iterable[i * chunksize : (i + 1) * chunksize]
+
+
+
+# split an iterable over some processes recursively
+_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
+             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
 def enum(*sequential, **named):
@@ -44,7 +47,8 @@ def enum(*sequential, **named):
 # Define MPI message tags
 tags = enum('READY', 'DONE', 'EXIT', 'START')
 
-def submit_forcephoto(subtraction_dependencies, detect_dependencies, batch_size=1024, job_script_destination='.',
+
+def submit_forcephoto(field, ccdid, qid, filtercode, detect_dependencies, batch_size=1024, job_script_destination='.',
                       log_destination='.', frame_destination='.', task_name=None):
 
 
@@ -59,17 +63,20 @@ def submit_forcephoto(subtraction_dependencies, detect_dependencies, batch_size=
     shifter_image = os.getenv('SHIFTER_IMAGE')
     volumes = os.getenv('VOLUMES')
 
-    sesub = db.DBSession().query(db.SingleEpochSubtraction).get(list(subtraction_dependencies.keys())[0])
+    #sesub = db.DBSession().query(db.SingleEpochSubtraction).get(list(subtraction_dependencies.keys())[0])
+    images = db.DBSession().query(db.Image).filter(db.Image.field == int(field), db.Image.ccdid == int(ccdid),
+                                                   db.Image.qid == int(qid), db.Image.filtercode == str(filtercode),
+                                                   db.Image.disk_sub_path != None, db.Image.disk_psf_path != None)\
+                                                   .all()
+
 
     estring = os.getenv("ESTRING").replace(r"\x27", "'")
 
-    for i, ch in chunk(list(subtraction_dependencies.keys()), batch_size):
-
-        my_deps = list(set([subtraction_dependencies[key] for key in ch]))
-        my_deps += list(set(detect_dependencies.values()))
+    for i, ch in chunk([i.id for i in images], batch_size):
+        my_deps = list(set(detect_dependencies.values()))
         dependency_string = ':'.join(list(map(str, set(my_deps))))
         sublist = ch
-        jobname = f'forcephoto.{task_name}.{sesub.field}.{sesub.ccdid}.{sesub.qid}.{sesub.filtercode}.{i}'
+        jobname = f'forcephoto.{task_name}.{field}.{ccdid}.{qid}.{filtercode}.{i}'
 
         jobstr = f'''#!/bin/bash
 #SBATCH -N 1
@@ -88,7 +95,7 @@ def submit_forcephoto(subtraction_dependencies, detect_dependencies, batch_size=
 export OMP_NUM_THREADS=1
 export USE_SIMPLE_THREADED_LEVEL3=1
 
-srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {' '.join(list(map(str, sublist)))}  
+srun -n 64 shifter {estring} python /pipeline/bin/forcephoto_ipac.py {' '.join(list(map(str, sublist)))}  
 
 '''
 
@@ -124,7 +131,6 @@ srun -n 64 shifter {estring} python /pipeline/bin/forcephoto.py {' '.join(list(m
         ssh_client.close()
 
 
-
 if __name__ == '__main__':
 
     from mpi4py import MPI
@@ -132,38 +138,23 @@ if __name__ == '__main__':
     rank = comm.Get_rank()
     size = comm.Get_size()
     status = MPI.Status()
-    from libztf import ipac_authenticate
-
-    import sys
-    sub_ids = list(map(int, sys.argv[1:]))
 
     env, cfg = db.load_env()
     db.init_db(**cfg['database'])
 
-    FORMAT = '[%(asctime)-15s]: %(message)s'
-    logger = logging.getLogger('main')
-    logger.setLevel(logging.DEBUG)
-    fmter = logging.Formatter(fmt=FORMAT)
-    handler = logging.StreamHandler(sys.stderr)
-    handler.setFormatter(fmter)
-    logger.addHandler(handler)
+    logging.basicConfig(format=f'[(Rank {rank:04d}) %(asctime)s] %(message)s',
+                        datefmt='%m/%d/%Y %I:%M:%S',
+                        level=logging.INFO)
+
+    image_ids = list(map(int, sys.argv[1:]))
 
     if rank == 0:
-        cookie = ipac_authenticate()
-    else:
-        cookie = None
-
-    cookie = comm.bcast(cookie, root=0)
-
-    if rank == 0:
-
         num_workers = size - 1
         task_index = 1
         closed_workers = 0
 
-        images = db.DBSession().query(db.SingleEpochSubtraction)\
-                               .filter(db.sa.and_(db.SingleEpochSubtraction.id.in_(sub_ids),
-                                                  db.SingleEpochSubtraction.image.has(db.Image.disk_psf_path != None)))\
+        images = db.DBSession().query(db.Image)\
+                               .filter(db.Image.id.in_(image_ids))\
                                .all()
 
         #  expunge all the images from the session before sending them to other ranks
@@ -196,11 +187,11 @@ if __name__ == '__main__':
                 closed_workers += 1
                 logging.info('Closing worker %d.' % source)
 
-        image = db.DBSession().query(db.SingleEpochSubtraction).get(images[0].id)
-        for source in image.image.sources:
+        for source in images[0].sources:
             if len(source.thumbnails) == 0:
                 db.redundantly_declare_thumbnails(source)
                 source.add_linked_thumbnails()
+
 
     else:
 
@@ -218,7 +209,7 @@ if __name__ == '__main__':
                     db.DBSession().add(image)
 
                     my_subtask = (task_index - 1) * CHUNK_SIZE + i + 1
-                    logging.info(f'Forcing photometry on image "{image.disk_path}"')
+                    logging.info(f'Forcing photometry on image "{image.path}" ({my_subtask} / {subtask_max})')
                     try:
                         image.force_photometry()
                     except FileNotFoundError as e:

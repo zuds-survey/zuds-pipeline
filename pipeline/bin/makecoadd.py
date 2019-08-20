@@ -1,71 +1,181 @@
 import os
+import db
 import numpy as np
-import liblg
+import libztf
 import uuid
 import time
 from astropy.io import fits
 from astropy.wcs import WCS
 import galsim
 from makevariance import make_variance
+from calibrate import calibrate
+from astropy.time import Time
 import logging
 from galsim import des
 from astropy.convolution import convolve
 import shutil
-
-SEED = 1234
-
-class Fake(object):
-
-    def __init__(self, ra, dec, mag=20.):
-        self.ra = ra
-        self.dec = dec
-        self.mag = mag
-
-    def xy(self, wcs):
-        # Return xy pixel coordinates of fake on image
-        return wcs.wcs_world2pix([(self.ra, self.dec)], 1)[0]
-
-    def galsim_object(self, sigma, magzpt):
-        flux = 10**(-0.4 * (self.mag - magzpt))
-        obj = galsim.Gaussian(sigma=sigma).withFlux(flux)
-        return obj
+import pandas as pd
+from datetime import datetime, timedelta
+from pathlib import Path
+import paramiko
+import subprocess
+import tempfile
 
 
-def add_fakes_to_image(inim, outim, fakes, inhdr=None):
+def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
+                    end_date=datetime(2018, 4, 1), template_science_minsep_days=0, template_destination='.',
+                    log_destination='.', job_script_destination=None, task_name=None):
 
-    im = galsim.fits.read(inim)
-    with fits.open(inim) as f:
-        seeing = f[0].header['SEEING']
-        sigma = seeing / 2.355
-        zp = f[0].header['MAGZP']
-        scale = f[0].header['PIXSCALE']
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
 
-        if inhdr is not None:
-            wcs = WCS(inhdr)
-        else:
-            wcs = WCS(f[0].header)
+    template_metatable = []
+    template_destination = Path(template_destination)
+    dependency_dict = {}
 
-    for fake in fakes:
-        obj = fake.galsim_object(sigma, zp)
-        img = obj.drawImage(scale=scale)
-        img.setCenter(fake.xy(wcs))
-        bounds = img.bounds
-        im[bounds] = im[bounds] + img
+    remaining_images = metatable.copy()
 
-    galsim.fits.write(im, file_name=outim, clobber=True)
+    for (field, quadrant, band, ccdnum), group in metatable.groupby(['field',
+                                                                     'qid',
+                                                                     'filtercode',
+                                                                     'ccdid']):
+        pass
 
-    with fits.open(outim, mode='update') as f, fits.open(inim) as ff:
-        hdr = f[0].header
-        orighdr = ff[0].header
-        hdr.update(orighdr.cards)
-        if inhdr is not None:
-            hdr.update([card for card in inhdr.cards if card.keyword not in ['END', 'COMMENT', 'HISTORY']])
-        for i, fake in enumerate(fakes):
-            hdr[f'FAKE{i:02d}RA'] = fake.ra
-            hdr[f'FAKE{i:02d}DC'] = fake.dec
-            hdr[f'FAKE{i:02d}FL'] = fake.galsim_object(sigma, zp).flux
-            hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = fake.xy(wcs)
-            hdr[f'FAKE{i:02d}MG'] = fake.mag
+    template_rows = group.copy()
+
+    if end_date is not None:
+        template_rows = template_rows[template_rows['obsdate'] < end_date]
+
+    if start_date is not None:
+        template_rows = template_rows[template_rows['obsdate'] > start_date]
+
+    # make cuts on seeing
+    template_rows = template_rows[template_rows['seeing'] > 1.8]
+    template_rows = template_rows[template_rows['seeing'] < 2.3]
+
+    if len(template_rows) < nimages:
+        raise ValueError(f'Not enough images to create requested template (Requested {nimages}, '
+                         f'got {len(template_rows)}).')
+
+
+    template_rows = template_rows.sort_values(by='maglimit', ascending=False)
+    template_rows = template_rows.iloc[:nimages]
+    template_rows = template_rows.sort_values(by='obsjd')
+
+    if len(variance_dependencies) > 0:
+        dependency_list = list(set([variance_dependencies[frame] for frame in template_rows['path']]))
+    else:
+        dependency_list = []
+
+    jobname = f'ref.{task_name}.{field}.{quadrant}.{band}.{ccdnum}'
+    dependency_string = ':'.join(list(map(str, dependency_list)))
+
+    minjd = template_rows.iloc[0]['obsjd']
+    maxjd = template_rows.iloc[-1]['obsjd']
+
+    mintime = Time(minjd, format='jd', scale='utc')
+    maxtime = Time(maxjd, format='jd', scale='utc')
+
+    mindatestr = mintime.iso.split()[0].replace('-', '')
+    maxdatestr = maxtime.iso.split()[0].replace('-', '')
+
+
+    template_basename = f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_' \
+                        f'{band:s}_{mindatestr:s}_{maxdatestr:s}_ztf_deepref.fits'
+
+    template_name = template_destination / template_basename
+    template_metatable.append([field, quadrant, band, ccdnum, f'{template_name}'])
+
+    incatstr = ' '.join([p.replace('fits', 'cat') for p in template_rows['full_path']])
+    inframestr = ' '.join(template_rows['full_path'])
+
+    ref = db.Reference(field=int(field), filtercode=str(band), qid=int(quadrant), ccdid=int(ccdnum),
+                       disk_path=f'{template_name}')
+    db.DBSession().add(ref)
+    db.DBSession().commit()
+
+    for imid in template_rows['id']:
+        im = db.DBSession().query(db.Image).get(int(imid))
+        refim = db.ReferenceImage(reference_id=ref.id, imag_id=im.id)
+        db.DBSession().add(refim)
+    db.DBSession().commit()
+
+    estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
+    jobstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J {jobname}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --dependency=afterok:{dependency_string}
+#SBATCH -C haswell
+#SBATCH --exclusive
+#SBATCH --volume="{volumes}"
+#SBATCH -o {Path(log_destination).resolve() / jobname}.out
+
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
+
+shifter {estring} python /pipeline/bin/makecoadd.py --outfile-path {template_name}  --input-catalogs {incatstr}  --input-frames {inframestr} --template
+
+if [ $? -eq 0 ]; then 
+
+shifter {estring} python /pipeline/bin/log_image.py {template_name} {ref.id} Reference
+
+fi
+
+'''
+
+    if len(dependency_list) == 0:
+        jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
+
+    if job_script_destination is None:
+        jobscript = tempfile.NamedTemporaryFile()
+    else:
+        jobscript = open(Path(job_script_destination / f'{jobname}.sh').resolve(), 'w')
+
+    jobscript.write(jobstr)
+    jobscript.seek(0)
+
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(hostname=nersc_host, password=nersc_password, username=nersc_username)
+
+    command = f'sbatch {jobscript.name}'
+    stdin, stdout, stderr = ssh_client.exec_command(command)
+
+    if stdout.channel.recv_exit_status() != 0:
+        raise RuntimeError(f'SSH Command returned nonzero exit status: {command}')
+
+    out = stdout.read()
+    err = stderr.read()
+
+    print(out, flush=True)
+    print(err, flush=True)
+
+    jobscript.close()
+    ssh_client.close()
+
+    jobid = int(out.strip().split()[-1])
+
+    dependency_dict[f'{template_name}'] = jobid
+
+    indices_left = remaining_images.index.difference(template_rows.index)
+    remaining_images = remaining_images.loc[indices_left, :]
+
+    early_enough = remaining_images['obsdate'] < start_date - timedelta(days=template_science_minsep_days)
+    late_enough = remaining_images['obsdate'] > end_date + timedelta(days=template_science_minsep_days)
+
+    remaining_images = remaining_images[early_enough | late_enough]
+    template_metatable = pd.DataFrame(template_metatable, columns=['field', 'qid', 'filtercode', 'ccdid', 'path'])
+    return dependency_dict, remaining_images, ref
 
 
 if __name__ == '__main__':
@@ -74,18 +184,14 @@ if __name__ == '__main__':
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('--output-basename', dest='output_basename', required=True,
+    parser.add_argument('--outfile-path', dest='outfile_path', required=True,
                         help='Basename of output coadd.', nargs=1)
     parser.add_argument('--input-catalogs', dest='cats', required=True,
                         help='List of catalogs to use for astrometric alignment.', nargs='+')
     parser.add_argument('--input-frames', dest='frames', nargs='+', required=True,
                         help='List of frames to coadd.')
-    parser.add_argument('--nothreads', dest='nothreads', action='store_true', default=False,
-                        help='Run astromatic software with only one thread.')
-    parser.add_argument('--add-fakes', dest='nfakes', type=int, default=0,
-                        help='Number of fakes to add. Default 0.')
-    parser.add_argument('--convolve', dest='convolve', action='store_true', default=False,
-                        help='Convolve image with PSF to artificially degrade its quality.')
+    parser.add_argument('--template', help='Turn on 64 threads for template jobs.',
+                        action='store_true', default=False)
 
     args = parser.parse_args()
 
@@ -110,110 +216,40 @@ if __name__ == '__main__':
     filtname = os.path.join(confdir, 'default.conv')
     nnwname = os.path.join(confdir, 'default.nnw')
     scampconf = os.path.join(confdir, 'scamp.conf')
-    swarpconf = os.path.join(confdir, 'default.swarp')
+    swarpconf = os.path.join(confdir, 'default.swarp') if not args.template else os.path.join(confdir, 'template.swarp')
     psfconf = os.path.join(confdir, 'psfex.conf')
 
-    clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
+    # first scamp everything together
 
-    # TODO: Delete this
-    rng = np.random.RandomState(SEED)
-
-    # First stamp everything together so that fakes are put down at the right place
-    mycats = ' '.join(cats)
-
-    # First scamp everything
     # make a random dir for the output catalogs
     scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
     os.makedirs(scamp_outpath)
 
-    syscall = 'scamp -c %s %s' % (scampconf, mycats)
-    syscall += f' -REFOUT_CATPATH {scamp_outpath}'
-    if args.nothreads:
-        syscall += ' -NTHREADS 2'
-    liblg.execute(syscall, capture=False)
+    syscall = 'scamp -c %s %s' % (scampconf, " ".join(cats))
+    band = cats[0].split('_z')[1][0]
+    syscall += f' -REFOUT_CATPATH {scamp_outpath} -ASTREF_BAND {band}'
+    if args.template:
+        syscall += ' -NTHREADS 64'
+
+    while True:
+        try:
+            libztf.execute(syscall, capture=False)
+        except subprocess.CalledProcessError as e:
+            print(f'there was a called process error on "{syscall}"', flush=True)
+            print(e, flush=True)
+            print('trying again...')
+            continue
+        else:
+            break
 
 
-    # First check to see if the fakes should be added
-    if args.nfakes > 0:
 
-        # get the range of ra and dec over which fakes can be implanted
-
-        radec = []
-        headers = []
-
-        for frame in frames:
-
-            # read in the fits header from scamp
-
-            head = frame.replace('.fits', '.head')
-
-            with open(head) as f:
-                h = fits.Header()
-                for text in f:
-                    h.append(fits.Card.fromstring(text.strip()))
-                with fits.open(frame) as hdul:
-                    hh = hdul[0].header
-                    h['SIMPLE'] = hh['SIMPLE']
-                    h['NAXIS'] = hh['NAXIS']
-                    h['BITPIX'] = hh['BITPIX']
-                    h['NAXIS1'] = hh['NAXIS1']
-                    h['NAXIS2'] = hh['NAXIS2']
-
-                wcs = WCS(h)
-                headers.append(h)
-
-                # get x and y coords
-                world_corners = wcs.calc_footprint()
-                radec.append(world_corners)
-
-        radec = np.vstack(radec)
-        minra, mindec = radec.min(axis=0)
-        maxra, maxdec = radec.max(axis=0)
-
-        rarange = maxra - minra
-        decrange = maxdec - mindec
-
-        fakeminra = minra + 0.15 * rarange
-        fakemaxra = minra + 0.85 * rarange
-
-        fakemindec = mindec + 0.15 * decrange
-        fakemaxdec = mindec + 0.85 * decrange
-
-        fakes = []
-
-        for i in range(args.nfakes):
-
-            ra = rng.uniform(fakeminra, fakemaxra)
-            dec = rng.uniform(fakemaxdec, fakemindec)
-            mag = rng.uniform(19.5, 24)
-            fake = Fake(ra, dec, mag=mag)
-            fakes.append(fake)
-
-        for frame, hdr in zip(frames, headers):
-            outim = frame.replace('.fits', '.fake.fits')
-            add_fakes_to_image(frame, outim, fakes, inhdr=hdr)
-
-        masks = [f.replace('sciimg','mskimg') for f in frames]
-        for f in frames:
-            orighead = f.replace('.fits', '.head')
-            newhead = orighead.replace('.head', '.fake.head')
-            origcat = f.replace('.fits', '.cat')
-            newcat = origcat.replace('.cat', '.fake.cat')
-            oldnoise = f.replace('.fits', '.noise.fits')
-            newnoise = oldnoise.replace('.noise.fits', '.fake.noise.fits')
-            shutil.copy(orighead, newhead)
-            shutil.copy(origcat, newcat)
-            shutil.copy(oldnoise, newnoise)
-
-        frames = [f.replace('.fits', '.fake.fits') for f in frames]
-        logger = logging.getLogger('fakevar')
-        logger.setLevel(logging.DEBUG)
-        make_variance(frames, masks, logger)
-
+    # set these up for later
+    clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
 
     allims = ' '.join(frames)
-    out = args.output_basename[0] + '.fits'
-    oweight = args.output_basename[0] + '.weight.fits'
+    out = args.outfile_path[0]
+    oweight = out.replace('.fits', '.weight.fits')
 
     # put all swarp temp files into a random dir
     swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
@@ -221,14 +257,23 @@ if __name__ == '__main__':
 
     syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
     syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
-    if args.nothreads:
-        syscall += ' -NTHREADS 2'
-    liblg.execute(syscall, capture=False)
+    libztf.execute(syscall, capture=False)
+    print(syscall, flush=True)
+
+
+    # now delete all the .head files as they are not needed anymore and can mess things up
+
+    for c in cats:
+        head = c.replace('.cat', '.head')
+        os.remove(head)
 
     # Now postprocess it a little bit
     with fits.open(frames[0]) as f:
         h0 = f[0].header
         band = h0['FILTER']
+        field = h0['FIELDID']
+        ccdid = h0['CCDID']
+        qid = h0['QID']
 
     mjds = []
     for frame in frames:
@@ -247,123 +292,18 @@ if __name__ == '__main__':
         else:
             raise ValueError('Invalid filter "%s."' % band)
 
+        # add in the basic stuff
+        header['FILTERCODE'] = 'z' + header['FILTER']
+        header['FIELD'] = field
+        header['CCDID'] = ccdid
+        header['QID'] = qid
+
+
         # TODO make this more general
-        header['PIXSCALE'] = 1.0
+        header['PIXSCALE'] = 1.013
         header['MJDEFF'] = np.median(mjds)
 
         # Add the sky back in as a constant
         f[0].data += 150.
 
-    # Make a new catalog
-    outcat = args.output_basename[0] + '.cat'
-    noise = args.output_basename[0] + '.noise.fits'
-    bkgsub = args.output_basename[0] + '.bkgsub.fits'
-    syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
-              f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
-    syscall = ' '.join([syscall, clargs])
-    liblg.execute(syscall, capture=False)
-
-    # now model the PSF
-    syscall = f'psfex -c {psfconf} {outcat}'
-    liblg.execute(syscall, capture=False)
-    psf = args.output_basename[0] + '.psf'
-
-    # and save it as a fits model
-    gsmod = des.DES_PSFEx(psf)
-    with fits.open(psf) as f:
-        xcen = f[1].header['POLZERO1']
-        ycen = f[1].header['POLZERO2']
-        psfsamp = f[1].header['PSF_SAMP']
-
-    cpos = galsim.PositionD(xcen, ycen)
-    psfmod = gsmod.getPSF(cpos)
-    psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-    # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-    psfimg.wcs = None
-    psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-    psfimpath = f'{psf}.fits'
-    # save it to the D
-    psfimg.write(psfimpath)
-
-    if args.convolve:
-        with fits.open(out, mode='update') as f, fits.open(psfimpath) as pf:
-            kernel = pf[0].data
-            idata = f[0].data
-            convolved = convolve(idata, kernel)
-            f[0].data = convolved
-
-        # Now remake the PSF model
-        # Make a new catalog
-        outcat = args.output_basename[0] + '.cat'
-        noise = args.output_basename[0] + '.noise.fits'
-        bkgsub = args.output_basename[0] + '.bkgsub.fits'
-        syscall = f'sex -c {sexconf} -CATALOG_NAME {outcat} -CHECKIMAGE_TYPE BACKGROUND_RMS,-BACKGROUND ' \
-                  f'-CHECKIMAGE_NAME {noise},{bkgsub} -MAG_ZEROPOINT 27.5 {out}'
-        syscall = ' '.join([syscall, clargs])
-        liblg.execute(syscall, capture=False)
-
-        # now model the PSF
-        syscall = f'psfex -c {psfconf} {outcat}'
-        liblg.execute(syscall, capture=False)
-        psf = args.output_basename[0] + '.psf'
-
-        # and save it as a fits model
-        gsmod = des.DES_PSFEx(psf)
-        with fits.open(psf) as f:
-            xcen = f[1].header['POLZERO1']
-            ycen = f[1].header['POLZERO2']
-            psfsamp = f[1].header['PSF_SAMP']
-
-        cpos = galsim.PositionD(xcen, ycen)
-        psfmod = gsmod.getPSF(cpos)
-        psfimg = psfmod.drawImage(scale=1., nx=25, ny=25, method='real_space')
-
-        # clear wcs and rotate array to be in same orientation as coadded images (north=up and east=left)
-        psfimg.wcs = None
-        psfimg = galsim.Image(np.fliplr(psfimg.array))
-
-        psfimpath = f'{psf}.fits'
-        # save it to the D
-        psfimg.write(psfimpath)
-
-    # And zeropoint the coadd, putting results in the header
-    liblg.solve_zeropoint(out, psfimpath, outcat, bkgsub)
-
-    # Now retrieve the zeropoint
-    with fits.open(out) as f:
-        zp = f[0].header['MAGZP']
-
-    # redo sextractor
-    syscall = 'sex -c %s -CATALOG_NAME %s -CHECKIMAGE_NAME %s -MAG_ZEROPOINT %f %s'
-    syscall = syscall % (sexconf, outcat, noise, zp, out)
-    syscall = ' '.join([syscall, clargs])
-    liblg.execute(syscall, capture=False)
-    liblg.make_rms(out, oweight)
-    liblg.medg(out)
-
-    if args.nfakes > 0:
-        with fits.open(out, mode='update') as f, fits.open(frames[0]) as ff, open(out.replace('fits', 'reg'), 'w') as o:
-            cards = [c for c in ff[0].header.cards if ('FAKE' in c.keyword and
-                                                       ('RA' in c.keyword or
-                                                        'DC' in c.keyword or
-                                                        'MG' in c.keyword or
-                                                        'FL' in c.keyword))]
-            wcs = WCS(f[0].header)
-            f[0].header.update(cards)
-
-            # make the region file
-            hdr = f[0].header
-
-            o.write("""# Region file format: DS9 version 4.1
-global color=green dashlist=8 3 width=1 font="helvetica 10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 de\
-lete=1 include=1 source=1
-physical
-""")
-
-            for i, fake in enumerate(fakes):
-                x, y = fake.xy(wcs)
-                hdr[f'FAKE{i:02d}X'], hdr[f'FAKE{i:02d}Y'] = x, y
-                o.write(f'circle({x},{y},10) # width=2 color=red\n')
-
+    calibrate(out, astrometry=False, psf=False)

@@ -1,12 +1,42 @@
 import os
+import db
 import numpy as np
 from astropy.io import fits
 from astropy.wcs import WCS
-from liblg import make_rms, cmbmask, execute, cmbrms
+from libztf import make_rms, cmbmask, execute, cmbrms
 import uuid
+import logging
+import shutil
+import pandas as pd
+
+from galsim import des
+import galsim
+
+import tempfile
+from pathlib import Path
+import paramiko
+
+
+def sub_name(frame, template):
+
+    frame = f'{frame}'
+    template = f'{template}'
+
+    refp = os.path.basename(template)[:-5]
+    newp = os.path.basename(frame)[:-5]
+
+    outdir = os.path.dirname(frame)
+
+    subp = '_'.join([newp, refp])
+
+    sub = os.path.join(outdir, 'sub.%s.fits' % subp)
+    return sub
+
+
+
+from libztf.yao import yao_photometry_single
 
 from filterobjects import filter_sexcat
-from makecoadd import Fake
 from publish import load_catalog
 
 # split an iterable over some processes recursively
@@ -14,7 +44,258 @@ _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
+def chunk(iterable, chunksize):
+    isize = len(iterable)
+    nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
+    for i in range(nchunks):
+        yield i, iterable[i * chunksize : (i + 1) * chunksize]
+
+
+def submit_coaddsub(template_dependencies, variance_dependencies, science_metatable, ref,
+                    rolling=False, coadd_windowsize=3, batch_size=32, job_script_destination='.',
+                    log_destination='.', frame_destination='.', task_name=None):
+
+
+    log_destination = Path(log_destination)
+    frame_destination = Path(frame_destination)
+    job_script_destination = Path(job_script_destination)
+    job_list = []
+
+    nersc_username = os.getenv('NERSC_USERNAME')
+    nersc_password = os.getenv('NERSC_PASSWORD')
+    nersc_host = os.getenv('NERSC_HOST')
+    nersc_account = os.getenv('NERSC_ACCOUNT')
+    shifter_image = os.getenv('SHIFTER_IMAGE')
+    volumes = os.getenv('VOLUMES')
+    coaddsub_exec = os.getenv('COADDSUB_EXEC')
+
+    ssh_client = paramiko.SSHClient()
+    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+
+    dependency_dict = {}
+
+    for (field, quadrant, band, ccdnum), group in science_metatable.groupby(['field',
+                                                                             'qid',
+                                                                             'filtercode',
+                                                                             'ccdid']):
+        pass
+
+    science_rows = group.copy()
+    science_rows = science_rows.sort_values('obsjd')
+
+    if len(template_dependencies) > 0:
+        template_dependency_list = [template_dependencies[ref.disk_path]]
+    else:
+        template_dependency_list = []
+
+    if coadd_windowsize > 0:
+        bin_edges = make_coadd_bins(science_rows, window_size=coadd_windowsize, rolling=rolling)
+        for l, r in bin_edges:
+            frames_c1 = science_rows['obsdate'] >= l
+            frames_c2 = science_rows['obsdate'] < r
+            frames = science_rows[frames_c1 & frames_c2]
+
+            if len(frames) > 3:
+                seeing = frames['seeing']
+                med = np.median(seeing)
+                std = 1.4826 * np.median(np.abs(seeing - med))
+
+                frames = frames[seeing < med + 2 * std]
+
+            if len(frames) == 0:
+                continue
+
+            if len(variance_dependencies) > 0:
+                variance_dependency_list = list(set([variance_dependencies[frame] for frame in frames['path']]))
+            else:
+                variance_dependency_list = []
+
+
+            cdep_list = variance_dependency_list + template_dependency_list
+
+            lstr = f'{l}'.split()[0].replace('-', '')
+            rstr = f'{r}'.split()[0].replace('-', '')
+
+            coadd_base = f'{field:06d}_c{ccdnum:02d}_{quadrant:d}_{band:s}_{lstr}_{rstr}_coadd'
+            coadd_dir = frame_destination / Path(frames['path'].iloc[0]).parent / coadd_base
+            coadd_dir.mkdir(parents=True, exist_ok=True)
+
+            coadd_name = coadd_dir / f'{coadd_base}.fits'
+
+            # log the stack to the database
+            stack = db.Stack(disk_path=f'{coadd_name}', field=int(field), ccdid=int(ccdnum), qid=int(quadrant),
+                             filtercode=band)
+
+            db.DBSession().add(stack)
+            db.DBSession().commit()
+
+            for imid in frames['id']:
+                stackimage = db.StackImage(imag_id=int(imid), stack_id=stack.id)
+                db.DBSession().add(stackimage)
+            db.DBSession().commit()
+
+            framepaths_in = [(frame_destination / frame).resolve() for frame in frames['path']]
+            framepaths_out = [(coadd_dir / os.path.basename(frame)) for frame in frames['path']]
+
+            for i, o in zip(framepaths_in, framepaths_out):
+                shutil.copy(i, o)
+
+            mesub = db.MultiEpochSubtraction(stack=stack, reference=ref,
+                                             disk_path=f'{coadd_dir / sub_name(stack.disk_path, ref.disk_path)}',
+                                             qid=int(quadrant), ccdid=int(ccdnum), field=int(field),
+                                             filtercode=band)
+            db.DBSession().add(mesub)
+            db.DBSession().commit()
+
+            job = {'type':'coaddsub',
+                   'frames': [f'{framepath}' for framepath in framepaths_out],
+                   'template': ref.disk_path, 'coadd_name': coadd_name,
+                   'sub': mesub,
+                   'dependencies': cdep_list}
+
+            job_list.append(job)
+
+    else:
+        # just run straight up subtractions
+        for i, row in science_rows.iterrows():
+            if len(variance_dependencies) > 0:
+                variance_dependency_list = [variance_dependencies[row['path']]]
+            else:
+                variance_dependency_list = []
+            cdep_list = variance_dependency_list + template_dependency_list
+
+            image = db.DBSession().query(db.Image).get(int(row['id']))
+            sesub = db.SingleEpochSubtraction(image=image, reference=ref,
+                                              disk_path=sub_name(row['full_path'], ref.disk_path),
+                                              qid=int(quadrant), ccdid=int(ccdnum), field=int(field),
+                                              filtercode=band)
+
+            db.DBSession().add(sesub)
+            db.DBSession().commit()
+
+            job = {'type': 'sub', 'frame': f"{(frame_destination / row['path']).resolve()}",
+                   'template': ref.disk_path, 'dependencies': cdep_list, 'sub': sesub}
+
+            job_list.append(job)
+
+    for i, ch in chunk(job_list, batch_size):
+
+        my_deps = []
+        for j in ch:
+            my_deps += j['dependencies']
+        my_deps = ':'.join(list(map(str, set(my_deps))))
+
+        job_name = f'sub.{task_name}.{field}.{ccdnum}.{quadrant}.{band}.bin{coadd_windowsize}.{i}'
+
+        jobstr = f'''#!/bin/bash
+#SBATCH -N 1
+#SBATCH -J {job_name}
+#SBATCH -t 00:30:00
+#SBATCH -L SCRATCH
+#SBATCH -A {nersc_account}
+#SBATCH --partition=realtime
+#SBATCH --image={shifter_image}
+#SBATCH --exclusive
+#SBATCH -C haswell
+#SBATCH --volume="{volumes}"
+#SBATCH -o {log_destination.resolve()}/{job_name}.out
+#SBATCH --dependency=afterok:{my_deps}
+
+export OMP_NUM_THREADS=1
+export USE_SIMPLE_THREADED_LEVEL3=1
+
+'''
+
+        estring = os.getenv("ESTRING").replace(r"\x27", "'")
+
+        if len(my_deps) == 0:
+            jobstr = jobstr.replace('#SBATCH --dependency=afterok:\n', '')
+
+        for j in ch:
+
+            template = j['template']
+
+            if j['type'] == 'coaddsub':
+
+                frames = j['frames']
+                cats = [frame.replace('.fits', '.cat') for frame in frames]
+                coadd = j['coadd_name']
+                execstr = f'shifter {estring} bash {coaddsub_exec} \"{" ".join(frames)}\" \"{" ".join(cats)}\"' \
+                          f' \"{coadd}\" \"{template}\" \"{j["sub"].id}\" \"{j["sub"].stack.id}\"' \
+                          f' \"{j["sub"].disk_path}\"&\n'
+            else:
+
+                frame = j['frame']
+                execstr = f'shifter {estring} python {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/makesub.py ' \
+                          f'--science-frames {frame} --templates {template}  --no-publish &&' \
+                          f'shifter {estring} python  {os.getenv("LENSGRINDER_HOME")}/pipeline/bin/log_image.py ' \
+                          f'{j["sub"].disk_path} {j["sub"].id} SingleEpochSubtraction &\n'
+
+
+            jobstr += execstr
+        jobstr += 'wait\n'
+
+        if job_script_destination is None:
+            job_script = tempfile.NamedTemporaryFile()
+            jobstr = jobstr.encode('ASCII')
+        else:
+            job_script = open(job_script_destination.resolve() / f'sub.{task_name}.bin{coadd_windowsize}.{i}.sh', 'w')
+
+        job_script.write(jobstr)
+        job_script.seek(0)
+
+        syscall = f'sbatch {job_script.name}'
+        stdin, stdout, stderr = ssh_client.exec_command(syscall)
+
+        out = stdout.read()
+        err = stderr.read()
+
+        jobid = int(out.strip().split()[-1])
+
+        for j in ch:
+            dependency_dict[j['sub'].id] = jobid
+
+        print(out, flush=True)
+        print(err, flush=True)
+
+        retcode = stdout.channel.recv_exit_status()
+        if retcode != 0:
+            raise RuntimeError(f'Unable to submit job with script: "{jobstr}", nonzero retcode')
+
+        job_script.close()
+
+    return dependency_dict
+
+
+def make_coadd_bins(science_rows, window_size=3, rolling=False):
+
+    mindate = pd.to_datetime(science_rows['obsdate'].min())
+    maxdate = pd.to_datetime(science_rows['obsdate'].max())
+
+
+    if rolling:
+        dates = pd.date_range(mindate, maxdate, freq='1D')
+        bins = []
+        for i, date in enumerate(dates):
+            if i + window_size >= len(dates):
+                break
+            bins.append((date, dates[i + window_size]))
+
+    else:
+        binedges = pd.date_range(mindate, maxdate, freq=f'{window_size}D')
+
+        bins = []
+        for i, lbin in enumerate(binedges[:-1]):
+            bins.append((lbin, binedges[i + 1]))
+
+    return bins
+
+
 def make_sub(myframes, mytemplates, publish=True):
+
+    myframes = np.atleast_1d(myframes).tolist()
+    mytemplates = np.atleast_1d(mytemplates).tolist()
 
     # now set up a few pointers to auxiliary files read by sextractor
     wd = os.path.dirname(__file__)
@@ -138,6 +419,10 @@ def make_sub(myframes, mytemplates, publish=True):
 
         execute(syscall, capture=False)
 
+        # get rid of the headers
+        os.remove(refremaphead)
+        os.remove(newhead)
+
         # Make the noise and bpm images
         make_rms(refremap, refremapweight)
 
@@ -184,8 +469,9 @@ def make_sub(myframes, mytemplates, publish=True):
         hotparlogger.info(str(nsx))
         hotparlogger.info(str(nsy))
 
-        syscall = 'hotpants -inim %s -hki -n i -c t -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
-                  '-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
+        convolve_target = 't'
+        syscall = f'hotpants -inim %s -hki -n i -c {convolve_target} -tmplim %s -outim %s -tu %f -iu %f  -tl %f -il %f -r %f ' \
+                  f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
         syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
                              submask, nsx, nsy)
 
@@ -194,12 +480,8 @@ def make_sub(myframes, mytemplates, publish=True):
 
         # Calibrate the subtraction
 
-        with fits.open(sub, mode='update') as f, fits.open(frame) as fr:
-            header = f[0].header
-            #frat = float(header['KSUM00'])
-            #subzp = 2.5 * np.log10(frat) + refzp
-            subzp = fr[0].header['MAGZP']
-            header['MAGZP'] = subzp
+        with fits.open(sub, mode='update') as f:
+            f[0].header['MAGZP'] = subzp = refzp
 
         # Make the subtraction catalogs
         clargs = ' -PARAMETERS_NAME %%s -FILTER_NAME %s -STARNNW_NAME %s' % (defconv, defnnw)
@@ -211,7 +493,13 @@ def make_sub(myframes, mytemplates, publish=True):
         execute(syscall, capture=False)
 
         # Subtraction catalog
-        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s -WEIGHT_IMAGE %s -WEIGHT_TYPE MAP_RMS'
+
+        # make a new background map
+
+        syscall = 'sex -c %s -MAG_ZEROPOINT %f -CATALOG_NAME %s -ASSOC_NAME %s -VERBOSE_TYPE QUIET %s ' \
+                  '-CHECKIMAGE_TYPE BACKGROUND_RMS -CHECKIMAGE_NAME %s'
+                  #'-WEIGHT_IMAGE %s -WEIGHT_TYPE MAP_RMS'
+        # try making rms
         syscall = syscall % (defsexsub, subzp, subcat, refremapcat, sub, subrms)
         syscall += clargs % defparsub
         syscall += f' -FLAG_IMAGE {submask}'
@@ -276,10 +564,11 @@ def make_sub(myframes, mytemplates, publish=True):
 if __name__ == '__main__':
 
     import argparse
-    import logging
 
-    rank = 0
-    size = 1
+    #from mpi4py import MPI
+    #comm = MPI.COMM_WORLD
+    rank = 0 #comm.Get_rank()
+    size = 1 #comm.Get_size()
 
     # set up the argument parser and parse the arguments
     parser = argparse.ArgumentParser()
@@ -301,7 +590,7 @@ if __name__ == '__main__':
             frames = np.atleast_1d(frames).tolist()
         else:
             frames = None
-
+        #frames = comm.bcast(frames, root=0)
     else:
         frames = args.sciimg
 
@@ -313,6 +602,7 @@ if __name__ == '__main__':
             templates = np.atleast_1d(templates).tolist()
         else:
             templates = None
+        #templates = comm.bcast(templates, root=0)
     else:
         templates = args.template
 

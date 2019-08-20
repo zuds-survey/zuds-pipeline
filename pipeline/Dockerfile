@@ -334,11 +334,6 @@ ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
 
 ENV PYTHONPATH $PYTHONPATH:/skyportal:/pipeline/bin
 
-ENV DB_FTP_ENDPOINT ***REMOVED***
-ENV DB_FTP_DIR /scratch/danny/stamps
-ENV DB_FTP_USERNAME danny
-ENV DB_FTP_PASSWORD 6BJ6l71KS0ie7eCevIKEUUlD
-
 ADD . /pipeline
 ADD msgconsumer /daemon
 ADD slurm /slurm
@@ -347,8 +342,4 @@ ADD astromatic /config
 RUN cd /pipeline/liblg && python setup.py install && \
     cd -
 
-RUN pip install sncosmo image_registration
-
-
-ENTRYPOINT ["/bin/bash", "-c"]
-CMD ["python /daemon/run.py"]
+RUN pip install sncosmo image_registration ztfquery noaodatalab sfdmap

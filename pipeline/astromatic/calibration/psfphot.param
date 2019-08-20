@@ -28,7 +28,9 @@ ERRTHETAWIN_IMAGE
 ERRA_WORLD
 ERRB_WORLD
 ERRTHETA_WORLD
-X_WORLD # Removing these made the internal astrometric solutions X^2/dof twice as high
+
+# Removing these made the internal astrometric solutions X^2/dof twice as high
+X_WORLD
 Y_WORLD
 ELONGATION
 AWIN_IMAGE
@@ -66,4 +68,12 @@ FLUXERR_APER
 
 X_IMAGE
 Y_IMAGE
+
+FLUX_PSF
+FLUXERR_PSF
+MAG_PSF
+MAGERR_PSF
+
+SPREAD_MODEL
+SPREADERR_MODEL
 

@@ -1,2 +1,5 @@
 .idea/
 *.pyc
+pipeline/libztf/build/
+shifter.sh
+interactive.sh

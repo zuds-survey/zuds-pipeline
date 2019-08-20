@@ -1,0 +1,24 @@
+clobber: false
+
+hpss:
+  object_name: 'ZTF18aanxrsy'
+  preserve_directories: true
+  whereclause: "FIELD=716 AND FID=1 AND CCDID=1 AND QID=1"
+  exclude_masks: false
+  skip: true
+
+makevariance:
+  batch_size: 128
+  skip: false
+
+template:
+  nimages: 50
+  start_date: 2017-12-20T00:00:00.0Z
+  end_date: 2018-05-21T00:00:00.0Z
+  template_science_minsep_days: 0
+
+coaddsub:
+  rolling: false
+  coadd_windowsize: 3
+  batch_size : 32
+
