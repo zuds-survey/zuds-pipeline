@@ -72,7 +72,6 @@ RUN conda install --copy --yes \
     scikit-image \
     ipython \
     jupyter \
-    ipywidgets=6.0.0 \
     bokeh \
     && mplrc="/usr/lib/python3.6/site-packages/matplotlib/mpl-data/matplotlibrc"; \
     cat ${mplrc} | sed -e "s#^backend.*#backend : TkAgg#" > ${mplrc}.tmp; \
@@ -293,15 +292,7 @@ RUN git clone https://github.com/acbecker/hotpants.git && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
 
 
-# for queue monitoring
-RUN pip install pika
-ENV IPAC_USERNAME dgold@berkeley.edu
-ENV IPAC_PASSWORD ***REMOVED***
-ENV NERSC_USERNAME dgold
-ENV NERSC_PASSWORD ***REMOVED***
-
-RUN conda install astropy=3
-RUN pip install paramiko
+RUN conda install astropy=3 paramiko
 
 # install galsim
 RUN conda install galsim -c conda-forge
@@ -318,28 +309,11 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
     && cd .. \
     && rm -rf scamp*
 
-ADD skyportal /skyportal
-RUN apt-get update && apt-get install -y supervisor nginx postgresql-client
-RUN curl -sL https://deb.nodesource.com/setup_8.x | bash - && \
-    apt-get update && \
-    apt-get -y upgrade && \
-    apt-get install -y nodejs && \
-    cd /skyportal && \
-    make -C baselayer paths && \
-    make -f baselayer/Makefile baselayer dependencies &&  make -f baselayer/Makefile bundle
-
-ADD patches/skyportal.yaml /skyportal/config.yaml.defaults
-
-
 
 ENV PYTHONPATH $PYTHONPATH:/skyportal:/pipeline/bin
 
 ADD . /pipeline
-ADD msgconsumer /daemon
 ADD slurm /slurm
 ADD astromatic /config
 
-RUN cd /pipeline/liblg && python setup.py install && \
-    cd -
-
-RUN pip install sncosmo image_registration ztfquery noaodatalab sfdmap
+RUN pip install sncosmo image_registration ztfquery noaodatalab sfdmap sqlalchemy_helpers
