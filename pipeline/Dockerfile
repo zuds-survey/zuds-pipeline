@@ -1,4 +1,4 @@
-FROM ubuntu:16.04
+FROM continuumio/miniconda3:4.7.10
 
 MAINTAINER Danny Goldstein <dgold@caltech.edu>
 
@@ -10,17 +10,10 @@ SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update \
     && apt-get install -y curl procps build-essential gfortran git subversion \
-    python libcairo2-dev libpixman-1-dev libgsl-dev flex pkg-config cmake \
+    flex pkg-config cmake \
     autoconf m4 libtool automake locales libopenblas-dev \
     && rm -fr /var/lib/apt/lists/*
-
-# Set up locales, to workaround a pip bug
-
-RUN locale-gen en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LANGUAGE en_US:en
-ENV LC_ALL en_US.UTF-8
-
+    
 # We install everything directly into /usr so that we do
 # not need to modify the default library and executable
 # search paths.  Shifter will manipulate LD_LIBRARY_PATH,
@@ -30,64 +23,6 @@ ENV LC_ALL en_US.UTF-8
 
 RUN mkdir /usr/src/desi
 WORKDIR /usr/src/desi
-
-# Install conda root environment
-
-ENV PYTHONPATH ""
-ENV PYTHONSTARTUP ""
-ENV PYTHONNOUSERSITE "1"
-ENV PYTHONUSERBASE "/tmp"
-
-RUN curl -SL https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh \
-    -o miniconda.sh \
-    && /bin/bash miniconda.sh -b -f -p /usr \
-    && conda install --copy --yes python=3.6 \
-    && rm miniconda.sh \
-    && rm -rf /usr/pkgs/*
-
-# Install conda packages.
-
-RUN conda install --copy --yes \
-    nose \
-    requests \
-    future \
-    cython \
-    numpy \
-    scipy \
-    matplotlib=2.1.2 \
-    basemap \
-    seaborn \
-    pyyaml \
-    astropy=2 \
-    hdf5 \
-    h5py \
-    psutil \
-    ephem \
-    psycopg2 \
-    pytest \
-    pytest-cov \
-    numba \
-    sqlalchemy \
-    scikit-learn \
-    scikit-image \
-    ipython \
-    jupyter \
-    bokeh \
-    && mplrc="/usr/lib/python3.6/site-packages/matplotlib/mpl-data/matplotlibrc"; \
-    cat ${mplrc} | sed -e "s#^backend.*#backend : TkAgg#" > ${mplrc}.tmp; \
-    mv ${mplrc}.tmp ${mplrc} \
-    && rm -rf /usr/pkgs/*
-
-# Install pip packages.
-
-RUN pip install --no-binary :all: \
-    speclite \
-    hpsspy \
-    photutils \
-    healpy \
-    coveralls \
-    line_profiler \
-    https://github.com/esheldon/fitsio/archive/v0.9.12rc1.zip
 
 # The conda TCL packages overwrite the system-installed regex.h.  So
 # now we force reinstall of the package that provides that
@@ -113,17 +48,6 @@ RUN curl -SL http://www.mpich.org/static/downloads/3.2/mpich-3.2.tar.gz \
     && make -j 4 && make install \
     && cd .. \
     && rm -rf mpich-3.2*
-
-# Install mpi4py.
-
-RUN curl -SL https://pypi.python.org/packages/ee/b8/f443e1de0b6495479fc73c5863b7b5272a4ece5122e3589db6cd3bb57eeb/mpi4py-2.0.0.tar.gz#md5=4f7d8126d7367c239fd67615680990e3 \
-    -o mpi4py-2.0.0.tar.gz \
-    && tar xzf mpi4py-2.0.0.tar.gz \
-    && cd mpi4py-2.0.0 \
-    && python setup.py build --mpicc="mpicc" --mpicxx="mpicxx" \
-    && python setup.py install --prefix=/usr \
-    && cd .. \
-    && rm -rf mpi4py*
 
 # Install CFITSIO.
 
@@ -228,7 +152,7 @@ RUN curl -SL http://www.astromatic.net/download/psfex/psfex-3.17.1.tar.gz \
     && cd .. \
     && rm -rf psfex*
 
-RUN curl -SL http://cdsarc.u-strasbg.fr/ftp/pub/sw/cdsclient-3.84.tar.gz \
+RUN curl -SL ftp://cdsarc.u-strasbg.fr/pub/sw/cdsclient-3.84.tar.gz \
     -o cdsclient-3.84.tar.gz \
     && tar xzf cdsclient-3.84.tar.gz \
     && cd cdsclient-3.84 \
@@ -265,10 +189,6 @@ RUN curl -SL http://www.astromatic.net/download/swarp/swarp-2.38.0.tar.gz \
 
 
 
-# Precompile all python modules.  Ignore errors.
-
-RUN python -m compileall -f "/usr/lib/python3.6/site-packages"; exit 0
-
 # Create a fake home directory so that packages can create
 # astromatic files if needed
 
@@ -278,24 +198,11 @@ RUN mkdir /home/desi/.astropy
 WORKDIR /home/desi
 ENV HOME /home/desi
 
-RUN python -c "import astropy"
-RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
-
-# Set the entrypoint and default command
-
-ENV PYTHONPATH /global/cscratch1/sd/dgold/lsn/install/lib/python3.6/site-packages/
-
 RUN apt-get install -y wget
 
 RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
-
-
-RUN conda install astropy=3 paramiko
-
-# install galsim
-RUN conda install galsim -c conda-forge
 
 RUN apt-get install -y  libcurl4-openssl-dev libatlas-base-dev
 RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
@@ -312,8 +219,81 @@ RUN curl -SL https://github.com/astromatic/scamp/archive/v2.6.7.tar.gz \
 
 ENV PYTHONPATH $PYTHONPATH:/skyportal:/pipeline/bin
 
+# Install conda root environment
+
+RUN conda install \
+    nose \
+    requests \
+    future \
+    cython \
+    numpy \
+    scipy \
+    matplotlib \
+    basemap \
+    seaborn \
+    pyyaml \
+    astropy \
+    hdf5 \
+    h5py \
+    psutil \
+    ephem \
+    psycopg2 \
+    pytest \
+    pytest-cov \
+    numba \
+    sqlalchemy \
+    scikit-learn \
+    scikit-image \
+    ipython \
+    jupyter \
+    paramiko \
+    setuptools  \    
+    galsim -c conda-forge 
+
+# Install pip packages.
+
+# Install mpi4py.
+
+RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65dba63759455e3da610d9a155d4d4cece1d8fd6706/mpi4py-3.0.2.tar.gz \
+    -o mpi4py-3.0.2.tar.gz \
+    && tar xzf mpi4py-3.0.2.tar.gz \
+    && cd mpi4py-3.0.2 \
+    && python setup.py build --mpicc="mpicc" --mpicxx="mpicxx" \
+    && python setup.py install --prefix=/usr \
+    && cd .. \
+    && rm -rf mpi4py*
+
+
+ADD requirements1.txt requirements1.txt
+ADD requirements2.txt requirements2.txt
+
+RUN pip install \
+    speclite \
+    hpsspy \
+    photutils \
+    healpy \
+    coveralls \
+    https://github.com/esheldon/fitsio/archive/v0.9.12rc1.zip \
+    image_registration \
+    ztfquery \
+    noaodatalab \
+    sfdmap \
+    -r requirements1.txt \
+    -r requirements2.txt \
+    git+https://github.com/dmitryduev/kowalski.git
+
+
+RUN python -c "import astropy"
+RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
+
+# Precompile all python modules.  Ignore errors.
+
+RUN python -m compileall -f "/usr/lib/python3.6/site-packages"; exit 0
+
+
+# Set the entrypoint and default command
+
 ADD . /pipeline
 ADD slurm /slurm
 ADD astromatic /config
 
-RUN pip install sncosmo image_registration ztfquery noaodatalab sfdmap sqlalchemy_helpers
