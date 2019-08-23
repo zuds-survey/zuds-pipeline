@@ -259,7 +259,7 @@ RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65db
     && tar xzf mpi4py-3.0.2.tar.gz \
     && cd mpi4py-3.0.2 \
     && python setup.py build --mpicc="mpicc" --mpicxx="mpicxx" \
-    && python setup.py install --prefix=/usr \
+    && python setup.py install \
     && cd .. \
     && rm -rf mpi4py*
 
@@ -278,6 +278,7 @@ RUN pip install \
     ztfquery \
     noaodatalab \
     sfdmap \
+    sep \
     -r requirements1.txt \
     -r requirements2.txt \
     git+https://github.com/dmitryduev/kowalski.git
