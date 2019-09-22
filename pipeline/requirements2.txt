@@ -1,0 +1,13 @@
+psycopg2-binary==2.7.6.1
+pyyaml
+pyzmq
+pyjwt
+distributed>=1.21.1
+simplejson
+requests
+selenium>=3.12.0
+social-auth-core>=3.0.0
+social-auth-app-tornado>=1.0.0
+social-auth-storage-sqlalchemy>=1.1.0
+selenium-requests
+arrow==0.13.0
