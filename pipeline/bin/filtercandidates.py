@@ -170,8 +170,8 @@ if __name__ == '__main__':
         # connect to kowalski
         while True:
             try:
-                k = penquins.Kowalski(username=os.getenv('KOWALSKI_USERNAME'),
-                                      password=os.getenv('KOWALSKI_PASSWORD'))
+                k = penquins.Kowalski(username=get_secret('kowalski_username'),
+                                      password=get_secret('kowalski_password'))
             except:
                 pass
             else:
