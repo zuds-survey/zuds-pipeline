@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import array
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.automap import automap_base
 
-
+import math
 from sqlalchemy import Index
 from sqlalchemy import func
 
@@ -643,11 +643,8 @@ models.Photometry.stack_detection_id = sa.Column(sa.Integer,
 models.Photometry.stack_detection = relationship('StackDetection', back_populates='photometry', cascade='all')
 
 
-class DR8Object(models.Base):
+class DR8Mixin(object):
 
-    __tablename__ = 'legacysurveydr8'
-
-    id = sa.Column('id', primary_key=True, nullable=False)
     release = sa.Column('RELEASE', sa.Integer)
     brickid = sa.Column('BRICKID', sa.Integer)
     brickname = sa.Column('BRICKNAME', sa.Text)
@@ -778,7 +775,28 @@ class DR8Object(models.Base):
     survey = sa.Column('survey', sa.Text)
     training = sa.Column('training', sa.Boolean)
 
+    @hybrid_property
+    def gmag(self):
+        return -2.5 * math.log10(self.flux_g) + 22.5
 
+    @hybrid_property
+    def rmag(self):
+        return -2.5 * math.log10(self.flux_r) + 22.5
+
+    @hybrid_property
+    def w1mag(self):
+        return -2.5 * math.log10(self.flux_w1) + 22.5
+
+
+
+
+
+class DR8North(DR8Mixin, models.Base):
+    __tablename__ = 'dr8_north'
+
+
+class DR8South(DR8Mixin, models.Base):
+    __tablename__ = 'dr8_south'
 
 
 def create_ztf_groups_if_nonexistent():

@@ -104,51 +104,38 @@ def cross_match_source_against_gaia(source, k):
             return []
 
 
-def cross_match_source_against_lensdbs(source, k):
+def cross_match_source_against_lensdbs(source):
 
     ra, dec = source.ra, source.dec
     matches = []
-    catalogs = ['legacysurveys_photoz_DR6', 'legacysurveys_photoz_DR7', 'sdss_ellipticals']
+    #catalogs = ['legacysurveys_photoz_DR6', 'legacysurveys_photoz_DR7', 'sdss_ellipticals']
 
     # have to do this for geojson
-    ra -= 180
+    #ra -= 180
 
-    for catalog in catalogs:
+    res = db.DBSession().query(db.DR8North)\
+        .filter(db.sa.func.q3c_radial_query(db.DR8North.ra, db.DR8North.dec, ra, dec, 0.0002777 * 10))\
+        .filter(db.DR8North.type != 'PSF')\
+        .order_by(db.sa.func.q3c_dist(db.DR8North.ra, db.DR8North.dec, ra, dec).asc())
 
-        query = "db['%s'].find({'coordinates.radec_geojson' : {'$geoWithin': {'$centerSphere' : [[%f, %f], 4.84814e-6]}}})"
-        query = query % (catalog, ra, dec)
+    neighb = res.first()
 
-        while True:
-            query_result = k.query({'query_type': 'general_search', 'query': query})
-            if query_result['status'] == 'failed':
-                print('failed')
-                continue
-            else:
-                break
+    if neighb is not None:
+        g = neighb.gmag
+        r = neighb.rmag
+        w1 = neighb.w1mag
+        z = neighb.z_phot_median
+        dz = neighb.z_phot_std
+        c1 = (g - r) > 0.84 + 0.44 * (r - w1)
+        c2 = (g - r) > 1.5
+        c3 = (g - r) > 1.
+        c4 = neighb.type.strip() == 'DEV'
+        c5 = dz / (1 + z) < 0.05
 
-        mymatches = query_result['result_data']['query_result']
+        if (c1 or c2 or c4) and c3 and c5:
+            return neighb
 
-        if 'legacy' in catalog:
-            finalmatches = []
-            for match in mymatches:
-                g = match['gmag']
-                r = match['rmag']
-                w1 = match['w1mag']
-                z = match['z_phot']
-                dz = match['z_phot_err']
-                c1 = (g - r) > 0.84 + 0.44 * (r - w1)
-                c2 = (g - r) > 1.5
-                c3 = (g - r) > 1.
-                c4 = match['TYPE'].strip() == 'DEV'
-                c5 = dz / (1 + z) < 0.05
-
-                if (c1 or c2 or c4) and c3 and c5:
-                    finalmatches.append(match)
-            mymatches = finalmatches
-
-        matches.extend(mymatches)
-
-    return matches
+    return None
 
 
 if __name__ == '__main__':
@@ -175,7 +162,7 @@ if __name__ == '__main__':
     run = db.FilterRun(tstart=datetime.now())
 
     # get dust directory
-    dustmap = sfdmap.SFDMap(os.getenv('SFDMAP_DIR'))
+    #dustmap = sfdmap.SFDMap(os.getenv('SFDMAP_DIR'))
 
     try:
         # connect to kowalski
@@ -193,9 +180,9 @@ if __name__ == '__main__':
             photdata = PhotometricData(light_curve)
 
             # cross match the source against the kowalski catalog
-            lensmatches = cross_match_source_against_lensdbs(source, k)
+            lensmatch = cross_match_source_against_lensdbs(source)
 
-            if len(lensmatches) == 0:
+            if lensmatch is None:
                 continue
 
             quasmatches = cross_match_source_against_milliquas(source, k)
@@ -218,13 +205,13 @@ if __name__ == '__main__':
                 continue
 
             # add in dust
-            dust = sncosmo.CCM89Dust()
-            ebv = dustmap.ebv(source.ra, source.dec)
-            dust['ebv'] = ebv
+            #dust = sncosmo.CCM89Dust()
+            #ebv = dustmap.ebv(source.ra, source.dec)
+            #dust['ebv'] = ebv
 
             # set up the fit model
-            fitmod = sncosmo.Model(source='salt2-extended', effects=[dust], effect_names=['mw'], effect_frames=['obs'])
-            fitmod['z'] = lensmatches[0]['z_phot']
+            fitmod = sncosmo.Model(source='salt2-extended', effect_names=['mw'], effect_frames=['obs'])#, effects=[dust])
+            fitmod['z'] = lensmatch.z_phot
             fitmod.set_source_peakabsmag(-18, 'bessellb', 'ab')
             x0_low = fitmod['x0']
             fitmod.set_source_peakabsmag(-20, 'bessellb', 'ab')
