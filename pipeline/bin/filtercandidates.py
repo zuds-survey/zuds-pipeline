@@ -9,6 +9,7 @@ from sncosmo.photdata import PhotometricData
 import penquins
 
 import sncosmo
+from secrets import get_secret
 
 from datetime import datetime, timedelta
 
@@ -140,12 +141,11 @@ def cross_match_source_against_lensdbs(source):
 
 if __name__ == '__main__':
 
-    env, cfg = db.load_env()
-    db.init_db(**cfg['database'])
+    db.init_db()
 
     # get time of previous filter run
 
-    prevtime = db.DBSession().query(db.FilterRun.tend.max()).first()
+    prevtime = db.DBSession().query(func.max(db.FilterRun.tend)).first()[0]
     if prevtime is None:
         prevtime = datetime.now() - timedelta(weeks=9999)
 
@@ -156,7 +156,9 @@ if __name__ == '__main__':
                sa.and_(db.models.Source.modified >= prevtime,
                        db.models.Source.modified <= func.now())
                )
-    ).distinct(db.models.Source.id).all()  # the distinct part only works in postgres, producing a DISTINCT ON
+    )
+
+
 
     # start the run
     run = db.FilterRun(tstart=datetime.now())

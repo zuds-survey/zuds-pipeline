@@ -15,7 +15,7 @@ from pathlib import Path
 import os
 from skyportal import models
 from skyportal.models import (join_model, DBSession, ACL,
-                              Role, User, Token, Group, init_db)
+                              Role, User, Token, Group, init_db as idb)
 
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -32,10 +32,18 @@ from astropy.table import Table
 import requests
 
 from download import safe_download
+from secrets import get_secret
 
-
-from baselayer.app.env import load_env
 from datetime import datetime
+
+
+def init_db():
+    hpss_dbhost = get_secret('hpss_dbhost')
+    hpss_dbport = get_secret('hpss_dbport')
+    hpss_dbusername = get_secret('hpss_dbusername')
+    hpss_dbname = get_secret('hpss_dbname')
+    hpss_dbpassword = get_secret('hpss_dbpassword')
+    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost, hpss_dbport)
 
 
 class IPACProgram(models.Base):
