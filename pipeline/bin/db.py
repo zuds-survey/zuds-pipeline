@@ -20,6 +20,8 @@ from skyportal.models import (join_model, DBSession, ACL,
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
 
+import sncosmo
+
 from photometry import phot_sex_auto
 
 from astropy.io import fits
@@ -406,11 +408,22 @@ class Fit(models.Base):
     parameters = sa.Column(models.NumpyArray)
     vparam_names = sa.Column(psql.ARRAY(sa.Text))
     covariance = sa.Column(models.NumpyArray)
-    errors = sa.Column(models.NumpyArray)
+    errors = sa.Column(psql.JSONB)
     nfit = sa.Column(sa.Integer)
     data_mask = sa.Column(psql.ARRAY(sa.Boolean))
     source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source')
+
+
+    @property
+    def model(self):
+        mod = sncosmo.Model(source='salt2-extended')
+        for p, n in zip(self.parameters, self.param_names):
+            mod[n] = p
+        return mod
+
+
+models.Source.fits = relationship('Fit', cascade='all')
 
 
 class File(object):
@@ -653,6 +666,12 @@ models.Photometry.stack_detection = relationship('StackDetection', back_populate
 
 class DR8Mixin(object):
 
+    def __repr__(self):
+        attr_list = [f"{c.name.lower()}={getattr(self, c.name.lower())}"
+                     for c in self.__table__.columns]
+        return f"<{type(self).__name__}({', '.join(attr_list)})>"
+
+
     release = sa.Column('RELEASE', sa.Integer)
     brickid = sa.Column('BRICKID', sa.Integer)
     brickname = sa.Column('BRICKNAME', sa.Text)
@@ -785,17 +804,27 @@ class DR8Mixin(object):
 
     @hybrid_property
     def gmag(self):
-        return -2.5 * math.log10(self.flux_g) + 22.5
+        return -2.5 * np.log10(self.flux_g) + 22.5
+
+    @gmag.expression
+    def gmag(self):
+        return -2.5 * sa.func.log(self.flux_g) + 22.5
 
     @hybrid_property
     def rmag(self):
-        return -2.5 * math.log10(self.flux_r) + 22.5
+        return -2.5 * np.log10(self.flux_r) + 22.5
+
+    @rmag.expression
+    def rmag(self):
+        return -2.5 * sa.func.log(self.flux_r) + 22.5
 
     @hybrid_property
     def w1mag(self):
-        return -2.5 * math.log10(self.flux_w1) + 22.5
+        return -2.5 * np.log10(self.flux_w1) + 22.5
 
-
+    @w1mag.expression
+    def w1mag(self):
+        return -2.5 * sa.func.log(self.flux_w1) + 22.5
 
 
 

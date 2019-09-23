@@ -1,4 +1,5 @@
 import db
+import numpy as np
 import os
 import sqlalchemy as sa
 #import sfdmap
@@ -108,15 +109,8 @@ def cross_match_source_against_gaia(source, k):
 def cross_match_source_against_lensdbs(source):
 
     ra, dec = source.ra, source.dec
-    matches = []
-    #catalogs = ['legacysurveys_photoz_DR6', 'legacysurveys_photoz_DR7', 'sdss_ellipticals']
-
-    # have to do this for geojson
-    #ra -= 180
-
     res = db.DBSession().query(db.DR8North)\
         .filter(db.sa.func.q3c_radial_query(db.DR8North.ra, db.DR8North.dec, ra, dec, 0.0002777 * 10))\
-        .filter(db.DR8North.type != 'PSF')\
         .order_by(db.sa.func.q3c_dist(db.DR8North.ra, db.DR8North.dec, ra, dec).asc())
 
     neighb = res.first()
@@ -131,7 +125,7 @@ def cross_match_source_against_lensdbs(source):
         c2 = (g - r) > 1.5
         c3 = (g - r) > 1.
         c4 = neighb.type.strip() == 'DEV'
-        c5 = dz / (1 + z) < 0.05
+        c5 = dz / (1 + z) < 0.5
 
         if (c1 or c2 or c4) and c3 and c5:
             return neighb
@@ -150,92 +144,117 @@ if __name__ == '__main__':
         prevtime = datetime.now() - timedelta(weeks=9999)
 
     # get the sources that should have their light curves refit
-    sources = db.DBSession().query(db.models.Source).join(db.models.Photometry).filter(
-        sa.or_(sa.and_(db.models.Photometry.modified >= prevtime,
-                       db.models.Photometry.modified <= func.now()),
-               sa.and_(db.models.Source.modified >= prevtime,
-                       db.models.Source.modified <= func.now())
-               )
-    )
 
+    v1 = db.sa.func.max(db.models.Photometry.modified).label('modified')
+    phot_query = db.DBSession().query(db.models.Photometry.source_id, v1) \
+        .group_by(db.models.Photometry.source_id).subquery()
 
+    q3c_join = db.sa.func.q3c_join(db.models.Source.ra, db.models.Source.dec,
+                                   db.DR8North.ra, db.DR8North.dec, 0.0002777 * 2)
 
+    ctable = db.DBSession().query(db.models.Source,
+                                  db.DR8North).join(
+        phot_query, db.models.Source.id == phot_query.c.source_id
+    ).filter(
+        db.models.Source.modified >= prevtime,
+        phot_query.c.modified >= prevtime
+    ).join(db.DR8North, q3c_join).options(db.sa.orm.joinedload(db.models.Source.comments))
+
+    final = filter(lambda r: (lambda s, d: d.flux_g > 0 and d.flux_r > 0 and d.flux_w1 > 0 and
+                   d.gmag - d.rmag > 1 and (d.z_spec != -99 or (d.z_phot_std / (1 + d.z_phot_median)) < 0.2) and
+                                (d.gmag - d.rmag > 0.84 + 0.44 * (d.rmag - d.w1mag) or
+                                 d.gmag - d.rmag > 1.5 or
+                                 d.type.strip() == 'DEV') and d.type.strip() != 'PSF' and
+                              np.isclose(d.parallax, 0.))(r[0], r[1]),
+                   ctable)
     # start the run
     run = db.FilterRun(tstart=datetime.now())
 
     # get dust directory
     #dustmap = sfdmap.SFDMap(os.getenv('SFDMAP_DIR'))
 
-    try:
-        # connect to kowalski
-        while True:
-            try:
-                k = penquins.Kowalski(username=get_secret('kowalski_username'),
-                                      password=get_secret('kowalski_password'))
-            except:
-                pass
-            else:
-                break
+    # connect to kowalski
+    while True:
+        try:
+            k = penquins.Kowalski(username=get_secret('kowalski_username'),
+                                  password=get_secret('kowalski_password'))
+        except:
+            pass
+        else:
+            break
 
-        for source in sources:
-            light_curve = source.light_curve()
-            photdata = PhotometricData(light_curve)
+    for source, galaxy in final:
 
-            # cross match the source against the kowalski catalog
-            lensmatch = cross_match_source_against_lensdbs(source)
+        light_curve = source.light_curve()
 
-            if lensmatch is None:
-                continue
+        # remove outliers from the fit
+        light_curve = light_curve[light_curve['flux'] / light_curve['fluxerr'] < 100.]
 
-            quasmatches = cross_match_source_against_milliquas(source, k)
+        photdata = PhotometricData(light_curve)
 
-            if len(quasmatches) > 0:
-                continue
+        print(f'matching {source.id}...')
 
-            agnmatches = cross_match_source_against_wise_agns(source, k)
+        if len(source.stack_detections) < 3:
+            continue
 
-            if len(agnmatches) > 0:
-                continue
+        quasmatches = cross_match_source_against_milliquas(source, k)
 
-            # need at least 2 detections
-            if len(light_curve) < 2:
-                continue
+        if len(quasmatches) > 0:
+            continue
 
-            # no parallax in gaia
-            gaiamatches = cross_match_source_against_gaia(source, k)
-            if len(gaiamatches) > 0:
-                continue
+        agnmatches = cross_match_source_against_wise_agns(source, k)
 
-            # add in dust
-            #dust = sncosmo.CCM89Dust()
-            #ebv = dustmap.ebv(source.ra, source.dec)
-            #dust['ebv'] = ebv
+        if len(agnmatches) > 0:
+            continue
 
-            # set up the fit model
-            fitmod = sncosmo.Model(source='salt2-extended', effect_names=['mw'], effect_frames=['obs'])#, effects=[dust])
-            fitmod['z'] = lensmatch.z_phot
-            fitmod.set_source_peakabsmag(-18, 'bessellb', 'ab')
-            x0_low = fitmod['x0']
-            fitmod.set_source_peakabsmag(-20, 'bessellb', 'ab')
-            x0_high = fitmod['x0']
-            x0_bounds = (x0_low, x0_high)
+        # need at least 3 detections > 3 sigma
+        if len(light_curve[light_curve['flux'] / light_curve['fluxerr'] >= 3]) < 3:
+            continue
 
-            # do the fit
-            result, fitted_model = sncosmo.fit_lc(photdata, fitmod, vparam_names=['x1', 'c', 'x0', 't0'],
-                                                  bounds={'x1': X1_BOUNDS, 'c': C_BOUNDS, 'x0': x0_bounds})
+        # add in dust
+        #dust = sncosmo.CCM89Dust()
+        #ebv = dustmap.ebv(source.ra, source.dec)
+        #dust['ebv'] = ebv
 
+        # set up the fit model
+        fitmod = sncosmo.Model(source='salt2-extended')#, effect_names=['mw'], effect_frames=['obs'])#, effects=[dust])
+        fitmod['z'] = galaxy.z_phot_median
+        fitmod.set_source_peakabsmag(-18, 'bessellb', 'ab')
+        x0_low = fitmod['x0']
+        fitmod.set_source_peakabsmag(-20, 'bessellb', 'ab')
+        x0_high = fitmod['x0']
+        x0_bounds = (x0_low, x0_high)
 
-            # save it to the DB
-            fit = db.Fit(**result)
-            fit.source = source
-            db.DBSession().add(fit)
-            db.DBSession().commit()
+        # estimate t0
+        t0 = db.DBSession().query(db.sa.func.avg(db.StackDetection.mjd)).filter(db.StackDetection.source_id == source.id)
+        t0 = t0.first()[0]
 
-            source.score = fit.chisq / fit.ndof
-            db.DBSession().add(source)
-            db.DBSession().commit()
+        fitmod['t0'] = t0
 
 
+
+        # do the fit
+        result, fitted_model = sncosmo.fit_lc(photdata, fitmod, vparam_names=['x1', 'c', 'x0', 't0'],
+                                              bounds={'x1': X1_BOUNDS, 'c': C_BOUNDS, 'x0': x0_bounds},
+                                              guess_t0=False, minsnr=3.)
+
+        for key in result:
+            val = result[key]
+            if isinstance(val, np.ndarray):
+                result[key] = db.psql.array(val.tolist())
+
+        # save it to the DB
+        fit = db.Fit(**result)
+        fit.source = source
+        db.DBSession().add(fit)
+        db.DBSession().commit()
+
+        source.score = fit.chisq / fit.ndof
+        db.DBSession().add(source)
+        db.DBSession().commit()
+
+
+    """
     except Exception as e:
         run.status = False
         run.reason = e.__str__()
@@ -245,4 +264,5 @@ if __name__ == '__main__':
         run.tend = datetime.now()
         db.DBSession().add(run)
         db.DBSession().commit()
+    """
 

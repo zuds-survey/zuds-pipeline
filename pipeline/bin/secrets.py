@@ -5,7 +5,7 @@
 import boto3
 import base64
 from botocore.exceptions import ClientError
-
+import json
 
 class SecretManager(object):
 
@@ -61,7 +61,7 @@ class SecretManager(object):
         else:
             # Decrypts secret using the associated KMS CMK.
             # Depending on whether the secret is a string or binary, one of these fields will be populated.
-            self.cache = get_secret_value_response['SecretString']
+            self.cache = json.loads(get_secret_value_response['SecretString'])
 
 
 get_secret = SecretManager()
