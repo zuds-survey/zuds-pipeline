@@ -1,4 +1,4 @@
-import sqlalchemy as sa
+
 from sqlalchemy.dialects import postgresql as psql
 import numpy as np
 from sqlalchemy.orm import relationship, column_property
@@ -9,7 +9,7 @@ from sqlalchemy import Index
 from sqlalchemy import func
 import os
 from skyportal import models
-from skyportal.models import (join_model, DBSession, ACL,
+from skyportal.models import (DBSession, ACL,
                               Role, User, Token, Group, init_db as idb)
 from skyportal.model_util import create_tables, drop_tables
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -22,10 +22,46 @@ from astropy.table import Table
 import requests
 from secrets import get_secret
 import photutils
+from astropy import modeling, convolution
 
 from astropy.wcs import WCS
+import astropy
 
-BKG_BOX_SIZE = 64
+import sqlalchemy as sa
+
+BKG_BOX_SIZE = 128
+DETECT_NSIGMA = 1.
+DETECT_NPIX = 5
+TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
+                 'sky_centroid_icrs', 'source_sum', 'source_sum_err',
+                 'orientation', 'eccentricity', 'semimajor_axis_sigma',
+                 'semiminor_axis_sigma']
+
+NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
+URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
+
+
+
+import matplotlib.pyplot as plt
+from astropy.visualization import ZScaleInterval
+from matplotlib.patches import Ellipse
+
+
+def show_image(array, catalog=None):
+    interval = ZScaleInterval()
+    vmin, vmax = interval.get_limits(array)
+    plt.imshow(array, cmap='gray', vmin=vmin, vmax=vmax, interpolation='none')
+    if catalog is not None:
+
+        for row in catalog:
+            e = Ellipse(xy=(row['xcentroid'].value, row['ycentroid'].value),
+                        width=6 * row['semimajor_axis_sigma'].value,
+                        height=6 * row['semiminor_axis_sigma'].value,
+                        angle=row['orientation'].to('deg').value)
+            e.set_facecolor('none')
+            e.set_edgecolor('red')
+            plt.gca().add_artist(e)
+    plt.show()
 
 
 def init_db():
@@ -35,6 +71,63 @@ def init_db():
     hpss_dbname = get_secret('hpss_dbname')
     hpss_dbpassword = get_secret('hpss_dbpassword')
     return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost, hpss_dbport)
+
+
+def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
+               fk_1='id', fk_2='id', base=models.Base):
+    """Helper function to create a join table for a many-to-many relationship.
+
+    Parameters
+    ----------
+    join_table : str
+        Name of the new table to be created.
+    model_1 : str
+        First model in the relationship.
+    model_2 : str
+        Second model in the relationship.
+    column_1 : str, optional
+        Name of the join table column corresponding to `model_1`. If `None`,
+        then {`table1`[:-1]_id} will be used (e.g., `user_id` for `users`).
+    column_2 : str, optional
+        Name of the join table column corresponding to `model_2`. If `None`,
+        then {`table2`[:-1]_id} will be used (e.g., `user_id` for `users`).
+    fk_1 : str, optional
+        Name of the column from `model_1` that the foreign key should refer to.
+    fk_2 : str, optional
+        Name of the column from `model_2` that the foreign key should refer to.
+    base : sqlalchemy.ext.declarative.api.DeclarativeMeta
+        SQLAlchemy model base to subclass.
+
+    Returns
+    -------
+    sqlalchemy.ext.declarative.api.DeclarativeMeta
+        SQLAlchemy association model class
+    """
+    table_1 = model_1.__tablename__
+    table_2 = model_2.__tablename__
+    if column_1 is None:
+        column_1 = f'{table_1[:-1]}_id'
+    if column_2 is None:
+        column_2 = f'{table_2[:-1]}_id'
+
+    model_attrs = {
+        '__tablename__': join_table,
+        'id': None,
+        column_1: sa.Column(column_1, sa.ForeignKey(f'{table_1}.{fk_1}',
+                                                    ondelete='CASCADE'),
+                            primary_key=True),
+        column_2: sa.Column(column_2, sa.ForeignKey(f'{table_2}.{fk_2}',
+                                                    ondelete='CASCADE'),
+                            primary_key=True),
+    }
+
+    model_attrs.update({
+        model_1.__name__.lower(): relationship(model_1, cascade='all', foreign_keys=[model_attrs[column_1]]),
+        model_2.__name__.lower(): relationship(model_2, cascade='all', foreign_keys=[model_attrs[column_2]])
+    })
+    model = type(model_1.__name__ + model_2.__name__, (base,), model_attrs)
+
+    return model
 
 
 class SpatiallyIndexed(object):
@@ -72,7 +165,7 @@ class MappableToLocalFilesystem(File):
         self._path = path
 
 
-class HasFITSHeader(File):
+class HasFITSHeader(MappableToLocalFilesystem):
     header = sa.Column(psql.JSONB)
 
     @classmethod
@@ -86,6 +179,7 @@ class HasFITSHeader(File):
                 del hd2[k]
         obj.header = hd2
         obj.basename = os.path.basename(f)
+        obj.map_to_local_file(os.path.abspath(f))
         return obj
 
     @property
@@ -100,6 +194,7 @@ class CanResideOnTape(File):
 
 
 class FileServedViaHTTP(MappableToLocalFilesystem):
+
     url = sa.Column(sa.Text)
 
     def get(self):
@@ -107,6 +202,15 @@ class FileServedViaHTTP(MappableToLocalFilesystem):
             r = requests.get(self.url)
             r.raise_for_status()
             f.write(r.content)
+            self.map_to_local_file(self.basename)
+
+
+class FilePushableViaHTTP(MappableToLocalFilesystem):
+
+    archive_path = sa.Column(sa.Text)
+
+    def put(self):
+        pass
 
 
 class HasPoly(object):
@@ -211,9 +315,17 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
 
-class PipelineFITSProduct(models.Base, HasFITSHeader, FileServedViaHTTP):
+class PipelineFITSProduct(models.Base, HasFITSHeader, FileServedViaHTTP, FilePushableViaHTTP):
     # this is the polymorphic column
     type = sa.Column(sa.Text)
+
+    field = sa.Column(sa.Integer)
+    qid = sa.Column(sa.Integer)
+    fid = sa.Column(sa.Integer)
+    ccdid = sa.Column(sa.Integer)
+
+    # this is not inherited
+    idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
 
     __mapper_args__ = {
         'polymorphic_on': type,
@@ -222,65 +334,14 @@ class PipelineFITSProduct(models.Base, HasFITSHeader, FileServedViaHTTP):
     }
 
 
-class MaskImage(PipelineFITSProduct):
+class PipelineFITSImage(PipelineFITSProduct):
+
     id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
+
     __mapper_args__ = {
-        'polymorphic_identity': 'mask',
+        'polymorphic_identity': 'image',
         'inherit_condition': id == PipelineFITSProduct.id
     }
-    parent_image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
-    parent_image = relationship('CalibratableImage', cascade='all', foreign_keys=[parent_image_id])
-
-
-class RMSImage(PipelineFITSProduct):
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
-    __mapper_args__ = {
-        'polymorphic_identity': 'rms',
-        'inherit_condition': id == PipelineFITSProduct.id
-    }
-    parent_image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
-    parent_image = relationship('CalibratableImage', cascade='all', foreign_keys=[parent_image_id])
-
-
-class CalibratableImage(PipelineFITSProduct, HasWCS):
-
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
-
-    __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
-                       'inherit_condition': id == PipelineFITSProduct.id}
-
-    detections = relationship('Detection', cascade='all')
-    objects = relationship('ObjectWithFlux', cascade='all')
-
-    rms_image_id = sa.Column(sa.Integer, sa.ForeignKey('rmsimages.id', ondelete='RESTRICT'),
-                             nullable=True)
-    rms_image = relationship('RMSImage', foreign_keys=[rms_image_id])
-
-    mask_image_id = sa.Column(sa.Integer, sa.ForeignKey('maskimages.id', ondelete='RESTRICT'),
-                              nullable=True)
-    mask_image = relationship('MaskImage', foreign_keys=[mask_image_id])
-
-    @property
-    def bkg(self):
-        try:
-            return self._background
-        except AttributeError:
-            # calculate the background
-            with fits.open(self.rms_image.local_path) as hdul:
-                bg = photutils.Background2D(hdul[0].data, box_size=BKG_BOX_SIZE)
-            self._background = bg
-        return self._background
-
-    @property
-    def mask(self):
-        try:
-            return self._mask
-        except AttributeError:
-            # load the mask into memory
-            with fits.open(self.mask_image.local_path) as hdul:
-                maskpix = hdul[0].data
-            self._mask = maskpix
-        return self._mask
 
     @property
     def data(self):
@@ -292,6 +353,242 @@ class CalibratableImage(PipelineFITSProduct, HasWCS):
                 data = hdul[0].data
             self._data = data
         return self._data
+
+    def show(self):
+        show_image(self.data)
+
+
+class MaskImage(PipelineFITSImage):
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id'), primary_key=True)
+    __mapper_args__ = {
+        'polymorphic_identity': 'mask',
+        'inherit_condition': id == PipelineFITSImage.id
+    }
+
+    parent_image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
+    parent_image = relationship('CalibratableImage', cascade='all', back_populates='mask_image',
+                                foreign_keys=[parent_image_id])
+
+
+class CalibratableImage(PipelineFITSImage, HasWCS):
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id'), primary_key=True)
+
+    __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
+                       'inherit_condition': id == PipelineFITSImage.id}
+
+    detections = relationship('Detection', cascade='all')
+    objects = relationship('ObjectWithFlux', cascade='all')
+
+    mask_image = relationship('MaskImage', back_populates='parent_image', uselist=False,
+                              primaryjoin=MaskImage.parent_image_id == id)
+
+    def write_rms_image(self, localpath):
+        bkgrms = self.bkg.background_rms
+        fits.writeto(localpath, bkgrms, header=self.astropy_header)
+
+    def write_weight_map(self, localpath):
+        fits.writeto(localpath, self.weight, header=self.astropy_header)
+
+    @property
+    def rms(self):
+        return self.bkg.background_rms
+
+    @property
+    def weight(self):
+        try:
+            return self._weight
+        except AttributeError:
+
+            # For example, to find all science - image pixels which are uncontaminated, but
+            # which may contain clean extracted - source signal(bits 1 or 11), one
+            # would “logically AND” the corresponding mask - image
+            # with the template value 6141 (= 2^0 + 2^2 +2^3 + 2^4 + 2^5 + 2^6 + 2^7 + 2^8 + 2^9 + 2^10 + 21^2)
+            # #and retain pixels where this operation yields zero.
+            # To then find which of these pixels contain source signal,
+            # one would “AND” the resulting image with 2050 (= 21 + 211)
+            # and retain pixels where this operation is non-zero.
+
+
+            ind = self.mask
+            wgt = np.empty_like(ind, dtype='<f8')
+
+            havesat = False
+            try:
+                saturval = self.header['SATURATE']
+            except KeyError:
+                pass
+            else:
+                havesat = True
+                saturind = self.data >= 0.9 * saturval
+
+            wgt[ind] = 1 / self.rmscd[ind] ** 2
+            wgt[~ind] = 0.
+
+            if havesat:
+                wgt[saturind] = 0.
+
+            self._weight = wgt
+        return self._weight
+
+    @property
+    def bkg(self):
+        try:
+            return self._background
+        except AttributeError:
+            self._background = photutils.Background2D(self.data, box_size=BKG_BOX_SIZE)
+        return self._background
+
+    @property
+    def mask(self):
+        try:
+            return self._mask
+        except AttributeError:
+            # load the mask into memory
+            if self.mask_image is None:
+                raise UnmappedFileError(f'"{self.basename}" has no attribute "mask_image"')
+            with fits.open(self.mask_image.local_path) as hdul:
+                maskpix = (hdul[0].data & 6141) > 0
+            self._mask = maskpix
+        return self._mask
+
+    @property
+    def filter_kernel(self):
+        try:
+            return self._filter_kernel
+        except AttributeError:
+            sigma = self.seeing / 2.355
+            kern = convolution.Gaussian2DKernel(x_stddev=sigma, y_stddev=sigma)
+            self._filter_kernel = kern
+        return self._filter_kernel
+
+    @property
+    def threshold(self):
+        try:
+            return self._thresh
+        except AttributeError:
+            self._thresh = photutils.detect_threshold(self.data,
+                                                      DETECT_NSIGMA,
+                                                      background=self.bkg.background,
+                                                      error=self.rms,
+                                                      mask=self.mask)
+        return self._thresh
+
+    @property
+    def segm(self):
+        try:
+            return self._segm
+        except AttributeError:
+
+            segm = photutils.detect_sources(self.data,
+                                            self.threshold,
+                                            DETECT_NPIX,
+                                            filter_kernel=self.filter_kernel,
+                                            mask=self.mask)
+
+            self._segm = photutils.deblend_sources(self.data,
+                                                   segm,
+                                                   DETECT_NPIX,
+                                                   filter_kernel=self.filter_kernel,
+                                                   contrast=0.0001)
+
+        return self._segm
+
+    @property
+    def sourcelist(self):
+        try:
+            return self._sourcelist
+        except AttributeError:
+            self._sourcelist = photutils.source_properties(self.data - self.bkg.background,
+                                                           self.segm, error=self.rms, mask=self.mask,
+                                                           background=self.bkg.background,
+                                                           filter_kernel=self.filter_kernel,
+                                                           wcs=self.wcs)
+        return self._sourcelist
+
+    @property
+    def catalog(self):
+        try:
+            return self._catalog
+        except AttributeError:
+            self._catalog = self.sourcelist.to_table(TABLE_COLUMNS)
+        return self._catalog
+
+    @hybrid_property
+    def seeing(self):
+        """FWHM of seeing in pixels."""
+        return self.header['SEEING']
+
+    def show(self, with_catalog=False, mask=False, background=False, rms=False, bkgsub=False, threshold=False,
+             segm=False):
+
+        types = []
+        data = True
+        for it in ['data', 'mask', 'background', 'rms', 'threshold', 'segm']:
+            if eval(it):
+                types.append(it)
+        nax = len(types)
+
+        if nax == 1:
+            fig, ax = plt.subplots()
+        elif nax == 2:
+            fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True)
+        elif nax <= 4:
+            fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
+            if nax == 3:
+                ax[-1, -1].set_visible(False)
+        else:
+            fig, ax = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True)
+            if nax == 5:
+                ax[-1, -1].set_visible(False)
+        ax = np.atleast_1d(ax)
+
+        for it, a in zip(types, ax.ravel()):
+            if it == 'data':
+                if bkgsub:
+                    data = self.data - self.bkg.background
+                else:
+                    data = self.data
+            elif it == 'mask':
+                data = self.mask.astype('<f8')
+            elif it == 'background':
+                data = self.bkg.background
+            elif it == 'rms':
+                data = self.bkg.background_rms
+            elif it == 'threshold':
+                data = self.threshold
+            elif it == 'segm':
+                data = self.segm.data.astype('<f8')
+
+            if it == 'mask':
+                vmin = 0
+                vmax = 1e-5
+            else:
+                interval = ZScaleInterval()
+                vmin, vmax = interval.get_limits(data)
+
+            if it == 'segm':
+                im = a.imshow(self.segm, cmap=self.segm.make_cmap())
+            else:
+                im = a.imshow(data, cmap='gray', vmin=vmin, vmax=vmax, interpolation='none')
+
+            if it == 'data' and with_catalog:
+                catalog = self.catalog
+                for row in catalog:
+                    e = Ellipse(xy=(row['xcentroid'].value, row['ycentroid'].value),
+                                width=6 * row['semimajor_axis_sigma'].value,
+                                height=6 * row['semiminor_axis_sigma'].value,
+                                angle=row['orientation'].to('deg').value)
+                    e.set_facecolor('none')
+                    e.set_edgecolor('red')
+                    a.add_artist(e)
+
+            if it not in ['mask', 'segm']:
+                fig.colorbar(im, ax=a)
+            a.set_title(it)
+
+        fig.tight_layout()
+        return fig
 
 
 class CalibratedImage(CalibratableImage):
@@ -327,12 +624,27 @@ class CalibratedImage(CalibratableImage):
                                     source=source)
             photometry.append(phot)
 
-        return photometry
+        DBSession().rollback()
+        DBSession().add_all(photometry)
+        DBSession().commit()
 
     @declared_attr
     def __table_args__(cls):
         # override spatial index - only need it on one table (calibratable images)
         return tuple()
+
+    @property
+    def catalog(self):
+        base = super().catalog
+        phot = aperture_photometry(self,
+                                   base['sky_centroid_icrs'].ra.deg,
+                                   base['sky_centroid_icrs'].dec.deg,
+                                   apply_calibration=True)
+        base['mag'] = phot['mag']
+        base['magerr'] = phot['magerr']
+        base['flux'] = phot['flux']
+        base['fluxerr'] = phot['fluxerr']
+        return base
 
 
 class ScienceImage(CalibratedImage):
@@ -354,14 +666,14 @@ class Coadd(CalibratableImage):
         'inherit_condition': id == CalibratableImage.id
     }
 
-    science_images = relationship('ScienceImage', secondary='coadd_scienceimages', cascade='all')
+    input_images = relationship('CalibratableImage', secondary='coadd_images', cascade='all')
 
     @declared_attr
     def __table_args__(cls):
         return tuple()
 
 
-CoaddScienceImages = join_model('coadd_scienceimages', Coadd, ScienceImage)
+CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
 
 
 class ReferenceImage(Coadd):
@@ -369,11 +681,8 @@ class ReferenceImage(Coadd):
     __mapper_args__ = {'polymorphic_identity': 'ref',
                        'inherit_condition': id == Coadd.id}
 
-    field = sa.Column(sa.Integer)
-    fid = sa.Column(sa.Integer)
-    qid = sa.Column(sa.Integer)
-    ccdid = sa.Column(sa.Integer)
-    idx = sa.Index('reference_field_ccdid_qid_fid', field, ccdid, qid, fid)
+    version = sa.Column(sa.Integer)
+
 
     single_epoch_subtractions = relationship('SingleEpochSubtraction', cascade='all')
     multi_epoch_subtractions = relationship('MultiEpochSubtraction', cascade='all')
@@ -388,32 +697,52 @@ class ScienceCoadd(Coadd):
 
 # Subtractions #############################################################################################
 
-class SingleEpochSubtraction(CalibratedImage):
+class Subtraction(object):
+
+    @declared_attr
+    def reference_image_id(self):
+        return sa.Column(sa.Integer, sa.ForeignKey('referenceimages.id', ondelete='CASCADE'), index=True)
+
+    @declared_attr
+    def reference_image(self):
+        return relationship('ReferenceImage', cascade='all', foreign_keys=[self.reference_image_id])
+
+    @property
+    def rms(self):
+        try:
+            return self._rms
+        except AttributeError:
+            self._rms = np.sqrt(self.target_image.rms**2 + self.reference_image.rms**2)
+        return self._rms
+
+    @property
+    def mask(self):
+        try:
+            return self._mask
+        except AttributeError:
+            self._mask = self.target_image.mask | self.reference_image.mask
+        return self._mask
+
+
+class SingleEpochSubtraction(CalibratedImage, Subtraction):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sesub',
                        'inherit_condition': id == CalibratedImage.id}
 
-    science_image_id = sa.Column(sa.Integer, sa.ForeignKey('scienceimages.id', ondelete='CASCADE'), index=True)
-    science_image = relationship('ScienceImage', cascade='all')
-
-    reference_image_id = sa.Column(sa.Integer, sa.ForeignKey('referenceimages.id', ondelete='CASCADE'), index=True)
-    reference_image = relationship('ReferenceImage', cascade='all')
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('scienceimages.id', ondelete='CASCADE'), index=True)
+    target_image = relationship('ScienceImage', cascade='all', foreign_keys=[target_image_id])
 
 
-class MultiEpochSubtraction(CalibratableImage):
+class MultiEpochSubtraction(CalibratableImage, Subtraction):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'mesub',
                        'inherit_condition': id == CalibratableImage.id}
-    science_coadd_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'), index=True)
-    science_coadd = relationship('ScienceCoadd', cascade='all')
-
-    reference_image_id = sa.Column(sa.Integer, sa.ForeignKey('referenceimages.id', ondelete='CASCADE'), index=True)
-    reference_image = relationship('ReferenceImage', cascade='all')
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'), index=True)
+    target_image = relationship('ScienceCoadd', cascade='all', foreign_keys=[target_image_id])
 
     @declared_attr
     def __table_args__(cls):
         return tuple()
-
 
 
 # Detections & Photometry ###################################################################################
@@ -529,7 +858,6 @@ class FilterRun(models.Base):
     tend = sa.Column(sa.DateTime)
     status = sa.Column(sa.Boolean, default=None)
     reason = sa.Column(sa.Text, nullable=True)
-
 
 
 class Fit(models.Base):

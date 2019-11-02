@@ -20,7 +20,7 @@ from pathlib import Path
 import paramiko
 import subprocess
 import tempfile
-
+import archive
 
 def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
                     end_date=datetime(2018, 4, 1), template_science_minsep_days=0, template_destination='.',
@@ -176,6 +176,33 @@ fi
     remaining_images = remaining_images[early_enough | late_enough]
     template_metatable = pd.DataFrame(template_metatable, columns=['field', 'qid', 'filtercode', 'ccdid', 'path'])
     return dependency_dict, remaining_images, ref
+
+
+import db
+
+
+def make_coadd(images, outname, coadd_class, data_product=False):
+    confdir = os.path.join(wd, '..', 'astromatic', 'makecoadd')
+    swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
+    swarpconf = os.path.join(confdir, 'default.swarp') \
+        if not args.template else \
+        os.path.join(confdir, 'template.swarp')
+
+    allims = ' '.join([c.local_path for c in images])
+
+    syscall = f'swarp -c {swarpconf} {allims} -IMAGEOUT_NAME {outname} ' \
+              f'-VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
+    libztf.execute(syscall, capture=False)
+
+    coadd = coadd_class.from_file(outname)
+
+    # keep a record of the images that went into the coadd
+    coadd.input_images = images
+
+    if data_product:
+        archive.archive(coadd)
+
+    return coadd
 
 
 if __name__ == '__main__':
