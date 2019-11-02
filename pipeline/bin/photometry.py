@@ -35,7 +35,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
     phot_table['reason'] = [None if s else 'Masked' for s in phot_table['status']]
 
     # rename some columns
-    phot_table.rename('aperture_sum', 'flux')
-    phot_table.rename('aperture_sum_err', 'fluxerr')
+    phot_table.rename_column('aperture_sum', 'flux')
+    phot_table.rename_column('aperture_sum_err', 'fluxerr')
 
     return phot_table
