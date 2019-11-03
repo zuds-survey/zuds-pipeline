@@ -1,14 +1,11 @@
 import os
 import db
 import numpy as np
-import libztf
 import uuid
 import time
 from astropy.io import fits
 from astropy.wcs import WCS
 import galsim
-from makevariance import make_variance
-from calibrate import calibrate
 from astropy.time import Time
 import logging
 from galsim import des
@@ -180,29 +177,103 @@ fi
 
 import db
 
+CONF_DIR = Path(__file__).parent.parent / 'astromatic/makecoadd'
+REF_CONF = CONF_DIR / 'template.swarp'
+SCI_CONF = CONF_DIR / 'default.swarp'
+MSK_CONF = CONF_DIR / 'mask.swarp'
+BKG_VAL = 150. # counts
 
-def make_coadd(images, outname, coadd_class, data_product=False):
-    confdir = os.path.join(wd, '..', 'astromatic', 'makecoadd')
-    swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
-    swarpconf = os.path.join(confdir, 'default.swarp') \
-        if not args.template else \
-        os.path.join(confdir, 'template.swarp')
 
+def initialize_directory(directory):
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True)
+
+
+def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=False):
+    conf = REF_CONF if reference else SCI_CONF
+    initialize_directory(directory)
+
+    if copy_inputs:
+        for image in images:
+            shutil.copy(image.local_path, directory)
+
+    # write weight images to temporary directory
+    wgtpaths = []
+    for image in images:
+        wgtpath = f"{directory / image.basename.replace('.fits', '.weight.fits')}"
+        image.write_weight_map(wgtpath)
+        wgtpaths.append(wgtpath)
+
+    # get the images in string form
+    allwgts = ','.join(wgtpaths)
     allims = ' '.join([c.local_path for c in images])
+    wgtout = outname.replace('.fits', '.weight.fits')
 
-    syscall = f'swarp -c {swarpconf} {allims} -IMAGEOUT_NAME {outname} ' \
-              f'-VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
-    libztf.execute(syscall, capture=False)
+    syscall = f'swarp -c {conf} {allims} ' \
+              f'-IMAGEOUT_NAME {outname} ' \
+              f'-VMEM_DIR {directory} ' \
+              f'-RESAMPLE_DIR {directory} ' \
+              f'-WEIGHT_IMAGE {allwgts} ' \
+              f'-WEIGHTOUT_NAME {wgtout}'
 
-    coadd = coadd_class.from_file(outname)
+    return syscall
 
-    # keep a record of the images that went into the coadd
-    coadd.input_images = images
 
-    if data_product:
-        archive.archive(coadd)
+def prepare_swarp_mask(masks, outname, directory, copy_inputs=False):
+    conf = MSK_CONF
+    initialize_directory(directory)
 
-    return coadd
+    if copy_inputs:
+        for image in masks:
+            shutil.copy(image.local_path, directory)
+
+    # get the images in string form
+    allims = ' '.join([c.local_path for c in masks])
+
+    syscall = f'swarp -c {conf} {allims} ' \
+              f'-IMAGEOUT_NAME {outname} ' \
+              f'-VMEM_DIR {directory} ' \
+              f'-RESAMPLE_DIR {directory} '
+
+    return syscall
+
+
+def run_swarp(images, outname, reference=False, addbkg=True):
+    """Run swarp on images `images`"""
+
+    directory = Path('/tmp') / uuid.uuid4().hex
+    directory.mkdir(exist_ok=True, parents=True)
+
+    command = prepare_swarp_sci(images, outname, directory, reference=reference)
+
+    # run swarp
+    subprocess.check_call(command.split())
+
+    # add the background back in if desired
+    if addbkg:
+        with fits.open(outname, mode='update') as hdul:
+            hdul[0].data += BKG_VAL
+
+    # now swarp together the masks
+    masks = [image.mask_image for image in images]
+    maskout = outname.replace('.fits', '.mask.fits')
+    command = prepare_swarp_mask(masks, maskout, directory)
+
+    # run swarp
+    subprocess.check_call(command.split())
+
+    # clean up
+    shutil.rmtree(directory)
+
+
+def ensure_images_have_the_same_properties(images, properties):
+    """Raise a ValueError if images have different fid, ccdid, qid, or field."""
+    for prop in properties:
+        vals = np.asarray([getattr(image, prop) for image in images])
+        if not all(vals == vals[0]):
+            raise ValueError(f'To be coadded, images must all have the same {prop}. '
+                             f'These images had: {[(image.id, getattr(image, prop)) for image in images]}.')
+
 
 
 if __name__ == '__main__':

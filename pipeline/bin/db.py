@@ -1,33 +1,30 @@
-
-from sqlalchemy.dialects import postgresql as psql
-import numpy as np
-from sqlalchemy.orm import relationship, column_property
-from sqlalchemy.dialects.postgresql import array
-from sqlalchemy.ext.declarative import declared_attr
-
-from sqlalchemy import Index
-from sqlalchemy import func
 import os
-from skyportal import models
-from skyportal.models import (DBSession, ACL,
-                              Role, User, Token, Group, init_db as idb)
-from skyportal.model_util import create_tables, drop_tables
-from sqlalchemy.ext.hybrid import hybrid_property
 import sncosmo
-from photometry import aperture_photometry
-from astropy.io import fits
-
-from astropy.coordinates import SkyCoord
-from astropy.table import Table
 import requests
-from secrets import get_secret
-import photutils
-from astropy import modeling, convolution
-
-from astropy.wcs import WCS
-import astropy
+import numpy as np
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as psql
+from sqlalchemy import Index
+from sqlalchemy import func
+from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import array
+from sqlalchemy.ext.declarative import declared_attr
+from sqlalchemy.ext.hybrid import hybrid_property
+
+from skyportal import models
+from skyportal.models import (DBSession, init_db as idb)
+
+from secrets import get_secret
+from photometry import aperture_photometry
+from makecoadd import ensure_images_have_the_same_properties, run_swarp
+import archive
+
+import photutils
+from astropy.io import fits
+from astropy.wcs import WCS
+from astropy import convolution
+
 
 BKG_BOX_SIZE = 128
 DETECT_NSIGMA = 1.
@@ -358,7 +355,7 @@ class PipelineFITSImage(PipelineFITSProduct):
         show_image(self.data)
 
 
-class MaskImage(PipelineFITSImage):
+class MaskImage(PipelineFITSImage, HasWCS):
     id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id'), primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'mask',
@@ -422,7 +419,7 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
                 havesat = True
                 saturind = self.data >= 0.9 * saturval
 
-            wgt[ind] = 1 / self.rmscd[ind] ** 2
+            wgt[ind] = 1 / self.rms[ind] ** 2
             wgt[~ind] = 0.
 
             if havesat:
@@ -671,6 +668,37 @@ class Coadd(CalibratableImage):
     @declared_attr
     def __table_args__(cls):
         return tuple()
+
+    @classmethod
+    def from_images(cls, images, outfile_name, data_product=False):
+        """Make a coadd from a bunch of input images"""
+
+        images = np.atleast_1d(images)
+
+        # make sure all images have the same field, filter, ccdid, qid:
+        properties = ['ccdid', 'qid', 'fid', 'field']
+        ensure_images_have_the_same_properties(images, properties)
+
+        # is this a reference image?
+        isref = issubclass(cls, ReferenceImage)
+
+        # call swarp
+        run_swarp(images, outfile_name, reference=isref, addbkg=True)
+
+        # load the result
+        coadd = cls.from_file(outfile_name)
+
+        # keep a record of the images that went into the coadd
+        coadd.input_images = images.tolist()
+
+        # set the ccdid, qid, field, fid for the coadd based on the input images
+        for prop in properties:
+            setattr(coadd, prop, getattr(images[0], prop))
+
+        if data_product:
+            archive.archive(coadd)
+
+        return coadd
 
 
 CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
