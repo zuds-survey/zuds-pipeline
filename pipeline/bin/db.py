@@ -14,10 +14,11 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from skyportal import models
 from skyportal.models import (DBSession, init_db as idb)
+from skyportal.model_util import create_tables, drop_tables
 
 from secrets import get_secret
 from photometry import aperture_photometry
-from makecoadd import ensure_images_have_the_same_properties, run_swarp
+from makecoadd import ensure_images_have_the_same_properties, run_coadd
 import archive
 
 import photutils
@@ -36,6 +37,7 @@ TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
+GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 
 
 
@@ -143,7 +145,7 @@ class UnmappedFileError(FileNotFoundError):
 
 class File(object):
     """Abstract representation of a file"""
-    basename = sa.Column(sa.Text)
+    basename = sa.Column(sa.Text, unique=True)
 
 
 class MappableToLocalFilesystem(File):
@@ -164,17 +166,21 @@ class MappableToLocalFilesystem(File):
 
 class HasFITSHeader(MappableToLocalFilesystem):
     header = sa.Column(psql.JSONB)
+    header_comments = sa.Column(psql.JSONB)
 
     @classmethod
     def from_file(cls, f):
         obj = cls()
         with fits.open(f) as hdul:
             hd = dict(hdul[0].header)
+            hdc = {card.keyword: card.comment for card in hdul[0].header.cards}
         hd2 = hd.copy()
         for k in hd:
             if not isinstance(hd[k], (int, str, bool, float)):
                 del hd2[k]
+                del hdc[k]
         obj.header = hd2
+        obj.header_comments = hdc
         obj.basename = os.path.basename(f)
         obj.map_to_local_file(os.path.abspath(f))
         return obj
@@ -183,6 +189,8 @@ class HasFITSHeader(MappableToLocalFilesystem):
     def astropy_header(self):
         header = fits.Header()
         header.update(self.header)
+        for key in self.header_comments:
+            header.comments[key] = self.header_comments[key]
         return header
 
 
@@ -266,7 +274,6 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
     obsjd = sa.Column(psql.DOUBLE_PRECISION)
     good = sa.Column(sa.Boolean)
     hasvariance = sa.Column(sa.Boolean)
-
     infobits = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
     rcid = sa.Column(sa.Integer)
@@ -331,6 +338,41 @@ class PipelineFITSProduct(models.Base, HasFITSHeader, FileServedViaHTTP, FilePus
     }
 
 
+class FITSCatalog(PipelineFITSProduct):
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
+    __mapper_args__ = {
+        'polymorphic_identity': 'catalog',
+        'inherit_condition': id == PipelineFITSProduct.id
+    }
+
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
+    image = relationship('CalibratableImage', cascade='all', back_populates='catalog',
+                         foreign_keys=[image_id])
+
+    @classmethod
+    def from_image(cls, image):
+        cat = cls()
+        for prop in GROUP_PROPERTIES:
+            setattr(cat, prop, getattr(image, prop))
+        table = image.catalog
+
+        cat.header = image.header
+        cat.header_comments = image.header_comments
+        cat.basename = image.basename.replace('.fits', '.cat.fits')
+
+        table.write(cat.basename, format='fits')
+        cat.map_to_local_file(cat.basename)
+
+        with fits.open(cat.basename, mode='update') as hdul:
+            hdul[0].header.update(image.header)
+            for key in cat.header_comments:
+                hdul[0].header.comments[key] = cat.header_comments[key]
+
+        cat.image = image
+        return cat
+
+
 class PipelineFITSImage(PipelineFITSProduct):
 
     id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
@@ -355,7 +397,7 @@ class PipelineFITSImage(PipelineFITSProduct):
         show_image(self.data)
 
 
-class MaskImage(PipelineFITSImage, HasWCS):
+class MaskImage(PipelineFITSImage):
     id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id'), primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'mask',
@@ -386,6 +428,11 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
 
     def write_weight_map(self, localpath):
         fits.writeto(localpath, self.weight, header=self.astropy_header)
+
+    @hybrid_property
+    def seeing(self):
+        """FWHM of seeing in pixels."""
+        return self.header['SEEING']
 
     @property
     def rms(self):
@@ -454,7 +501,12 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
         try:
             return self._filter_kernel
         except AttributeError:
-            sigma = self.seeing / 2.355
+            try:
+                sigma = self.seeing / 2.355
+            except KeyError:
+                # no filter kernel can be calculated for this image
+                # as it does not yet have an estimate of the seeing
+                return None
             kern = convolution.Gaussian2DKernel(x_stddev=sigma, y_stddev=sigma)
             self._filter_kernel = kern
         return self._filter_kernel
@@ -510,11 +562,6 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
         except AttributeError:
             self._catalog = self.sourcelist.to_table(TABLE_COLUMNS)
         return self._catalog
-
-    @hybrid_property
-    def seeing(self):
-        """FWHM of seeing in pixels."""
-        return self.header['SEEING']
 
     def show(self, with_catalog=False, mask=False, background=False, rms=False, bkgsub=False, threshold=False,
              segm=False):
@@ -597,6 +644,7 @@ class CalibratedImage(CalibratableImage):
 
     forced_photometry = relationship('ForcedPhotometry', cascade='all')
 
+
     def force_photometry(self, sources):
         """Force aperture photometry at the locations of `sources`.
         Assumes that calibration has already been done.
@@ -674,6 +722,7 @@ class Coadd(CalibratableImage):
         """Make a coadd from a bunch of input images"""
 
         images = np.atleast_1d(images)
+        mskoutname = outfile_name.replace('.fits', '.mask.fits')
 
         # make sure all images have the same field, filter, ccdid, qid:
         properties = ['ccdid', 'qid', 'fid', 'field']
@@ -683,13 +732,17 @@ class Coadd(CalibratableImage):
         isref = issubclass(cls, ReferenceImage)
 
         # call swarp
-        run_swarp(images, outfile_name, reference=isref, addbkg=True)
+        run_coadd(images, outfile_name, mskoutname, reference=isref, addbkg=True)
 
         # load the result
         coadd = cls.from_file(outfile_name)
+        coaddmask = MaskImage.from_file(mskoutname)
+
+        # estimate the seeing on the coadd
 
         # keep a record of the images that went into the coadd
         coadd.input_images = images.tolist()
+        coadd.mask_image = coaddmask
 
         # set the ccdid, qid, field, fid for the coadd based on the input images
         for prop in properties:
@@ -697,6 +750,7 @@ class Coadd(CalibratableImage):
 
         if data_product:
             archive.archive(coadd)
+            archive.archive(coaddmask)
 
         return coadd
 

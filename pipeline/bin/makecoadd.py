@@ -18,6 +18,7 @@ import paramiko
 import subprocess
 import tempfile
 import archive
+import photutils
 
 def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
                     end_date=datetime(2018, 4, 1), template_science_minsep_days=0, template_destination='.',
@@ -238,7 +239,7 @@ def prepare_swarp_mask(masks, outname, directory, copy_inputs=False):
     return syscall
 
 
-def run_swarp(images, outname, reference=False, addbkg=True):
+def run_swarp(images, outname, mskoutname, reference=False):
     """Run swarp on images `images`"""
 
     directory = Path('/tmp') / uuid.uuid4().hex
@@ -249,21 +250,26 @@ def run_swarp(images, outname, reference=False, addbkg=True):
     # run swarp
     subprocess.check_call(command.split())
 
-    # add the background back in if desired
-    if addbkg:
-        with fits.open(outname, mode='update') as hdul:
-            hdul[0].data += BKG_VAL
-
     # now swarp together the masks
     masks = [image.mask_image for image in images]
-    maskout = outname.replace('.fits', '.mask.fits')
-    command = prepare_swarp_mask(masks, maskout, directory)
+    command = prepare_swarp_mask(masks, mskoutname, directory)
 
     # run swarp
     subprocess.check_call(command.split())
 
     # clean up
     shutil.rmtree(directory)
+
+
+def run_coadd(images, outname, mskoutname, reference=False, addbkg=True):
+
+    # first run swarp
+    run_swarp(images, outname, mskoutname, reference=reference)
+
+    # finally, add the background back in if desired
+    if addbkg:
+        with fits.open(outname, mode='update') as hdul:
+            hdul[0].data += BKG_VAL
 
 
 def ensure_images_have_the_same_properties(images, properties):
@@ -274,134 +280,3 @@ def ensure_images_have_the_same_properties(images, properties):
             raise ValueError(f'To be coadded, images must all have the same {prop}. '
                              f'These images had: {[(image.id, getattr(image, prop)) for image in images]}.')
 
-
-
-if __name__ == '__main__':
-
-    import argparse
-
-    # set up the argument parser and parse the arguments
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--outfile-path', dest='outfile_path', required=True,
-                        help='Basename of output coadd.', nargs=1)
-    parser.add_argument('--input-catalogs', dest='cats', required=True,
-                        help='List of catalogs to use for astrometric alignment.', nargs='+')
-    parser.add_argument('--input-frames', dest='frames', nargs='+', required=True,
-                        help='List of frames to coadd.')
-    parser.add_argument('--template', help='Turn on 64 threads for template jobs.',
-                        action='store_true', default=False)
-
-    args = parser.parse_args()
-
-    # distribute the work to each processor
-    if args.frames[0].startswith('@'):
-        frames = np.genfromtxt(args.frames[0][1:], dtype=None, encoding='ascii')
-        frames = np.atleast_1d(frames)
-    else:
-        frames = args.frames
-
-    if args.cats[0].startswith('@'):
-        cats = np.genfromtxt(args.cats[0][1:], dtype=None, encoding='ascii')
-        cats = np.atleast_1d(cats)
-    else:
-        cats = args.cats
-
-    # now set up a few pointers to auxiliary files read by sextractor
-    wd = os.path.dirname(__file__)
-    confdir = os.path.join(wd, '..', 'astromatic', 'makecoadd')
-    sexconf = os.path.join(confdir, 'scamp.sex')
-    scampparam = os.path.join(confdir, 'scamp.param')
-    filtname = os.path.join(confdir, 'default.conv')
-    nnwname = os.path.join(confdir, 'default.nnw')
-    scampconf = os.path.join(confdir, 'scamp.conf')
-    swarpconf = os.path.join(confdir, 'default.swarp') if not args.template else os.path.join(confdir, 'template.swarp')
-    psfconf = os.path.join(confdir, 'psfex.conf')
-
-    # first scamp everything together
-
-    # make a random dir for the output catalogs
-    scamp_outpath = f'/tmp/{uuid.uuid4().hex}'
-    os.makedirs(scamp_outpath)
-
-    syscall = 'scamp -c %s %s' % (scampconf, " ".join(cats))
-    band = cats[0].split('_z')[1][0]
-    syscall += f' -REFOUT_CATPATH {scamp_outpath} -ASTREF_BAND {band}'
-    if args.template:
-        syscall += ' -NTHREADS 64'
-
-    while True:
-        try:
-            libztf.execute(syscall, capture=False)
-        except subprocess.CalledProcessError as e:
-            print(f'there was a called process error on "{syscall}"', flush=True)
-            print(e, flush=True)
-            print('trying again...')
-            continue
-        else:
-            break
-
-
-
-    # set these up for later
-    clargs = '-PARAMETERS_NAME %s -FILTER_NAME %s -STARNNW_NAME %s' % (scampparam, filtname, nnwname)
-
-    allims = ' '.join(frames)
-    out = args.outfile_path[0]
-    oweight = out.replace('.fits', '.weight.fits')
-
-    # put all swarp temp files into a random dir
-    swarp_rundir = f'/tmp/{uuid.uuid4().hex}'
-    os.makedirs(swarp_rundir)
-
-    syscall = 'swarp -c %s %s -IMAGEOUT_NAME %s -WEIGHTOUT_NAME %s' % (swarpconf, allims, out, oweight)
-    syscall += f' -VMEM_DIR {swarp_rundir} -RESAMPLE_DIR {swarp_rundir}'
-    libztf.execute(syscall, capture=False)
-    print(syscall, flush=True)
-
-
-    # now delete all the .head files as they are not needed anymore and can mess things up
-
-    for c in cats:
-        head = c.replace('.cat', '.head')
-        os.remove(head)
-
-    # Now postprocess it a little bit
-    with fits.open(frames[0]) as f:
-        h0 = f[0].header
-        band = h0['FILTER']
-        field = h0['FIELDID']
-        ccdid = h0['CCDID']
-        qid = h0['QID']
-
-    mjds = []
-    for frame in frames:
-        with fits.open(frame) as f:
-            mjds.append(f[0].header['OBSMJD'])
-
-    with fits.open(out, mode='update') as f:
-        header = f[0].header
-
-        if 'r' in band.lower():
-            header['FILTER'] = 'r'
-        elif 'g' in band.lower():
-            header['FILTER'] = 'g'
-        elif 'i' in band.lower():
-            header['FILTER'] = 'i'
-        else:
-            raise ValueError('Invalid filter "%s."' % band)
-
-        # add in the basic stuff
-        header['FILTERCODE'] = 'z' + header['FILTER']
-        header['FIELD'] = field
-        header['CCDID'] = ccdid
-        header['QID'] = qid
-
-
-        # TODO make this more general
-        header['PIXSCALE'] = 1.013
-        header['MJDEFF'] = np.median(mjds)
-
-        # Add the sky back in as a constant
-        f[0].data += 150.
-
-    calibrate(out, astrometry=False, psf=False)
