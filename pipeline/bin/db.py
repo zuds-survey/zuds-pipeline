@@ -17,11 +17,14 @@ from skyportal.models import (DBSession, init_db as idb)
 from skyportal.model_util import create_tables, drop_tables
 
 from secrets import get_secret
-from photometry import aperture_photometry
+from photometry import aperture_photometry, APER_KEY
 from makecoadd import ensure_images_have_the_same_properties, run_coadd
 import archive
+from seeing import estimate_seeing
 
 import photutils
+from astropy.wcs.utils import proj_plane_pixel_scales
+from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy import convolution
@@ -261,6 +264,16 @@ class HasWCS(HasFITSHeader, HasPoly, SpatiallyIndexed):
         return DBSession().query(models.Source) \
             .filter(func.q3c_poly_query(models.Source.ra, models.Source.dec, self.poly))
 
+    @property
+    def pixel_scale(self):
+        units = self.wcs.world_axis_units
+        u1 = getattr(u, units[0])
+        u2 = getattr(u, units[1])
+        scales = proj_plane_pixel_scales(self.wcs)
+        ps1 = (scales[0] * u1).to('arcsec').value
+        ps2 = (scales[1] * u2).to('arcsec').value
+        return np.asarray([ps1, ps2]) * u.arcsec
+
 
 class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
     __tablename__ = 'ipacrecords'
@@ -347,8 +360,7 @@ class FITSCatalog(PipelineFITSProduct):
     }
 
     image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
-    image = relationship('CalibratableImage', cascade='all', back_populates='catalog',
-                         foreign_keys=[image_id])
+    image = relationship('CalibratableImage', cascade='all', foreign_keys=[image_id])
 
     @classmethod
     def from_image(cls, image):
@@ -429,11 +441,6 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
     def write_weight_map(self, localpath):
         fits.writeto(localpath, self.weight, header=self.astropy_header)
 
-    @hybrid_property
-    def seeing(self):
-        """FWHM of seeing in pixels."""
-        return self.header['SEEING']
-
     @property
     def rms(self):
         return self.bkg.background_rms
@@ -502,12 +509,13 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
             return self._filter_kernel
         except AttributeError:
             try:
-                sigma = self.seeing / 2.355
+                sigma = 2. / 2.355  # equivalent to SExtractor "all ground" default.conv
             except KeyError:
                 # no filter kernel can be calculated for this image
                 # as it does not yet have an estimate of the seeing
                 return None
             kern = convolution.Gaussian2DKernel(x_stddev=sigma, y_stddev=sigma)
+            kern.normalize()
             self._filter_kernel = kern
         return self._filter_kernel
 
@@ -691,6 +699,19 @@ class CalibratedImage(CalibratableImage):
         base['fluxerr'] = phot['fluxerr']
         return base
 
+    @hybrid_property
+    def seeing(self):
+        """FWHM of seeing in pixels."""
+        return self.header['SEEING']
+
+    @hybrid_property
+    def magzp(self):
+        return self.header['MAGZP']
+
+    @hybrid_property
+    def apcor(self):
+        return self.header[APER_KEY]
+
 
 class ScienceImage(CalibratedImage):
 
@@ -739,6 +760,11 @@ class Coadd(CalibratableImage):
         coaddmask = MaskImage.from_file(mskoutname)
 
         # estimate the seeing on the coadd
+        coadd_seeing = (estimate_seeing(coadd) / coadd.pixel_scale).value
+        coadd.header['SEEING'] = coadd_seeing
+        with fits.open(coadd.local_path, mode='update') as hdul:
+            hdul[0].header['SEEING'] = coadd_seeing
+            hdul[0].header.comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
 
         # keep a record of the images that went into the coadd
         coadd.input_images = images.tolist()
@@ -749,8 +775,10 @@ class Coadd(CalibratableImage):
             setattr(coadd, prop, getattr(images[0], prop))
 
         if data_product:
+            catalog = FITSCatalog.from_image(coadd)
             archive.archive(coadd)
             archive.archive(coaddmask)
+            archive.archive(catalog)
 
         return coadd
 
