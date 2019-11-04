@@ -28,6 +28,7 @@ from astropy import units as u
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy import convolution
+from astropy.coordinates import SkyCoord
 
 
 BKG_BOX_SIZE = 128
@@ -112,7 +113,8 @@ def init_db():
     hpss_dbusername = get_secret('hpss_dbusername')
     hpss_dbname = get_secret('hpss_dbname')
     hpss_dbpassword = get_secret('hpss_dbpassword')
-    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost, hpss_dbport)
+    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword,
+               hpss_dbhost, hpss_dbport)
 
 
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
@@ -164,8 +166,14 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
     }
 
     model_attrs.update({
-        model_1.__name__.lower(): relationship(model_1, cascade='all', foreign_keys=[model_attrs[column_1]]),
-        model_2.__name__.lower(): relationship(model_2, cascade='all', foreign_keys=[model_attrs[column_2]])
+        model_1.__name__.lower(): relationship(model_1, cascade='all',
+                                               foreign_keys=[
+                                                   model_attrs[column_1]
+                                               ]),
+        model_2.__name__.lower(): relationship(model_2, cascade='all',
+                                               foreign_keys=[
+                                                   model_attrs[column_2]
+                                               ])
     })
     model = type(model_1.__name__ + model_2.__name__, (base,), model_attrs)
 
@@ -173,34 +181,86 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
 
 
 class SpatiallyIndexed(object):
+    """A mixin indicating to the database that an object has sky coordinates.
+    Classes that mix this class get a q3c spatial index on ra and dec.
+
+    Columns:
+        ra: the icrs right ascension of the object in degrees
+        dec: the icrs declination of the object in degrees
+
+    Indexes:
+        q3c index on ra, dec
+
+    Properties: skycoord: astropy.coordinates.SkyCoord representation of the
+    object's coordinate
+    """
+
+    # database-mapped
     ra = sa.Column(psql.DOUBLE_PRECISION)
     dec = sa.Column(psql.DOUBLE_PRECISION)
 
+    @property
+    def skycoord(self):
+        return SkyCoord(self.ra, self.dec, unit='deg')
+
     @declared_attr
     def __table_args__(cls):
+        """"""
         tn = cls.__tablename__
-        return sa.Index(f'{tn}_q3c_ang2ipix_idx', sa.func.q3c_ang2ipix(cls.ra, cls.dec)),
+        return sa.Index(f'{tn}_q3c_ang2ipix_idx', sa.func.q3c_ang2ipix(
+            cls.ra, cls.dec)),
 
 
 class UnmappedFileError(FileNotFoundError):
+    """Error raised when a user attempts to call a method of a `File` that
+    requires the file to be mapped to a file on disk, but the file is not
+    mapped. """
     pass
 
 
 class File(object):
-    """Abstract representation of a file"""
+    """A mixin indicating that a python object can be mapped to a file on
+    spinning disk. `File` provides the class-level attribute `basename`,
+    which is of type Column and must be unique. This indicates that `File`s
+    have a representation in an sqlalchemy database. `File`s should thus be
+    thought of as python objects, that live in memory, and serve as an
+    intermediary between database records and files that live on disk.
+
+    `File`s can read and write data and metadata to and from disk and to and
+    from the database. However, there are some general rules about
+
+    In general, files that live on disk and are represented by `File`s
+    contain data that users and subclasses may want to make use of. It is
+    imperative to keep in mind that file metadata, and only file metadata,
+    should be mapped to the database by instances of File. File data should
+    never be stored in the database. Instead it should reside on disk.
+    Putting the file data directly into the database would slow it down and
+    make queries take too long.
+
+    Files represented by this class can reside on spinning disk only. This
+    class does not make any attempt to represent files that reside on tape.
+
+    The user is responsible for manually associating `File`s (and,
+    by extension, their corresponding  database records) with files on disk.
+    This frees `File`s  from being tied to specific blocks of disk on
+    specific machines.  The class makes no attempt to enforce that the user
+    maps python objects tied to particular database records to the "right"
+    files on disk. This is the user's responsibility!
+    """
+
     basename = sa.Column(sa.Text, unique=True)
-
-
-class MappableToLocalFilesystem(File):
 
     @property
     def local_path(self):
         try:
             return self._path
         except AttributeError:
-            errormsg = f'File "{self.basename}" is not mapped to the local file system. ' \
-                       f'Identify the file corresponding to this object on the local file system, ' \
-                       f'then call the `map_to_local_file` to identify the path.'
+            errormsg = f'File "{self.basename}" is not mapped to the local ' \
+                       f'file system. ' \ 
+                       f'Identify the file corresponding to this object on ' \
+                       f'the local file system, ' \ 
+                       f'then call the `map_to_local_file` to identify the ' \
+                       f'path. '
             raise UnmappedFileError(errormsg)
 
     def map_to_local_file(self, path):
@@ -210,10 +270,11 @@ class MappableToLocalFilesystem(File):
         try:
             del self._path
         except AttributeError:
-            raise UnmappedFileError(f"Cannot unmap file '{self.basename}', file is not mapped")
+            raise UnmappedFileError(f"Cannot unmap file '{self.basename}', "
+                                    f"file is not mapped")
 
 
-class HasFITSHeader(MappableToLocalFilesystem):
+class HasFITSHeader(File):
     header = sa.Column(psql.JSONB)
     header_comments = sa.Column(psql.JSONB)
 
@@ -243,13 +304,10 @@ class HasFITSHeader(MappableToLocalFilesystem):
         return header
 
 
-class CanResideOnTape(File):
-    tarball = sa.Column(sa.Text)
-
-
-class FileServedViaHTTP(MappableToLocalFilesystem):
+class ArchiveFile(File):
 
     url = sa.Column(sa.Text)
+    archive_path = sa.Column(sa.Text)
 
     def get(self):
         with open(self.basename, 'wb') as f:
@@ -257,11 +315,6 @@ class FileServedViaHTTP(MappableToLocalFilesystem):
             r.raise_for_status()
             f.write(r.content)
             self.map_to_local_file(self.basename)
-
-
-class FilePushableViaHTTP(MappableToLocalFilesystem):
-
-    archive_path = sa.Column(sa.Text)
 
     def put(self):
         pass
@@ -378,7 +431,7 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
 
-class PipelineFITSProduct(models.Base, HasFITSHeader, FileServedViaHTTP, FilePushableViaHTTP):
+class PipelineFITSProduct(models.Base, HasFITSHeader, ArchiveFile):
     # this is the polymorphic column
     type = sa.Column(sa.Text)
 
