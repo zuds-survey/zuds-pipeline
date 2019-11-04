@@ -20,6 +20,8 @@ import tempfile
 import archive
 import photutils
 
+from seeing import estimate_seeing
+
 def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
                     end_date=datetime(2018, 4, 1), template_science_minsep_days=0, template_destination='.',
                     log_destination='.', job_script_destination=None, task_name=None):
@@ -220,7 +222,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=F
     return syscall
 
 
-def prepare_swarp_mask(masks, outname, directory, copy_inputs=False):
+def prepare_swarp_mask(masks, outname, mskoutweightname, directory, copy_inputs=False):
     conf = MSK_CONF
     initialize_directory(directory)
 
@@ -234,12 +236,13 @@ def prepare_swarp_mask(masks, outname, directory, copy_inputs=False):
     syscall = f'swarp -c {conf} {allims} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
-              f'-RESAMPLE_DIR {directory} '
+              f'-RESAMPLE_DIR {directory} ' \
+              f'-WEIGHTOUT_NAME {mskoutweightname}'
 
     return syscall
 
 
-def run_swarp(images, outname, mskoutname, reference=False):
+def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
     """Run swarp on images `images`"""
 
     directory = Path('/tmp') / uuid.uuid4().hex
@@ -252,24 +255,40 @@ def run_swarp(images, outname, mskoutname, reference=False):
 
     # now swarp together the masks
     masks = [image.mask_image for image in images]
-    command = prepare_swarp_mask(masks, mskoutname, directory)
+    mskoutweightname = directory / Path(mskoutname.replace('.fits', '.weight.fits')).name
+    command = prepare_swarp_mask(masks, mskoutname, mskoutweightname, directory)
 
     # run swarp
     subprocess.check_call(command.split())
 
-    # clean up
-    shutil.rmtree(directory)
+    # load the result
+    coadd = cls.from_file(outname)
+    coaddmask = db.MaskImage.from_file(mskoutname)
+    coaddmask.update_from_weight_map(mskoutweightname)
 
+    # keep a record of the images that went into the coadd
+    coadd.input_images = images.tolist()
+    coadd.mask_image = coaddmask
 
-def run_coadd(images, outname, mskoutname, reference=False, addbkg=True):
+    # set the ccdid, qid, field, fid for the coadd (and mask) based on the input images
+    for prop in db.GROUP_PROPERTIES:
+        for img in [coadd, coaddmask]:
+            setattr(img, prop, getattr(images[0], prop))
 
-    # first run swarp
-    run_swarp(images, outname, mskoutname, reference=reference)
+    # estimate the seeing on the coadd
+    coadd_seeing = (estimate_seeing(coadd) / coadd.pixel_scale).value
+    coadd.header['SEEING'] = coadd_seeing
+    coadd.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
+    coadd.sync_header()
 
-    # finally, add the background back in if desired
     if addbkg:
-        with fits.open(outname, mode='update') as hdul:
-            hdul[0].data += BKG_VAL
+        # this also updates the fits file
+        data = coadd.data
+        data[~coadd.mask] += BKG_VAL
+        coadd.data = data
+
+    # clean up -- this also deletes the mask weight map
+    shutil.rmtree(directory)
 
 
 def ensure_images_have_the_same_properties(images, properties):

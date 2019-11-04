@@ -3,7 +3,7 @@
 #
 #----------------------------------- Output -----------------------------------
 IMAGEOUT_NAME          coadd.fits      # Output filename
-WEIGHTOUT_NAME         /dev/null       # Output weight-map filename
+WEIGHTOUT_NAME         coadd.mask.fits       # Output weight-map filename
 
 HEADER_ONLY            N               # Only a header as an output file (Y/N)?
 HEADER_SUFFIX          .head           # Filename extension for additional headers

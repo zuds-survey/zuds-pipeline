@@ -31,7 +31,7 @@ from astropy import convolution
 
 
 BKG_BOX_SIZE = 128
-DETECT_NSIGMA = 1.
+DETECT_NSIGMA = 1.5
 DETECT_NPIX = 5
 TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
                  'sky_centroid_icrs', 'source_sum', 'source_sum_err',
@@ -42,6 +42,46 @@ NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 
+
+MASK_BITS = {
+    'BIT00': 0,
+    'BIT01': 1,
+    'BIT02': 2,
+    'BIT03': 3,
+    'BIT04': 4,
+    'BIT05': 5,
+    'BIT06': 6,
+    'BIT07': 7,
+    'BIT08': 8,
+    'BIT09': 9,
+    'BIT10': 10,
+    'BIT11': 11,
+    'BIT12': 12,
+    'BIT13': 13,
+    'BIT14': 14,
+    'BIT15': 15,
+    'BIT16': 16
+}
+
+MASK_COMMENTS = {
+    'BIT00': 'AIRCRAFT/SATELLITE TRACK',
+    'BIT01': 'CONTAINS SEXTRACTOR DETECTION',
+    'BIT02': 'LOW RESPONSIVITY',
+    'BIT03': 'HIGH RESPONSIVITY',
+    'BIT04': 'NOISY',
+    'BIT05': 'GHOST FROM BRIGHT SOURCE',
+    'BIT06': 'RESERVED FOR FUTURE USE',
+    'BIT07': 'PIXEL SPIKE (POSSIBLE RAD HIT)',
+    'BIT08': 'SATURATED',
+    'BIT09': 'DEAD (UNRESPONSIVE)',
+    'BIT10': 'NAN (not a number)',
+    'BIT11': 'CONTAINS PSF-EXTRACTED SOURCE POSITION',
+    'BIT12': 'HALO FROM BRIGHT SOURCE',
+    'BIT13': 'RESERVED FOR FUTURE USE',
+    'BIT14': 'RESERVED FOR FUTURE USE',
+    'BIT15': 'RESERVED FOR FUTURE USE',
+    'BIT16': 'NON-DATA SECTION FROM SWARP ALIGNMENT'
+}
 
 
 import matplotlib.pyplot as plt
@@ -165,6 +205,12 @@ class MappableToLocalFilesystem(File):
 
     def map_to_local_file(self, path):
         self._path = path
+
+    def unmap(self):
+        try:
+            del self._path
+        except AttributeError:
+            raise UnmappedFileError(f"Cannot unmap file '{self.basename}', file is not mapped")
 
 
 class HasFITSHeader(MappableToLocalFilesystem):
@@ -353,7 +399,7 @@ class PipelineFITSProduct(models.Base, HasFITSHeader, FileServedViaHTTP, FilePus
 
 class FITSCatalog(PipelineFITSProduct):
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'catalog',
         'inherit_condition': id == PipelineFITSProduct.id
@@ -387,7 +433,7 @@ class FITSCatalog(PipelineFITSProduct):
 
 class PipelineFITSImage(PipelineFITSProduct):
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id', ondelete='CASCADE'), primary_key=True)
 
     __mapper_args__ = {
         'polymorphic_identity': 'image',
@@ -410,11 +456,25 @@ class PipelineFITSImage(PipelineFITSProduct):
 
 
 class MaskImage(PipelineFITSImage):
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'mask',
         'inherit_condition': id == PipelineFITSImage.id
     }
+
+    def refresh_bit_mask(self):
+        self.header.update(MASK_BITS)
+        self.header_comments.update(MASK_COMMENTS)
+        self.sync_header()
+
+    def update_from_weight_map(self, weightname):
+        with fits.open(weightname) as hdul:
+            mskarr = self.data
+            ftsarr = hdul[0].data
+            mskarr[ftsarr == 0] += 2**16
+            self.data = mskarr
+        self.refresh_bit_mask()
+
 
     parent_image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
     parent_image = relationship('CalibratableImage', cascade='all', back_populates='mask_image',
@@ -423,7 +483,7 @@ class MaskImage(PipelineFITSImage):
 
 class CalibratableImage(PipelineFITSImage, HasWCS):
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id', ondelete='CASCADE'), primary_key=True)
 
     __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
                        'inherit_condition': id == PipelineFITSImage.id}
@@ -646,7 +706,7 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
 class CalibratedImage(CalibratableImage):
     """An image on which photometry can be performed."""
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'calibratedimage',
                        'inherit_condition': id == CalibratableImage.id}
 
@@ -715,18 +775,27 @@ class CalibratedImage(CalibratableImage):
 
 class ScienceImage(CalibratedImage):
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sci',
                        'inherit_condition': id == CalibratedImage.id}
 
     ipac_record_id = sa.Column(sa.Integer, sa.ForeignKey('ipacrecords.id'), index=True)
     ipac_record = relationship('IPACRecord', back_populates='science_image')
 
+    @classmethod
+    def from_file(cls, f):
+        obj = super().from_file(f)
+        obj.field = obj.header['FIELDID']
+        obj.ccdid = obj.header['CCDID']
+        obj.qid = obj.header['QID']
+        obj.fid = obj.header['FILTERID']
+        return obj
+
 
 # Coadds #################################################################################################
 
 class Coadd(CalibratableImage):
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'coadd',
         'inherit_condition': id == CalibratableImage.id
@@ -746,33 +815,14 @@ class Coadd(CalibratableImage):
         mskoutname = outfile_name.replace('.fits', '.mask.fits')
 
         # make sure all images have the same field, filter, ccdid, qid:
-        properties = ['ccdid', 'qid', 'fid', 'field']
-        ensure_images_have_the_same_properties(images, properties)
+        ensure_images_have_the_same_properties(images, GROUP_PROPERTIES)
 
         # is this a reference image?
         isref = issubclass(cls, ReferenceImage)
 
         # call swarp
-        run_coadd(images, outfile_name, mskoutname, reference=isref, addbkg=True)
-
-        # load the result
-        coadd = cls.from_file(outfile_name)
-        coaddmask = MaskImage.from_file(mskoutname)
-
-        # estimate the seeing on the coadd
-        coadd_seeing = (estimate_seeing(coadd) / coadd.pixel_scale).value
-        coadd.header['SEEING'] = coadd_seeing
-        with fits.open(coadd.local_path, mode='update') as hdul:
-            hdul[0].header['SEEING'] = coadd_seeing
-            hdul[0].header.comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
-
-        # keep a record of the images that went into the coadd
-        coadd.input_images = images.tolist()
-        coadd.mask_image = coaddmask
-
-        # set the ccdid, qid, field, fid for the coadd based on the input images
-        for prop in properties:
-            setattr(coadd, prop, getattr(images[0], prop))
+        coadd = run_coadd(cls, images, outfile_name, mskoutname, reference=isref, addbkg=True)
+        coaddmask = coadd.mask_image
 
         if data_product:
             catalog = FITSCatalog.from_image(coadd)
@@ -787,7 +837,7 @@ CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
 
 
 class ReferenceImage(Coadd):
-    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'ref',
                        'inherit_condition': id == Coadd.id}
 
@@ -799,7 +849,7 @@ class ReferenceImage(Coadd):
 
 
 class ScienceCoadd(Coadd):
-    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'scicoadd',
                        'inherit_condition': id == Coadd.id}
     subtraction = relationship('MultiEpochSubtraction', uselist=False, cascade='all')
@@ -835,7 +885,7 @@ class Subtraction(object):
 
 
 class SingleEpochSubtraction(CalibratedImage, Subtraction):
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sesub',
                        'inherit_condition': id == CalibratedImage.id}
 
@@ -844,7 +894,7 @@ class SingleEpochSubtraction(CalibratedImage, Subtraction):
 
 
 class MultiEpochSubtraction(CalibratableImage, Subtraction):
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'mesub',
                        'inherit_condition': id == CalibratableImage.id}
     target_image_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'), index=True)
@@ -884,14 +934,14 @@ class ObjectWithFlux(models.Base):
 
 
 class Detection(ObjectWithFlux, SpatiallyIndexed):
-    id = sa.Column(sa.Integer, sa.ForeignKey('objectswithflux.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'), primary_key=True)
     __tablename__ = 'detections'
     __mapper_args__ = {'polymorphic_identity': 'detection',
                        'inherit_condition': id == ObjectWithFlux.id}
 
 
 class ForcedPhotometry(ObjectWithFlux):
-    id = sa.Column(sa.Integer, sa.ForeignKey('objectswithflux.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'), primary_key=True)
     __tablename__ = 'forcedphotometry'
     __mapper_args__ = {'polymorphic_identity': 'photometry',
                        'inherit_condition': id == ObjectWithFlux.id}
@@ -1170,7 +1220,7 @@ class DR8(models.Base, SpatiallyIndexed):
 
 
 class DR8North(DR8):
-    id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'), primary_key=True)
     __tablename__ = 'dr8_north'
     __mapper_args__ = {'polymorphic_identity': 'n'}
 
@@ -1180,7 +1230,7 @@ class DR8North(DR8):
 
 
 class DR8South(DR8):
-    id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'), primary_key=True)
     __tablename__ = 'dr8_south'
     __mapper_args__ = {'polymorphic_identity': 's'}
 
