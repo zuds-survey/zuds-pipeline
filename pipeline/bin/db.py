@@ -2,6 +2,8 @@ import os
 import sncosmo
 import requests
 import numpy as np
+from numpy.lib import recfunctions
+from pathlib import Path
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -31,6 +33,9 @@ from astropy import convolution
 from astropy.coordinates import SkyCoord
 
 
+from matplotlib import colors
+
+
 BKG_BOX_SIZE = 128
 DETECT_NSIGMA = 1.5
 DETECT_NPIX = 5
@@ -38,6 +43,8 @@ TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
                  'sky_centroid_icrs', 'source_sum', 'source_sum_err',
                  'orientation', 'eccentricity', 'semimajor_axis_sigma',
                  'semiminor_axis_sigma']
+
+CMAP_RANDOM_SEED = 8675309
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
@@ -90,22 +97,56 @@ from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
 
 
-def show_image(array, catalog=None):
-    interval = ZScaleInterval()
-    vmin, vmax = interval.get_limits(array)
-    plt.imshow(array, cmap='gray', vmin=vmin, vmax=vmax, interpolation='none')
-    if catalog is not None:
+def discrete_cmap(ncolors):
+    """Create a ListedColorMap with `ncolors` randomly-generated colors
+    that can be used to color an IntegerFITSImage.
 
-        for row in catalog:
-            e = Ellipse(xy=(row['xcentroid'].value, row['ycentroid'].value),
-                        width=6 * row['semimajor_axis_sigma'].value,
-                        height=6 * row['semiminor_axis_sigma'].value,
-                        angle=row['orientation'].to('deg').value)
-            e.set_facecolor('none')
-            e.set_edgecolor('red')
-            plt.gca().add_artist(e)
-    plt.show()
+    The first color in the list is always black."""
 
+    prng = np.random.RandomState(CMAP_RANDOM_SEED)
+    h = prng.uniform(low=0.0, high=1.0, size=ncolors)
+    s = prng.uniform(low=0.2, high=0.7, size=ncolors)
+    v = prng.uniform(low=0.5, high=1.0, size=ncolors)
+    hsv = np.dstack((h, s, v))
+    rgb = np.squeeze(colors.hsv_to_rgb(hsv))
+    rgb[0] = (0.,) * 3
+    return colors.ListedColormap(rgb)
+
+
+def show_images(image_or_images, catalog=None, titles=None):
+
+    imgs = np.atleast_1d(image_or_images)
+    n = len(imgs)
+
+    if titles is not None and len(titles) != n:
+        raise ValueError('len(titles) != len(images)')
+
+    ncols = n % 3 + 1
+    nrows = n // 3 + 1
+
+    fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True)
+    for a in ax.ravel()[n:]:
+        a.set_visible(False)
+
+    for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
+        im.show(a)
+
+        if catalog is not None:
+            for row in catalog.data:
+                e = Ellipse(xy=(row['xcentroid'], row['ycentroid']),
+                            width=6 * row['semimajor_axis_sigma'],
+                            height=6 * row['semiminor_axis_sigma'],
+                            angle=row['orientation'] * 180. / np.pi)
+                e.set_facecolor('none')
+                e.set_edgecolor('red')
+                a.add_artist(e)
+
+        if titles is not None:
+            a.set_title(titles[i])
+
+    fig.tight_layout()
+    fig.show()
+    return fig
 
 def init_db():
     hpss_dbhost = get_secret('hpss_dbhost')
@@ -219,36 +260,40 @@ class UnmappedFileError(FileNotFoundError):
 
 
 class File(object):
-    """A mixin indicating that a python object can be mapped to a file on
-    spinning disk. `File` provides the class-level attribute `basename`,
-    which is of type Column and must be unique. This indicates that `File`s
-    have a representation in an sqlalchemy database. `File`s should thus be
-    thought of as python objects, that live in memory, and serve as an
+    """A python object mapped to a file on spinning disk, with metadata
+    mappable to rows in a database.`File`s should be thought of as python
+    objects that live in memory that can represent the data and metadata of
+    files on disk. If mapped to database records, they can serve as an
     intermediary between database records and files that live on disk.
 
     `File`s can read and write data and metadata to and from disk and to and
-    from the database. However, there are some general rules about
+    from the database. However, there are some general rules about this that
+    should be heeded to ensure good performance.
 
     In general, files that live on disk and are represented by `File`s
-    contain data that users and subclasses may want to make use of. It is
-    imperative to keep in mind that file metadata, and only file metadata,
-    should be mapped to the database by instances of File. File data should
-    never be stored in the database. Instead it should reside on disk.
-    Putting the file data directly into the database would slow it down and
-    make queries take too long.
+    contain data that users and subclasses may want to use. It is imperative
+    that file metadata, and only file metadata, should be mapped to the
+    database by instances of File. Data larger than a few kb from disk-mapped
+    files should never be stored in the database. Instead it should reside on
+    disk. Putting the file data directly into the database would slow it down
+    and make queries take too long.
 
     Files represented by this class can reside on spinning disk only. This
     class does not make any attempt to represent files that reside on tape.
 
-    The user is responsible for manually associating `File`s (and,
-    by extension, their corresponding  database records) with files on disk.
-    This frees `File`s  from being tied to specific blocks of disk on
+    The user is responsible for manually associating `File`s  with files on
+    disk. This frees `File`s  from being tied to specific blocks of disk on
     specific machines.  The class makes no attempt to enforce that the user
     maps python objects tied to particular database records to the "right"
     files on disk. This is the user's responsibility!
+
+    `property`s of Files should be assumed to represent what is in memory
+    only, not necessarily what is on disk. Disk-memory synchronization is up
+    to the user and can be achived using the save() function.
     """
 
     basename = sa.Column(sa.Text, unique=True)
+    __diskmapped_cached_properties__ = ['_path']
 
     @property
     def local_path(self):
@@ -256,30 +301,60 @@ class File(object):
             return self._path
         except AttributeError:
             errormsg = f'File "{self.basename}" is not mapped to the local ' \
-                       f'file system. ' \ 
+                       f'file system. ' \
                        f'Identify the file corresponding to this object on ' \
-                       f'the local file system, ' \ 
+                       f'the local file system, ' \
                        f'then call the `map_to_local_file` to identify the ' \
                        f'path. '
             raise UnmappedFileError(errormsg)
 
+    @property
+    def ismapped(self):
+        return hasattr(self, '_path')
+
     def map_to_local_file(self, path):
-        self._path = path
+        self._path = str(Path(path).absolute())
 
     def unmap(self):
-        try:
-            del self._path
-        except AttributeError:
+        if not self.ismapped:
             raise UnmappedFileError(f"Cannot unmap file '{self.basename}', "
                                     f"file is not mapped")
+        for attr in self.__diskmapped_cached_properties__:
+            if hasattr(self, attr):
+                delattr(self, attr)
+
+    def save(self):
+        """Update the data and metadata of a mapped file on disk to reflect
+        their values in this object."""
+        raise NotImplemented
 
 
-class HasFITSHeader(File):
+class FITSFile(File):
+    """A python object that maps a fits file. Instances of classes mixed with
+    FITSFile that implement `Base` map to database rows that store fits file
+    metadata.
+
+    Assumes the fits file has only one extension. TODO: add support for
+    multi-extension fits files.
+
+    Provides methods for loading fits file data from disk to memory,
+    and writing it to disk from memory.
+
+    Methods for loading fits file metadata from the database and back are
+    handled by sqlalchemy.
+    """
+
     header = sa.Column(psql.JSONB)
     header_comments = sa.Column(psql.JSONB)
+    __diskmapped_cached_properties__ = ['_path', '_data']
+    _DATA_HDU = 0
 
     @classmethod
     def from_file(cls, f):
+        """Read a file into memory from disk, and set the values of
+        database-backed variables that store metadata (e.g., header). These
+        can later be flushed to the database using SQLalchemy. """
+        f = Path(f)
         obj = cls()
         with fits.open(f) as hdul:
             hd = dict(hdul[0].header)
@@ -291,20 +366,123 @@ class HasFITSHeader(File):
                 del hdc[k]
         obj.header = hd2
         obj.header_comments = hdc
-        obj.basename = os.path.basename(f)
-        obj.map_to_local_file(os.path.abspath(f))
+        obj.basename = f.name
+        obj.map_to_local_file(f.absolute())
         return obj
 
     @property
+    def data(self):
+        """Data are read directly from a mapped file on disk, and cached in
+        memory to avoid unnecessary IO.
+
+        This property can be modified, but in order to save the resulting
+        changes to disk the save() method must be called.
+        """
+        try:
+            return self._data
+        except AttributeError:
+            # load the data into memory
+            with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
+                data = hdul[self._DATA_HDU].data
+            self._data = data
+        return self._data
+
+    @data.setter
+    def data(self, d):
+        """Update the data member of this object in memory only. To flush
+        this to disk you must call `save`."""
+        self._data = d
+
+    @property
     def astropy_header(self):
+        """astropy.io.fits.Header representation of the database-mapped
+        metadata columns header and header_comments. This attribute may not
+        reflect the current header on disk"""
         header = fits.Header()
         header.update(self.header)
         for key in self.header_comments:
             header.comments[key] = self.header_comments[key]
         return header
 
+    def save(self):
+        try:
+            f = self.local_path
+        except UnmappedFileError:
+            f = self.basename
+            self.map_to_local_file(f)
+        fits.writeto(f, self.data, self.astropy_header, overwrite=True)
+
+
+class FITSImage(FITSFile):
+    """A `FITSFile` with a data member representing an image. Same as
+    FITSFile, but provides the method show() to render the image in
+    matplotlib. Also defines some properties that help to optimally render
+    the image (cmap, cmap_limits)"""
+
+    def show(self, axis=None):
+        if axis is None:
+            fig, axis = plt.subplots()
+        vmin, vmax = self.cmap_limits()
+        axis.imshow(self.data,
+                    vmin=vmin,
+                    vmax=vmax,
+                    norm=self.cmap_norm(),
+                    cmap=self.cmap())
+
+    def cmap_limits(self):
+        raise NotImplemented
+
+    def cmap(self):
+        raise NotImplemented
+
+    def cmap_norm(self):
+        raise NotImplemented
+
+
+class FloatingPointFITSImage(FITSImage):
+    """A `FITSImage` with a data member that contains a two dimensional array
+    of floating point numbers.
+
+    Suitable for representing a science image, rms image, background image,
+    coadd, etc."""
+
+    def cmap_limits(self):
+        interval = ZScaleInterval()
+        return interval.get_limits(self.data)
+
+    def cmap(self):
+        return 'gray'
+
+    def cmap_norm(self):
+        return None
+
+
+class IntegerFITSImage(FITSImage):
+    """A `FITSImage` with a data member that contains a two dimensional array
+    of integers.
+
+    Suitable for representing a mask image, segmentation image, etc."""
+
+    def cmap_limits(self):
+        return (None, None)
+
+    def cmap(self):
+        ncolors = len(np.unique(self.data))
+        return discrete_cmap(ncolors)
+
+    def cmap_norm(self):
+        boundaries = np.unique(self.data)
+        ncolors = len(boundaries)
+        return colors.BoundaryNorm(boundaries, ncolors)
+
 
 class ArchiveFile(File):
+    """A file that can be downloaded to the local disk from the archive,
+    and can also be pushed to the archive.
+
+    Provides methods `get` and `put`, which download the file from the
+    archive over http, and push it to the archive via http respectively.
+    """
 
     url = sa.Column(sa.Text)
     archive_path = sa.Column(sa.Text)
@@ -321,6 +499,17 @@ class ArchiveFile(File):
 
 
 class HasPoly(object):
+    """Mixin indicating that an object represents an entity with four corners
+    on the celestial sphere, connected by great circles.
+
+    The four corners, ra{1..4}, dec{1..4} are database-backed metadata,
+    and are thus queryable.
+
+    Provides a hybrid property `poly` (in-memory and in-db), which can be
+    used to query against the polygon in the database or to access the
+    polygon in memory.
+    """
+
     ra1 = sa.Column(psql.DOUBLE_PRECISION)
     dec1 = sa.Column(psql.DOUBLE_PRECISION)
     ra2 = sa.Column(psql.DOUBLE_PRECISION)
@@ -336,18 +525,21 @@ class HasPoly(object):
                       self.ra3, self.dec3, self.ra4, self.dec4))
 
 
-class HasWCS(HasFITSHeader, HasPoly, SpatiallyIndexed):
+class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
+    """Mixin indicating that an object represents a fits file with a WCS
+    solution."""
 
     @property
     def wcs(self):
-        try:
-            return self._wcs
-        except AttributeError:
-            self._wcs = WCS(self.astropy_header)
-        return self._wcs
+        """Astropy representation of the fits file's WCS solution.
+        Lives in memory only."""
+        return WCS(self.astropy_header)
 
     @classmethod
     def from_file(cls, fname):
+        """Read a fits file into memory from disk, and set the values of
+        database-backed variables that store metadata (e.g., header). These
+        can later be flushed to the database using SQLalchemy. """
         self = super(HasWCS, cls).from_file(fname)
         corners = self.wcs.calc_footprint()
         for i, row in enumerate(corners):
@@ -355,16 +547,22 @@ class HasWCS(HasFITSHeader, HasPoly, SpatiallyIndexed):
             setattr(self, f'dec{i+1}', row[1])
         naxis1 = self.header['NAXIS1']
         naxis2 = self.header['NAXIS2']
-        self.ra, self.dec = self.wcs.all_pix2world([[naxis1 / 2, naxis2 / 2]], 1)[0]
+        self.ra, self.dec = self.wcs.all_pix2world([[naxis1 / 2,
+                                                     naxis2 / 2]], 1)[0]
         return self
 
     @property
     def sources_contained(self):
+        """Query the database and return all `Sources` contained by the
+        polygon of this object"""
         return DBSession().query(models.Source) \
-            .filter(func.q3c_poly_query(models.Source.ra, models.Source.dec, self.poly))
+            .filter(func.q3c_poly_query(models.Source.ra,
+                                        models.Source.dec,
+                                        self.poly))
 
     @property
     def pixel_scale(self):
+        """The pixel scales of the detector in the X and Y image dimensions. """
         units = self.wcs.world_axis_units
         u1 = getattr(u, units[0])
         u2 = getattr(u, units[1])
@@ -375,9 +573,24 @@ class HasWCS(HasFITSHeader, HasPoly, SpatiallyIndexed):
 
 
 class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
+    """IPAC record of a science image from their pipeline. Contains some
+    metadata that IPAC makes available through its irsa metadata query
+    service.  This class is primarily intended to enable the reflection of
+    IPAC's idea of its science images and which science images exist so that
+    IPAC's world can be compared against the results of this pipeline.
+
+    This class does not map to any file on disk, in the sense that it is not
+    designed to reflect the data or metadata of any local file to memory,
+    but it can be used to download files from the IRSA archive to disk (
+    again, it does not make any attempt to represent the contents of these
+    files, or synchronize their contents on disk to their representation in
+    memory).
+
+    This class represents immutable metadata only.
+    """
+
     __tablename__ = 'ipacrecords'
 
-    created_at = sa.Column(sa.DateTime(), nullable=True, default=func.now())
     path = sa.Column(sa.Text, unique=True)
     filtercode = sa.Column(sa.CHAR(2))
     qid = sa.Column(sa.Integer)
@@ -412,7 +625,8 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
     imgtypecode = sa.Column(sa.CHAR(1))
     exptime = sa.Column(sa.Float)
     filefracday = sa.Column(psql.BIGINT)
-    fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx", field, ccdid, qid, filtercode, obsjd)
+    fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",
+                  field, ccdid, qid, filtercode, obsjd)
 
     science_image = relationship('ScienceImage', cascade='all')
 
@@ -425,22 +639,40 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
         return 'ztf' + self.filtercode[-1]
 
     def ipac_path(self, suffix):
+        """The url of a particular file corresponding to this metadata
+        record, with suffix `suffix`, in the IPAC archive. """
         sffd = str(self.filefracday)
-        return f'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{sffd[:4]}/{sffd[4:8]}/{sffd[8:]}/' \
-               f'ztf_{sffd}_{self.field:06d}_{self.filtercode}_c{self.ccdid:02d}_' \
+        return f'https://irsa.ipac.caltech.edu/ibe/data/ztf/' \
+               f'products/sci/{sffd[:4]}/{sffd[4:8]}/{sffd[8:]}/' \
+               f'ztf_{sffd}_{self.field:06d}_' \
+               f'{self.filtercode}_c{self.ccdid:02d}_' \
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
 
-class PipelineFITSProduct(models.Base, HasFITSHeader, ArchiveFile):
-    # this is the polymorphic column
+class PipelineFITSProduct(models.Base, FITSFile, ArchiveFile):
+    """A database-mapped, disk-mappable memory-representation of a file that
+    can be pushed to the NERSC archive. This class is abstract and not
+    designed to be instantiated, but it is also not a mixin. Think of it as a
+    base class for the polymorphic hierarchy of fits products in SQLalchemy.
+
+    To represent an disk-mappable memory-representation of a fits file that
+    is not mapped to rows in the database, instantiate FITSFile directly.
+    """
+
+    # this is the discriminator that is used to keep track of different types
+    #  of fits files produced by the pipeline for the rest of the hierarchy
     type = sa.Column(sa.Text)
+
+    # all pipeline fits products must implement these four key pieces of
+    # metadata. These are all assumed to be not None in valid instances of
+    # PipelineFITSProduct.
 
     field = sa.Column(sa.Integer)
     qid = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
     ccdid = sa.Column(sa.Integer)
 
-    # this is not inherited
+    # An index on the four indentifying
     idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
 
     __mapper_args__ = {
@@ -450,171 +682,237 @@ class PipelineFITSProduct(models.Base, HasFITSHeader, ArchiveFile):
     }
 
 
-class FITSCatalog(PipelineFITSProduct):
+class PipelineFITSCatalog(PipelineFITSProduct):
+    """Python object that maps a catalog stored on a fits file on disk."""
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'catalog',
         'inherit_condition': id == PipelineFITSProduct.id
     }
 
-    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
-    image = relationship('CalibratableImage', cascade='all', foreign_keys=[image_id])
+    image_id = sa.Column(sa.Integer,
+                         sa.ForeignKey('calibratableimages.id',
+                                       ondelete='CASCADE'))
+    image = relationship('CalibratableImage', cascade='all',
+                         foreign_keys=[image_id])
+
+    # since this object maps a fits binary table, the data lives in the first
+    #  extension, not in the primary hdu
+    _DATA_HDU = 1
 
     @classmethod
     def from_image(cls, image):
+        if not isinstance(image, CalibratableImage):
+            raise ValueError('Image is not an instance of '
+                             'CalibratableImage.')
+
         cat = cls()
         for prop in GROUP_PROPERTIES:
             setattr(cat, prop, getattr(image, prop))
-        table = image.catalog
+        tab = image.sourcelist.to_table(TABLE_COLUMNS)
 
+        if isinstance(image, CalibratedImage):
+            phot = aperture_photometry(image,
+                                       tab['sky_centroid_icrs'].ra.deg,
+                                       tab['sky_centroid_icrs'].dec.deg,
+                                       apply_calibration=True)
+            names = ['mag', 'magerr', 'flux', 'fluxerr', 'status', 'reason']
+            for name in names:
+                tab[name] = phot[name]
+
+
+        df = tab.to_pandas()
+
+        # fits binary tables can't handle unicode columns... old data-format ;-)
+        df['reason2'] = df['reason'].astype('|S')
+        del df['reason']
+        df = df.rename(columns={'reason2': 'reason'})
+        df.loc[df['reason'] == 'None', 'reason'] = None
+
+        rec = df.to_records()
+        cat.data = rec
         cat.header = image.header
         cat.header_comments = image.header_comments
         cat.basename = image.basename.replace('.fits', '.cat.fits')
-
-        table.write(cat.basename, format='fits')
-        cat.map_to_local_file(cat.basename)
-
-        with fits.open(cat.basename, mode='update') as hdul:
-            hdul[0].header.update(image.header)
-            for key in cat.header_comments:
-                hdul[0].header.comments[key] = cat.header_comments[key]
-
+        cat.image_id = image.id
         cat.image = image
+
         return cat
 
 
-class PipelineFITSImage(PipelineFITSProduct):
+class MaskImage(PipelineFITSProduct, IntegerFITSImage):
+    __diskmapped_cached_properties__ = IntegerFITSImage.__diskmapped_cached_properties__ + [
+        '_boolean']
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id', ondelete='CASCADE'), primary_key=True)
-
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {
-        'polymorphic_identity': 'image',
+        'polymorphic_identity': 'mask',
         'inherit_condition': id == PipelineFITSProduct.id
     }
 
-    @property
-    def data(self):
-        try:
-            return self._data
-        except AttributeError:
-            # load the data into memory
-            with fits.open(self.local_path) as hdul:
-                data = hdul[0].data
-            self._data = data
-        return self._data
-
-    def show(self):
-        show_image(self.data)
-
-
-class MaskImage(PipelineFITSImage):
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id', ondelete='CASCADE'), primary_key=True)
-    __mapper_args__ = {
-        'polymorphic_identity': 'mask',
-        'inherit_condition': id == PipelineFITSImage.id
-    }
-
-    def refresh_bit_mask(self):
+    def refresh_bit_mask_entries_in_header(self):
+        """Update the database record and the disk record with a constant
+        bitmap information stored in in memory. """
         self.header.update(MASK_BITS)
         self.header_comments.update(MASK_COMMENTS)
-        self.sync_header()
+        self.save()
 
     def update_from_weight_map(self, weightname):
+        """Update what's in memory based on what's on disk (produced by
+        SWarp)."""
         with fits.open(weightname) as hdul:
             mskarr = self.data
             ftsarr = hdul[0].data
             mskarr[ftsarr == 0] += 2**16
             self.data = mskarr
-        self.refresh_bit_mask()
+        self.refresh_bit_mask_entries_in_header()
 
+    @property
+    def boolean(self):
+        """A boolean array that is True when a masked pixel is 'bad', i.e.,
+        not usable for science, and False when a pixel is not masked."""
+        try:
+            return self._boolean
+        except AttributeError:
 
-    parent_image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'))
-    parent_image = relationship('CalibratableImage', cascade='all', back_populates='mask_image',
+            # From ZSDS document:
+
+            # For example, to find all science - image pixels which are
+            # uncontaminated, but which may contain clean extracted - source
+            # signal(bits 1 or 11), one would “logically AND” the
+            # corresponding mask - image with the template value 6141 (= 2^0
+            # + 2^2 +2^3 + 2^4 + 2^5 + 2^6 + 2^7 + 2^8 + 2^9 + 2^10 + 21^2)
+            # #and retain pixels where this operation yields zero. To then
+            # find which of these pixels contain source signal, one would
+            # “AND” the resulting image with 2050 (= 21 + 211) and retain
+            # pixels where this operation is non-zero.
+            maskpix = (self.data & 6141) > 0
+            self._boolean = maskpix
+        return self._boolean
+
+    parent_image_id = sa.Column(sa.Integer,
+                                sa.ForeignKey('calibratableimages.id',
+                                              ondelete='CASCADE'))
+    parent_image = relationship('CalibratableImage', cascade='all',
+                                back_populates='mask_image',
                                 foreign_keys=[parent_image_id])
 
 
-class CalibratableImage(PipelineFITSImage, HasWCS):
+class SegmentationImage(photutils.segmentation.SegmentationImage,
+                        IntegerFITSImage):
+    pass
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsimages.id', ondelete='CASCADE'), primary_key=True)
+
+class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
+
+    __diskmapped_cached_properties__ = ['_path', '_data', '_weight',
+                                        '_bkg', '_filter_kernel', '_rms',
+                                        '_thresh', '_segm', '_sourcelist']
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
 
     __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
-                       'inherit_condition': id == PipelineFITSImage.id}
+                       'inherit_condition': id == PipelineFITSProduct.id}
 
     detections = relationship('Detection', cascade='all')
     objects = relationship('ObjectWithFlux', cascade='all')
 
-    mask_image = relationship('MaskImage', back_populates='parent_image', uselist=False,
+    mask_image = relationship('MaskImage', back_populates='parent_image',
+                              uselist=False,
                               primaryjoin=MaskImage.parent_image_id == id)
 
-    def write_rms_image(self, localpath):
-        bkgrms = self.bkg.background_rms
-        fits.writeto(localpath, bkgrms, header=self.astropy_header)
+    catalog = relationship('PipelineFITSCatalog', uselist=False,
+                           primaryjoin=PipelineFITSCatalog.image_id == id)
 
-    def write_weight_map(self, localpath):
-        fits.writeto(localpath, self.weight, header=self.astropy_header)
 
     @property
-    def rms(self):
-        return self.bkg.background_rms
-
-    @property
-    def weight(self):
+    def weight_image(self):
         try:
-            return self._weight
+            return self._weightimg
         except AttributeError:
-
-            # For example, to find all science - image pixels which are uncontaminated, but
-            # which may contain clean extracted - source signal(bits 1 or 11), one
-            # would “logically AND” the corresponding mask - image
-            # with the template value 6141 (= 2^0 + 2^2 +2^3 + 2^4 + 2^5 + 2^6 + 2^7 + 2^8 + 2^9 + 2^10 + 21^2)
-            # #and retain pixels where this operation yields zero.
-            # To then find which of these pixels contain source signal,
-            # one would “AND” the resulting image with 2050 (= 21 + 211)
-            # and retain pixels where this operation is non-zero.
-
-
-            ind = self.mask
+            ind = self.mask_image.boolean
             wgt = np.empty_like(ind, dtype='<f8')
+            wgt[ind] = 1 / self.rms[ind] ** 2
+            wgt[~ind] = 0.
 
-            havesat = False
             try:
                 saturval = self.header['SATURATE']
             except KeyError:
                 pass
             else:
-                havesat = True
                 saturind = self.data >= 0.9 * saturval
-
-            wgt[ind] = 1 / self.rms[ind] ** 2
-            wgt[~ind] = 0.
-
-            if havesat:
                 wgt[saturind] = 0.
 
-            self._weight = wgt
-        return self._weight
+            self._weightimg = FloatingPointFITSImage()
+            self._weightimg.basename = self.basename.replace('.fits',
+                                                             '.weight.fits')
+            self._weightimg.data = wgt
+        return self._weightimg
 
     @property
-    def bkg(self):
+    def rms_image(self):
         try:
-            return self._background
+            return self._rmsimg
         except AttributeError:
-            self._background = photutils.Background2D(self.data, box_size=BKG_BOX_SIZE)
-        return self._background
+            data = self.background_object.background_rms
+            rmsi = FloatingPointFITSImage()
+            rmsi.basename = self.basename.replace('.fits', '.rms.fits')
+            rmsi.data = data
+            self._rmsimg = rmsi
+        return self._rmsimg
 
     @property
-    def mask(self):
+    def background_image(self):
         try:
-            return self._mask
+            return self._bkgimg
         except AttributeError:
-            # load the mask into memory
-            if self.mask_image is None:
-                raise UnmappedFileError(f'"{self.basename}" has no attribute "mask_image"')
-            with fits.open(self.mask_image.local_path) as hdul:
-                maskpix = (hdul[0].data & 6141) > 0
-            self._mask = maskpix
-        return self._mask
+            data = self.background_object.background
+            bkgi = FloatingPointFITSImage()
+            bkgi.basename = self.basename.replace('.fits', '.bkg.fits')
+            bkgi.data = data
+            self._bkgimg = bkgi
+        return self._bkgimg
+
+    @property
+    def segm_image(self):
+        try:
+            return self._segmimg
+        except AttributeError:
+
+            fk = self.filter_kernel
+            segm = photutils.detect_sources(self.data,
+                                            self.threshold_image.data,
+                                            DETECT_NPIX,
+                                            filter_kernel=fk,
+                                            mask=self.mask_image.boolean)
+
+            deblended = photutils.deblend_sources(self.data,
+                                                  segm,
+                                                  DETECT_NPIX,
+                                                  filter_kernel=fk,
+                                                  contrast=0.0001).data
+
+            basename = self.basename.replace('.fits', '.segm.fits')
+            segmi = SegmentationImage(deblended)
+            segmi.basename = basename
+            self._segmimg = segmi
+
+        return self._segmimg
+
+    @property
+    def background_object(self):
+        try:
+            return self._bkg
+        except AttributeError:
+            self._bkg = photutils.Background2D(self.data, box_size=BKG_BOX_SIZE)
+        return self._bkg
 
     @property
     def filter_kernel(self):
@@ -622,7 +920,8 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
             return self._filter_kernel
         except AttributeError:
             try:
-                sigma = 2. / 2.355  # equivalent to SExtractor "all ground" default.conv
+                # equivalent to SExtractor "all ground" default.conv
+                sigma = 2. / 2.355
             except KeyError:
                 # no filter kernel can be calculated for this image
                 # as it does not yet have an estimate of the seeing
@@ -633,133 +932,49 @@ class CalibratableImage(PipelineFITSImage, HasWCS):
         return self._filter_kernel
 
     @property
-    def threshold(self):
+    def threshold_image(self):
         try:
-            return self._thresh
-        except AttributeError:
-            self._thresh = photutils.detect_threshold(self.data,
-                                                      DETECT_NSIGMA,
-                                                      background=self.bkg.background,
-                                                      error=self.rms,
-                                                      mask=self.mask)
-        return self._thresh
-
-    @property
-    def segm(self):
-        try:
-            return self._segm
+            return self._threshimg
         except AttributeError:
 
-            segm = photutils.detect_sources(self.data,
-                                            self.threshold,
-                                            DETECT_NPIX,
-                                            filter_kernel=self.filter_kernel,
-                                            mask=self.mask)
-
-            self._segm = photutils.deblend_sources(self.data,
-                                                   segm,
-                                                   DETECT_NPIX,
-                                                   filter_kernel=self.filter_kernel,
-                                                   contrast=0.0001)
-
-        return self._segm
+            bkg = self.background_image.data
+            rms = self.rms_image.data
+            msk = self.mask_image.boolean
+            data = photutils.detect_threshold(self.data,
+                                              DETECT_NSIGMA,
+                                              background=bkg,
+                                              error=rms,
+                                              mask=msk)
+            threshi = FloatingPointFITSImage()
+            threshi.data = data
+            threshi.basename = self.basename.replace('.fits', '.thresh.fits')
+            self._threshimg = threshi
+        return self._threshimg
 
     @property
     def sourcelist(self):
         try:
             return self._sourcelist
         except AttributeError:
-            self._sourcelist = photutils.source_properties(self.data - self.bkg.background,
-                                                           self.segm, error=self.rms, mask=self.mask,
-                                                           background=self.bkg.background,
-                                                           filter_kernel=self.filter_kernel,
-                                                           wcs=self.wcs)
+            f = photutils.source_properties
+            self._sourcelist = f(self.data - self.background_image.data,
+                                 self.segm_image,
+                                 error=self.rms_image.data,
+                                 mask=self.mask_image.boolean,
+                                 background=self.background_image.data,
+                                 filter_kernel=self.filter_kernel,
+                                 wcs=self.wcs)
         return self._sourcelist
 
-    @property
-    def catalog(self):
-        try:
-            return self._catalog
-        except AttributeError:
-            self._catalog = self.sourcelist.to_table(TABLE_COLUMNS)
-        return self._catalog
 
-    def show(self, with_catalog=False, mask=False, background=False, rms=False, bkgsub=False, threshold=False,
-             segm=False):
-
-        types = []
-        data = True
-        for it in ['data', 'mask', 'background', 'rms', 'threshold', 'segm']:
-            if eval(it):
-                types.append(it)
-        nax = len(types)
-
-        if nax == 1:
-            fig, ax = plt.subplots()
-        elif nax == 2:
-            fig, ax = plt.subplots(ncols=2, sharex=True, sharey=True)
-        elif nax <= 4:
-            fig, ax = plt.subplots(nrows=2, ncols=2, sharex=True, sharey=True)
-            if nax == 3:
-                ax[-1, -1].set_visible(False)
-        else:
-            fig, ax = plt.subplots(nrows=2, ncols=3, sharex=True, sharey=True)
-            if nax == 5:
-                ax[-1, -1].set_visible(False)
-        ax = np.atleast_1d(ax)
-
-        for it, a in zip(types, ax.ravel()):
-            if it == 'data':
-                if bkgsub:
-                    data = self.data - self.bkg.background
-                else:
-                    data = self.data
-            elif it == 'mask':
-                data = self.mask.astype('<f8')
-            elif it == 'background':
-                data = self.bkg.background
-            elif it == 'rms':
-                data = self.bkg.background_rms
-            elif it == 'threshold':
-                data = self.threshold
-            elif it == 'segm':
-                data = self.segm.data.astype('<f8')
-
-            if it == 'mask':
-                vmin = 0
-                vmax = 1e-5
-            else:
-                interval = ZScaleInterval()
-                vmin, vmax = interval.get_limits(data)
-
-            if it == 'segm':
-                im = a.imshow(self.segm, cmap=self.segm.make_cmap())
-            else:
-                im = a.imshow(data, cmap='gray', vmin=vmin, vmax=vmax, interpolation='none')
-
-            if it == 'data' and with_catalog:
-                catalog = self.catalog
-                for row in catalog:
-                    e = Ellipse(xy=(row['xcentroid'].value, row['ycentroid'].value),
-                                width=6 * row['semimajor_axis_sigma'].value,
-                                height=6 * row['semiminor_axis_sigma'].value,
-                                angle=row['orientation'].to('deg').value)
-                    e.set_facecolor('none')
-                    e.set_edgecolor('red')
-                    a.add_artist(e)
-
-            if it not in ['mask', 'segm']:
-                fig.colorbar(im, ax=a)
-            a.set_title(it)
-
-        fig.tight_layout()
-        return fig
 
 
 class CalibratedImage(CalibratableImage):
     """An image on which photometry can be performed."""
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'calibratedimage',
                        'inherit_condition': id == CalibratableImage.id}
 
@@ -798,19 +1013,6 @@ class CalibratedImage(CalibratableImage):
     def __table_args__(cls):
         # override spatial index - only need it on one table (calibratable images)
         return tuple()
-
-    @property
-    def catalog(self):
-        base = super().catalog
-        phot = aperture_photometry(self,
-                                   base['sky_centroid_icrs'].ra.deg,
-                                   base['sky_centroid_icrs'].dec.deg,
-                                   apply_calibration=True)
-        base['mag'] = phot['mag']
-        base['magerr'] = phot['magerr']
-        base['flux'] = phot['flux']
-        base['fluxerr'] = phot['fluxerr']
-        return base
 
     @hybrid_property
     def seeing(self):
@@ -878,7 +1080,7 @@ class Coadd(CalibratableImage):
         coaddmask = coadd.mask_image
 
         if data_product:
-            catalog = FITSCatalog.from_image(coadd)
+            catalog = PipelineFITSCatalog.from_image(coadd)
             archive.archive(coadd)
             archive.archive(coaddmask)
             archive.archive(catalog)

@@ -16,12 +16,14 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
     apertures = photutils.SkyCircularAperture(coord, r=APERTURE_RADIUS)
 
     # something that is photometerable implements mask, background, and wcs
-    pixels_bkgsub = calibratable.data - calibratable.bkg.background
-    bkgrms = calibratable.bkg.background_rms
-    mask = calibratable.mask
+    pixels_bkgsub = calibratable.data - calibratable.background_image.data
+    bkgrms = calibratable.rms_image.data
+    mask = calibratable.mask_image.boolean
     wcs = calibratable.wcs
 
-    phot_table = photutils.aperture_photometry(pixels_bkgsub, apertures, error=bkgrms, mask=mask, wcs=wcs)
+    phot_table = photutils.aperture_photometry(pixels_bkgsub, apertures,
+                                               error=bkgrms, mask=mask,
+                                               wcs=wcs)
 
     if apply_calibration:
         magzp = calibratable.header['MAGZP']
@@ -31,8 +33,9 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
         phot_table['magerr'] = 1.0826 * phot_table['aperture_sum_err'] / phot_table['aperture_sum']
 
     # check for invalid photometry on masked pixels
-    phot_table['status'] = (phot_table['aperture_sum'] == 0) & (phot_table['aperture_sum_err'] == 0)
-    phot_table['reason'] = [None if s else 'Masked' for s in phot_table['status']]
+    phot_table['status'] = ~((phot_table['aperture_sum'] == 0) &
+                             (phot_table['aperture_sum_err'] == 0))
+    phot_table['reason'] = ['None' if s else 'Masked' for s in phot_table['status']]
 
     # rename some columns
     phot_table.rename_column('aperture_sum', 'flux')
