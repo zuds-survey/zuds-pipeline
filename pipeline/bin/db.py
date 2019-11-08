@@ -148,6 +148,7 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
                                    'projection': WCS(wcs_header)
                                } if reproject else None)
 
+        ax = np.atleast_1d(ax)
         for a in ax.ravel()[n:]:
             a.set_visible(False)
 
