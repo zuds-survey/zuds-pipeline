@@ -197,8 +197,25 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=F
     initialize_directory(directory)
 
     if copy_inputs:
+        impaths = []
         for image in images:
             shutil.copy(image.local_path, directory)
+            impaths.append(str(directory / image.basename))
+    else:
+        impaths = [im.local_path for im in images]
+
+    # normalize all images to the same zeropoint
+    for im, path in zip(images, impaths):
+        if 'MAGZP' in im.header:
+            fluxscale = 10**(-0.4 * (im.header['MAGZP'] - 25.))
+            im.header['FLXSCALE'] = fluxscale
+            im.header_comments['FLXSCALE'] = 'Flux scale factor for coadd / DG'
+            im.header['FLXSCLZP'] = 25.
+            im.header_comments['FLXSCLZP'] = 'FLXSCALE equivalent ZP / DG'
+            opath = im.local_path
+            im.map_to_local_file(path)
+            im.save()
+            im.map_to_local_file(opath)
 
     # write weight images to temporary directory
     wgtpaths = []
@@ -210,7 +227,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=F
 
     # get the images in string form
     allwgts = ','.join(wgtpaths)
-    allims = ' '.join([c.local_path for c in images])
+    allims = ' '.join(impaths)
     wgtout = outname.replace('.fits', '.weight.fits')
 
     syscall = f'swarp -c {conf} {allims} ' \
@@ -249,7 +266,9 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
     directory = Path('/tmp') / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
-    command = prepare_swarp_sci(images, outname, directory, reference=reference)
+    command = prepare_swarp_sci(images, outname, directory,
+                                reference=reference,
+                                copy_inputs=True)
 
     # run swarp
     subprocess.check_call(command.split())

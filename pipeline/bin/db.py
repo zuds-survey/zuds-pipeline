@@ -124,10 +124,14 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
     n = len(imgs)
 
     if ds9:
+        if catalog is not None:
+            reg = PipelineRegionFile.from_catalog(catalog)
         cmd = '%ds9 -zscale '
         for img in imgs:
             img.save()
-        cmd += ' '.join([img.local_path for img in imgs])
+            cmd += f' {img.local_path}'
+            if catalog is not None:
+                cmd += f' -region {reg.local_path}'
         cmd += ' -lock frame wcs'
         print(cmd)
     else:
@@ -681,7 +685,7 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
 
-class PipelineFITSProduct(models.Base, FITSFile, ArchiveFile):
+class PipelineProduct(models.Base, ArchiveFile):
     """A database-mapped, disk-mappable memory-representation of a file that
     can be pushed to the NERSC archive. This class is abstract and not
     designed to be instantiated, but it is also not a mixin. Think of it as a
@@ -697,7 +701,7 @@ class PipelineFITSProduct(models.Base, FITSFile, ArchiveFile):
 
     # all pipeline fits products must implement these four key pieces of
     # metadata. These are all assumed to be not None in valid instances of
-    # PipelineFITSProduct.
+    # PipelineProduct.
 
     field = sa.Column(sa.Integer)
     qid = sa.Column(sa.Integer)
@@ -714,15 +718,52 @@ class PipelineFITSProduct(models.Base, FITSFile, ArchiveFile):
     }
 
 
-class PipelineFITSCatalog(PipelineFITSProduct):
+class PipelineRegionFile(PipelineProduct):
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'regionfile',
+        'inherit_condition': id == PipelineProduct.id
+    }
+
+    catalog_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'pipelinefitscatalogs.id', ondelete='CASCADE'))
+    catalog = relationship('PipelineFITSCatalog', cascade='all',
+                           foreign_keys=[catalog_id],
+                           back_populates='regionfile')
+
+    @classmethod
+    def from_catalog(cls, catalog):
+        reg = cls()
+        reg.basename = catalog.basename.replace('.cat.fits', '.reg')
+        reg.map_to_local_file(reg.basename)
+        reg.catalog = catalog
+        with open(reg.local_path, 'w') as f:
+            f.write('global color=green dashlist=8 3 width=1 font="helvetica '
+            '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
+            'delete=1 include=1 source=1\n')
+            f.write('icrs\n')
+            rad = 13 * 0.26667 * 0.00027777
+            for line in catalog.data:
+                f.write(f'circle({line["sky_centroid_icrs.ra"]},'
+                        f'{line["sky_centroid_icrs.dec"]},{rad}) # width=2 '
+                        f'color=blue\n')
+
+        return reg
+
+
+class PipelineFITSCatalog(PipelineProduct, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'catalog',
-        'inherit_condition': id == PipelineFITSProduct.id
+        'inherit_condition': id == PipelineProduct.id
     }
 
     image_id = sa.Column(sa.Integer,
@@ -730,6 +771,10 @@ class PipelineFITSCatalog(PipelineFITSProduct):
                                        ondelete='CASCADE'))
     image = relationship('CalibratableImage', cascade='all',
                          foreign_keys=[image_id])
+
+    regionfile = relationship('PipelineRegionFile', cascade='all',
+                              uselist=False,
+                              primaryjoin=PipelineRegionFile.catalog_id == id)
 
     # since this object maps a fits binary table, the data lives in the first
     #  extension, not in the primary hdu
@@ -775,16 +820,16 @@ class PipelineFITSCatalog(PipelineFITSProduct):
         return cat
 
 
-class MaskImage(PipelineFITSProduct, IntegerFITSImage):
+class MaskImage(PipelineProduct, IntegerFITSImage):
     __diskmapped_cached_properties__ = IntegerFITSImage.__diskmapped_cached_properties__ + [
         '_boolean']
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'mask',
-        'inherit_condition': id == PipelineFITSProduct.id
+        'inherit_condition': id == PipelineProduct.id
     }
 
     def refresh_bit_mask_entries_in_header(self):
@@ -844,7 +889,7 @@ class SegmentationImage(photutils.segmentation.SegmentationImage,
     pass
 
 
-class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct):
+class CalibratableImage(FloatingPointFITSImage, PipelineProduct):
 
     __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
                                         '_bkgimg', '_filter_kernel', '_rmsimg',
@@ -852,12 +897,12 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct):
                                         '_sourcelist', '_bkgsubimg']
 
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
 
     __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
-                       'inherit_condition': id == PipelineFITSProduct.id}
+                       'inherit_condition': id == PipelineProduct.id}
 
     detections = relationship('Detection', cascade='all')
     objects = relationship('ObjectWithFlux', cascade='all')
@@ -1136,6 +1181,7 @@ class Coadd(CalibratableImage):
 
         # make sure all images have the same field, filter, ccdid, qid:
         ensure_images_have_the_same_properties(images, GROUP_PROPERTIES)
+
 
         # is this a reference image?
         isref = issubclass(cls, ReferenceImage)
