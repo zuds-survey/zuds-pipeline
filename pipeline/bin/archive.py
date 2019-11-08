@@ -14,7 +14,7 @@ fid_map = {
 def archive(product):
     """Publish a PipelineFITSProduct to the NERSC archive."""
 
-    if not isinstance(product, db.PipelineFITSProduct):
+    if not isinstance(product, db.PipelineProduct):
         raise ValueError(f'Cannot archive object "{product}", must be an instance of'
                          f'PipelineFITSProduct.')
 
@@ -30,7 +30,7 @@ def archive(product):
                                    f'{band}/' \
                                    f'{product.basename}'
 
-    product.nersc_path = path.absolute()
+    product.archive_path = f'{path.absolute()}'
     product.url = f'{path.absolute()}'.replace(db.NERSC_PREFIX, db.URL_PREFIX)
 
     if os.getenv('NERSC_HOST') == 'cori':

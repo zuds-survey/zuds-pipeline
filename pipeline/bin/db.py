@@ -610,18 +610,28 @@ class ArchiveFile(File):
         self.save()
         # authenticate to nersc system
         target = 'https://newt.nersc.gov/newt/login'
-        username = get_secret('NERSC_USERNAME')
-        password = get_secret('NERSC_PASSWORD')
-        r = requests.post(target, json={
+        username = get_secret('nersc_username')
+        password = get_secret('nersc_password')
+        r = requests.post(target, data={
             'username': username,
             'password': password
         })
         r.raise_for_status()
         auth_cookie = r.cookies
 
-        # upload the file
+        # prepare the destination directory to receive the file
+        target = f'https://newt.nersc.gov/newt/command/cori'
+        cmd = f'/usr/bin/mkdir -p {os.path.dirname(self.archive_path)}'
+        loginenv = False
+        r = requests.post(target, data={
+            'executable': cmd,
+            'loginenv': loginenv
+        }, cookies=auth_cookie)
+        r.raise_for_status()
+
+        # upload the file, delete leading "/" for newt
         target = f'https://newt.nersc.gov/newt/file/cori/' \
-                 f'{self.archive_path[1:]}'
+                 f'{str(self.archive_path)[1:]}'
         with open(self.local_path, 'rb') as f:
             contents = f.read()
         r = requests.put(target, data=contents, cookies=auth_cookie)
