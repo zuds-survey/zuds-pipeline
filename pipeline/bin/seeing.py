@@ -1,8 +1,10 @@
+import db
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 from secrets import get_secret
 import penquins
+
 
 
 def estimate_seeing(image):
@@ -14,11 +16,14 @@ def estimate_seeing(image):
     kowalski = penquins.Kowalski(username=username, password=password)
     catalog = image.catalog
 
+    if catalog is None:
+        catalog = db.PipelineFITSCatalog.from_image(image)
+
     # get a list of gaia stars
     coordlist = []
-    for row in catalog:
-        ra = row['sky_centroid_icrs'].ra.deg
-        dec = row['sky_centroid_icrs'].dec.deg
+    for row in catalog.data:
+        ra = row['sky_centroid_icrs.ra']
+        dec = row['sky_centroid_icrs.dec']
         coordlist.append((ra, dec))
 
     q = {"query_type": "cone_search",

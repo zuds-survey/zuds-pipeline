@@ -204,7 +204,8 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=F
     wgtpaths = []
     for image in images:
         wgtpath = f"{directory / image.basename.replace('.fits', '.weight.fits')}"
-        image.write_weight_map(wgtpath)
+        image.weight_image.map_to_local_file(wgtpath)
+        image.weight_image.save()
         wgtpaths.append(wgtpath)
 
     # get the images in string form
@@ -276,19 +277,18 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
             setattr(img, prop, getattr(images[0], prop))
 
     # estimate the seeing on the coadd
-    coadd_seeing = (estimate_seeing(coadd) / coadd.pixel_scale).value
-    coadd.header['SEEING'] = coadd_seeing
-    coadd.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
-    coadd.sync_header()
+    #coadd_seeing = (estimate_seeing(coadd) / coadd.pixel_scale).value
+    #coadd.header['SEEING'] = coadd_seeing
+    #coadd.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
+    #coadd.sync_header()
+    coadd.save()
 
     if addbkg:
-        # this also updates the fits file
-        data = coadd.data
-        data[~coadd.mask] += BKG_VAL
-        coadd.data = data
+        coadd.data += BKG_VAL
 
     # clean up -- this also deletes the mask weight map
     shutil.rmtree(directory)
+    return coadd
 
 
 def ensure_images_have_the_same_properties(images, properties):

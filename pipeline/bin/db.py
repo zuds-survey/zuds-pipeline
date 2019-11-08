@@ -22,7 +22,11 @@ from secrets import get_secret
 from photometry import aperture_photometry, APER_KEY
 from makecoadd import ensure_images_have_the_same_properties, run_coadd
 import archive
-from seeing import estimate_seeing
+
+import warnings
+from reproject import reproject_interp
+
+
 
 import photutils
 from astropy.wcs.utils import proj_plane_pixel_scales
@@ -113,40 +117,56 @@ def discrete_cmap(ncolors):
     return colors.ListedColormap(rgb)
 
 
-def show_images(image_or_images, catalog=None, titles=None):
+def show_images(image_or_images, catalog=None, titles=None, reproject=False,
+                ds9=False):
 
     imgs = np.atleast_1d(image_or_images)
     n = len(imgs)
 
-    if titles is not None and len(titles) != n:
-        raise ValueError('len(titles) != len(images)')
+    if ds9:
+        cmd = '%ds9 -zscale '
+        for img in imgs:
+            img.save()
+        cmd += ' '.join([img.local_path for img in imgs])
+        cmd += ' -lock frame wcs'
+        print(cmd)
+    else:
 
-    ncols = n % 3 + 1
-    nrows = n // 3 + 1
+        if titles is not None and len(titles) != n:
+            raise ValueError('len(titles) != len(images)')
 
-    fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True)
-    for a in ax.ravel()[n:]:
-        a.set_visible(False)
+        ncols = min(n, 3)
+        nrows = (n - 1) // 3 + 1
 
-    for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
-        im.show(a)
+        wcs_header = imgs[0].astropy_header
+        fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True,
+                               subplot_kw={
+                                   'projection': WCS(wcs_header)
+                               } if reproject else None)
 
-        if catalog is not None:
-            for row in catalog.data:
-                e = Ellipse(xy=(row['xcentroid'], row['ycentroid']),
-                            width=6 * row['semimajor_axis_sigma'],
-                            height=6 * row['semiminor_axis_sigma'],
-                            angle=row['orientation'] * 180. / np.pi)
-                e.set_facecolor('none')
-                e.set_edgecolor('red')
-                a.add_artist(e)
+        for a in ax.ravel()[n:]:
+            a.set_visible(False)
 
-        if titles is not None:
-            a.set_title(titles[i])
+        for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
+            im.show(a, reproject_to=wcs_header if reproject else None)
 
-    fig.tight_layout()
-    fig.show()
-    return fig
+            if catalog is not None:
+                for row in catalog.data:
+                    e = Ellipse(xy=(row['xcentroid'], row['ycentroid']),
+                                width=6 * row['semimajor_axis_sigma'],
+                                height=6 * row['semiminor_axis_sigma'],
+                                angle=row['orientation'] * 180. / np.pi)
+                    e.set_facecolor('none')
+                    e.set_edgecolor('red')
+                    a.add_artist(e)
+
+            if titles is not None:
+                a.set_title(titles[i])
+
+        fig.tight_layout()
+        fig.show()
+        return fig
+
 
 def init_db():
     hpss_dbhost = get_secret('hpss_dbhost')
@@ -413,90 +433,6 @@ class FITSFile(File):
         fits.writeto(f, self.data, self.astropy_header, overwrite=True)
 
 
-class FITSImage(FITSFile):
-    """A `FITSFile` with a data member representing an image. Same as
-    FITSFile, but provides the method show() to render the image in
-    matplotlib. Also defines some properties that help to optimally render
-    the image (cmap, cmap_limits)"""
-
-    def show(self, axis=None):
-        if axis is None:
-            fig, axis = plt.subplots()
-        vmin, vmax = self.cmap_limits()
-        axis.imshow(self.data,
-                    vmin=vmin,
-                    vmax=vmax,
-                    norm=self.cmap_norm(),
-                    cmap=self.cmap())
-
-    def cmap_limits(self):
-        raise NotImplemented
-
-    def cmap(self):
-        raise NotImplemented
-
-    def cmap_norm(self):
-        raise NotImplemented
-
-
-class FloatingPointFITSImage(FITSImage):
-    """A `FITSImage` with a data member that contains a two dimensional array
-    of floating point numbers.
-
-    Suitable for representing a science image, rms image, background image,
-    coadd, etc."""
-
-    def cmap_limits(self):
-        interval = ZScaleInterval()
-        return interval.get_limits(self.data)
-
-    def cmap(self):
-        return 'gray'
-
-    def cmap_norm(self):
-        return None
-
-
-class IntegerFITSImage(FITSImage):
-    """A `FITSImage` with a data member that contains a two dimensional array
-    of integers.
-
-    Suitable for representing a mask image, segmentation image, etc."""
-
-    def cmap_limits(self):
-        return (None, None)
-
-    def cmap(self):
-        ncolors = len(np.unique(self.data))
-        return discrete_cmap(ncolors)
-
-    def cmap_norm(self):
-        boundaries = np.unique(self.data)
-        ncolors = len(boundaries)
-        return colors.BoundaryNorm(boundaries, ncolors)
-
-
-class ArchiveFile(File):
-    """A file that can be downloaded to the local disk from the archive,
-    and can also be pushed to the archive.
-
-    Provides methods `get` and `put`, which download the file from the
-    archive over http, and push it to the archive via http respectively.
-    """
-
-    url = sa.Column(sa.Text)
-    archive_path = sa.Column(sa.Text)
-
-    def get(self):
-        with open(self.basename, 'wb') as f:
-            r = requests.get(self.url)
-            r.raise_for_status()
-            f.write(r.content)
-            self.map_to_local_file(self.basename)
-
-    def put(self):
-        pass
-
 
 class HasPoly(object):
     """Mixin indicating that an object represents an entity with four corners
@@ -570,6 +506,102 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         ps1 = (scales[0] * u1).to('arcsec').value
         ps2 = (scales[1] * u2).to('arcsec').value
         return np.asarray([ps1, ps2]) * u.arcsec
+
+
+class FITSImage(HasWCS):
+    """A `FITSFile` with a data member representing an image. Same as
+    FITSFile, but provides the method show() to render the image in
+    matplotlib. Also defines some properties that help to optimally render
+    the image (cmap, cmap_limits)"""
+
+    def show(self, axis=None, reproject_to=None):
+        if axis is None:
+            fig, axis = plt.subplots()
+        vmin, vmax = self.cmap_limits()
+
+        data = self.data
+        if reproject_to is not None:
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=DeprecationWarning)
+                data, _ = reproject_interp((self.data, self.astropy_header),
+                                           reproject_to, order=0)
+
+        axis.imshow(data,
+                    vmin=vmin,
+                    vmax=vmax,
+                    norm=self.cmap_norm(),
+                    cmap=self.cmap(),
+                    interpolation='none')
+
+    def cmap_limits(self):
+        raise NotImplemented
+
+    def cmap(self):
+        raise NotImplemented
+
+    def cmap_norm(self):
+        raise NotImplemented
+
+
+class FloatingPointFITSImage(FITSImage):
+    """A `FITSImage` with a data member that contains a two dimensional array
+    of floating point numbers.
+
+    Suitable for representing a science image, rms image, background image,
+    coadd, etc."""
+
+    def cmap_limits(self):
+        interval = ZScaleInterval()
+        return interval.get_limits(self.data)
+
+    def cmap(self):
+        return 'gray'
+
+    def cmap_norm(self):
+        return None
+
+
+
+class IntegerFITSImage(FITSImage):
+    """A `FITSImage` with a data member that contains a two dimensional array
+    of integers.
+
+    Suitable for representing a mask image, segmentation image, etc."""
+
+    def cmap_limits(self):
+        return (None, None)
+
+    def cmap(self):
+        ncolors = len(np.unique(self.data))
+        return discrete_cmap(ncolors)
+
+    def cmap_norm(self):
+        boundaries = np.unique(self.data)
+        ncolors = len(boundaries)
+        return colors.BoundaryNorm(boundaries, ncolors)
+
+
+class ArchiveFile(File):
+    """A file that can be downloaded to the local disk from the archive,
+    and can also be pushed to the archive.
+
+    Provides methods `get` and `put`, which download the file from the
+    archive over http, and push it to the archive via http respectively.
+    """
+
+    url = sa.Column(sa.Text)
+    archive_path = sa.Column(sa.Text)
+
+    def get(self):
+        with open(self.basename, 'wb') as f:
+            r = requests.get(self.url)
+            r.raise_for_status()
+            f.write(r.content)
+            self.map_to_local_file(self.basename)
+
+    def put(self):
+        pass
+
 
 
 class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
@@ -713,6 +745,7 @@ class PipelineFITSCatalog(PipelineFITSProduct):
         for prop in GROUP_PROPERTIES:
             setattr(cat, prop, getattr(image, prop))
         tab = image.sourcelist.to_table(TABLE_COLUMNS)
+        df = tab.to_pandas()
 
         if isinstance(image, CalibratedImage):
             phot = aperture_photometry(image,
@@ -721,16 +754,14 @@ class PipelineFITSCatalog(PipelineFITSProduct):
                                        apply_calibration=True)
             names = ['mag', 'magerr', 'flux', 'fluxerr', 'status', 'reason']
             for name in names:
-                tab[name] = phot[name]
+                df[name] = phot[name]
 
-
-        df = tab.to_pandas()
-
-        # fits binary tables can't handle unicode columns... old data-format ;-)
-        df['reason2'] = df['reason'].astype('|S')
-        del df['reason']
-        df = df.rename(columns={'reason2': 'reason'})
-        df.loc[df['reason'] == 'None', 'reason'] = None
+            # fits binary tables can't handle unicode columns...
+            # old data-format ;-)
+            df['reason2'] = df['reason'].astype('|S')
+            del df['reason']
+            df = df.rename(columns={'reason2': 'reason'})
+            df.loc[df['reason'] == 'None', 'reason'] = None
 
         rec = df.to_records()
         cat.data = rec
@@ -739,6 +770,7 @@ class PipelineFITSCatalog(PipelineFITSProduct):
         cat.basename = image.basename.replace('.fits', '.cat.fits')
         cat.image_id = image.id
         cat.image = image
+        image.catalog = cat
 
         return cat
 
@@ -791,7 +823,11 @@ class MaskImage(PipelineFITSProduct, IntegerFITSImage):
             # find which of these pixels contain source signal, one would
             # “AND” the resulting image with 2050 (= 21 + 211) and retain
             # pixels where this operation is non-zero.
-            maskpix = (self.data & 6141) > 0
+
+            # DG: also have to add 2^16 (my custom bit)
+            # So 6141 ->
+
+            maskpix = (self.data & 71677) > 0
             self._boolean = maskpix
         return self._boolean
 
@@ -808,11 +844,13 @@ class SegmentationImage(photutils.segmentation.SegmentationImage,
     pass
 
 
-class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
+class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct):
 
-    __diskmapped_cached_properties__ = ['_path', '_data', '_weight',
-                                        '_bkg', '_filter_kernel', '_rms',
-                                        '_thresh', '_segm', '_sourcelist']
+    __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
+                                        '_bkgimg', '_filter_kernel', '_rmsimg',
+                                        '_threshimg', '_segmimg',
+                                        '_sourcelist', '_bkgsubimg']
+
 
     id = sa.Column(sa.Integer, sa.ForeignKey('pipelinefitsproducts.id',
                                              ondelete='CASCADE'),
@@ -831,6 +869,9 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
+    def cmap_limits(self):
+        interval = ZScaleInterval()
+        return interval.get_limits(self.data[~self.mask_image.boolean])
 
     @property
     def weight_image(self):
@@ -839,8 +880,8 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
         except AttributeError:
             ind = self.mask_image.boolean
             wgt = np.empty_like(ind, dtype='<f8')
-            wgt[ind] = 1 / self.rms[ind] ** 2
-            wgt[~ind] = 0.
+            wgt[~ind] = 1 / self.rms_image.data[~ind] ** 2
+            wgt[ind] = 0.
 
             try:
                 saturval = self.header['SATURATE']
@@ -854,6 +895,8 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
             self._weightimg.basename = self.basename.replace('.fits',
                                                              '.weight.fits')
             self._weightimg.data = wgt
+            self._weightimg.header = self.header
+            self._weightimg.header_comments = self.header_comments
         return self._weightimg
 
     @property
@@ -866,6 +909,8 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
             rmsi.basename = self.basename.replace('.fits', '.rms.fits')
             rmsi.data = data
             self._rmsimg = rmsi
+            self._rmsimg.header = self.header
+            self._rmsimg.header_comments = self.header_comments
         return self._rmsimg
 
     @property
@@ -878,7 +923,23 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
             bkgi.basename = self.basename.replace('.fits', '.bkg.fits')
             bkgi.data = data
             self._bkgimg = bkgi
+            self._bkgimg.header = self.header
+            self._bkgimg.header_comments = self.header_comments
         return self._bkgimg
+
+    @property
+    def background_subtracted_image(self):
+        try:
+            return self._bkgsubimg
+        except AttributeError:
+            data = self.data - self.background_image.data
+            bkgsubi = FloatingPointFITSImage()
+            bkgsubi.basename = self.basename.replace('.fits', '.bkgsub.fits')
+            bkgsubi.data = data
+            bkgsubi.header = self.header
+            bkgsubi.header_comments = self.header_comments
+            self._bkgsubimg = bkgsubi
+        return self._bkgsubimg
 
     @property
     def segm_image(self):
@@ -902,6 +963,8 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
             basename = self.basename.replace('.fits', '.segm.fits')
             segmi = SegmentationImage(deblended)
             segmi.basename = basename
+            segmi.header = self.header
+            segmi.header_comments = self.header_comments
             self._segmimg = segmi
 
         return self._segmimg
@@ -911,7 +974,9 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
         try:
             return self._bkg
         except AttributeError:
-            self._bkg = photutils.Background2D(self.data, box_size=BKG_BOX_SIZE)
+            self._bkg = photutils.Background2D(self.data,
+                                               box_size=BKG_BOX_SIZE,
+                                               mask=self.mask_image.boolean)
         return self._bkg
 
     @property
@@ -949,6 +1014,8 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
             threshi.data = data
             threshi.basename = self.basename.replace('.fits', '.thresh.fits')
             self._threshimg = threshi
+            self._threshimg.header = self.header
+            self._threshimg.header_comments = self.header_comments
         return self._threshimg
 
     @property
@@ -965,8 +1032,6 @@ class CalibratableImage(FloatingPointFITSImage, PipelineFITSProduct, HasWCS):
                                  filter_kernel=self.filter_kernel,
                                  wcs=self.wcs)
         return self._sourcelist
-
-
 
 
 class CalibratedImage(CalibratableImage):
