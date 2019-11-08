@@ -23,6 +23,8 @@ from photometry import aperture_photometry, APER_KEY
 from makecoadd import ensure_images_have_the_same_properties, run_coadd
 import archive
 
+import requests
+
 import warnings
 from reproject import reproject_interp
 
@@ -605,8 +607,27 @@ class ArchiveFile(File):
             self.map_to_local_file(self.basename)
 
     def put(self):
-        pass
+        self.save()
+        # authenticate to nersc system
+        target = 'https://newt.nersc.gov/newt/login'
+        username = get_secret('NERSC_USERNAME')
+        password = get_secret('NERSC_PASSWORD')
+        r = requests.post(target, json={
+            'username': username,
+            'password': password
+        })
+        r.raise_for_status()
+        auth_cookie = r.cookies
 
+        # upload the file
+        target = f'https://newt.nersc.gov/newt/file/cori/' \
+                 f'{self.archive_path[1:]}'
+        with open(self.local_path, 'rb') as f:
+            contents = f.read()
+        r = requests.put(target, data=contents, cookies=auth_cookie)
+        resp = r.json()
+        if not resp['status'] == 'OK':
+            raise requests.RequestException(resp)
 
 
 class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
