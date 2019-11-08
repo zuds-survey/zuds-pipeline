@@ -43,7 +43,7 @@ def init_db():
     hpss_dbhost = get_secret('hpss_dbhost')
     hpss_dbport = get_secret('hpss_dbport')
     hpss_dbusername = get_secret('hpss_dbusername')
-    hpss_dbname = get_secret('hpss_dbname')
+    hpss_dbname = get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
     return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost, hpss_dbport)
 
