@@ -37,9 +37,6 @@ def archive(product):
         path.parent.mkdir(exist_ok=True, parents=True)
         shutil.copy(product.local_path, path)
     else:
-        # TODO: implement this -- will send a local file to
-        # an HTTP server that can put the file in its proper
-        # place at NERSC
         product.put()
 
     db.DBSession().rollback()
