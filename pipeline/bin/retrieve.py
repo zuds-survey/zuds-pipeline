@@ -10,7 +10,7 @@ import db
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
                     frame_destination, log_destination,
-                    tape_number):
+                    tape_number, preserve_dirs):
 
     nersc_account = get_secret('nersc_account')
 
@@ -53,12 +53,14 @@ cd {Path(frame_destination).resolve()}
 
 '''
 
+    sc = 12 if not preserve_dirs else 8
+
     for tarfile, imlist in zip(tarfiles, images):
         wildimages = '\n'.join([f'*{p}' for p in imlist])
 
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
-echo "{wildimages}" | tar --strip-components=12 -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
+echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
@@ -104,7 +106,7 @@ rm {os.path.basename(tarfile)}
 
 
 def retrieve_images(query, exclude_masks=False, job_script_destination=None,
-                    frame_destination='.', log_destination='.'):
+                    frame_destination='.', log_destination='.', preserve_dirs=False):
 
     # this is the query to get the image paths
     metatable = pd.read_sql(query.statement, db.DBSession().get_bind())
@@ -170,7 +172,7 @@ def retrieve_images(query, exclude_masks=False, job_script_destination=None,
         tarnames = group['hpsspath'].tolist()
         images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
-        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape)
+        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape, preserve_dirs)
         for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
