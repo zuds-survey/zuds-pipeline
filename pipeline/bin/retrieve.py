@@ -9,8 +9,10 @@ import tempfile
 import io
 
 
-def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
-                    preserve_dirs):
+
+def submit_hpss_job(tarfiles, images, job_script_destination,
+                    frame_destination, log_destination,
+                    tape_number, preserve_dirs):
 
     nersc_account = get_secret('nersc_account')
 
@@ -96,9 +98,9 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(query, exclude_masks=False, preserve_dirs=False,
-                    job_script_destination=None,
-                    frame_destination='.', log_destination='.'):
+
+def retrieve_images(query, exclude_masks=False, job_script_destination=None,
+                    frame_destination='.', log_destination='.', preserve_dirs=False):
 
     # this is the query to get the image paths
     metatable = pd.read_sql(query.statement, db.DBSession().get_bind())
@@ -183,6 +185,7 @@ def retrieve_images(query, exclude_masks=False, preserve_dirs=False,
         jobid = submit_hpss_job(tarnames, images, job_script_destination,
                                 frame_destination, log_destination, tape,
                                 preserve_dirs)
+
         for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
