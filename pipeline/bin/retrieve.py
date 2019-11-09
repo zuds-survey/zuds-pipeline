@@ -127,11 +127,20 @@ def retrieve_images(query, exclude_masks=False, job_script_destination='.',
     # sort tarball retrieval by location on tape
     t = datetime.datetime.utcnow().isoformat().replace(' ', '_')
     hpss_in = Path(job_script_destination) / f'hpss_{t}.in'
+    hpss_out = Path(job_script_destination) / f'hpss_{t}.out'
 
     with open(hpss_in, 'w') as f:
         f.write("\n".join([f'ls -P {tar}' for tar in tars]))
 
-    syscall = f'/usr/common/mss/bin/hsi -q in {t}'
+    syscall = f'/usr/common/mss/bin/hsi -O {hpss_out} in {hpss_in}'
+
+    # for some reason hsi writes in >> mode, so need to delete the output
+    # file if it exists to prevent it from mixing with results of a previous
+    # run
+
+    if hpss_out.exists():
+        os.remove(hpss_out)
+
     p = subprocess.Popen(syscall.split(),
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE)
@@ -145,28 +154,36 @@ def retrieve_images(query, exclude_masks=False, job_script_destination='.',
     retcode = p.returncode
     stderr, stdout = p.stderr, p.stdout
 
-    if retcode != 0:
+    # 64 means some of the files didnt exist, that's ok
+    if retcode not in [0, 64]:
         raise subprocess.CalledProcessError(stderr.read())
 
-    # read it into pandas
-    data = stdout.read()
-    data = data.replace('FILEting', 'FILE    ')
-    f = io.StringIO(data)
+    # filter out the lines that dont start with FILE
+    with open(hpss_out, 'r') as f:
+        lines = [line for line in f.readlines() if line.startswith('FILE')]
+    stream = io.StringIO(''.join(lines))
 
-    ordered = pd.read_csv(f, delim_whitespace=True, names=['file',
-                                                           'hpsspath',
-                                                           'size1',
-                                                           'size2',
-                                                           'position',
-                                                           'tape',
-                                                           'ignore1',
-                                                           'ignore2',
-                                                           'ignore3',
-                                                           'ignore4',
-                                                           'ignore5',
-                                                           'ignore6',
-                                                           'ignore7'])
+    # read it into pandas
+    ordered = pd.read_csv(stream, delim_whitespace=True, names=['ignore-2',
+                                                                'hpsspath',
+                                                                'ignore-1',
+                                                                'ignore0',
+                                                                'position',
+                                                                'tape',
+                                                                'ignore1',
+                                                                'ignore2',
+                                                                'ignore3',
+                                                                'ignore4',
+                                                                'ignore5',
+                                                                'ignore6',
+                                                                'ignore7'])
+    ordered['tape'] = [t[:-2] for t in ordered['tape']]
+    ordered['position'] = [t.split('+')[0] for t in ordered['position']]
     ordered = ordered.sort_values(['tape', 'position'])
+
+    for column in ordered.copy().columns:
+        if column.startswith('ignore'):
+            del ordered[column]
 
     # submit the jobs based on which tape the tar files reside on
     # and in what order they are on the tape
