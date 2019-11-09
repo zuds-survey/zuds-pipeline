@@ -17,16 +17,18 @@ def submit_hpss_job(tarfiles, images, job_script_destination,
 
     nersc_account = get_secret('nersc_account')
 
-    jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
-    subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
+    cmdlist = open(Path(job_script_destination) /
+                   f'hpss.{tape_number}.cmd.sh', 'w')
+    jobscript = open(Path(job_script_destination) /
+                     f'hpss.{tape_number}.sh', 'w')
+    subscript = open(Path(job_script_destination) /
+                     f'hpss.{tape_number}.sub.sh', 'w')
+
 
     substr =  f'''#!/usr/bin/env bash
 module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 '''
-
-    if job_script_destination is None:
-        substr = substr.encode('ASCII')
 
     subscript.write(substr)
 
@@ -42,9 +44,11 @@ sbatch {Path(jobscript.name).resolve()}
 #SBATCH -C haswell
 #SBATCH -o {(Path(log_destination) / hpt).resolve()}.out
 
-cd {Path(frame_destination).resolve()}
+bash {os.path.abspath(cmdlist.name)}
 
 '''
+
+    cmdstr = f'cd {frame_destination}\n'
 
     sc = 12 if not preserve_dirs else 8
 
@@ -57,15 +61,14 @@ echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-mat
 rm {os.path.basename(tarfile)}
 
 '''
-        jobstr += directive
-
-    if job_script_destination is None:
-        jobstr = jobstr.encode('ASCII')
+        cmdstr += directive
 
     jobscript.write(jobstr)
+    cmdlist.write(cmdstr)
 
-    jobscript.seek(0)
-    subscript.seek(0)
+    jobscript.close()
+    subscript.close()
+    cmdlist.close()
 
     command = f'/bin/bash {Path(subscript.name).resolve()}'
     p = subprocess.Popen(command.split(), stdout=subprocess.PIPE,
