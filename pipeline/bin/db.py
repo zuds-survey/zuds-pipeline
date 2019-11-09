@@ -72,7 +72,7 @@ class Image(models.Base):
     ra4 = sa.Column(psql.DOUBLE_PRECISION)
     dec4 = sa.Column(psql.DOUBLE_PRECISION)
     ipac_pub_date = sa.Column(sa.DateTime)
-    ipac_gid = sa.Column(sa.Integer, sa.ForeignKey('ipacprograms.id', ondelete='RESTRICT'))
+    ipac_gid = sa.Column(sa.Integer)
     imgtypecode = sa.Column(sa.CHAR(1))
     exptime = sa.Column(sa.Float)
     filefracday = sa.Column(psql.BIGINT)
