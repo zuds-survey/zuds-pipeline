@@ -8,12 +8,10 @@ from secrets import get_secret
 import db
 
 
-
-
 def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
                     preserve_dirs):
 
-    nersc_username = get_secret('nersc_username')
+    nersc_account = get_secret('nersc_account')
 
 
     jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
@@ -45,12 +43,14 @@ cd {Path(frame_destination).resolve()}
 
 '''
 
+    sc = 12 if not preserve_dirs else 8
+
     for tarfile, imlist in zip(tarfiles, images):
         wildimages = '\n'.join([f'*{p}' for p in imlist])
 
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
-echo "{wildimages}" | tar --strip-components=12 -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
+echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-match-slash --files-from=- -xvf {os.path.basename(tarfile)}
 rm {os.path.basename(tarfile)}
 
 '''
