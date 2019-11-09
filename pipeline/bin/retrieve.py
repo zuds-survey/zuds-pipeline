@@ -4,6 +4,7 @@ import pandas as pd
 import tempfile
 from pathlib import Path
 import subprocess
+from secrets import get_secret
 import db
 
 
@@ -11,7 +12,7 @@ def submit_hpss_job(tarfiles, images, job_script_destination,
                     frame_destination, log_destination,
                     tape_number):
 
-    nersc_account = os.getenv('NERSC_ACCOUNT')
+    nersc_account = get_secret('nersc_account')
 
     if job_script_destination is None:
         # then just use temporary files
