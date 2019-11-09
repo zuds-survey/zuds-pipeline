@@ -8,27 +8,19 @@ from secrets import get_secret
 import db
 
 
-def submit_hpss_job(tarfiles, images, job_script_destination,
-                    frame_destination, log_destination,
-                    tape_number):
 
-    nersc_account = get_secret('nersc_account')
 
-    if job_script_destination is None:
-        # then just use temporary files
+def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
+                    preserve_dirs):
 
-        jobscript = tempfile.NamedTemporaryFile()
-        subscript = tempfile.NamedTemporaryFile()
+    nersc_username = get_secret('nersc_username')
 
-    else:
 
-        jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
-        subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
+    jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
+    subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
     substr =  f'''#!/usr/bin/env bash
-#module load esslurm
-export PATH=/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH
-export LD_LIBRARY_PATH=/opt/esslurm/lib64:$LD_LIBRARY_PATH
+module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 '''
 
@@ -103,7 +95,8 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(query, exclude_masks=False, job_script_destination=None,
+def retrieve_images(query, exclude_masks=False, preserve_dirs=False,
+                    job_script_destination=None,
                     frame_destination='.', log_destination='.'):
 
     # this is the query to get the image paths
@@ -170,7 +163,9 @@ def retrieve_images(query, exclude_masks=False, job_script_destination=None,
         tarnames = group['hpsspath'].tolist()
         images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
-        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape)
+        jobid = submit_hpss_job(tarnames, images, job_script_destination,
+                                frame_destination, log_destination, tape,
+                                preserve_dirs)
         for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
