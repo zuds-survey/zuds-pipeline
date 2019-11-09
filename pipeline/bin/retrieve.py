@@ -1,4 +1,5 @@
 import time
+import datetime
 import os
 import pandas as pd
 from pathlib import Path
@@ -15,7 +16,6 @@ def submit_hpss_job(tarfiles, images, job_script_destination,
                     tape_number, preserve_dirs):
 
     nersc_account = get_secret('nersc_account')
-
 
     jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
     subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
@@ -98,9 +98,9 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-
-def retrieve_images(query, exclude_masks=False, job_script_destination=None,
-                    frame_destination='.', log_destination='.', preserve_dirs=False):
+def retrieve_images(query, exclude_masks=False, job_script_destination='.',
+                    frame_destination='.', log_destination='.',
+                    preserve_dirs=False):
 
     # this is the query to get the image paths
     metatable = pd.read_sql(query.statement, db.DBSession().get_bind())
@@ -124,30 +124,29 @@ def retrieve_images(query, exclude_masks=False, job_script_destination=None,
     if len(tars) == 0:
         raise ValueError('No images match the given query')
 
-
-
     # sort tarball retrieval by location on tape
+    t = datetime.datetime.utcnow().isoformat().replace(' ', '_')
+    hpss_in = Path(job_script_destination) / f'hpss_{t}.in'
 
-    with tempfile.NamedTemporaryFile() as t:
-        t.write(("\n".join([f'ls -P {tar}' for tar in tars])).encode('ASCII'))
-        t.seek(0)
+    with open(hpss_in, 'w') as f:
+        f.write("\n".join([f'ls -P {tar}' for tar in tars]))
 
-        syscall = f'/usr/common/mss/bin/hsi -q in {t.name}'
-        p = subprocess.Popen(syscall.split(),
-                             stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+    syscall = f'/usr/common/mss/bin/hsi -q in {t}'
+    p = subprocess.Popen(syscall.split(),
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
 
-        while True:
-            if p.poll() is not None:
-                break
-            else:
-                time.sleep(0.01)
+    while True:
+        if p.poll() is not None:
+            break
+        else:
+            time.sleep(0.01)
 
-        retcode = p.returncode
-        stderr, stdout = p.stderr, p.stdout
+    retcode = p.returncode
+    stderr, stdout = p.stderr, p.stdout
 
-        if retcode != 0:
-            raise subprocess.CalledProcessError(stderr.read())
+    if retcode != 0:
+        raise subprocess.CalledProcessError(stderr.read())
 
     # read it into pandas
     data = stdout.read()
