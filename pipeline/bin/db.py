@@ -1,12 +1,6 @@
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
-import numpy as np
-
-from sqlalchemy.orm import relationship, column_property
 from sqlalchemy.dialects.postgresql import array
-from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.ext.automap import automap_base
-
 from sqlalchemy import Index
 from sqlalchemy import func
 
@@ -31,15 +25,6 @@ def init_db():
     hpss_dbname = get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
     return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost, hpss_dbport)
-
-
-class IPACProgram(models.Base):
-    groups = relationship('Group', secondary='ipacprogram_groups',  back_populates='ipacprograms')#, cascade='all')
-    images = relationship('Image', back_populates='ipac_program', cascade='all')
-
-
-IPACProgramGroup = join_model('ipacprogram_groups', IPACProgram, Group)
-Group.ipacprograms = relationship('IPACProgram', secondary='ipacprogram_groups', back_populates='groups', cascade='all')
 
 
 class Image(models.Base):
@@ -102,9 +87,6 @@ class Image(models.Base):
     disk_sub_path = sa.Column(sa.Text)
     disk_psf_path = sa.Column(sa.Text)
 
-    instrument_id = sa.Column(sa.Integer, sa.ForeignKey('instruments.id', ondelete='RESTRICT'), default=1)
-    instrument = relationship('Instrument')
-
     zp = sa.Column(sa.Float, default=None, nullable=True)
     zpsys = sa.Column(sa.Text, default='ab')
 
@@ -145,14 +127,6 @@ class Image(models.Base):
     hsubi = Index("image_hpss_sub_path_idx", hpss_sub_path)
     obsjdi = Index("image_obsjd_idx", obsjd)
     pathi = Index("image_path_idx", path)
-
-    #groups = relationship('Group', back_populates='images', secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
-    ipac_program = relationship('IPACProgram', back_populates='images')
-    photometry = relationship('Photometry', cascade='all')
-
-    subtraction = relationship('SingleEpochSubtraction', back_populates='image', cascade='all')
-    references = relationship('Reference', back_populates='images', cascade='all', secondary='reference_images')
-    stacks = relationship('Stack', back_populates='images', cascade='all', secondary='stack_images')
 
     @hybrid_property
     def poly(self):
