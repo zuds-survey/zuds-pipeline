@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 from secrets import get_secret
 import db
+import tempfile
 import io
 
 
@@ -121,24 +122,30 @@ def retrieve_images(query, exclude_masks=False, preserve_dirs=False,
     if len(tars) == 0:
         raise ValueError('No images match the given query')
 
+
+
     # sort tarball retrieval by location on tape
-    syscall = f'/usr/common/mss/bin/hsi -q ls -P {" ".join(tars)}'
 
-    p = subprocess.Popen(syscall.split(),
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE)
+    with tempfile.NamedTemporaryFile() as t:
+        t.write("\n".join([f'ls -P {tar}' for tar in tars]))
+        t.seek(0)
+        syscall = f'/usr/common/mss/bin/hsi -q in {t.name}'
 
-    while True:
-        if p.poll() is not None:
-            break
-        else:
-            time.sleep(0.01)
+        p = subprocess.Popen(syscall.split(),
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE)
 
-    retcode = p.returncode
-    stderr, stdout = p.stderr, p.stdout
+        while True:
+            if p.poll() is not None:
+                break
+            else:
+                time.sleep(0.01)
 
-    if retcode != 0:
-        raise subprocess.CalledProcessError(stderr.read())
+        retcode = p.returncode
+        stderr, stdout = p.stderr, p.stdout
+
+        if retcode != 0:
+            raise subprocess.CalledProcessError(stderr.read())
 
     # read it into pandas
     data = stdout.read()
