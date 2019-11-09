@@ -1,11 +1,12 @@
 import time
 import os
 import pandas as pd
-import tempfile
 from pathlib import Path
 import subprocess
 from secrets import get_secret
 import db
+import io
+
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
@@ -14,21 +15,12 @@ def submit_hpss_job(tarfiles, images, job_script_destination,
 
     nersc_account = get_secret('nersc_account')
 
-    if job_script_destination is None:
-        # then just use temporary files
 
-        jobscript = tempfile.NamedTemporaryFile()
-        subscript = tempfile.NamedTemporaryFile()
-
-    else:
-
-        jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
-        subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
+    jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
+    subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
     substr =  f'''#!/usr/bin/env bash
-#module load esslurm
-export PATH=/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH
-export LD_LIBRARY_PATH=/opt/esslurm/lib64:$LD_LIBRARY_PATH
+module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 '''
 
@@ -105,6 +97,7 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
+
 def retrieve_images(query, exclude_masks=False, job_script_destination=None,
                     frame_destination='.', log_destination='.', preserve_dirs=False):
 
@@ -130,49 +123,62 @@ def retrieve_images(query, exclude_masks=False, job_script_destination=None,
     if len(tars) == 0:
         raise ValueError('No images match the given query')
 
-    instr = '\n'.join(tars.tolist())
+    # sort tarball retrieval by location on tape
+    syscall = f'/usr/common/mss/bin/hsi -q ls -P {" ".join(tars)}'
 
-    with tempfile.NamedTemporaryFile() as f:
-        f.write(f"{instr}\n".encode('ASCII'))
+    p = subprocess.Popen(syscall.split(),
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
 
-        # rewind the file
-        f.seek(0)
+    while True:
+        if p.poll() is not None:
+            break
+        else:
+            time.sleep(0.01)
 
-        # sort tarball retrieval by location on tape
-        sortexec = Path(__file__).parent / 'hpsssort.sh'
-        syscall = f'bash {sortexec} {f.name}'
-        p = subprocess.Popen(syscall.split(), stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE)
+    retcode = p.returncode
+    stderr, stdout = p.stderr, p.stdout
 
-        while True:
-            if p.poll() is not None:
-                break
-            else:
-                time.sleep(0.01)
+    if retcode != 0:
+        raise subprocess.CalledProcessError(stderr.read())
 
-        retcode = p.returncode
-        stderr, stdout = p.stderr, p.stdout
+    # read it into pandas
+    data = stdout.read()
+    data = data.replace('FILEting', 'FILE    ')
+    f = io.StringIO(data)
 
-        if retcode != 0:
-            raise subprocess.CalledProcessError(stderr.read())
-
-        # read it into pandas
-        ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape',
-                                                                    'position',
-                                                                    '_',
-                                                                    'hpsspath'])
+    ordered = pd.read_csv(f, delim_whitespace=True, names=['file',
+                                                           'hpsspath',
+                                                           'size1',
+                                                           'size2',
+                                                           'position',
+                                                           'tape',
+                                                           'ignore1',
+                                                           'ignore2',
+                                                           'ignore3',
+                                                           'ignore4',
+                                                           'ignore5',
+                                                           'ignore6',
+                                                           'ignore7'])
+    ordered = ordered.sort_values(['tape', 'position'])
 
     # submit the jobs based on which tape the tar files reside on
     # and in what order they are on the tape
 
     dependency_dict = {}
-    for tape, group in ordered.groupby('tape'):
+
+    import numpy as np
+    for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
+            ordered) // 14)):
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
         images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
-        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape, preserve_dirs)
+        jobid = submit_hpss_job(tarnames, images, job_script_destination,
+                                frame_destination, log_destination, tape,
+                                preserve_dirs)
+
         for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
