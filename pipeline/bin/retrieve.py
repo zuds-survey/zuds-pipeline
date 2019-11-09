@@ -129,10 +129,10 @@ def retrieve_images(query, exclude_masks=False, job_script_destination=None,
     # sort tarball retrieval by location on tape
 
     with tempfile.NamedTemporaryFile() as t:
-        t.write("\n".join([f'ls -P {tar}' for tar in tars]))
+        t.write(("\n".join([f'ls -P {tar}' for tar in tars])).encode('ASCII'))
         t.seek(0)
-        syscall = f'/usr/common/mss/bin/hsi -q in {t.name}'
 
+        syscall = f'/usr/common/mss/bin/hsi -q in {t.name}'
         p = subprocess.Popen(syscall.split(),
                              stdout=subprocess.PIPE,
                              stderr=subprocess.PIPE)
