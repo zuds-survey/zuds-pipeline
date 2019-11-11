@@ -44,8 +44,8 @@ PROJECTION_ERR         0.001           # Maximum projection error (in output
                                        # pixels), or 0 for no approximation
 CENTER_TYPE            ALL             # MANUAL, ALL or MOST
 CENTER         00:00:00.0, +00:00:00.0 # Coordinates of the image center
-PIXELSCALE_TYPE        MANUAL          # MANUAL,FIT,MIN,MAX or MEDIAN
-PIXEL_SCALE            1.0             # Pixel scale
+PIXELSCALE_TYPE        MEDIAN          # MANUAL,FIT,MIN,MAX or MEDIAN
+PIXEL_SCALE            0.0             # Pixel scale
 IMAGE_SIZE             0               # Image size (0 = AUTOMATIC)
 
 #-------------------------------- Resampling ----------------------------------
