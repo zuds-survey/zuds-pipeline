@@ -355,6 +355,12 @@ class File(object):
         their values in this object."""
         raise NotImplemented
 
+    def load(self):
+        """Load the data and metadata of a mapped file on disk into memory
+        and set the values of database mapped columns, which can later be
+        flushed into the DB."""
+        raise NotImplemented
+
 
 class FITSFile(File):
     """A python object that maps a fits file. Instances of classes mixed with
@@ -383,7 +389,16 @@ class FITSFile(File):
         can later be flushed to the database using SQLalchemy. """
         f = Path(f)
         obj = cls()
-        with fits.open(f) as hdul:
+        obj.basename = f.name
+        obj.map_to_local_file(str(f.absolute()))
+        obj.load()
+        return obj
+
+    def _load_header(self):
+        """Load a header from disk into memory. Sets the values of
+        database-backed variables that store metadata. These can later be
+        flushed to the database using SQLalchemy."""
+        with fits.open(self.local_path) as hdul:
             hd = dict(hdul[0].header)
             hdc = {card.keyword: card.comment for card in hdul[0].header.cards}
         hd2 = hd.copy()
@@ -391,11 +406,14 @@ class FITSFile(File):
             if not isinstance(hd[k], (int, str, bool, float)):
                 del hd2[k]
                 del hdc[k]
-        obj.header = hd2
-        obj.header_comments = hdc
-        obj.basename = f.name
-        obj.map_to_local_file(f.absolute())
-        return obj
+        self.header = hd2
+        self.header_comments = hdc
+
+    def _load_data(self):
+        """Load data from disk into memory"""
+        with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
+            data = hdul[self._DATA_HDU].data
+        self._data = data
 
     @property
     def data(self):
@@ -409,9 +427,7 @@ class FITSFile(File):
             return self._data
         except AttributeError:
             # load the data into memory
-            with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
-                data = hdul[self._DATA_HDU].data
-            self._data = data
+            self._load_data()
         return self._data
 
     @data.setter
@@ -439,6 +455,9 @@ class FITSFile(File):
             self.map_to_local_file(f)
         fits.writeto(f, self.data, self.astropy_header, overwrite=True)
 
+    def load(self):
+        self._load_header()
+        self._load_data()
 
 
 class HasPoly(object):
@@ -1265,14 +1284,13 @@ class Subtraction(object):
     def reference_image(self):
         return relationship('ReferenceImage', cascade='all', foreign_keys=[self.reference_image_id])
 
-    @property
-    def rms(self):
-        try:
-            return self._rms
-        except AttributeError:
-            self._rms = np.sqrt(self.target_image.rms**2 + self.reference_image.rms**2)
-        return self._rms
+    @classmethod
+    def from_images(cls, sci, ref):
+        mask = MaskImage()
+        #maskdata = sci.mask_image.data |
+        pass
 
+    """
     @property
     def mask(self):
         try:
@@ -1280,6 +1298,8 @@ class Subtraction(object):
         except AttributeError:
             self._mask = self.target_image.mask | self.reference_image.mask
         return self._mask
+
+    """
 
 
 class SingleEpochSubtraction(CalibratedImage, Subtraction):
