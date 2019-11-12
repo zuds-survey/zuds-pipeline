@@ -548,9 +548,16 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         target_header = other.astropy_header
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
-            data, _ = reproject_interp((self.data, self.astropy_header),
-                                       target_header, order=0)
+            data, footprint = reproject_interp((self.data, self.astropy_header),
+                                               target_header, order=0)
 
+        # replace nans with zeros
+        data[np.isnan(data)] = 0
+
+        if isinstance(self, MaskImage):
+            data = data.astype(int)
+            data[footprint == 0] += 2**16
+            
         # make the new object and load it up with data
         new = self.__class__()
         new.data = data
@@ -923,14 +930,13 @@ class MaskImage(PipelineProduct, IntegerFITSImage):
         self.header_comments.update(MASK_COMMENTS)
         self.save()
 
-    def update_from_weight_map(self, weightname):
+    def update_from_weight_map(self, weight_image):
         """Update what's in memory based on what's on disk (produced by
         SWarp)."""
-        with fits.open(weightname) as hdul:
-            mskarr = self.data
-            ftsarr = hdul[0].data
-            mskarr[ftsarr == 0] += 2**16
-            self.data = mskarr
+        mskarr = self.data
+        ftsarr = weight_image.data
+        mskarr[ftsarr == 0] += 2**16
+        self.data = mskarr
         self.refresh_bit_mask_entries_in_header()
 
     @property

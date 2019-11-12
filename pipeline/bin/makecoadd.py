@@ -284,7 +284,8 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
     # load the result
     coadd = cls.from_file(outname)
     coaddmask = db.MaskImage.from_file(mskoutname)
-    coaddmask.update_from_weight_map(mskoutweightname)
+    coaddweight = db.FloatingPointFITSImage.from_file(mskoutweightname)
+    coaddmask.update_from_weight_map(coaddweight)
 
     # keep a record of the images that went into the coadd
     coadd.input_images = images.tolist()
