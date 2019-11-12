@@ -50,6 +50,10 @@ TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
                  'orientation', 'eccentricity', 'semimajor_axis_sigma',
                  'semiminor_axis_sigma']
 
+SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
+                          'Y_WORLD', 'FLUX_APER', 'FLUXERR_APER',
+                          'THETA_WORLD', 'ELLIPTICITY', 'A_IMAGE', 'B_IMAGE']
+
 CMAP_RANDOM_SEED = 8675309
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
@@ -532,6 +536,35 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         ps1 = (scales[0] * u1).to('arcsec').value
         ps2 = (scales[1] * u2).to('arcsec').value
         return np.asarray([ps1, ps2]) * u.arcsec
+
+    def aligned_to(self, other):
+        """Return a version of this object that is pixel-by-pixel aligned to
+        the WCS solution of another image with a WCS solution."""
+
+        if not isinstance(other, HasWCS):
+            raise ValueError(f'WCS Alignment target must be an instance of '
+                             f'HasWCS (got "{other.__class__}").')
+
+        target_header = other.astropy_header
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            data, _ = reproject_interp((self.data, self.astropy_header),
+                                       target_header, order=0)
+
+        # make the new object and load it up with data
+        new = self.__class__()
+        new.data = data
+
+        # create a header for the new object that reflects the new WCS
+        header = self.astropy_header
+        target_wcs = WCS(target_header)
+        header.update(target_wcs.to_header())
+
+        new.header = dict(header)
+        new.header_comments = {card.keyword: card.comment for card in
+                               header.cards}
+
+        return new
 
 
 class FITSImage(HasWCS):
@@ -1286,7 +1319,16 @@ class Subtraction(object):
 
     @classmethod
     def from_images(cls, sci, ref):
+        sub = cls()
+        supercls = super(sub, cls)
+
+        if not isinstance(sci, supercls):
+            raise ValueError(f'Target image must be an instance of {supercls}, '
+                             f'got {sci.__class__}.')
+
         mask = MaskImage()
+
+        # create the mask data
         #maskdata = sci.mask_image.data |
         pass
 
