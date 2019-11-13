@@ -1269,7 +1269,7 @@ class Coadd(CalibratableImage):
         return tuple()
 
     @classmethod
-    def from_images(cls, images, outfile_name, data_product=False):
+    def from_images(cls, images, outfile_name, nthreads=1, data_product=False):
         """Make a coadd from a bunch of input images"""
 
         images = np.atleast_1d(images)
@@ -1283,7 +1283,7 @@ class Coadd(CalibratableImage):
 
         # call swarp
         coadd = run_coadd(cls, images, outfile_name, mskoutname,
-                          reference=isref, addbkg=True)
+                          reference=isref, addbkg=True, nthreads=nthreads)
         coaddmask = coadd.mask_image
 
         if data_product:

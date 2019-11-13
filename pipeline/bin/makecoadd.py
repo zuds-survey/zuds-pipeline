@@ -192,7 +192,8 @@ def initialize_directory(directory):
     directory.mkdir(parents=True, exist_ok=True)
 
 
-def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=False):
+def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
+                      reference=False, nthreads=1):
     conf = REF_CONF if reference else SCI_CONF
     initialize_directory(directory)
 
@@ -235,12 +236,14 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False, reference=F
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
               f'-WEIGHT_IMAGE {allwgts} ' \
-              f'-WEIGHTOUT_NAME {wgtout}'
+              f'-WEIGHTOUT_NAME {wgtout} ' \
+              f'-NTHREADS {nthreads}'
 
     return syscall
 
 
-def prepare_swarp_mask(masks, outname, mskoutweightname, directory, copy_inputs=False):
+def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
+                       copy_inputs=False, nthreads=1):
     conf = MSK_CONF
     initialize_directory(directory)
 
@@ -255,12 +258,14 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory, copy_inputs=
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
-              f'-WEIGHTOUT_NAME {mskoutweightname}'
+              f'-WEIGHTOUT_NAME {mskoutweightname} ' \
+              f'-NTHREADS {nthreads}'
 
     return syscall
 
 
-def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
+def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
+              nthreads=1):
     """Run swarp on images `images`"""
 
     directory = Path('/tmp') / uuid.uuid4().hex
@@ -268,7 +273,7 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
 
     command = prepare_swarp_sci(images, outname, directory,
                                 reference=reference,
-                                copy_inputs=True)
+                                copy_inputs=True, nthreads=nthreads)
 
     # run swarp
     subprocess.check_call(command.split())
@@ -276,7 +281,9 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True):
     # now swarp together the masks
     masks = [image.mask_image for image in images]
     mskoutweightname = directory / Path(mskoutname.replace('.fits', '.weight.fits')).name
-    command = prepare_swarp_mask(masks, mskoutname, mskoutweightname, directory)
+    command = prepare_swarp_mask(masks, mskoutname, mskoutweightname,
+                                 directory, copy_inputs=False,
+                                 nthreads=nthreads)
 
     # run swarp
     subprocess.check_call(command.split())
