@@ -10,6 +10,16 @@ fid_map = {
     3: 'zi'
 }
 
+perm = 0o755
+
+
+def _mkdir_recursive(path):
+    sub_path = os.path.dirname(path)
+    if not os.path.exists(sub_path):
+        _mkdir_recursive(sub_path)
+    if not os.path.exists(path):
+        os.mkdir(path, mode=perm)
+
 
 def archive(product):
     """Publish a PipelineFITSProduct to the NERSC archive."""
@@ -34,13 +44,13 @@ def archive(product):
     product.url = f'{path.absolute()}'.replace(db.NERSC_PREFIX, db.URL_PREFIX)
 
     if os.getenv('NERSC_HOST') == 'cori':
-        path.parent.mkdir(exist_ok=True, parents=True)
+        if not path.parent.exists():
+            _mkdir_recursive(path.parent)
         shutil.copy(product.local_path, path)
+        os.chmod(path, perm)
     else:
         product.put()
 
     db.DBSession().rollback()
     db.DBSession().add(product)
     db.DBSession().commit()
-
-

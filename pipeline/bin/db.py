@@ -148,10 +148,11 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
         ncols = min(n, 3)
         nrows = (n - 1) // 3 + 1
 
-        wcs_header = imgs[0].astropy_header
+        align_target = imgs[0]
         fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True,
                                subplot_kw={
-                                   'projection': WCS(wcs_header)
+                                   'projection': WCS(
+                                       align_target.astropy_header)
                                } if reproject else None)
 
         ax = np.atleast_1d(ax)
@@ -159,7 +160,7 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
             a.set_visible(False)
 
         for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
-            im.show(a, reproject_to=wcs_header if reproject else None)
+            im.show(a, align_to=align_target if reproject else None)
 
             if catalog is not None:
                 for row in catalog.data:
@@ -557,7 +558,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         if isinstance(self, MaskImage):
             data = data.astype(int)
             data[footprint == 0] += 2**16
-            
+
         # make the new object and load it up with data
         new = self.__class__()
         new.data = data
@@ -580,17 +581,15 @@ class FITSImage(HasWCS):
     matplotlib. Also defines some properties that help to optimally render
     the image (cmap, cmap_limits)"""
 
-    def show(self, axis=None, reproject_to=None):
+    def show(self, axis=None, align_to=None):
         if axis is None:
             fig, axis = plt.subplots()
         vmin, vmax = self.cmap_limits()
 
-        data = self.data
-        if reproject_to is not None:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=DeprecationWarning)
-                data, _ = reproject_interp((self.data, self.astropy_header),
-                                           reproject_to, order=0)
+        if align_to is not None:
+            data = self.aligned_to(align_to).data
+        else:
+            data = self.data
 
         axis.imshow(data,
                     vmin=vmin,
@@ -1230,11 +1229,14 @@ class CalibratedImage(CalibratableImage):
 
 class ScienceImage(CalibratedImage):
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sci',
                        'inherit_condition': id == CalibratedImage.id}
 
-    ipac_record_id = sa.Column(sa.Integer, sa.ForeignKey('ipacrecords.id'), index=True)
+    ipac_record_id = sa.Column(sa.Integer, sa.ForeignKey('ipacrecords.id'),
+                               index=True)
     ipac_record = relationship('IPACRecord', back_populates='science_image')
 
     @classmethod
@@ -1247,16 +1249,20 @@ class ScienceImage(CalibratedImage):
         return obj
 
 
-# Coadds #################################################################################################
+# Coadds #######################################################################
 
 class Coadd(CalibratableImage):
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'coadd',
         'inherit_condition': id == CalibratableImage.id
     }
 
-    input_images = relationship('CalibratableImage', secondary='coadd_images', cascade='all')
+    input_images = relationship('CalibratableImage',
+                                secondary='coadd_images',
+                                cascade='all')
 
     @declared_attr
     def __table_args__(cls):
@@ -1272,12 +1278,12 @@ class Coadd(CalibratableImage):
         # make sure all images have the same field, filter, ccdid, qid:
         ensure_images_have_the_same_properties(images, GROUP_PROPERTIES)
 
-
         # is this a reference image?
         isref = issubclass(cls, ReferenceImage)
 
         # call swarp
-        coadd = run_coadd(cls, images, outfile_name, mskoutname, reference=isref, addbkg=True)
+        coadd = run_coadd(cls, images, outfile_name, mskoutname,
+                          reference=isref, addbkg=True)
         coaddmask = coadd.mask_image
 
         if data_product:
@@ -1293,15 +1299,17 @@ CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
 
 
 class ReferenceImage(Coadd):
-    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'ref',
                        'inherit_condition': id == Coadd.id}
 
     version = sa.Column(sa.Integer)
 
-
-    single_epoch_subtractions = relationship('SingleEpochSubtraction', cascade='all')
-    multi_epoch_subtractions = relationship('MultiEpochSubtraction', cascade='all')
+    single_epoch_subtractions = relationship('SingleEpochSubtraction',
+                                             cascade='all')
+    multi_epoch_subtractions = relationship('MultiEpochSubtraction',
+                                            cascade='all')
 
 
 class ScienceCoadd(Coadd):
@@ -1313,7 +1321,7 @@ class ScienceCoadd(Coadd):
 
 # Subtractions #############################################################################################
 
-class Subtraction(object):
+class Subtraction(HasWCS):
 
     @declared_attr
     def reference_image_id(self):
@@ -1325,17 +1333,6 @@ class Subtraction(object):
 
     @classmethod
     def from_images(cls, sci, ref):
-        sub = cls()
-        supercls = super(sub, cls)
-
-        if not isinstance(sci, supercls):
-            raise ValueError(f'Target image must be an instance of {supercls}, '
-                             f'got {sci.__class__}.')
-
-        mask = MaskImage()
-
-        # create the mask data
-        #maskdata = sci.mask_image.data |
         pass
 
     """
@@ -1347,7 +1344,23 @@ class Subtraction(object):
             self._mask = self.target_image.mask | self.reference_image.mask
         return self._mask
 
-    """
+        nsx = sci.header['NAXIS1'] / 100.
+        nsy = sci.header['NAXIS2'] / 100.
+
+        convolve_target = 't'
+        syscall = f'hotpants -inim {sci.local_path} -hki -n i -c t' \
+                  f'-tmplim {remapped_ref.local_path} -outim %s -tu %f -iu %f  -tl %f ' \
+                  f'-il %f ' \
+                  f'-r %f ' \
+                  f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
+        syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
+                             submask, nsx, nsy)
+
+
+
+        sub.mask_image = submask
+        sub = cls.from_file(subname)
+        """
 
 
 class SingleEpochSubtraction(CalibratedImage, Subtraction):
