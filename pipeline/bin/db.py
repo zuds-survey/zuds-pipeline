@@ -1287,10 +1287,8 @@ class Coadd(CalibratableImage):
         coaddmask = coadd.mask_image
 
         if data_product:
-            catalog = PipelineFITSCatalog.from_image(coadd)
             archive.archive(coadd)
             archive.archive(coaddmask)
-            archive.archive(catalog)
 
         return coadd
 
