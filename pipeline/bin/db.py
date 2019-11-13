@@ -1335,14 +1335,37 @@ class Subtraction(HasWCS):
     def from_images(cls, sci, ref):
         pass
 
-    """
-    @property
-    def mask(self):
-        try:
-            return self._mask
-        except AttributeError:
-            self._mask = self.target_image.mask | self.reference_image.mask
-        return self._mask
+        """
+        sub = run_hotpants(sci, ref, )
+
+        remapped_ref = ref.aligned_to(sci)
+        remapped_refmask = ref.mask_image.aligned_to(sci.mask_image)
+
+        # these files need to be written to disk for hotpants
+
+
+        remapped_ref.map_to_local_file(ref.local_path.replace('.fits',
+                                                              '.remap.fits'))
+        remapped_refmask.map_to_local_file(ref.mask_image.local_path.replace(
+            '.fits', '.remap.fits'))
+
+        submask = MaskImage()
+        submask.data = sci.mask_image.data | remapped_refmask.data
+
+        # need to implement this
+        # subname = run_hotpants(sci, remapped_ref)
+
+        seepix = sci.pixel_scale.value.mean() * sci.header['SEEING']
+        r = 2.5 * seepix
+        rss = 6. * seepix
+
+        gain = 1.0  # TODO check this assumption
+
+        newskysig = tnewskysig * 1.48 / gain
+        refskysig = trefskysig * 1.48 / gain
+
+        il = newskybkg - 10. * newskysig
+        tl = refskybkg - 10. * refskysig
 
         nsx = sci.header['NAXIS1'] / 100.
         nsy = sci.header['NAXIS2'] / 100.

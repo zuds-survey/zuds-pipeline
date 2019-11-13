@@ -1,5 +1,6 @@
 import db
 import os
+import stat
 import shutil
 from pathlib import Path
 
@@ -50,7 +51,3 @@ def archive(product):
         os.chmod(path, perm)
     else:
         product.put()
-
-    db.DBSession().rollback()
-    db.DBSession().add(product)
-    db.DBSession().commit()

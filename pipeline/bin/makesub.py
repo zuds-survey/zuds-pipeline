@@ -291,6 +291,65 @@ def make_coadd_bins(science_rows, window_size=3, rolling=False):
 
     return bins
 
+from makecoadd import initialize_directory
+
+
+def prepare_hotpants(sci, ref, outname, mskoutname, directory,
+                     copy_inputs=False):
+    initialize_directory(directory)
+
+    # if requested, copy the input images to a temporary working directory
+    if copy_inputs:
+        impaths = []
+        for image in [sci, ref]:
+            shutil.copy(image.local_path, directory)
+            impaths.append(str(directory / image.basename))
+    else:
+        impaths = [im.local_path for im in [sci, ref]]
+    scipath, refpath = impaths
+
+    # create the remapped ref, which will be pixel-by-pixel subtracted from
+    # the science image
+    remapped_ref = ref.aligned_to(sci)
+    remapped_refmask = ref.mask_image.aligned_to(sci)
+    remapped_refname = Path(refpath).parent / f'ref.{ref.basename}.remap.fits'
+    remapped_refname = str(remapped_refname.absolute())
+    remapped_refmaskname = remapped_refname.replace('.fits', '.mask.fits')
+    remapped_ref.map_to_local_file(remapped_refname)
+    remapped_refmask.map_to_local_file(remapped_refmaskname)
+
+    # calculate some kernel size parameters (based on seeing)
+    pixscal = sci.pixel_scale.value.mean() # in arcsec
+    seeing = sci.header['SEEING']
+    seepix = pixscal * seeing
+    r = 2.5 * seepix
+    rss = 6. * seepix
+
+
+
+    syscall = f'hotpants -inim {scipath} -hki -n i -c t ' \
+              f'-tmplim {remapped_refname} -outim {outname}' \
+              f'-tu %f -iu %f  -tl %f -il %f -r {r} ' \
+              f'-rss {rss} -tni %s -ini %s -imi %s -nsx %f -nsy %f'
+    syscall = syscall % (
+    frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
+    submask, nsx, nsy)
+
+    return syscall
+
+
+def make_subtraction(sci, ref):
+
+    directory = Path('/tmp') / uuid.uuid4().hex
+    directory.mkdir(exist_ok=True, parents=True)
+
+    outname = sub_name(sci.local_path, ref.local_path)
+    outmask = sub_name(sci.mask_image.local_path, ref.mask_image.local_path)
+
+    command = prepare_hotpants(sci, ref, outname, directory, copy_inputs=True)
+
+
+
 
 def make_sub(myframes, mytemplates, publish=True):
 
@@ -436,6 +495,7 @@ def make_sub(myframes, mytemplates, publish=True):
         ntst = seenew > seeref
 
         seeing = seenew if ntst else seeref
+
 
         pixscal = 1.01  # TODO make this more general
         seepix = pixscal * seeing
