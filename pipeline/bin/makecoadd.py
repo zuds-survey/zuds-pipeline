@@ -265,10 +265,10 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
 
 
 def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
-              nthreads=1):
+              nthreads=1, tmpdir='/tmp'):
     """Run swarp on images `images`"""
 
-    directory = Path('/tmp') / uuid.uuid4().hex
+    directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
     command = prepare_swarp_sci(images, outname, directory,
