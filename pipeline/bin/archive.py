@@ -19,7 +19,8 @@ def _mkdir_recursive(path):
     if not os.path.exists(sub_path):
         _mkdir_recursive(sub_path)
     if not os.path.exists(path):
-        os.mkdir(path, mode=perm)
+        os.mkdir(path)
+        os.chmod(path, perm)
 
 
 def archive(product):
