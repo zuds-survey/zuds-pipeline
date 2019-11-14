@@ -6,7 +6,6 @@ from secrets import get_secret
 import penquins
 
 
-
 def estimate_seeing(image):
     """Estimate the seeing on an image by comparing its catalog to GAIA stars."""
 
@@ -68,8 +67,11 @@ def estimate_seeing(image):
 
     seeings = []
     for row in catok:
-        fwhm = 2 * np.sqrt(np.log(2) * (row['semimajor_axis_sigma']**2 + row['semiminor_axis_sigma']**2))
+        fwhm = 2 * np.sqrt(np.log(2) * (row['semimajor_axis_sigma']**2 +
+                                        row['semiminor_axis_sigma']**2))
         seeings.append(fwhm.value)
 
     medsee = np.nanmedian(seeings) * np.median(image.pixel_scale)
-    return medsee
+    seeing = (medsee / image.pixel_scale).value
+    image.header['SEEING'] = seeing
+    image.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'

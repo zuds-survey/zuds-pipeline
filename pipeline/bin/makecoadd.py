@@ -303,15 +303,11 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
         for img in [coadd, coaddmask]:
             setattr(img, prop, getattr(images[0], prop))
 
-    # estimate the seeing on the coadd
-    #coadd_seeing = (estimate_seeing(coadd) / coadd.pixel_scale).value
-    #coadd.header['SEEING'] = coadd_seeing
-    #coadd.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
-    #coadd.sync_header()
-    coadd.save()
-
     if addbkg:
         coadd.data += BKG_VAL
+
+    # save the coadd to disk
+    coadd.save()
 
     # clean up -- this also deletes the mask weight map
     shutil.rmtree(directory)
