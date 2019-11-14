@@ -272,7 +272,7 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
               nthreads=1, tmpdir='/tmp', copy_inputs=False):
     """Run swarp on images `images`"""
 
-    directory = Path(tmpdir)
+    directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
     command = prepare_swarp_sci(images, outname, directory,
