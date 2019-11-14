@@ -218,12 +218,16 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
             im.save()
             im.map_to_local_file(opath)
 
-    # write weight images to temporary directory
+    # if weight images do not exist yet, write them to temporary
+    # directory
     wgtpaths = []
     for image in images:
-        wgtpath = f"{directory / image.basename.replace('.fits', '.weight.fits')}"
-        image.weight_image.map_to_local_file(wgtpath)
-        image.weight_image.save()
+        if not image.weight_image.ismapped or copy_inputs:
+            wgtpath = f"{directory / image.basename.replace('.fits', '.weight.fits')}"
+            image.weight_image.map_to_local_file(wgtpath)
+            image.weight_image.save()
+        else:
+            wgtpath = image.weight_image.local_path
         wgtpaths.append(wgtpath)
 
     # get the images in string form
