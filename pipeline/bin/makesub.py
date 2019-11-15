@@ -1,29 +1,16 @@
 import os
 import db
 import numpy as np
-from astropy.io import fits
-from astropy.wcs import WCS
-import uuid
-import logging
 import shutil
 import pandas as pd
 
 from utils import initialize_directory
 from seeing import estimate_seeing
 
-import subprocess
 
 import tempfile
 from pathlib import Path
 import paramiko
-
-
-
-
-from libztf.yao import yao_photometry_single
-
-from filterobjects import filter_sexcat
-from publish import load_catalog
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
