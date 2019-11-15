@@ -1,4 +1,5 @@
 import os
+from secrets import get_secret
 import db
 import numpy as np
 import pandas as pd
@@ -14,15 +15,15 @@ WHERECLAUSE = ''
 if __name__ == '__main__':
 
     env, cfg = db.load_env()
-    db.init_db(**cfg['database'])
+    db.init_db()
 
     zquery = query.ZTFQuery()
-    
+
     start = datetime.now()
 
     # get the maximum nid
-    max_nid = db.DBSession().query(db.sa.func.max(db.Image.nid)).first()[0]
-    max_date = db.DBSession().query(db.sa.func.max(db.Image.obsdate)).first()[0]
+    max_nid = db.DBSession().query(db.sa.func.max(db.IPACRecord.nid)).first()[0]
+    max_date = db.DBSession().query(db.sa.func.max(db.IPACRecord.obsdate)).first()[0]
     today = datetime.utcnow()
     todays_nid = max_nid + (today - max_date).days
 
@@ -32,20 +33,20 @@ if __name__ == '__main__':
     mod = nid_diff % QUERY_WINDOWSIZE
 
     n_chunks = quotient if mod == 0 else quotient + 1
-    
+
     print('querying')
 
     for i in range(n_chunks):
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
                              f'NID BETWEEN {max_nid + QUERY_WINDOWSIZE * i} AND '
                              f'{max_nid + QUERY_WINDOWSIZE * (i + 1)} AND IPAC_GID > 0',
-                             auth=[os.getenv('IPAC_USERNAME'),
-                                   os.getenv('IPAC_PASSWORD')])
+                             auth=[get_secret('IPAC_USERNAME'),
+                                   get_secret('IPAC_PASSWORD')])
         metatable = zquery.metatable
         metatables.append(metatable)
 
     metatable = pd.concat(metatables)
-    current_paths = db.DBSession().query(db.Image.path).all()
+    current_paths = db.DBSession().query(db.IPACRecord.path).all()
     print(f'pulled {len(metatable)} images')
 
     # dont need this
@@ -56,14 +57,14 @@ if __name__ == '__main__':
     basenames = [i.ipac_path('sciimg.fits').split('/')[-1] for i in meta_images]
 
     indices = np.nonzero(~np.in1d(basenames, current_paths, assume_unique=True))[0]
-    
+
     print(f'uploading images')
 
     for index in indices:
         meta_images[index].path = basenames[index]
         db.DBSession().add(meta_images[index])
     db.DBSession().commit()
-    
+
     end = datetime.now()
 
     print(f'done in {end - start}')
