@@ -303,7 +303,9 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     coadd.input_images = images.tolist()
     coadd.mask_image = coaddmask
 
-    # set the ccdid, qid, field, fid for the coadd (and mask) based on the input images
+    # set the ccdid, qid, field, fid for the coadd
+    # (and mask) based on the input images
+
     for prop in db.GROUP_PROPERTIES:
         for img in [coadd, coaddmask]:
             setattr(img, prop, getattr(images[0], prop))
