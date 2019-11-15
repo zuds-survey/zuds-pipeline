@@ -319,9 +319,11 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
     satlev = 5e4  # not perfect, but close enough.
 
     syscall = f'hotpants -inim {scipath} -hki -n i -c t ' \
-              f'-tmplim {ref.local_path} -outim {outname}' \
+              f'-tmplim {ref.local_path} -outim {outname} ' \
               f'-tu {satlev} -iu {satlev}  -tl {tl} -il {il} -r {r} ' \
-              f'-rss {rss} -tni %s -ini %s -imi {submask.local_path} ' \
+              f'-rss {rss} -tni {refrms.local_path} ' \
+              f'-ini {scirms.local_path} ' \
+              f'-imi {submask.local_path} ' \
               f'-nsx {nsx} -nsy {nsy}'
 
     return syscall
