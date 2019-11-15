@@ -1378,6 +1378,7 @@ class Subtraction(HasWCS):
         remapped_refmask.map_to_local_file(remapped_refmaskname)
         remapped_ref.save()
         remapped_refmask.save()
+        remapped_ref.mask_image = remapped_refmask
 
         badpix = remapped_refmask.boolean | sci.mask_image.boolean
         submask.data = badpix.astype('uint16')
