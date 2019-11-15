@@ -2,14 +2,7 @@ import os
 import db
 import numpy as np
 import uuid
-import time
-from astropy.io import fits
-from astropy.wcs import WCS
-import galsim
 from astropy.time import Time
-import logging
-from galsim import des
-from astropy.convolution import convolve
 import shutil
 import pandas as pd
 from datetime import datetime, timedelta
@@ -17,10 +10,8 @@ from pathlib import Path
 import paramiko
 import subprocess
 import tempfile
-import archive
-import photutils
 
-from seeing import estimate_seeing
+from utils import initialize_directory
 
 def submit_template(variance_dependencies, metatable, nimages=100, start_date=datetime(2017, 12, 10),
                     end_date=datetime(2018, 4, 1), template_science_minsep_days=0, template_destination='.',
@@ -185,11 +176,6 @@ REF_CONF = CONF_DIR / 'template.swarp'
 SCI_CONF = CONF_DIR / 'default.swarp'
 MSK_CONF = CONF_DIR / 'mask.swarp'
 BKG_VAL = 150. # counts
-
-
-def initialize_directory(directory):
-    directory = Path(directory)
-    directory.mkdir(parents=True, exist_ok=True)
 
 
 def prepare_swarp_sci(images, outname, directory, copy_inputs=False,

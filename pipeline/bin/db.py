@@ -22,9 +22,12 @@ from secrets import get_secret
 from photometry import aperture_photometry, APER_KEY
 from makecoadd import ensure_images_have_the_same_properties, run_coadd
 import archive
+from makesub import prepare_hotpants
 
 import requests
 
+import subprocess
+import uuid
 import warnings
 from reproject import reproject_interp
 
@@ -178,6 +181,22 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
         fig.tight_layout()
         fig.show()
         return fig
+
+
+def sub_name(frame, template):
+
+    frame = f'{frame}'
+    template = f'{template}'
+
+    refp = os.path.basename(template)[:-5]
+    newp = os.path.basename(frame)[:-5]
+
+    outdir = os.path.dirname(frame)
+
+    subp = '_'.join([newp, refp])
+
+    sub = os.path.join(outdir, 'sub.%s.fits' % subp)
+    return sub
 
 
 def init_db():
@@ -1332,58 +1351,53 @@ class Subtraction(HasWCS):
         return relationship('ReferenceImage', cascade='all', foreign_keys=[self.reference_image_id])
 
     @classmethod
-    def from_images(cls, sci, ref):
-        pass
+    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
+                    copy_inputs=False):
 
-        """
-        sub = run_hotpants(sci, ref, )
+        directory = Path(tmpdir) / uuid.uuid4().hex
+        directory.mkdir(exist_ok=True, parents=True)
 
+        outname = sub_name(sci.local_path, ref.local_path)
+        outmask = sub_name(sci.mask_image.local_path, ref.mask_image.local_path)
+
+        # create the mask
+        submask = MaskImage()
+        submask.map_to_local_file(outmask)
+
+        # create the remapped ref, and remapped ref mask. the former will be
+        # pixel-by-pixel subtracted from the science image. both will be written
+        # to this subtraction's working directory (i.e., `directory`)
         remapped_ref = ref.aligned_to(sci)
         remapped_refmask = ref.mask_image.aligned_to(sci.mask_image)
+        remapped_refname = directory / f'{ref.basename}.remap.fits'
+        remapped_refname = str(remapped_refname.absolute())
+        remapped_refmaskname = remapped_refname.replace('.fits', '.mask.fits')
 
-        # these files need to be written to disk for hotpants
+        # flush to the disk
+        remapped_ref.map_to_local_file(remapped_refname)
+        remapped_refmask.map_to_local_file(remapped_refmaskname)
+        remapped_ref.save()
+        remapped_refmask.save()
 
+        badpix = remapped_refmask.boolean | sci.mask_image.boolean
+        submask.data = badpix.astype('uint16')
+        submask.header = {}
+        submask.header_comments = {}
+        submask.save()
 
-        remapped_ref.map_to_local_file(ref.local_path.replace('.fits',
-                                                              '.remap.fits'))
-        remapped_refmask.map_to_local_file(ref.mask_image.local_path.replace(
-            '.fits', '.remap.fits'))
+        command = prepare_hotpants(sci, remapped_ref, outname, submask,
+                                   directory, copy_inputs=copy_inputs)
 
-        submask = MaskImage()
-        submask.data = sci.mask_image.data | remapped_refmask.data
+        subprocess.check_call(command.split())
 
-        # need to implement this
-        # subname = run_hotpants(sci, remapped_ref)
-
-        seepix = sci.pixel_scale.value.mean() * sci.header['SEEING']
-        r = 2.5 * seepix
-        rss = 6. * seepix
-
-        gain = 1.0  # TODO check this assumption
-
-        newskysig = tnewskysig * 1.48 / gain
-        refskysig = trefskysig * 1.48 / gain
-
-        il = newskybkg - 10. * newskysig
-        tl = refskybkg - 10. * refskysig
-
-        nsx = sci.header['NAXIS1'] / 100.
-        nsy = sci.header['NAXIS2'] / 100.
-
-        convolve_target = 't'
-        syscall = f'hotpants -inim {sci.local_path} -hki -n i -c t' \
-                  f'-tmplim {remapped_ref.local_path} -outim %s -tu %f -iu %f  -tl %f ' \
-                  f'-il %f ' \
-                  f'-r %f ' \
-                  f'-rss %f -tni %s -ini %s -imi %s -nsx %f -nsy %f'
-        syscall = syscall % (frame, refremap, sub, tu, iu, tl, il, r, rss, refremapnoise, newnoise,
-                             submask, nsx, nsy)
-
-
-
+        sub = cls.from_file(outname)
         sub.mask_image = submask
-        sub = cls.from_file(subname)
-        """
+
+        if data_product:
+            archive.archive(sub)
+            archive.archive(sub.mask_image)
+
+        return sub
 
 
 class SingleEpochSubtraction(CalibratedImage, Subtraction):
