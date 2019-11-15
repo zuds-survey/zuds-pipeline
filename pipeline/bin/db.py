@@ -1369,7 +1369,8 @@ class Subtraction(HasWCS):
         # to this subtraction's working directory (i.e., `directory`)
         remapped_ref = ref.aligned_to(sci)
         remapped_refmask = ref.mask_image.aligned_to(sci.mask_image)
-        remapped_refname = directory / f'{ref.basename}.remap.fits'
+        remapped_ref_basename = f'{ref.basename}.remap.fits'
+        remapped_refname = directory / remapped_ref_basename
         remapped_refname = str(remapped_refname.absolute())
         remapped_refmaskname = remapped_refname.replace('.fits', '.mask.fits')
 
@@ -1379,6 +1380,9 @@ class Subtraction(HasWCS):
         remapped_ref.save()
         remapped_refmask.save()
         remapped_ref.mask_image = remapped_refmask
+        remapped_ref.basename = remapped_ref_basename
+        remapped_refmask.basename = os.path.basename(remapped_refmaskname)
+
 
         badpix = remapped_refmask.boolean | sci.mask_image.boolean
         submask.data = badpix.astype('uint16')
