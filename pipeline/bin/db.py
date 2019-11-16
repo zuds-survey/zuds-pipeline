@@ -395,6 +395,8 @@ class PipelineProductCopy(models.Base):
     on local disk, whereas a File is mappable. A copy is just a record of a
     file that lives in a permanent place somewhere."""
 
+    __tablename__ = 'pipelineproductcopies'
+
     __mapper_args__ = {
         'polymorphic_on': 'type',
         'polymorphic_identity': 'copy'
@@ -428,6 +430,12 @@ class HTTPArchiveCopy(PipelineProductCopy):
     __mapper_args__ = {
         'polymorphic_identity': 'http'
     }
+
+    __tablename__ = 'httparchivecopies'
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproductcopies.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
 
     url = sa.Column(sa.Text)
     archive_path = sa.Column(sa.Text)
@@ -476,9 +484,15 @@ class TapeCopy(PipelineProductCopy):
     """Record of a copy of a pipelineproduct that lives inside a
     tape archive on HPSS."""
 
+    __tablename__ = 'tapecopies'
+
     __mapper_args__ = {
         'polymorphic_identity': 'tape'
     }
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproductcopies.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
 
     archive_id = sa.Column(sa.Text, sa.ForeignKey('tapearchives.id',
                                                   ondelete='CASCADE'),
