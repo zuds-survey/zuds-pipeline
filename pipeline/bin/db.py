@@ -904,7 +904,7 @@ class PipelineProduct(models.Base, ArchiveFile):
     fid = sa.Column(sa.Integer)
     ccdid = sa.Column(sa.Integer)
 
-    copies = relationship('Copy', cascade='all')
+    copies = relationship('PipelineProductCopy', cascade='all')
 
     # An index on the four indentifying
     idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
