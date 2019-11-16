@@ -1,42 +1,34 @@
+import time
+import datetime
 import os
-import db
 import pandas as pd
-from argparse import ArgumentParser
-import tempfile, io
-import paramiko
 from pathlib import Path
+import subprocess
+from secrets import get_secret
+import db
+import tempfile
+import io
 
 
 
-class HPSSDB(object):
+def submit_hpss_job(tarfiles, images, job_script_destination,
+                    frame_destination, log_destination,
+                    tape_number, preserve_dirs):
 
-    def __init__(self):
-        self.engine = db.DBSession().get_bind()
+    nersc_account = get_secret('nersc_account')
 
+    cmdlist = open(Path(job_script_destination) /
+                   f'hpss.{tape_number}.cmd.sh', 'w')
+    jobscript = open(Path(job_script_destination) /
+                     f'hpss.{tape_number}.sh', 'w')
+    subscript = open(Path(job_script_destination) /
+                     f'hpss.{tape_number}.sub.sh', 'w')
 
-def submit_hpss_job(tarfiles, images, job_script_destination, frame_destination, log_destination, tape_number,
-                    preserve_dirs):
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    nersc_username = os.getenv('NERSC_XFER_USERNAME')
-    nersc_password = os.getenv('NERSC_PASSWORD')
-    nersc_host = os.getenv('NERSC_HOST')
-    nersc_account = os.getenv('NERSC_ACCOUNT')
-
-    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
-
-
-    jobscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sh', 'w')
-    subscript = open(Path(job_script_destination) / f'hpss.{tape_number}.sub.sh', 'w')
 
     substr =  f'''#!/usr/bin/env bash
 module load esslurm
 sbatch {Path(jobscript.name).resolve()}
 '''
-
-    if job_script_destination is None:
-        substr = substr.encode('ASCII')
 
     subscript.write(substr)
 
@@ -52,16 +44,16 @@ sbatch {Path(jobscript.name).resolve()}
 #SBATCH -C haswell
 #SBATCH -o {(Path(log_destination) / hpt).resolve()}.out
 
-cd {Path(frame_destination).resolve()}
+bash {os.path.abspath(cmdlist.name)}
 
 '''
+
+    cmdstr = f'cd {frame_destination}\n'
 
     sc = 12 if not preserve_dirs else 8
 
     for tarfile, imlist in zip(tarfiles, images):
         wildimages = '\n'.join([f'*{p}' for p in imlist])
-
-
 
         directive = f'''
 /usr/common/mss/bin/hsi get {tarfile}
@@ -69,25 +61,28 @@ echo "{wildimages}" | tar --strip-components={sc} -i --wildcards --wildcards-mat
 rm {os.path.basename(tarfile)}
 
 '''
-        jobstr += directive
-
-    jobstr += f"PYTHONPATH={os.getenv('PYTHONPATH').replace('shifter', 'dtn')} " \
-              f"/global/cscratch1/sd/ztfproc/miniconda3/bin/python " \
-              f"{Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/finish_hpssjob.py'} " \
-              f"$SLURM_JOB_ID"
-
-    if job_script_destination is None:
-        jobstr = jobstr.encode('ASCII')
+        cmdstr += directive
 
     jobscript.write(jobstr)
+    cmdlist.write(cmdstr)
 
-    jobscript.seek(0)
-    subscript.seek(0)
+    jobscript.close()
+    subscript.close()
+    cmdlist.close()
 
     command = f'/bin/bash {Path(subscript.name).resolve()}'
-    stdin, stdout, stderr = ssh_client.exec_command(command)
+    p = subprocess.Popen(command.split(), stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+    #stdout, stderr = p.communicate()
 
-    retcode = stdout.channel.recv_exit_status()
+    while True:
+        if p.poll() is not None:
+            break
+        else:
+            time.sleep(0.01)
+
+    stdout, stderr = p.stdout, p.stderr
+    retcode = p.returncode
 
     out = stdout.readlines()
     err = stderr.readlines()
@@ -103,33 +98,17 @@ rm {os.path.basename(tarfile)}
 
     jobid = int(out[0].strip().split()[-1])
 
-    hpssjob = db.HPSSJob(id=jobid, user=nersc_username)
-    db.DBSession().add(hpssjob)
-    db.DBSession().commit()
-
-    ssh_client.close()
-
     return jobid
 
 
-def full_query(whereclause):
-    query = f'SELECT * FROM IMAGE WHERE HPSS_SCI_PATH IS NOT NULL AND ' \
-            f'{whereclause} AND SEEING < 3.0 AND MAGLIMIT > 18.5 AND ' \
-            f'HPSS_MASK_PATH IS NOT NULL'
-    return query
-
-
-def retrieve_images(whereclause, exclude_masks=False, preserve_dirs=False, job_script_destination=None,
-                    frame_destination='.', log_destination='.'):
-
-    # interface to HPSS and database
-    hpssdb = HPSSDB()
+def retrieve_images(query, exclude_masks=False, job_script_destination='.',
+                    frame_destination='.', log_destination='.',
+                    preserve_dirs=False):
 
     # this is the query to get the image paths
-    query = full_query(whereclause)
-    metatable = pd.read_sql(query, hpssdb.engine)
-    df = metatable[['path', 'hpss_sci_path', 'hpss_mask_path']]
+    metatable = pd.read_sql(query.statement, db.DBSession().get_bind())
 
+    df = metatable[['path', 'hpss_sci_path', 'hpss_mask_path']]
     dfsci = df[['path', 'hpss_sci_path']]
     dfsci = dfsci.rename({'hpss_sci_path': 'tarpath'}, axis='columns')
 
@@ -148,57 +127,85 @@ def retrieve_images(whereclause, exclude_masks=False, preserve_dirs=False, job_s
     if len(tars) == 0:
         raise ValueError('No images match the given query')
 
-    instr = '\n'.join(tars.tolist())
-
-    tlfile = Path(job_script_destination) / f'tarlist.dat'
-
-    with open(tlfile, 'w') as f:
-        f.write(instr)
-
     # sort tarball retrieval by location on tape
-    sortexec = Path(os.getenv('LENSGRINDER_HOME')) / 'pipeline/bin/hpsssort.sh'
+    t = datetime.datetime.utcnow().isoformat().replace(' ', '_')
+    hpss_in = Path(job_script_destination) / f'hpss_{t}.in'
+    hpss_out = Path(job_script_destination) / f'hpss_{t}.out'
 
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    with open(hpss_in, 'w') as f:
+        f.write("\n".join([f'ls -P {tar}' for tar in tars]))
 
-    nersc_username = os.getenv('NERSC_XFER_USERNAME')
-    nersc_password = os.getenv('NERSC_PASSWORD')
-    nersc_host = os.getenv('NERSC_HOST')
+    syscall = f'/usr/common/mss/bin/hsi -O {hpss_out} in {hpss_in}'
 
-    ssh_client.connect(hostname=nersc_host, username=nersc_username, password=nersc_password)
+    # for some reason hsi writes in >> mode, so need to delete the output
+    # file if it exists to prevent it from mixing with results of a previous
+    # run
 
-    syscall = f'bash {sortexec} {f.name}'
-    _, stdout, _ = ssh_client.exec_command(syscall)
+    if hpss_out.exists():
+        os.remove(hpss_out)
+
+    p = subprocess.Popen(syscall.split(),
+                         stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE)
+
+    while True:
+        if p.poll() is not None:
+            break
+        else:
+            time.sleep(0.01)
+
+    retcode = p.returncode
+    stderr, stdout = p.stderr, p.stdout
+
+    # 64 means some of the files didnt exist, that's ok
+    if retcode not in [0, 64]:
+        raise subprocess.CalledProcessError(stderr.read())
+
+    # filter out the lines that dont start with FILE
+    with open(hpss_out, 'r') as f:
+        lines = [line for line in f.readlines() if line.startswith('FILE')]
+    stream = io.StringIO(''.join(lines))
 
     # read it into pandas
-    ordered = pd.read_csv(stdout, delim_whitespace=True, names=['tape', 'position', '_', 'hpsspath'])
+    ordered = pd.read_csv(stream, delim_whitespace=True, names=['ignore-2',
+                                                                'hpsspath',
+                                                                'ignore-1',
+                                                                'ignore0',
+                                                                'position',
+                                                                'tape',
+                                                                'ignore1',
+                                                                'ignore2',
+                                                                'ignore3',
+                                                                'ignore4',
+                                                                'ignore5',
+                                                                'ignore6',
+                                                                'ignore7'])
+    ordered['tape'] = [t[:-2] for t in ordered['tape']]
+    ordered['position'] = [t.split('+')[0] for t in ordered['position']]
+    ordered = ordered.sort_values(['tape', 'position'])
+
+    for column in ordered.copy().columns:
+        if column.startswith('ignore'):
+            del ordered[column]
 
     # submit the jobs based on which tape the tar files reside on
     # and in what order they are on the tape
 
     dependency_dict = {}
-    for tape, group in ordered.groupby('tape'):
+
+    import numpy as np
+    for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
+            ordered) // 14)):
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
         images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
 
-        jobid = submit_hpss_job(tarnames, images, job_script_destination, frame_destination, log_destination, tape,
+        jobid = submit_hpss_job(tarnames, images, job_script_destination,
+                                frame_destination, log_destination, tape,
                                 preserve_dirs)
+
         for image in df[[name in tarnames for name in df['tarpath']]]['path']:
             dependency_dict[image] = jobid
 
-    del hpssdb
     return dependency_dict, metatable
-
-
-if __name__ == '__main__':
-    parser = ArgumentParser()
-    parser.add_argument("whereclause", default=None, type=str,
-                        help='SQL where clause that tells the program which images to retrieve.')
-    parser.add_argument('--exclude-masks', default=False, action='store_true',
-                        help='Only retrieve the science images.')
-    parser.add_argument('--preserve-directories', default=False, action='store_true',
-                        help='If true, write files out in directories organized by field, chip, quad, filter.')
-    args = parser.parse_args()
-    retrieve_images(args.whereclause, exclude_masks=args.exclude_masks, preserve_dirs=args.preserve_directories)
