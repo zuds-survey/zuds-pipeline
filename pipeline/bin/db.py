@@ -503,7 +503,7 @@ class TapeCopy(PipelineProductCopy):
 class TapeArchive(models.Base):
     """Record of a tape archive that contains copies of Pipelineproducts."""
     id = sa.Column(sa.Text, primary_key=True)
-    contents = relationship('PipelineProduct', cascade='all')
+    contents = relationship('TapeCopy', cascade='all')
     size = sa.Column(sa.Integer) # size of the archive in bytes
 
 
