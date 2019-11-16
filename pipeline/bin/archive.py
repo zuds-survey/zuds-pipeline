@@ -3,13 +3,9 @@ import os
 import stat
 import shutil
 from pathlib import Path
+from secrets import get_secret
+import requests
 
-
-fid_map = {
-    1: 'zg',
-    2: 'zr',
-    3: 'zi'
-}
 
 perm = 0o755
 
@@ -23,27 +19,51 @@ def _mkdir_recursive(path):
         os.chmod(path, perm)
 
 
-def archive(product):
-    """Publish a PipelineFITSProduct to the NERSC archive."""
+def archive_copy_over_http(copy):
+    product = copy.product
+    product.save()
+    # authenticate to nersc system
+    target = 'https://newt.nersc.gov/newt/login'
+    username = get_secret('nersc_username')
+    password = get_secret('nersc_password')
+    r = requests.post(target, data={
+        'username': username,
+        'password': password
+    })
+    r.raise_for_status()
+    auth_cookie = r.cookies
 
-    if not isinstance(product, db.PipelineProduct):
-        raise ValueError(f'Cannot archive object "{product}", must be an instance of'
-                         f'PipelineFITSProduct.')
+    # prepare the destination directory to receive the file
+    target = f'https://newt.nersc.gov/newt/command/cori'
+    cmd = f'/usr/bin/mkdir -p {os.path.dirname(product.archive_path)}'
+    loginenv = False
+    r = requests.post(target, data={
+        'executable': cmd,
+        'loginenv': loginenv
+    }, cookies=auth_cookie)
+    r.raise_for_status()
 
-    field = product.field
-    qid = product.qid
-    ccdid = product.ccdid
-    fid = product.fid
-    band = fid_map[fid]
+    # upload the file, delete leading "/" for newt
+    target = f'https://newt.nersc.gov/newt/file/cori/' \
+             f'{str(self.archive_path)[1:]}'
+    with open(product.local_path, 'rb') as f:
+        contents = f.read()
+    r = requests.put(target, data=contents, cookies=auth_cookie)
+    resp = r.json()
+    if not resp['status'] == 'OK':
+        raise requests.RequestException(resp)
 
-    path = Path(db.NERSC_PREFIX) / f'{field:06d}/' \
-                                   f'c{ccdid:02d}/' \
-                                   f'q{qid}/' \
-                                   f'{band}/' \
-                                   f'{product.basename}'
 
-    product.archive_path = f'{path.absolute()}'
-    product.url = f'{path.absolute()}'.replace(db.NERSC_PREFIX, db.URL_PREFIX)
+def archive(copy):
+    """Publish a copy of a PipelineProduct to the NERSC archive."""
+
+    if not isinstance(copy, db.HTTPArchiveCopy):
+        raise ValueError(
+            f'Cannot archive object "{copy}", must be an instance of'
+            f'Copy.')
+
+    path = copy.archive_path
+    product = copy.product
 
     if os.getenv('NERSC_HOST') == 'cori':
         if not path.parent.exists():
@@ -51,4 +71,4 @@ def archive(product):
         shutil.copy(product.local_path, path)
         os.chmod(path, perm)
     else:
-        product.put()
+        archive_copy_over_http(copy)
