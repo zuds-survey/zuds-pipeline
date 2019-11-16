@@ -391,7 +391,6 @@ class TapeArchive(models.Base):
     contents = relationship('PipelineProduct', cascade='all')
 
 
-
 class FITSFile(File):
     """A python object that maps a fits file. Instances of classes mixed with
     FITSFile that implement `Base` map to database rows that store fits file
@@ -786,6 +785,9 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
 
     science_image = relationship('ScienceImage', cascade='all')
 
+    hpss_sci_path = sa.Column(sa.Text, index=True)
+    hpss_mask_path = sa.Column(sa.Text, index=True)
+
     @hybrid_property
     def obsmjd(self):
         return self.obsjd - 2400000.5
@@ -834,8 +836,6 @@ class PipelineProduct(models.Base, ArchiveFile):
 
     # An index on the four indentifying
     idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
-    idx2 = sa.Index('pipelineproducts_archive_path_idx',
-                    'archive_path')
 
     __mapper_args__ = {
         'polymorphic_on': type,
@@ -1046,9 +1046,14 @@ class CalibratableImage(FloatingPointFITSImage, PipelineProduct):
 
     @property
     def weight_image(self):
+        """Image representing the inverse variance map of this calibratable
+        image."""
+
         try:
             return self._weightimg
         except AttributeError:
+            # need to calculate the weight map.
+
             ind = self.mask_image.boolean
             wgt = np.empty_like(ind, dtype='<f8')
             wgt[~ind] = 1 / self.rms_image.data[~ind] ** 2
