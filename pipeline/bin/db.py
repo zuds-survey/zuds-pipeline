@@ -386,7 +386,34 @@ class File(object):
         raise NotImplemented
 
 
-class TapeArchive(models.Base):
+class PipelineProductCopy(models.Base):
+
+    __mapper_args__ = {
+        'polymorphic_on': 'type',
+        'polymorphic_identity': 'copy'
+    }
+
+    type = sa.Column(sa.Text)
+    product_id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+                                                     ondelete='CASCADE'),
+                           index=True)
+    product = relationship('PipelineProduct', back_populates='copies',
+                           cascade='all')
+
+
+class TapeCopy(PipelineProductCopy):
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'tape'
+    }
+
+    archive_id = sa.Column(sa.Text, sa.ForeignKey('tapearchives.id',
+                                                  ondelete='CASCADE'),
+                           index=True)
+    archive = relationship('TapeArchive', back_populates='contents')
+
+
+class TapeArchive(PipelineProductCopy):
     id = sa.Column(sa.Text, primary_key=True)
     contents = relationship('PipelineProduct', cascade='all')
 
@@ -829,10 +856,8 @@ class PipelineProduct(models.Base, ArchiveFile):
     qid = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
     ccdid = sa.Column(sa.Integer)
-    tape_archive_id = sa.Column(sa.Text, sa.ForeignKey('tapearchives.id',
-                                                       ondelete='SET NULL'))
-    archive = relationship('TapeArchive', cascade='all', foreign_keys=[
-        tape_archive_id])
+
+    copies = relationship('Copy', cascade='all')
 
     # An index on the four indentifying
     idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
