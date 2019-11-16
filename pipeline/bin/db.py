@@ -386,6 +386,12 @@ class File(object):
         raise NotImplemented
 
 
+class TapeArchive(models.Base):
+    id = sa.Column(sa.Text, primary_key=True)
+    contents = relationship('PipelineProduct', cascade='all')
+
+
+
 class FITSFile(File):
     """A python object that maps a fits file. Instances of classes mixed with
     FITSFile that implement `Base` map to database rows that store fits file
@@ -772,6 +778,11 @@ class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
     filefracday = sa.Column(psql.BIGINT)
     fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",
                   field, ccdid, qid, filtercode, obsjd)
+    pathidx = Index('image_path_idx', path)
+
+    created_at = sa.Column(sa.DateTime, default=sa.func.now())
+    modified = sa.Column(sa.DateTime, default=sa.func.now(),
+                         onupdate=sa.func.now())
 
     science_image = relationship('ScienceImage', cascade='all')
 
@@ -816,9 +827,15 @@ class PipelineProduct(models.Base, ArchiveFile):
     qid = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
     ccdid = sa.Column(sa.Integer)
+    tape_archive_id = sa.Column(sa.Text, sa.ForeignKey('tapearchives.id',
+                                                       ondelete='SET NULL'))
+    archive = relationship('TapeArchive', cascade='all', foreign_keys=[
+        tape_archive_id])
 
     # An index on the four indentifying
     idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
+    idx2 = sa.Index('pipelineproducts_archive_path_idx',
+                    'archive_path')
 
     __mapper_args__ = {
         'polymorphic_on': type,
@@ -991,6 +1008,7 @@ class MaskImage(PipelineProduct, IntegerFITSImage):
                                 back_populates='mask_image',
                                 foreign_keys=[parent_image_id])
 
+    idx = Index('maskimages_parent_image_id_idx', parent_image_id)
 
 class SegmentationImage(photutils.segmentation.SegmentationImage,
                         IntegerFITSImage):
@@ -1254,9 +1272,11 @@ class ScienceImage(CalibratedImage):
     __mapper_args__ = {'polymorphic_identity': 'sci',
                        'inherit_condition': id == CalibratedImage.id}
 
-    ipac_record_id = sa.Column(sa.Integer, sa.ForeignKey('ipacrecords.id'),
+    ipac_record_id = sa.Column(sa.Integer, sa.ForeignKey('ipacrecords.id',
+                                                         name='ipacrecords_id_fk'),
                                index=True)
     ipac_record = relationship('IPACRecord', back_populates='science_image')
+
 
     @classmethod
     def from_file(cls, f):
@@ -1406,20 +1426,30 @@ class Subtraction(HasWCS):
 
 
 class SingleEpochSubtraction(CalibratedImage, Subtraction):
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sesub',
                        'inherit_condition': id == CalibratedImage.id}
 
-    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('scienceimages.id', ondelete='CASCADE'), index=True)
-    target_image = relationship('ScienceImage', cascade='all', foreign_keys=[target_image_id])
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('scienceimages.id',
+                                                          ondelete='CASCADE'),
+                                index=True)
+    target_image = relationship('ScienceImage', cascade='all',
+                                foreign_keys=[target_image_id])
 
 
 class MultiEpochSubtraction(CalibratableImage, Subtraction):
-    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'mesub',
                        'inherit_condition': id == CalibratableImage.id}
-    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'), index=True)
-    target_image = relationship('ScienceCoadd', cascade='all', foreign_keys=[target_image_id])
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id',
+                                                          ondelete='CASCADE'),
+                                index=True)
+    target_image = relationship('ScienceCoadd', cascade='all',
+                                foreign_keys=[target_image_id])
 
     @declared_attr
     def __table_args__(cls):
