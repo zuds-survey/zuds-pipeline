@@ -500,6 +500,8 @@ class TapeCopy(PipelineProductCopy):
     archive = relationship('TapeArchive', back_populates='contents')
 
 
+
+
 class TapeArchive(models.Base):
     """Record of a tape archive that contains copies of Pipelineproducts."""
     id = sa.Column(sa.Text, primary_key=True)
