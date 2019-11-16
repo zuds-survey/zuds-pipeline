@@ -14,11 +14,9 @@ WHERECLAUSE = ''
 
 if __name__ == '__main__':
 
-    env, cfg = db.load_env()
     db.init_db()
 
     zquery = query.ZTFQuery()
-
     start = datetime.now()
 
     # get the maximum nid
@@ -40,8 +38,8 @@ if __name__ == '__main__':
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
                              f'NID BETWEEN {max_nid + QUERY_WINDOWSIZE * i} AND '
                              f'{max_nid + QUERY_WINDOWSIZE * (i + 1)} AND IPAC_GID > 0',
-                             auth=[get_secret('IPAC_USERNAME'),
-                                   get_secret('IPAC_PASSWORD')])
+                             auth=[get_secret('ipac_username'),
+                                   get_secret('ipac_password')])
         metatable = zquery.metatable
         metatables.append(metatable)
 
@@ -53,7 +51,7 @@ if __name__ == '__main__':
     del metatable['imgtype']
     del metatable['ipac_pub_date']
 
-    meta_images = [db.Image(**row.to_dict()) for _, row in metatable.iterrows()]
+    meta_images = [db.IPACRecord(**row.to_dict()) for _, row in metatable.iterrows()]
     basenames = [i.ipac_path('sciimg.fits').split('/')[-1] for i in meta_images]
 
     indices = np.nonzero(~np.in1d(basenames, current_paths, assume_unique=True))[0]
