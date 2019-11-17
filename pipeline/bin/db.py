@@ -499,6 +499,8 @@ class TapeCopy(PipelineProductCopy):
                            index=True)
     archive = relationship('TapeArchive', back_populates='contents')
 
+    # The exact name of the TAR archive member
+    member_name = sa.Column(sa.Text, nullable=False)
 
 
 

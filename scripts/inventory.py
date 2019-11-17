@@ -35,28 +35,34 @@ if __name__ == '__main__':
         tar = tarfile.open(os.path.basename(file))
         size = os.path.getsize(tar.name)
 
+        fullnames = []
+        basenames = []
         for member in tar:
+            fullnames.append(member.name)  # keep the full path here
             member.name = os.path.basename(member.name)
+            basenames.append(member.name)
         tar.extractall()
 
         # need to do all queries first to avoid tripping sa autoflush (i.e.,
         # writing things to db before commit is issued)
-        objects = []
-        for member in tar:
-            basename = member.name
-            obj = db.DBSession().query(db.PipelineProduct).filter(
-                db.PipelineProduct.basename == basename).first()
-            objects.append(obj)
+
+        objects = db.DBSession().query(db.PipelineProduct.basename,
+                                       db.PipelineProduct.type).filter(
+            db.PipelineProduct.basename.in_(basenames)
+        ).all()
+        objects = dict(objects)
 
         tapearchive = db.TapeArchive(id=file, size=size)
         copies = []
-        for i, member in enumerate(tar):
-            obj = objects[i]
+        for (i, member), fullname in zip(enumerate(tar), fullnames):
             if 'HTAR_CF_CHK' in member.name:
                 continue
-            if obj is None:
+            try:
+                obj = objects[member.name]
+            except KeyError:
                 obj = object_from_filename(member.name)
-            copy = db.TapeCopy(product=obj, archive=tapearchive)
+            copy = db.TapeCopy(product=obj, archive=tapearchive,
+                               member_name=fullname)
             os.remove(member.name)
             copies.append(copy)
         tar.close()
