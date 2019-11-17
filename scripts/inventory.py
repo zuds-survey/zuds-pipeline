@@ -39,6 +39,8 @@ if __name__ == '__main__':
         for member in tar:
             member.name = os.path.basename(member.name)
         tar.extractall()
+
+        copies = []
         for member in tar:
             basename = member.name
             obj = db.DBSession().query(db.PipelineProduct).filter(
@@ -47,11 +49,12 @@ if __name__ == '__main__':
                 obj = object_from_filename(basename)
 
             copy = db.TapeCopy(product=obj, archive=tapearchive)
-            db.DBSession().add(copy)
             os.remove(basename)
-
         tar.close()
+
+        db.DBSession().add_all(copies)
         db.DBSession().commit()
+
         os.chdir(olddir)
         shutil.rmtree(mydir)
 
