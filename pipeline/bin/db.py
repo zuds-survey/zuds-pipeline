@@ -506,7 +506,7 @@ class TapeArchive(models.Base):
     """Record of a tape archive that contains copies of Pipelineproducts."""
     id = sa.Column(sa.Text, primary_key=True)
     contents = relationship('TapeCopy', cascade='all')
-    size = sa.Column(sa.Integer) # size of the archive in bytes
+    size = sa.Column(psql.BIGINT) # size of the archive in bytes
 
 
 class FITSFile(File):
