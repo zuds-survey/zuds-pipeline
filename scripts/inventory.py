@@ -34,22 +34,29 @@ if __name__ == '__main__':
             continue
         tar = tarfile.open(os.path.basename(file))
         size = os.path.getsize(tar.name)
-        tapearchive = db.TapeArchive(id=file, size=size)
 
         for member in tar:
             member.name = os.path.basename(member.name)
         tar.extractall()
 
-        copies = []
+        # need to do all queries first to avoid tripping sa autoflush (i.e.,
+        # writing things to db before commit is issued)
+        objects = []
         for member in tar:
             basename = member.name
             obj = db.DBSession().query(db.PipelineProduct).filter(
                 db.PipelineProduct.basename == basename).first()
-            if obj is None:
-                obj = object_from_filename(basename)
+            objects.append(obj)
 
+        tapearchive = db.TapeArchive(id=file, size=size)
+        copies = []
+        for i, member in enumerate(tar):
+            obj = objects[i]
+            if obj is None:
+                obj = object_from_filename(member.name)
             copy = db.TapeCopy(product=obj, archive=tapearchive)
-            os.remove(basename)
+            os.remove(member.name)
+            copies.append(copy)
         tar.close()
 
         db.DBSession().add_all(copies)
