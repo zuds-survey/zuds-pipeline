@@ -37,10 +37,10 @@ if __name__ == '__main__':
         tapearchive = db.TapeArchive(id=file, size=size)
 
         for member in tar:
-            basename = os.path.basename(member.name)
-            buf = tar.extractfile(member)
-            with open(basename, 'wb') as f:
-                f.write(buf.read())
+            member.name = os.path.basename(member.name)
+        tar.extractall()
+        for member in tar:
+            basename = member.name
             obj = db.DBSession().query(db.PipelineProduct).filter(
                 db.PipelineProduct.basename == basename).first()
             if obj is None:
