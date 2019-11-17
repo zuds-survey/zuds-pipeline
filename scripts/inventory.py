@@ -47,7 +47,7 @@ if __name__ == '__main__':
         # writing things to db before commit is issued)
 
         objects = db.DBSession().query(db.PipelineProduct.basename,
-                                       db.PipelineProduct.type).filter(
+                                       db.PipelineProduct.id).filter(
             db.PipelineProduct.basename.in_(basenames)
         ).all()
         objects = dict(objects)
@@ -58,11 +58,15 @@ if __name__ == '__main__':
             if 'HTAR_CF_CHK' in member.name:
                 continue
             try:
-                obj = objects[member.name]
+                objid = objects[member.name]
+                copy = db.TapeCopy(product_id=objid, archive=tapearchive,
+                                   member_name=fullname)
+
             except KeyError:
                 obj = object_from_filename(member.name)
-            copy = db.TapeCopy(product=obj, archive=tapearchive,
-                               member_name=fullname)
+                copy = db.TapeCopy(product=obj, archive=tapearchive,
+                                   member_name=fullname)
+
             os.remove(member.name)
             copies.append(copy)
         tar.close()
