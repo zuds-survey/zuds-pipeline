@@ -52,6 +52,8 @@ if __name__ == '__main__':
         copies = []
         for i, member in enumerate(tar):
             obj = objects[i]
+            if 'HTAR_CF_CHK' in member.name:
+                continue
             if obj is None:
                 obj = object_from_filename(member.name)
             copy = db.TapeCopy(product=obj, archive=tapearchive)
