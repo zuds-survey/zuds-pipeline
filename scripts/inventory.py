@@ -33,12 +33,14 @@ if __name__ == '__main__':
         except subprocess.CalledProcessError:
             continue
         tar = tarfile.open(os.path.basename(file))
-        tar.extractall()
-
-        tapearchive = db.TapeArchive(id=file)
+        size = os.path.getsize(tar.name)
+        tapearchive = db.TapeArchive(id=file, size=size)
 
         for member in tar:
             basename = os.path.basename(member.name)
+            buf = tar.extractfile(member)
+            with open(basename, 'wb') as f:
+                f.write(buf.read())
             obj = db.DBSession().query(db.PipelineProduct).filter(
                 db.PipelineProduct.basename == basename).first()
             if obj is None:
@@ -46,6 +48,7 @@ if __name__ == '__main__':
 
             copy = db.TapeCopy(product=obj, archive=tapearchive)
             db.DBSession().add(copy)
+            os.remove(basename)
 
         tar.close()
         db.DBSession().commit()
