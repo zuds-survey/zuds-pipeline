@@ -30,4 +30,4 @@ def get_my_share_of_work(fname):
             files = None
 
         files = comm.scatter(files, root=0)
-        return files[rank]
+        return files
