@@ -204,11 +204,11 @@ def sub_name(frame, template):
     return sub
 
 
-def init_db():
+def init_db(old=False):
     hpss_dbhost = get_secret('hpss_dbhost')
     hpss_dbport = get_secret('hpss_dbport')
     hpss_dbusername = get_secret('hpss_dbusername')
-    hpss_dbname = get_secret('hpss_dbname')
+    hpss_dbname = get_secret('hpss_dbname') if not old else get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
     return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword,
                hpss_dbhost, hpss_dbport)
