@@ -3,10 +3,16 @@ db.init_db()  # zuds2
 import numpy as np
 import pandas as pd
 
-from mpi4py import MPI
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    mpi = True
+except ImportError:
+    mpi = False
+    rank = 0
+    size = 1
 
 # this may need to be parallelized
 df = pd.read_csv('/global/cscratch1/sd/dgold/image.csv')
@@ -19,7 +25,7 @@ fid_map = {
 
 
 if rank == 0:
-    archives = pd.concat(df['hpss_sci_path'], df['hpss_mask_path']).unique()
+    archives = pd.concat([df['hpss_sci_path'], df['hpss_mask_path']]).unique()
     tarchs = []
     arch_map = {}
     for archive in archives:
@@ -31,14 +37,19 @@ if rank == 0:
     db.DBSession().commit()
     for dbarch in tarchs:
         arch_map[dbarch.id] = dbarch
-    subframes = np.array_split(df, size)
+
+    if mpi:
+        subframes = np.array_split(df, size)
 
 else:
     subframes = None
     arch_map = None
 
-arch_map = comm.bcast(arch_map, root=0)
-myframes = comm.scatter(subframes, root=0)
+if mpi: 
+    arch_map = comm.bcast(arch_map, root=0)
+    myframes = comm.scatter(subframes, root=0)
+else:
+    myframes = df
 
 # load in chunks of 50k
 for i, row in myframes.iterrows():
