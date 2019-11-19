@@ -43,6 +43,10 @@ from astropy.coordinates import SkyCoord
 
 
 from matplotlib import colors
+import matplotlib.pyplot as plt
+from astropy.visualization import ZScaleInterval
+from matplotlib.patches import Ellipse
+
 
 
 BKG_BOX_SIZE = 128
@@ -105,10 +109,11 @@ MASK_COMMENTS = {
 }
 
 
-import matplotlib.pyplot as plt
-from astropy.visualization import ZScaleInterval
-from matplotlib.patches import Ellipse
-
+fid_map = {
+    1: 'zg',
+    2: 'zr',
+    3: 'zi'
+}
 
 def discrete_cmap(ncolors):
     """Create a ListedColorMap with `ncolors` randomly-generated colors
@@ -343,7 +348,7 @@ class File(object):
     to the user and can be achived using the save() function.
     """
 
-    basename = sa.Column(sa.Text, unique=True)
+    basename = sa.Column(sa.Text, unique=True, index=True)
     __diskmapped_cached_properties__ = ['_path']
 
     @property
@@ -386,7 +391,7 @@ class File(object):
         raise NotImplemented
 
 
-class PipelineProductCopy(models.Base):
+class ZTFFileCopy(models.Base):
     """Record of a *permanent* (i.e., will not be deleted or modified,
     or will only be touched extremely rarely and by someone who can do it in
     concert with the database).
@@ -395,7 +400,7 @@ class PipelineProductCopy(models.Base):
     on local disk, whereas a File is mappable. A copy is just a record of a
     file that lives in a permanent place somewhere."""
 
-    __tablename__ = 'pipelineproductcopies'
+    __tablename__ = 'ztffilecopies'
 
     __mapper_args__ = {
         'polymorphic_on': 'type',
@@ -403,10 +408,10 @@ class PipelineProductCopy(models.Base):
     }
 
     type = sa.Column(sa.Text)
-    product_id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+    product_id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                                      ondelete='CASCADE'),
                            index=True)
-    product = relationship('PipelineProduct', back_populates='copies',
+    product = relationship('ZTFFile', back_populates='copies',
                            cascade='all')
 
     def get(self):
@@ -415,16 +420,8 @@ class PipelineProductCopy(models.Base):
         raise NotImplemented
 
 
-
-fid_map = {
-    1: 'zg',
-    2: 'zr',
-    3: 'zi'
-}
-
-
-class HTTPArchiveCopy(PipelineProductCopy):
-    """Record of a copy of a pipelineproduct that lives on the ZUDS disk
+class HTTPArchiveCopy(ZTFFileCopy):
+    """Record of a copy of a ZTFFile that lives on the ZUDS disk
     archive at NERSC (on project) and is accessible via HTTP."""
 
     __mapper_args__ = {
@@ -433,7 +430,7 @@ class HTTPArchiveCopy(PipelineProductCopy):
 
     __tablename__ = 'httparchivecopies'
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproductcopies.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffilecopies.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
 
@@ -449,13 +446,13 @@ class HTTPArchiveCopy(PipelineProductCopy):
             product.map_to_local_file(product.basename)
         return product
 
-    def store(self):
+    def put(self):
         archive.archive(self)
 
     @classmethod
     def from_product(cls, product):
 
-        if not isinstance(product, PipelineProduct):
+        if not isinstance(product, ZTFFile):
             raise ValueError(
                 f'Cannot archive object "{product}", must be an instance of'
                 f'PipelineFITSProduct.')
@@ -480,8 +477,8 @@ class HTTPArchiveCopy(PipelineProductCopy):
         return copy
 
 
-class TapeCopy(PipelineProductCopy):
-    """Record of a copy of a pipelineproduct that lives inside a
+class TapeCopy(ZTFFileCopy):
+    """Record of a copy of a ZTFFile that lives inside a
     tape archive on HPSS."""
 
     __tablename__ = 'tapecopies'
@@ -490,7 +487,7 @@ class TapeCopy(PipelineProductCopy):
         'polymorphic_identity': 'tape'
     }
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproductcopies.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffilecopies.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
 
@@ -503,12 +500,19 @@ class TapeCopy(PipelineProductCopy):
     member_name = sa.Column(sa.Text, nullable=False)
 
 
-
 class TapeArchive(models.Base):
-    """Record of a tape archive that contains copies of Pipelineproducts."""
+    """Record of a tape archive that contains copies of ZTFFiles."""
     id = sa.Column(sa.Text, primary_key=True)
     contents = relationship('TapeCopy', cascade='all')
     size = sa.Column(psql.BIGINT) # size of the archive in bytes
+
+    @classmethod
+    def from_directories(cls, path):
+        raise NotImplemented
+
+    def get(self, extract=False, extract_kws=None):
+        # use retrieve.retrieve for now
+        raise NotImplemented
 
 
 class FITSFile(File):
@@ -543,7 +547,7 @@ class FITSFile(File):
         obj.load()
         return obj
 
-    def _load_header(self):
+    def load_header(self):
         """Load a header from disk into memory. Sets the values of
         database-backed variables that store metadata. These can later be
         flushed to the database using SQLalchemy."""
@@ -558,7 +562,7 @@ class FITSFile(File):
         self.header = hd2
         self.header_comments = hdc
 
-    def _load_data(self):
+    def load_data(self):
         """Load data from disk into memory"""
         with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
             data = hdul[self._DATA_HDU].data
@@ -576,7 +580,7 @@ class FITSFile(File):
             return self._data
         except AttributeError:
             # load the data into memory
-            self._load_data()
+            self.load_data()
         return self._data
 
     @data.setter
@@ -590,11 +594,19 @@ class FITSFile(File):
         """astropy.io.fits.Header representation of the database-mapped
         metadata columns header and header_comments. This attribute may not
         reflect the current header on disk"""
-        header = fits.Header()
-        header.update(self.header)
-        for key in self.header_comments:
-            header.comments[key] = self.header_comments[key]
-        return header
+        if self.header is None or self.header_comments is None:
+            # haven't seen the file on disk yet
+            raise AttributeError(f'This image does not have a header '
+                                 f'or headercomments record yet. Please map '
+                                 f'this object to the corresponding '
+                                 f'ScienceImage file on disk, load the header '
+                                 f'with .load_header(), and retry.')
+        else:
+            header = fits.Header()
+            header.update(self.header)
+            for key in self.header_comments:
+                header.comments[key] = self.header_comments[key]
+            return header
 
     def save(self):
         try:
@@ -605,8 +617,8 @@ class FITSFile(File):
         fits.writeto(f, self.data, self.astropy_header, overwrite=True)
 
     def load(self):
-        self._load_header()
-        self._load_data()
+        self.load_header()
+        self.load_data()
 
 
 class HasPoly(object):
@@ -790,109 +802,15 @@ class IntegerFITSImage(FITSImage):
         return colors.BoundaryNorm(boundaries, ncolors)
 
 
-class ArchiveFile(File):
-    """A file that can be downloaded to the local disk from the archive,
-    and can also be pushed to the archive.
-
-    Provides methods `get` and `put`, which download the file from the
-    archive over http, and push it to the archive via http respectively.
-    """
-
-
-
-class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
-    """IPAC record of a science image from their pipeline. Contains some
-    metadata that IPAC makes available through its irsa metadata query
-    service.  This class is primarily intended to enable the reflection of
-    IPAC's idea of its science images and which science images exist so that
-    IPAC's world can be compared against the results of this pipeline.
-
-    This class does not map to any file on disk, in the sense that it is not
-    designed to reflect the data or metadata of any local file to memory,
-    but it can be used to download files from the IRSA archive to disk (
-    again, it does not make any attempt to represent the contents of these
-    files, or synchronize their contents on disk to their representation in
-    memory).
-
-    This class represents immutable metadata only.
-    """
-
-    __tablename__ = 'ipacrecords'
-
-    path = sa.Column(sa.Text, unique=True)
-    filtercode = sa.Column(sa.CHAR(2))
-    qid = sa.Column(sa.Integer)
-    field = sa.Column(sa.Integer)
-    ccdid = sa.Column(sa.Integer)
-    obsjd = sa.Column(psql.DOUBLE_PRECISION)
-    good = sa.Column(sa.Boolean)
-    hasvariance = sa.Column(sa.Boolean)
-    infobits = sa.Column(sa.Integer)
-    fid = sa.Column(sa.Integer)
-    rcid = sa.Column(sa.Integer)
-    pid = sa.Column(psql.BIGINT)
-    nid = sa.Column(sa.Integer)
-    expid = sa.Column(sa.Integer)
-    itid = sa.Column(sa.Integer)
-    obsdate = sa.Column(sa.DateTime)
-    seeing = sa.Column(sa.Float)
-    airmass = sa.Column(sa.Float)
-    moonillf = sa.Column(sa.Float)
-    moonesb = sa.Column(sa.Float)
-    maglimit = sa.Column(sa.Float)
-    crpix1 = sa.Column(sa.Float)
-    crpix2 = sa.Column(sa.Float)
-    crval1 = sa.Column(sa.Float)
-    crval2 = sa.Column(sa.Float)
-    cd11 = sa.Column(sa.Float)
-    cd12 = sa.Column(sa.Float)
-    cd21 = sa.Column(sa.Float)
-    cd22 = sa.Column(sa.Float)
-    ipac_pub_date = sa.Column(sa.DateTime)
-    ipac_gid = sa.Column(sa.Integer)
-    imgtypecode = sa.Column(sa.CHAR(1))
-    exptime = sa.Column(sa.Float)
-    filefracday = sa.Column(psql.BIGINT)
-    fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",
-                  field, ccdid, qid, filtercode, obsjd)
-    pathidx = Index('image_path_idx', path)
-
-    created_at = sa.Column(sa.DateTime, default=sa.func.now())
-    modified = sa.Column(sa.DateTime, default=sa.func.now(),
-                         onupdate=sa.func.now())
-
-    science_image = relationship('ScienceImage', cascade='all')
-
-    hpss_sci_path = sa.Column(sa.Text, index=True)
-    hpss_mask_path = sa.Column(sa.Text, index=True)
-
-    @hybrid_property
-    def obsmjd(self):
-        return self.obsjd - 2400000.5
-
-    @hybrid_property
-    def filter(self):
-        return 'ztf' + self.filtercode[-1]
-
-    def ipac_path(self, suffix):
-        """The url of a particular file corresponding to this metadata
-        record, with suffix `suffix`, in the IPAC archive. """
-        sffd = str(self.filefracday)
-        return f'https://irsa.ipac.caltech.edu/ibe/data/ztf/' \
-               f'products/sci/{sffd[:4]}/{sffd[4:8]}/{sffd[8:]}/' \
-               f'ztf_{sffd}_{self.field:06d}_' \
-               f'{self.filtercode}_c{self.ccdid:02d}_' \
-               f'{self.imgtypecode}_q{self.qid}_{suffix}'
-
-
-class PipelineProduct(models.Base, ArchiveFile):
+class ZTFFile(models.Base, File):
     """A database-mapped, disk-mappable memory-representation of a file that
-    can be pushed to the NERSC archive. This class is abstract and not
+    is associated with a ZTF sky partition. This class is abstract and not
     designed to be instantiated, but it is also not a mixin. Think of it as a
-    base class for the polymorphic hierarchy of fits products in SQLalchemy.
+    base class for the polymorphic hierarchy of products in SQLalchemy.
 
-    To represent an disk-mappable memory-representation of a fits file that
-    is not mapped to rows in the database, instantiate FITSFile directly.
+    To create an disk-mappable representation of a fits file that stores data in
+    memory and is not mapped to rows in the database, instantiate FITSFile
+    directly.
     """
 
     # this is the discriminator that is used to keep track of different types
@@ -901,14 +819,14 @@ class PipelineProduct(models.Base, ArchiveFile):
 
     # all pipeline fits products must implement these four key pieces of
     # metadata. These are all assumed to be not None in valid instances of
-    # PipelineProduct.
+    # ZTFFile.
 
     field = sa.Column(sa.Integer)
     qid = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
     ccdid = sa.Column(sa.Integer)
 
-    copies = relationship('PipelineProductCopy', cascade='all')
+    copies = relationship('ZTFFileCopy', cascade='all')
 
     # An index on the four indentifying
     idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
@@ -920,15 +838,15 @@ class PipelineProduct(models.Base, ArchiveFile):
     }
 
 
-class PipelineRegionFile(PipelineProduct):
+class PipelineRegionFile(ZTFFile):
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
 
     __mapper_args__ = {
         'polymorphic_identity': 'regionfile',
-        'inherit_condition': id == PipelineProduct.id
+        'inherit_condition': id == ZTFFile.id
     }
 
     catalog_id = sa.Column(sa.Integer, sa.ForeignKey(
@@ -957,15 +875,15 @@ class PipelineRegionFile(PipelineProduct):
         return reg
 
 
-class PipelineFITSCatalog(PipelineProduct, FITSFile):
+class PipelineFITSCatalog(ZTFFile, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'catalog',
-        'inherit_condition': id == PipelineProduct.id
+        'inherit_condition': id == ZTFFile.id
     }
 
     image_id = sa.Column(sa.Integer,
@@ -1022,16 +940,16 @@ class PipelineFITSCatalog(PipelineProduct, FITSFile):
         return cat
 
 
-class MaskImage(PipelineProduct, IntegerFITSImage):
+class MaskImage(ZTFFile, IntegerFITSImage):
     __diskmapped_cached_properties__ = IntegerFITSImage.__diskmapped_cached_properties__ + [
         '_boolean']
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
     __mapper_args__ = {
         'polymorphic_identity': 'mask',
-        'inherit_condition': id == PipelineProduct.id
+        'inherit_condition': id == ZTFFile.id
     }
 
     def refresh_bit_mask_entries_in_header(self):
@@ -1091,20 +1009,19 @@ class SegmentationImage(photutils.segmentation.SegmentationImage,
     pass
 
 
-class CalibratableImage(FloatingPointFITSImage, PipelineProduct):
+class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
     __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
                                         '_bkgimg', '_filter_kernel', '_rmsimg',
                                         '_threshimg', '_segmimg',
                                         '_sourcelist', '_bkgsubimg']
 
-
-    id = sa.Column(sa.Integer, sa.ForeignKey('pipelineproducts.id',
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
 
     __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
-                       'inherit_condition': id == PipelineProduct.id}
+                       'inherit_condition': id == ZTFFile.id}
 
     detections = relationship('Detection', cascade='all')
     objects = relationship('ObjectWithFlux', cascade='all')
@@ -1345,18 +1262,32 @@ class CalibratedImage(CalibratableImage):
         return self.header[APER_KEY]
 
 
+#class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
 class ScienceImage(CalibratedImage):
+
+    """IPAC record of a science image from their pipeline. Contains some
+    metadata that IPAC makes available through its irsa metadata query
+    service.  This class is primarily intended to enable the reflection of
+    IPAC's idea of its science images and which science images exist so that
+    IPAC's world can be compared against the results of this pipeline.
+
+    This class does not map to any file on disk, in the sense that it is not
+    designed to reflect the data or metadata of any local file to memory,
+    but it can be used to download files from the IRSA archive to disk (
+    again, it does not make any attempt to represent the contents of these
+    files, or synchronize their contents on disk to their representation in
+    memory).
+
+    This class represents immutable metadata only.
+    """
+
+    #__tablename__ = 'ipacrecords'
 
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sci',
                        'inherit_condition': id == CalibratedImage.id}
-
-    ipac_record_id = sa.Column(sa.Integer, sa.ForeignKey('ipacrecords.id',
-                                                         name='ipacrecords_id_fk'),
-                               index=True)
-    ipac_record = relationship('IPACRecord', back_populates='science_image')
 
 
     @classmethod
@@ -1367,6 +1298,74 @@ class ScienceImage(CalibratedImage):
         obj.qid = obj.header['QID']
         obj.fid = obj.header['FILTERID']
         return obj
+
+    #basename = sa.Column(sa.Text, unique=True)
+    filtercode = sa.Column(sa.CHAR(2))
+    #qid = sa.Column(sa.Integer)
+    #field = sa.Column(sa.Integer)
+    #ccdid = sa.Column(sa.Integer)
+    obsjd = sa.Column(psql.DOUBLE_PRECISION)
+    #good = sa.Column(sa.Boolean)
+    #hasvariance = sa.Column(sa.Boolean)
+    infobits = sa.Column(sa.Integer)
+    #fid = sa.Column(sa.Integer)
+    rcid = sa.Column(sa.Integer)
+    pid = sa.Column(psql.BIGINT)
+    nid = sa.Column(sa.Integer)
+    expid = sa.Column(sa.Integer)
+    itid = sa.Column(sa.Integer)
+    obsdate = sa.Column(sa.DateTime)
+    seeing = sa.Column(sa.Float)
+    airmass = sa.Column(sa.Float)
+    moonillf = sa.Column(sa.Float)
+    moonesb = sa.Column(sa.Float)
+    maglimit = sa.Column(sa.Float)
+    crpix1 = sa.Column(sa.Float)
+    crpix2 = sa.Column(sa.Float)
+    crval1 = sa.Column(sa.Float)
+    crval2 = sa.Column(sa.Float)
+    cd11 = sa.Column(sa.Float)
+    cd12 = sa.Column(sa.Float)
+    cd21 = sa.Column(sa.Float)
+    cd22 = sa.Column(sa.Float)
+    #ipac_pub_date = sa.Column(sa.DateTime)
+    ipac_gid = sa.Column(sa.Integer)
+    imgtypecode = sa.Column(sa.CHAR(1))
+    exptime = sa.Column(sa.Float)
+    filefracday = sa.Column(psql.BIGINT)
+
+    #fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",
+    #              field, ccdid, qid, filtercode, obsjd)
+    #pathidx = Index('image_path_idx', path)
+
+    #created_at = sa.Column(sa.DateTime, default=sa.func.now())
+    #modified = sa.Column(sa.DateTime, default=sa.func.now(),
+    #                     onupdate=sa.func.now())
+
+    #science_image = relationship('ScienceImage', cascade='all')
+
+    #hpss_sci_path = sa.Column(sa.Text, index=True)
+    #hpss_mask_path = sa.Column(sa.Text, index=True)
+
+
+
+    @hybrid_property
+    def obsmjd(self):
+        return self.obsjd - 2400000.5
+
+    @hybrid_property
+    def filter(self):
+        return 'ztf' + self.filtercode[-1]
+
+    def ipac_path(self, suffix):
+        """The url of a particular file corresponding to this metadata
+        record, with suffix `suffix`, in the IPAC archive. """
+        sffd = str(self.filefracday)
+        return f'https://irsa.ipac.caltech.edu/ibe/data/ztf/' \
+               f'products/sci/{sffd[:4]}/{sffd[4:8]}/{sffd[8:]}/' \
+               f'ztf_{sffd}_{self.field:06d}_' \
+               f'{self.filtercode}_c{self.ccdid:02d}_' \
+               f'{self.imgtypecode}_q{self.qid}_{suffix}'
 
 
 # Coadds #######################################################################
