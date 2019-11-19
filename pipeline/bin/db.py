@@ -1309,7 +1309,7 @@ class ScienceImage(CalibratedImage):
     #hasvariance = sa.Column(sa.Boolean)
     infobits = sa.Column(sa.Integer)
     #fid = sa.Column(sa.Integer)
-    rcid = sa.Column(sa.Integer)
+    #rcid = sa.Column(sa.Integer)
     pid = sa.Column(psql.BIGINT)
     nid = sa.Column(sa.Integer)
     expid = sa.Column(sa.Integer)
