@@ -214,6 +214,18 @@ def init_db():
                hpss_dbhost, hpss_dbport)
 
 
+def model_representation(o):
+    if sa.inspection.inspect(o).expired:
+        DBSession().refresh(o)
+    mapper = sa.inspect(o)
+    attr_list = [f"{c.name}={getattr(o, c.name)}"
+                 for c in mapper.attrs]
+    return f"<{type(o).__name__}({', '.join(attr_list)})>"
+
+
+models.Base.__repr__ = model_representation
+
+
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
                fk_1='id', fk_2='id', base=models.Base):
     """Helper function to create a join table for a many-to-many relationship.
@@ -497,7 +509,7 @@ class TapeCopy(ZTFFileCopy):
     archive = relationship('TapeArchive', back_populates='contents')
 
     # The exact name of the TAR archive member
-    member_name = sa.Column(sa.Text, nullable=False)
+    member_name = sa.Column(sa.Text)
 
 
 class TapeArchive(models.Base):
