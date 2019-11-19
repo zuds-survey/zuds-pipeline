@@ -20,8 +20,8 @@ if __name__ == '__main__':
     start = datetime.now()
 
     # get the maximum nid
-    max_nid = db.DBSession().query(db.sa.func.max(db.IPACRecord.nid)).first()[0]
-    max_date = db.DBSession().query(db.sa.func.max(db.IPACRecord.obsdate)).first()[0]
+    max_nid = db.DBSession().query(db.sa.func.max(db.ScienceImage.nid)).first()[0]
+    max_date = db.DBSession().query(db.sa.func.max(db.ScienceImage.obsdate)).first()[0]
     today = datetime.utcnow()
     todays_nid = max_nid + (today - max_date).days
 
@@ -44,14 +44,14 @@ if __name__ == '__main__':
         metatables.append(metatable)
 
     metatable = pd.concat(metatables)
-    current_paths = db.DBSession().query(db.IPACRecord.path).all()
+    current_paths = db.DBSession().query(db.ScienceImage.basename).all()
     print(f'pulled {len(metatable)} images')
 
     # dont need this
     del metatable['imgtype']
     del metatable['ipac_pub_date']
 
-    meta_images = [db.IPACRecord(**row.to_dict()) for _, row in metatable.iterrows()]
+    meta_images = [db.ScienceImage(**row.to_dict()) for _, row in metatable.iterrows()]
     basenames = [i.ipac_path('sciimg.fits').split('/')[-1] for i in meta_images]
 
     indices = np.nonzero(~np.in1d(basenames, current_paths, assume_unique=True))[0]
