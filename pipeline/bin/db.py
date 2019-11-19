@@ -217,9 +217,9 @@ def init_db():
 def model_representation(o):
     if sa.inspection.inspect(o).expired:
         DBSession().refresh(o)
-    mapper = sa.inspect(o)
-    attr_list = [f"{c.name}={getattr(o, c.name)}"
-                 for c in mapper.attrs]
+    inst = sa.inspect(o)
+    attr_list = [f"{g.key}={getattr(o, g.key)}"
+                 for g in inst.mapper.column_attrs]
     return f"<{type(o).__name__}({', '.join(attr_list)})>"
 
 
