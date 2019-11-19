@@ -55,7 +55,7 @@ def archive_copy_over_http(copy):
 
 
 def archive(copy):
-    """Publish a copy of a PipelineProduct to the NERSC archive."""
+    """Publish a copy of a ZTFFile to the NERSC archive."""
 
     if not isinstance(copy, db.HTTPArchiveCopy):
         raise ValueError(
