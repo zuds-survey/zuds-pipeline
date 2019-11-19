@@ -1691,20 +1691,20 @@ class Fit(models.Base):
 models.Source.fits = relationship('Fit', cascade='all')
 
 
-class DR8(models.Base, SpatiallyIndexed):
+class DR8(SpatiallyIndexed):
 
-    hemisphere = sa.Column(sa.Text)
+    #hemisphere = sa.Column(sa.Text)
 
-    __tablename__ = 'dr8'
-    __mapper_args__ = {
-        'polymorphic_on': hemisphere,
-        'polymorphic_identity': 'base'
-    }
+    #__tablename__ = 'dr8'
+    #__mapper_args__ = {
+    #    'polymorphic_on': hemisphere,
+    #    'polymorphic_identity': 'base'
+    #}
 
-    def __repr__(self):
-        attr_list = [f"{c.name.lower()}={getattr(self, c.name.lower())}"
-                     for c in self.__table__.columns]
-        return f"<{type(self).__name__}({', '.join(attr_list)})>"
+    #def __repr__(self):
+    #    attr_list = [f"{c.name.lower()}={getattr(self, c.name.lower())}"
+    #                 for c in self.__table__.columns]
+    #    return f"<{type(self).__name__}({', '.join(attr_list)})>"
 
 
     release = sa.Column('RELEASE', sa.Integer)
@@ -1862,21 +1862,23 @@ class DR8(models.Base, SpatiallyIndexed):
         return -2.5 * sa.func.log(self.flux_w1) + 22.5
 
 
-class DR8North(DR8):
-    id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'), primary_key=True)
+class DR8North(models.Base, DR8):
+    #id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
+    # primary_key=True)
     __tablename__ = 'dr8_north'
-    __mapper_args__ = {'polymorphic_identity': 'n'}
+    #__mapper_args__ = {'polymorphic_identity': 'n'}
 
-    @declared_attr
-    def __table_args__(cls):
-        return tuple()
+    #@declared_attr
+    #def __table_args__(cls):
+    #    return tuple()
 
 
-class DR8South(DR8):
-    id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'), primary_key=True)
+class DR8South(models.Base, DR8):
+    #id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
+    # primary_key=True)
     __tablename__ = 'dr8_south'
-    __mapper_args__ = {'polymorphic_identity': 's'}
+    #__mapper_args__ = {'polymorphic_identity': 's'}
 
-    @declared_attr
-    def __table_args__(cls):
-        return tuple()
+    #@declared_attr
+    #def __table_args__(cls):
+    #    return tuple()
