@@ -855,7 +855,6 @@ class ZTFFile(models.Base, File):
         return DBSession().query(cls).filter(cls.basename == basename).first()
 
 
-
 class PipelineRegionFile(ZTFFile):
 
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
@@ -1066,7 +1065,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
             # need to calculate the weight map.
 
             ind = self.mask_image.boolean
-            wgt = np.empty_like(ind, dtype='<f8')
+            wgt = np.empty_like(ind, dtype='<f4')
             wgt[~ind] = 1 / self.rms_image.data[~ind] ** 2
             wgt[ind] = 0.
 
