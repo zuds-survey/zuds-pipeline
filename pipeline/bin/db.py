@@ -1016,7 +1016,7 @@ class MaskImage(ZTFFile, IntegerFITSImage):
             # pixels where this operation is non-zero.
 
             # DG: also have to add 2^16 (my custom bit)
-            # So 6141 ->
+            # So 6141 -> 71677
 
             maskpix = (self.data & 71677) > 0
             self._boolean = maskpix
@@ -1525,6 +1525,13 @@ class Subtraction(HasWCS):
         sub = cls.from_file(outname)
         sub.mask_image = submask
 
+        if isinstance(sub, CalibratedImage):
+            sub.header['MAGZP'] = sci.header['MAGZP']
+            sub.header[APER_KEY] = sci.header[APER_KEY]
+            sub.header_comments['MAGZP'] = sci.header_comments['MAGZP']
+            sub.header_comments[APER_KEY] = sci.header_comments[APER_KEY]
+            sub.save()
+
         if data_product:
             archive.archive(sub)
             archive.archive(sub.mask_image)
@@ -1623,10 +1630,13 @@ class HPSSJob(models.Base):
     reason = sa.Column(sa.Text)
 
 
+"""
 def images(self):
     candidates = DBSession().query(IPACRecord).filter(func.q3c_radial_query(IPACRecord.ra, IPACRecord.dec, self.ra, self.dec, 0.64))\
                                          .filter(func.q3c_poly_query(self.ra, self.dec, IPACRecord.poly))
     return candidates.all()
+    
+"""
 
 
 # keep track of the images that the photometry came from
