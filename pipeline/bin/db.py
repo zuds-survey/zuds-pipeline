@@ -560,7 +560,10 @@ class FITSFile(File):
 
         This is a 'get_or_create' method."""
         f = Path(f)
-        obj = cls.get_by_basename(f.name)
+        if issubclass(cls, models.Base):
+            obj = cls.get_by_basename(f.name)
+        else:
+            obj = None
         if obj is None:
             obj = cls()
             obj.basename = f.name
