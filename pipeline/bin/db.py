@@ -1093,7 +1093,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
             data = self.background_object.background_rms
             rmsi = FloatingPointFITSImage()
             rmsi.basename = self.basename.replace('.fits', '.rms.fits')
-            rmsi.data = data
+            rmsi.data = data.astype('<f4')
             self._rmsimg = rmsi
             self._rmsimg.header = self.header
             self._rmsimg.header_comments = self.header_comments
