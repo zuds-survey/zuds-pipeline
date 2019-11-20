@@ -549,13 +549,21 @@ class FITSFile(File):
     _DATA_HDU = 0
 
     @classmethod
+    def get_by_basename(cls, basename):
+        return DBSession().query(cls).filter(cls.basename == basename).first()
+
+    @classmethod
     def from_file(cls, f):
         """Read a file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
-        can later be flushed to the database using SQLalchemy. """
+        can later be flushed to the database using SQLalchemy.
+
+        This is a 'get_or_create' method."""
         f = Path(f)
-        obj = cls()
-        obj.basename = f.name
+        obj = cls.get_by_basename(f.name)
+        if obj is None:
+            obj = cls()
+            obj.basename = f.name
         obj.map_to_local_file(str(f.absolute()))
         obj.load()
         return obj
@@ -580,6 +588,8 @@ class FITSFile(File):
         with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
             data = hdul[self._DATA_HDU].data
         self._data = data
+
+
 
     @property
     def data(self):
@@ -850,9 +860,6 @@ class ZTFFile(models.Base, File):
 
     }
 
-    @classmethod
-    def get_by_basename(cls, basename):
-        return DBSession().query(cls).filter(cls.basename == basename).first()
 
 
 class PipelineRegionFile(ZTFFile):
