@@ -104,7 +104,7 @@ rm {os.path.basename(tarfile)}
 def retrieve_images(image_query,
                     job_script_destination='.',
                     frame_destination='.', log_destination='.',
-                    preserve_dirs=False):
+                    preserve_dirs=False, n_jobs=14):
 
 
     # db.DBSession().query(db.ZTFFile).filter(...)
@@ -189,7 +189,7 @@ def retrieve_images(image_query,
 
     import numpy as np
     for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
-            ordered) // 14)):
+            ordered) // n_jobs)):
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
