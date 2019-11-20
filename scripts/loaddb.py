@@ -14,9 +14,6 @@ except ImportError:
     rank = 0
     size = 1
 
-# this may need to be parallelized
-df = pd.read_csv('/global/cscratch1/sd/dgold/image.csv')
-
 fid_map = {
     'zg': 1,
     'zr': 2,
@@ -25,28 +22,24 @@ fid_map = {
 
 
 if rank == 0:
+    df = pd.read_csv('/global/cscratch1/sd/dgold/image.csv')    
     archives = pd.concat([df['hpss_sci_path'], df['hpss_mask_path']]).unique()
-    tarchs = []
-    arch_map = {}
+    """
     for archive in archives:
         if archive is None:
             continue
         dbarch = db.TapeArchive(id=archive)
         db.DBSession().add(dbarch)
-        tarchs.append(dbarch)
     db.DBSession().commit()
-    for dbarch in tarchs:
-        arch_map[dbarch.id] = dbarch
-
+    """
+    
     if mpi:
         subframes = np.array_split(df, size)
 
 else:
     subframes = None
-    arch_map = None
 
 if mpi: 
-    arch_map = comm.bcast(arch_map, root=0)
     myframes = comm.scatter(subframes, root=0)
 else:
     myframes = df
@@ -87,14 +80,12 @@ for i, row in myframes.iterrows():
 
     hpss_sci_path = row['hpss_sci_path']
     if hpss_sci_path is not None:
-        scitar = arch_map[hpss_sci_path]
-        scicopy = db.TapeCopy(archive=scitar, product=sci)
+        scicopy = db.TapeCopy(archive_id=hpss_sci_path, product=sci)
         db.DBSession().add(scicopy)
 
     hpss_mask_path = row['hpss_mask_path']
     if hpss_mask_path is not None:
-        masktar = arch_map[hpss_mask_path]
-        maskcopy = db.TapeCopy(archive=masktar, product=msk)
+        maskcopy = db.TapeCopy(archive=hpss_mask_path, product=msk)
         db.DBSession().add(maskcopy)
 
     db.DBSession().add(msk)
