@@ -426,6 +426,7 @@ class ZTFFileCopy(models.Base):
     product = relationship('ZTFFile', back_populates='copies',
                            cascade='all')
 
+
     def get(self):
         """Pull the Copy to local disk and return the corresponding
         Product (File subclass) that the Copy is mapped to."""
@@ -848,6 +849,11 @@ class ZTFFile(models.Base, File):
         'polymorphic_identity': 'fitsproduct'
 
     }
+
+    @classmethod
+    def get_by_basename(cls, basename):
+        return DBSession().query(cls).filter(cls.basename == basename).first()
+
 
 
 class PipelineRegionFile(ZTFFile):
