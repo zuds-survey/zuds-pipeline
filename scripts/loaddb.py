@@ -3,13 +3,16 @@ db.init_db()  # zuds2
 import numpy as np
 import pandas as pd
 
-from mpi4py import MPI
-comm = MPI.COMM_WORLD
-rank = comm.Get_rank()
-size = comm.Get_size()
-
-# this may need to be parallelized
-df = pd.read_csv('/global/cscratch1/sd/dgold/image.csv')
+try:
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+    size = comm.Get_size()
+    mpi = True
+except ImportError:
+    mpi = False
+    rank = 0
+    size = 1
 
 fid_map = {
     'zg': 1,
@@ -17,30 +20,27 @@ fid_map = {
     'zi': 3
 }
 
+nrows = 18892958
 
-if rank == 0:
-    archives = pd.concat(df['hpss_sci_path'], df['hpss_mask_path']).unique()
-    tarchs = []
-    arch_map = {}
-    for archive in archives:
-        if archive is None:
-            continue
-        dbarch = db.TapeArchive(id=archive)
-        db.DBSession().add(dbarch)
-        tarchs.append(dbarch)
-    db.DBSession().commit()
-    for dbarch in tarchs:
-        arch_map[dbarch.id] = dbarch
-    subframes = np.array_split(df, size)
+import os
+jobarray_idx = int(os.getenv('SLURM_ARRAY_TASK_ID'))
+jobarray_count = int(os.getenv('SLURM_ARRAY_TASK_MAX')) + 1
 
-else:
-    subframes = None
-    arch_map = None
+# data row indices
+inds = np.arange(1, nrows)
+inds = np.array_split(inds, jobarray_count)[jobarray_idx]
 
-arch_map = comm.bcast(arch_map, root=0)
-myframes = comm.scatter(subframes, root=0)
+splinds = np.array_split(inds, size)
+my_inds = splinds[rank]
 
-# load in chunks of 50k
+lb = min(my_inds)
+skiprows = lambda r: 0 < r < lb
+
+nrows = len(my_inds)  # number of DATA ROWS to read 
+
+myframes = pd.read_csv('/global/cscratch1/sd/dgold/image.csv',
+                       skiprows=skiprows, nrows=nrows)
+
 for i, row in myframes.iterrows():
     poly_dict = {}
     for key in ['ra', 'dec', 'ra1', 'dec1', 'ra2', 'dec2', 'ra3',
@@ -76,20 +76,16 @@ for i, row in myframes.iterrows():
 
     hpss_sci_path = row['hpss_sci_path']
     if hpss_sci_path is not None:
-        scitar = arch_map[hpss_sci_path]
-        scicopy = db.TapeCopy(archive=scitar, product=sci)
+        scicopy = db.TapeCopy(archive_id=hpss_sci_path, product=sci)
         db.DBSession().add(scicopy)
 
     hpss_mask_path = row['hpss_mask_path']
     if hpss_mask_path is not None:
-        masktar = arch_map[hpss_mask_path]
-        maskcopy = db.TapeCopy(archive=masktar, product=msk)
+        maskcopy = db.TapeCopy(archive_id=hpss_mask_path, product=msk)
         db.DBSession().add(maskcopy)
 
     db.DBSession().add(msk)
     db.DBSession().add(sci)
-
-    if (i != 0 and i % 50000 == 0) or (i == len(myframes) - 1):
-        db.DBSession().commit()
+db.DBSession().commit()
 
 
