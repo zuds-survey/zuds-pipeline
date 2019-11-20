@@ -1266,9 +1266,7 @@ class CalibratedImage(CalibratableImage):
                                     source=source)
             photometry.append(phot)
 
-        DBSession().rollback()
-        DBSession().add_all(photometry)
-        DBSession().commit()
+        return photometry 
 
     @declared_attr
     def __table_args__(cls):
