@@ -20,31 +20,27 @@ fid_map = {
     'zi': 3
 }
 
+nrows = 18892958
 
-if rank == 0:
-    df = pd.read_csv('/global/cscratch1/sd/dgold/image.csv')    
-    archives = pd.concat([df['hpss_sci_path'], df['hpss_mask_path']]).unique()
-    """
-    for archive in archives:
-        if archive is None:
-            continue
-        dbarch = db.TapeArchive(id=archive)
-        db.DBSession().add(dbarch)
-    db.DBSession().commit()
-    """
-    
-    if mpi:
-        subframes = np.array_split(df, size)
+import os
+jobarray_idx = int(os.getenv('SLURM_ARRAY_TASK_ID'))
+jobarray_count = int(os.getenv('SLURM_ARRAY_TASK_MAX')) + 1
 
-else:
-    subframes = None
+# data row indices
+inds = np.arange(1, nrows)
+inds = np.array_split(inds, jobarray_count)[jobarray_idx]
 
-if mpi: 
-    myframes = comm.scatter(subframes, root=0)
-else:
-    myframes = df
+splinds = np.array_split(inds, size)
+my_inds = splinds[rank]
 
-# load in chunks of 50k
+lb = min(my_inds)
+skiprows = lambda r: 0 < r < lb
+
+nrows = len(my_inds)  # number of DATA ROWS to read 
+
+myframes = pd.read_csv('/global/cscratch1/sd/dgold/image.csv',
+                       skiprows=skiprows, nrows=nrows)
+
 for i, row in myframes.iterrows():
     poly_dict = {}
     for key in ['ra', 'dec', 'ra1', 'dec1', 'ra2', 'dec2', 'ra3',
@@ -85,13 +81,11 @@ for i, row in myframes.iterrows():
 
     hpss_mask_path = row['hpss_mask_path']
     if hpss_mask_path is not None:
-        maskcopy = db.TapeCopy(archive=hpss_mask_path, product=msk)
+        maskcopy = db.TapeCopy(archive_id=hpss_mask_path, product=msk)
         db.DBSession().add(maskcopy)
 
     db.DBSession().add(msk)
     db.DBSession().add(sci)
-
-    if (i != 0 and i % 50000 == 0) or (i == len(myframes) - 1):
-        db.DBSession().commit()
+db.DBSession().commit()
 
 
