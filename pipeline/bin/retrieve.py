@@ -101,26 +101,20 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(query, exclude_masks=False, job_script_destination='.',
+def retrieve_images(image_query,
+                    job_script_destination='.',
                     frame_destination='.', log_destination='.',
                     preserve_dirs=False):
 
+
+    # db.DBSession().query(db.ZTFFile).filter(...)
+    full_query = image_query.join(db.TapeCopies)
+
     # this is the query to get the image paths
-    metatable = pd.read_sql(query.statement, db.DBSession().get_bind())
+    metatable = pd.read_sql(full_query.statement, db.DBSession().get_bind())
 
-    df = metatable[['path', 'hpss_sci_path', 'hpss_mask_path']]
-    dfsci = df[['path', 'hpss_sci_path']]
-    dfsci = dfsci.rename({'hpss_sci_path': 'tarpath'}, axis='columns')
-
-    if not exclude_masks:
-        dfmask = df[['path', 'hpss_mask_path']].copy()
-        dfmask.loc[:, 'path'] = [im.replace('sciimg', 'mskimg') for im in dfmask['path']]
-        dfmask = dfmask.rename({'hpss_mask_path': 'tarpath'}, axis='columns')
-        dfmask.dropna(inplace=True)
-        df = pd.concat((dfsci, dfmask))
-    else:
-        df = dfsci
-
+    df = metatable[['basename', 'archive_id']]
+    df = df.rename({'archive_id': 'tarpath'}, axis='columns')
     tars = df['tarpath'].unique()
 
     # if nothing is found raise valueerror
@@ -199,13 +193,15 @@ def retrieve_images(query, exclude_masks=False, job_script_destination='.',
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
-        images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
+        images = [df[df['tarpath'] == tarname]['basename'].tolist() for tarname
+                  in tarnames]
 
         jobid = submit_hpss_job(tarnames, images, job_script_destination,
                                 frame_destination, log_destination, tape,
                                 preserve_dirs)
 
-        for image in df[[name in tarnames for name in df['tarpath']]]['path']:
+        for image in df[[name in tarnames for name in df['tarpath']]][
+            'basename']:
             dependency_dict[image] = jobid
 
     return dependency_dict, metatable

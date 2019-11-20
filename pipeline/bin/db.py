@@ -1266,7 +1266,7 @@ class CalibratedImage(CalibratableImage):
                                     source=source)
             photometry.append(phot)
 
-        return photometry 
+        return photometry
 
     @declared_attr
     def __table_args__(cls):
