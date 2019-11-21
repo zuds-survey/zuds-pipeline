@@ -47,4 +47,3 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
     phot_table.rename_column('aperture_sum_err', 'fluxerr')
 
     return phot_table
-np.
