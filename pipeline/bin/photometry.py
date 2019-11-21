@@ -39,7 +39,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
 
 
     # check for invalid photometry on masked pixels
-    phot_table['flags'] = [np.bitwise_or.reduce(m, axis=[0, 1]) for m in
+    phot_table['flags'] = [np.bitwise_or.reduce(m, axis=(0, 1)) for m in
                            maskpix]
 
     # rename some columns
@@ -47,3 +47,4 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
     phot_table.rename_column('aperture_sum_err', 'fluxerr')
 
     return phot_table
+np.
