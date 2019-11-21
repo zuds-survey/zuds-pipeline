@@ -1019,7 +1019,12 @@ class MaskImage(ZTFFile, IntegerFITSImage):
             # So 6141 -> 71677
 
             maskpix = (self.data & 71677) > 0
-            self._boolean = maskpix
+            _boolean = IntegerFITSImage()
+            _boolean.data = maskpix
+            _boolean.header = self.header
+            _boolean.header_comments = self.header_comments
+            _boolean.basename = self.basename.replace('.fits', '.bpm.fits')
+            self._boolean = _boolean
         return self._boolean
 
     parent_image_id = sa.Column(sa.Integer,
@@ -1260,8 +1265,7 @@ class CalibratedImage(CalibratableImage):
         for row, source in zip(result, sources):
             phot = ForcedPhotometry(flux=row['flux'],
                                     fluxerr=row['fluxerr'],
-                                    status=row['status'],
-                                    reason=row['reason'],
+                                    flags=row['flags'],
                                     image=self,
                                     source=source)
             photometry.append(phot)
@@ -1513,14 +1517,13 @@ class Subtraction(HasWCS):
         remapped_ref.basename = remapped_ref_basename
         remapped_refmask.basename = os.path.basename(remapped_refmaskname)
 
-
-        badpix = remapped_refmask.boolean | sci.mask_image.boolean
+        badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix.astype('uint16')
-        submask.header = {}
-        submask.header_comments = {}
-        submask.save()
+        submask.header = sci.mask_image.header
+        submask.header_comments = sci.mask_image.header_comments
+        submask.boolean.save()
 
-        command = prepare_hotpants(sci, remapped_ref, outname, submask,
+        command = prepare_hotpants(sci, remapped_ref, outname, submask.boolean,
                                    directory, copy_inputs=copy_inputs)
 
         subprocess.check_call(command.split())
@@ -1614,8 +1617,7 @@ class ForcedPhotometry(ObjectWithFlux):
     __mapper_args__ = {'polymorphic_identity': 'photometry',
                        'inherit_condition': id == ObjectWithFlux.id}
 
-    status = sa.Column(sa.Boolean)
-    reason = sa.Column(sa.Text)
+    flags = sa.Column(sa.Integer)
 
     @property
     def mag(self):
