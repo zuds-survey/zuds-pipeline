@@ -745,7 +745,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         data[np.isnan(data)] = 0
 
         if isinstance(self, MaskImage):
-            data = data.astype(np.int16)
+            data = data.astype(int)
             data[footprint == 0] += 2**16
 
         # make the new object and load it up with data
