@@ -951,7 +951,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
                                        tab['sky_centroid_icrs'].ra.deg,
                                        tab['sky_centroid_icrs'].dec.deg,
                                        apply_calibration=True)
-            names = ['mag', 'magerr', 'flux', 'fluxerr', 'status', 'reason']
+            names = ['mag', 'magerr', 'flux', 'fluxerr', 'flags']
             for name in names:
                 df[name] = phot[name]
 
@@ -1272,7 +1272,7 @@ class CalibratedImage(CalibratableImage):
         for row, source in zip(result, sources):
             phot = ForcedPhotometry(flux=row['flux'],
                                     fluxerr=row['fluxerr'],
-                                    flags=row['flags'],
+                                    flags=int(row['flags']),
                                     image=self,
                                     source=source)
             photometry.append(phot)
