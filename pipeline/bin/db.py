@@ -590,6 +590,8 @@ class FITSFile(File):
         """Load data from disk into memory"""
         with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
             data = hdul[self._DATA_HDU].data
+        if data.dtype.name == 'uint8':
+            data = data.astype(bool)
         self._data = data
 
 
@@ -642,7 +644,7 @@ class FITSFile(File):
             self.map_to_local_file(f)
         dname = self.data.dtype.name
         if dname == 'bool':
-            data = self.data.astype('uint16')
+            data = self.data.astype('uint8')
         else:
             data = self.data
         fits.writeto(f, data, self.astropy_header, overwrite=True)
@@ -743,7 +745,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         data[np.isnan(data)] = 0
 
         if isinstance(self, MaskImage):
-            data = data.astype(int)
+            data = data.astype(np.int16)
             data[footprint == 0] += 2**16
 
         # make the new object and load it up with data
@@ -1072,7 +1074,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
     def cmap_limits(self):
         interval = ZScaleInterval()
-        return interval.get_limits(self.data[~self.mask_image.boolean])
+        return interval.get_limits(self.data[~self.mask_image.boolean.data])
 
     @property
     def weight_image(self):
@@ -1084,7 +1086,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         except AttributeError:
             # need to calculate the weight map.
 
-            ind = self.mask_image.boolean
+            ind = self.mask_image.boolean.data
             wgt = np.empty_like(ind, dtype='<f4')
             wgt[~ind] = 1 / self.rms_image.data[~ind] ** 2
             wgt[ind] = 0.
@@ -1524,7 +1526,7 @@ class Subtraction(HasWCS):
         remapped_refmask.basename = os.path.basename(remapped_refmaskname)
 
         badpix = remapped_refmask.data | sci.mask_image.data
-        submask.data = badpix.astype('uint16')
+        submask.data = badpix
         submask.header = sci.mask_image.header
         submask.header_comments = sci.mask_image.header_comments
         submask.boolean.save()
