@@ -1522,7 +1522,6 @@ class Subtraction(HasWCS):
         submask.data = badpix.astype('uint16')
         submask.header = sci.mask_image.header
         submask.header_comments = sci.mask_image.header_comments
-        submask.basename =
         submask.boolean.save()
 
         command = prepare_hotpants(sci, remapped_ref, outname, submask.boolean,
