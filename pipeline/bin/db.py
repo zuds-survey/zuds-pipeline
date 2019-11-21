@@ -640,7 +640,12 @@ class FITSFile(File):
         except UnmappedFileError:
             f = self.basename
             self.map_to_local_file(f)
-        fits.writeto(f, self.data, self.astropy_header, overwrite=True)
+        dname = self.data.dtype.name
+        if dname == 'bool':
+            data = self.data.astype('uint16')
+        else:
+            data = self.data
+        fits.writeto(f, data, self.astropy_header, overwrite=True)
 
     def load(self):
         self.load_header()
