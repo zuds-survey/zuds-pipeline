@@ -1432,6 +1432,11 @@ class Coadd(CalibratableImage):
                           tmpdir=tmpdir, copy_inputs=copy_inputs)
         coaddmask = coadd.mask_image
 
+        coadd.header['FIELD'] = coadd.field = images[0].field
+        coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
+        coadd.header['QID'] = coadd.qid = images[0].qid
+        coadd.header['FID'] = coadd.fid = images[0].fid
+
         if data_product:
             archive.archive(coadd)
             archive.archive(coaddmask)
