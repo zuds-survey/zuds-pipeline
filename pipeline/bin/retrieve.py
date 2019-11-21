@@ -106,9 +106,10 @@ def retrieve_images(image_whereclause,
                     frame_destination='.', log_destination='.',
                     preserve_dirs=False, n_jobs=14):
 
-    full_query = db.DBSession().query(db.ZTFFile, db.TapeCopy)\
-                               .filter(image_whereclause)
-    
+    jt = db.sa.join(db.ZTFFile, db.TapeCopy,
+                    db.ZTFFile.id == db.TapeCopy.product_id)
+    full_query = db.DBSession().query(db.ZTFFile, db.TapeCopy).select_from(jt)
+    full_query = full_query.filter(image_whereclause)
 
     # this is the query to get the image paths
     metatable = pd.read_sql(full_query.statement, db.DBSession().get_bind())
