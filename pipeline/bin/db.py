@@ -1160,7 +1160,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
                                             self.threshold_image.data,
                                             DETECT_NPIX,
                                             filter_kernel=fk,
-                                            mask=self.mask_image.boolean)
+                                            mask=self.mask_image.boolean.data)
 
             deblended = photutils.deblend_sources(self.data,
                                                   segm,
@@ -1184,7 +1184,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         except AttributeError:
             self._bkg = photutils.Background2D(self.data,
                                                box_size=BKG_BOX_SIZE,
-                                               mask=self.mask_image.boolean)
+                                               mask=self.mask_image.boolean.data)
         return self._bkg
 
     @property
@@ -1212,7 +1212,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
             bkg = self.background_image.data
             rms = self.rms_image.data
-            msk = self.mask_image.boolean
+            msk = self.mask_image.boolean.data
             data = photutils.detect_threshold(self.data,
                                               DETECT_NSIGMA,
                                               background=bkg,
@@ -1235,7 +1235,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
             self._sourcelist = f(self.data - self.background_image.data,
                                  self.segm_image,
                                  error=self.rms_image.data,
-                                 mask=self.mask_image.boolean,
+                                 mask=self.mask_image.boolean.data,
                                  background=self.background_image.data,
                                  filter_kernel=self.filter_kernel,
                                  wcs=self.wcs)
