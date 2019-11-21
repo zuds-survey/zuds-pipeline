@@ -101,14 +101,14 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(image_query,
+def retrieve_images(image_whereclause,
                     job_script_destination='.',
                     frame_destination='.', log_destination='.',
                     preserve_dirs=False, n_jobs=14):
 
-
-    # db.DBSession().query(db.ZTFFile).filter(...)
-    full_query = image_query.join(db.TapeCopy).add_columns(db.TapeCopy)
+    full_query = db.DBSession().query(db.ZTFFile, db.TapeCopy)\
+                               .filter(image_whereclause)
+    
 
     # this is the query to get the image paths
     metatable = pd.read_sql(full_query.statement, db.DBSession().get_bind())
