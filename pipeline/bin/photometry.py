@@ -39,7 +39,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
 
 
     # check for invalid photometry on masked pixels
-    phot_table['flags'] = [np.bitwise_or.reduce(m, axis=(0, 1)).astype(int) for
+    phot_table['flags'] = [int(np.bitwise_or.reduce(m, axis=(0, 1))) for
                            m in maskpix]
 
     # rename some columns
