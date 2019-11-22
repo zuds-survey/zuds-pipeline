@@ -49,7 +49,7 @@ from matplotlib.patches import Ellipse
 
 
 
-BKG_BOX_SIZE = 128
+BKG_BOX_SIZE = 1024
 DETECT_NSIGMA = 1.5
 DETECT_NPIX = 5
 TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
@@ -955,13 +955,6 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
             for name in names:
                 df[name] = phot[name]
 
-            # fits binary tables can't handle unicode columns...
-            # old data-format ;-)
-            df['reason2'] = df['reason'].astype('|S')
-            del df['reason']
-            df = df.rename(columns={'reason2': 'reason'})
-            df.loc[df['reason'] == 'None', 'reason'] = None
-
         rec = df.to_records()
         cat.data = rec
         cat.header = image.header
@@ -1065,7 +1058,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
     detections = relationship('Detection', cascade='all')
     objects = relationship('ObjectWithFlux', cascade='all')
 
-    mask_image = relationship('MaskImage', back_populates='parent_image',
+    mask_image = relationship('MaskImage',
                               uselist=False,
                               primaryjoin=MaskImage.parent_image_id == id)
 

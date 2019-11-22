@@ -50,8 +50,19 @@ if __name__ == '__main__':
     # dont need this
     del metatable['imgtype']
     del metatable['ipac_pub_date']
+    del metatable['rcid']
 
-    meta_images = [db.ScienceImage(**row.to_dict()) for _, row in metatable.iterrows()]
+
+    meta_images = [db.ScienceImage(**row.to_dict()) for _, row
+                   in metatable.iterrows()]
+    meta_masks = [db.MaskImage(parent_image=s, field=s.field, qid=s.qid,
+                               ccdid=s.ccdid, fid=s.fid, ra1=s.ra1,
+                               ra2=s.ra2, ra3=s.ra3, ra4=s.ra4,
+                               dec1=s.dec1, dec2=s.dec2, dec3=s.dec3,
+                               dec4=s.dec4, ra=s.ra, dec=s.dec,
+                               basename=s.basename.replace('sciimg', 'mskimg'))
+                  for s in meta_images]
+
     basenames = [i.ipac_path('sciimg.fits').split('/')[-1] for i in meta_images]
 
     indices = np.nonzero(~np.in1d(basenames, current_paths, assume_unique=True))[0]
