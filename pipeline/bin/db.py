@@ -1259,11 +1259,10 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         if segmpath.exists():
             obj._segmimg = SegmentationImage.from_file(f'{segmpath}')
 
-        with DBSession().no_autoflush:
-            if obj.mask_image is not None:
-                mskpath = dir / obj.mask_image.basename
-                if mskpath.exists():
-                    obj.mask_image.map_to_local_file(mskpath)
+        if obj.mask_image is not None:
+            mskpath = dir / obj.mask_image.basename
+            if mskpath.exists():
+                obj.mask_image.map_to_local_file(mskpath)
 
         return obj
 

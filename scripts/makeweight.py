@@ -34,9 +34,8 @@ for fn in sci_fns:
     os.chdir(cwd)
 
     # clean up
-    sci.mask_image.unmap()
     sci.unmap()
-    del sci.mask_image
     del sci
 
+    db.DBSession().close()
 
