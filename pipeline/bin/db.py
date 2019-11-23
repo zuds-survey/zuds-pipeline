@@ -1262,7 +1262,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         if obj.mask_image is not None:
             mskpath = dir / obj.mask_image.basename
             if mskpath.exists():
-                obj.mask_image.map_to_local_file(mskpath)
+                obj.mask_image = MaskImage.from_file(mskpath)
 
         return obj
 
