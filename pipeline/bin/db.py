@@ -48,7 +48,7 @@ from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
 
 
-BKG_BOX_SIZE = 512
+BKG_BOX_SIZE = 384
 DETECT_NSIGMA = 1.5
 DETECT_NPIX = 5
 TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
