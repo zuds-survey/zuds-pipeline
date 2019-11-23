@@ -20,9 +20,17 @@ for fn in sci_fns:
 
     # this line assumes that .mskimg.fits is in the same directory
     sci = db.ScienceImage.from_file(fn)
+    weightname = os.path.abspath(fn.replace('.fits', '.weight.fits'))
+    rmsname = os.path.abspath(fn.replace('.fits', '.rms.fits'))
+
+    # save the results
     os.chdir(os.path.dirname(fn))
-    sci.weight_image.save()
-    sci.rms_image.save()
+    if not os.path.exists(weightname):
+        sci.weight_image.save()
+
+    if not os.path.exists(rmsname):
+        sci.rms_image.save()
+
     os.chdir(cwd)
 
     # clean up
