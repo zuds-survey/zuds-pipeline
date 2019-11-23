@@ -31,8 +31,6 @@ import uuid
 import warnings
 from reproject import reproject_interp
 
-
-
 import photutils
 from astropy.wcs.utils import proj_plane_pixel_scales
 from astropy import units as u
@@ -41,12 +39,10 @@ from astropy.wcs import WCS
 from astropy import convolution
 from astropy.coordinates import SkyCoord
 
-
 from matplotlib import colors
 import matplotlib.pyplot as plt
 from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
-
 
 BKG_BOX_SIZE = 384
 DETECT_NSIGMA = 1.5
@@ -65,7 +61,6 @@ CMAP_RANDOM_SEED = 8675309
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
-
 
 MASK_BITS = {
     'BIT00': 0,
@@ -107,12 +102,12 @@ MASK_COMMENTS = {
     'BIT16': 'NON-DATA SECTION FROM SWARP ALIGNMENT'
 }
 
-
 fid_map = {
     1: 'zg',
     2: 'zr',
     3: 'zi'
 }
+
 
 def discrete_cmap(ncolors):
     """Create a ListedColorMap with `ncolors` randomly-generated colors
@@ -132,7 +127,6 @@ def discrete_cmap(ncolors):
 
 def show_images(image_or_images, catalog=None, titles=None, reproject=False,
                 ds9=False):
-
     imgs = np.atleast_1d(image_or_images)
     n = len(imgs)
 
@@ -156,7 +150,8 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
         nrows = (n - 1) // 3 + 1
 
         align_target = imgs[0]
-        fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True, sharey=True,
+        fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True,
+                               sharey=True,
                                subplot_kw={
                                    'projection': WCS(
                                        align_target.astropy_header)
@@ -188,7 +183,6 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
 
 
 def sub_name(frame, template):
-
     frame = f'{frame}'
     template = f'{template}'
 
@@ -425,7 +419,6 @@ class ZTFFileCopy(models.Base):
     product = relationship('ZTFFile', back_populates='copies',
                            cascade='all')
 
-
     def get(self):
         """Pull the Copy to local disk and return the corresponding
         Product (File subclass) that the Copy is mapped to."""
@@ -463,7 +456,6 @@ class HTTPArchiveCopy(ZTFFileCopy):
 
     @classmethod
     def from_product(cls, product):
-
         if not isinstance(product, ZTFFile):
             raise ValueError(
                 f'Cannot archive object "{product}", must be an instance of'
@@ -516,7 +508,7 @@ class TapeArchive(models.Base):
     """Record of a tape archive that contains copies of ZTFFiles."""
     id = sa.Column(sa.Text, primary_key=True)
     contents = relationship('TapeCopy', cascade='all')
-    size = sa.Column(psql.BIGINT) # size of the archive in bytes
+    size = sa.Column(psql.BIGINT)  # size of the archive in bytes
 
     @classmethod
     def from_directories(cls, path):
@@ -592,8 +584,6 @@ class FITSFile(File):
         if data.dtype.name == 'uint8':
             data = data.astype(bool)
         self._data = data
-
-
 
     @property
     def data(self):
@@ -745,7 +735,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
 
         if isinstance(self, MaskImage):
             data = data.astype(int)
-            data[footprint == 0] += 2**16
+            data[footprint == 0] += 2 ** 16
 
         # make the new object and load it up with data
         new = self.__class__()
@@ -814,7 +804,6 @@ class FloatingPointFITSImage(FITSImage):
         return None
 
 
-
 class IntegerFITSImage(FITSImage):
     """A `FITSImage` with a data member that contains a two dimensional array
     of integers.
@@ -870,9 +859,7 @@ class ZTFFile(models.Base, File):
     }
 
 
-
 class PipelineRegionFile(ZTFFile):
-
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
@@ -896,8 +883,8 @@ class PipelineRegionFile(ZTFFile):
         reg.catalog = catalog
         with open(reg.local_path, 'w') as f:
             f.write('global color=green dashlist=8 3 width=1 font="helvetica '
-            '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
-            'delete=1 include=1 source=1\n')
+                    '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
+                    'delete=1 include=1 source=1\n')
             f.write('icrs\n')
             rad = 13 * 0.26667 * 0.00027777
             for line in catalog.data:
@@ -990,7 +977,7 @@ class MaskImage(ZTFFile, IntegerFITSImage):
         SWarp)."""
         mskarr = self.data
         ftsarr = weight_image.data
-        mskarr[ftsarr == 0] += 2**16
+        mskarr[ftsarr == 0] += 2 ** 16
         self.data = mskarr
         self.refresh_bit_mask_entries_in_header()
 
@@ -1035,13 +1022,13 @@ class MaskImage(ZTFFile, IntegerFITSImage):
 
     idx = Index('maskimages_parent_image_id_idx', parent_image_id)
 
+
 class SegmentationImage(photutils.segmentation.SegmentationImage,
                         IntegerFITSImage):
     pass
 
 
 class CalibratableImage(FloatingPointFITSImage, ZTFFile):
-
     __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
                                         '_bkgimg', '_filter_kernel', '_rmsimg',
                                         '_threshimg', '_segmimg',
@@ -1233,7 +1220,6 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
                                  wcs=self.wcs)
         return self._sourcelist
 
-
     @classmethod
     def from_file(cls, fname):
         obj = super().from_file(fname)
@@ -1277,7 +1263,6 @@ class CalibratedImage(CalibratableImage):
                        'inherit_condition': id == CalibratableImage.id}
 
     forced_photometry = relationship('ForcedPhotometry', cascade='all')
-
 
     def force_photometry(self, sources):
         """Force aperture photometry at the locations of `sources`.
@@ -1323,9 +1308,8 @@ class CalibratedImage(CalibratableImage):
         return self.header[APER_KEY]
 
 
-#class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
+# class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
 class ScienceImage(CalibratedImage):
-
     """IPAC record of a science image from their pipeline. Contains some
     metadata that IPAC makes available through its irsa metadata query
     service.  This class is primarily intended to enable the reflection of
@@ -1342,14 +1326,13 @@ class ScienceImage(CalibratedImage):
     This class represents immutable metadata only.
     """
 
-    #__tablename__ = 'ipacrecords'
+    # __tablename__ = 'ipacrecords'
 
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sci',
                        'inherit_condition': id == CalibratedImage.id}
-
 
     @classmethod
     def from_file(cls, f):
@@ -1497,11 +1480,14 @@ class Subtraction(HasWCS):
 
     @declared_attr
     def reference_image_id(self):
-        return sa.Column(sa.Integer, sa.ForeignKey('referenceimages.id', ondelete='CASCADE'), index=True)
+        return sa.Column(sa.Integer, sa.ForeignKey('referenceimages.id',
+                                                   ondelete='CASCADE'),
+                         index=True)
 
     @declared_attr
     def reference_image(self):
-        return relationship('ReferenceImage', cascade='all', foreign_keys=[self.reference_image_id])
+        return relationship('ReferenceImage', cascade='all',
+                            foreign_keys=[self.reference_image_id])
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
@@ -1607,13 +1593,17 @@ class ObjectWithFlux(models.Base):
         'polymorphic_identity': 'base'
     }
 
-    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id', ondelete='CASCADE'), index=True)
-    image = relationship('CalibratableImage', back_populates='objects', cascade='all')
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                                   ondelete='CASCADE'),
+                         index=True)
+    image = relationship('CalibratableImage', back_populates='objects',
+                         cascade='all')
 
+    # thumbnails = relationship('Thumbnail', cascade='all')
 
-    #thumbnails = relationship('Thumbnail', cascade='all')
-
-    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='CASCADE'), index=True)
+    source_id = sa.Column(sa.Text,
+                          sa.ForeignKey('sources.id', ondelete='CASCADE'),
+                          index=True)
     source = relationship('Source', cascade='all')
 
     flux = sa.Column(sa.Float)
@@ -1625,14 +1615,18 @@ class ObjectWithFlux(models.Base):
 
 
 class Detection(ObjectWithFlux, SpatiallyIndexed):
-    id = sa.Column(sa.Integer, sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer,
+                   sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
+                   primary_key=True)
     __tablename__ = 'detections'
     __mapper_args__ = {'polymorphic_identity': 'detection',
                        'inherit_condition': id == ObjectWithFlux.id}
 
 
 class ForcedPhotometry(ObjectWithFlux):
-    id = sa.Column(sa.Integer, sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer,
+                   sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
+                   primary_key=True)
     __tablename__ = 'forcedphotometry'
     __mapper_args__ = {'polymorphic_identity': 'photometry',
                        'inherit_condition': id == ObjectWithFlux.id}
@@ -1648,7 +1642,6 @@ class ForcedPhotometry(ObjectWithFlux):
         return 1.08573620476 * self.fluxerr / self.flux
 
 
-
 class HPSSJob(models.Base):
     user = sa.Column(sa.Text)
     status = sa.Column(sa.Boolean, default=False)
@@ -1660,9 +1653,8 @@ def images(self):
     candidates = DBSession().query(IPACRecord).filter(func.q3c_radial_query(IPACRecord.ra, IPACRecord.dec, self.ra, self.dec, 0.64))\
                                          .filter(func.q3c_poly_query(self.ra, self.dec, IPACRecord.poly))
     return candidates.all()
-    
-"""
 
+"""
 
 # keep track of the images that the photometry came from
 """
@@ -1706,6 +1698,7 @@ def light_curve(self):
 models.Source.light_curve = light_curve
 """
 
+
 class FilterRun(models.Base):
     tstart = sa.Column(sa.DateTime)
     tend = sa.Column(sa.DateTime)
@@ -1726,9 +1719,9 @@ class Fit(models.Base):
     errors = sa.Column(psql.JSONB)
     nfit = sa.Column(sa.Integer)
     data_mask = sa.Column(psql.ARRAY(sa.Boolean))
-    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
+    source_id = sa.Column(sa.Text,
+                          sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source')
-
 
     @property
     def model(self):
@@ -1742,20 +1735,18 @@ models.Source.fits = relationship('Fit', cascade='all')
 
 
 class DR8(SpatiallyIndexed):
+    # hemisphere = sa.Column(sa.Text)
 
-    #hemisphere = sa.Column(sa.Text)
-
-    #__tablename__ = 'dr8'
-    #__mapper_args__ = {
+    # __tablename__ = 'dr8'
+    # __mapper_args__ = {
     #    'polymorphic_on': hemisphere,
     #    'polymorphic_identity': 'base'
-    #}
+    # }
 
-    #def __repr__(self):
+    # def __repr__(self):
     #    attr_list = [f"{c.name.lower()}={getattr(self, c.name.lower())}"
     #                 for c in self.__table__.columns]
     #    return f"<{type(self).__name__}({', '.join(attr_list)})>"
-
 
     release = sa.Column('RELEASE', sa.Integer)
     brickid = sa.Column('BRICKID', sa.Integer)
@@ -1858,17 +1849,27 @@ class DR8(SpatiallyIndexed):
     ref_cat = sa.Column('REF_CAT', sa.Text)
     ref_id = sa.Column('REF_ID', sa.Integer)
     ref_epoch = sa.Column('REF_EPOCH', psql.DOUBLE_PRECISION)
-    gaia_phot_g_mean_mag = sa.Column('GAIA_PHOT_G_MEAN_MAG', psql.DOUBLE_PRECISION)
-    gaia_phot_g_mean_flux_over_error = sa.Column('GAIA_PHOT_G_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
-    gaia_phot_bp_mean_mag = sa.Column('GAIA_PHOT_BP_MEAN_MAG', psql.DOUBLE_PRECISION)
-    gaia_phot_bp_mean_flux_over_error = sa.Column('GAIA_PHOT_BP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
-    gaia_phot_rp_mean_mag = sa.Column('GAIA_PHOT_RP_MEAN_MAG', psql.DOUBLE_PRECISION)
-    gaia_phot_rp_mean_flux_over_error = sa.Column('GAIA_PHOT_RP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
-    gaia_astrometric_excess_noise = sa.Column('GAIA_ASTROMETRIC_EXCESS_NOISE', psql.DOUBLE_PRECISION)
+    gaia_phot_g_mean_mag = sa.Column('GAIA_PHOT_G_MEAN_MAG',
+                                     psql.DOUBLE_PRECISION)
+    gaia_phot_g_mean_flux_over_error = sa.Column(
+        'GAIA_PHOT_G_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
+    gaia_phot_bp_mean_mag = sa.Column('GAIA_PHOT_BP_MEAN_MAG',
+                                      psql.DOUBLE_PRECISION)
+    gaia_phot_bp_mean_flux_over_error = sa.Column(
+        'GAIA_PHOT_BP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
+    gaia_phot_rp_mean_mag = sa.Column('GAIA_PHOT_RP_MEAN_MAG',
+                                      psql.DOUBLE_PRECISION)
+    gaia_phot_rp_mean_flux_over_error = sa.Column(
+        'GAIA_PHOT_RP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
+    gaia_astrometric_excess_noise = sa.Column('GAIA_ASTROMETRIC_EXCESS_NOISE',
+                                              psql.DOUBLE_PRECISION)
     gaia_duplicated_source = sa.Column('GAIA_DUPLICATED_SOURCE', sa.Boolean)
-    gaia_phot_bp_rp_excess_factor = sa.Column('GAIA_PHOT_BP_RP_EXCESS_FACTOR', psql.DOUBLE_PRECISION)
-    gaia_astrometric_sigma5d_max = sa.Column('GAIA_ASTROMETRIC_SIGMA5D_MAX', psql.DOUBLE_PRECISION)
-    gaia_astrometric_params_solved = sa.Column('GAIA_ASTROMETRIC_PARAMS_SOLVED', sa.Integer)
+    gaia_phot_bp_rp_excess_factor = sa.Column('GAIA_PHOT_BP_RP_EXCESS_FACTOR',
+                                              psql.DOUBLE_PRECISION)
+    gaia_astrometric_sigma5d_max = sa.Column('GAIA_ASTROMETRIC_SIGMA5D_MAX',
+                                             psql.DOUBLE_PRECISION)
+    gaia_astrometric_params_solved = sa.Column('GAIA_ASTROMETRIC_PARAMS_SOLVED',
+                                               sa.Integer)
     parallax = sa.Column('PARALLAX', psql.DOUBLE_PRECISION)
     parallax_ivar = sa.Column('PARALLAX_IVAR', psql.DOUBLE_PRECISION)
     pmra = sa.Column('PMRA', psql.DOUBLE_PRECISION)
@@ -1913,22 +1914,22 @@ class DR8(SpatiallyIndexed):
 
 
 class DR8North(models.Base, DR8):
-    #id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
+    # id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
     # primary_key=True)
     __tablename__ = 'dr8_north'
-    #__mapper_args__ = {'polymorphic_identity': 'n'}
+    # __mapper_args__ = {'polymorphic_identity': 'n'}
 
-    #@declared_attr
-    #def __table_args__(cls):
+    # @declared_attr
+    # def __table_args__(cls):
     #    return tuple()
 
 
 class DR8South(models.Base, DR8):
-    #id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
+    # id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
     # primary_key=True)
     __tablename__ = 'dr8_south'
-    #__mapper_args__ = {'polymorphic_identity': 's'}
+    # __mapper_args__ = {'polymorphic_identity': 's'}
 
-    #@declared_attr
-    #def __table_args__(cls):
+    # @declared_attr
+    # def __table_args__(cls):
     #    return tuple()
