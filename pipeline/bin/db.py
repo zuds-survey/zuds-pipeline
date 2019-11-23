@@ -568,7 +568,7 @@ class FITSFile(File):
             obj = cls()
             obj.basename = f.name
         obj.map_to_local_file(str(f.absolute()))
-        obj.load()
+        obj.load_header()
         return obj
 
     def load_header(self):
@@ -1235,6 +1235,39 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         return self._sourcelist
 
 
+    @classmethod
+    def from_file(cls, fname):
+        obj = super().from_file(fname)
+        dir = Path(fname).parent
+
+        weightpath = dir / obj.basename.replace('.fits', '.weight.fits')
+        rmspath = dir / obj.basename.replace('.fits', '.rms.fits')
+        bkgpath = dir / obj.basename.replace('.fits', '.bkg.fits')
+        threshpath = dir / obj.basename.replace('.fits', '.thresh.fits')
+        bkgsubpath = dir / obj.basename.replace('.fits', '.bkgsub.fits')
+
+        paths = [weightpath, rmspath, bkgpath, threshpath,
+                 bkgsubpath]
+
+        types = ['_weightimg', '_rmsimg', '_bkgimg', '_threshimg',
+                 '_bkgsubimg']
+
+        for path, t in zip(paths, types):
+            if path.exists():
+                setattr(obj, t, FloatingPointFITSImage.from_file(f'{path}'))
+
+        segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
+        if segmpath.exists():
+            obj._segmimg = SegmentationImage.from_file(f'{segmpath}')
+
+        if obj.mask_image is not None:
+            mskpath = dir / obj.mask_image.basename
+            if mskpath.exists():
+                obj.mask_image.map_to_local_file(mskpath)
+
+        return obj
+
+
 class CalibratedImage(CalibratableImage):
     """An image on which photometry can be performed."""
 
@@ -1328,17 +1361,9 @@ class ScienceImage(CalibratedImage):
         obj.fid = obj.header['FILTERID']
         return obj
 
-    #basename = sa.Column(sa.Text, unique=True)
     filtercode = sa.Column(sa.CHAR(2))
-    #qid = sa.Column(sa.Integer)
-    #field = sa.Column(sa.Integer)
-    #ccdid = sa.Column(sa.Integer)
     obsjd = sa.Column(psql.DOUBLE_PRECISION)
-    #good = sa.Column(sa.Boolean)
-    #hasvariance = sa.Column(sa.Boolean)
     infobits = sa.Column(sa.Integer)
-    #fid = sa.Column(sa.Integer)
-    #rcid = sa.Column(sa.Integer)
     pid = sa.Column(psql.BIGINT)
     nid = sa.Column(sa.Integer)
     expid = sa.Column(sa.Integer)
@@ -1357,26 +1382,10 @@ class ScienceImage(CalibratedImage):
     cd12 = sa.Column(sa.Float)
     cd21 = sa.Column(sa.Float)
     cd22 = sa.Column(sa.Float)
-    #ipac_pub_date = sa.Column(sa.DateTime)
     ipac_gid = sa.Column(sa.Integer)
     imgtypecode = sa.Column(sa.CHAR(1))
     exptime = sa.Column(sa.Float)
     filefracday = sa.Column(psql.BIGINT)
-
-    #fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",
-    #              field, ccdid, qid, filtercode, obsjd)
-    #pathidx = Index('image_path_idx', path)
-
-    #created_at = sa.Column(sa.DateTime, default=sa.func.now())
-    #modified = sa.Column(sa.DateTime, default=sa.func.now(),
-    #                     onupdate=sa.func.now())
-
-    #science_image = relationship('ScienceImage', cascade='all')
-
-    #hpss_sci_path = sa.Column(sa.Text, index=True)
-    #hpss_mask_path = sa.Column(sa.Text, index=True)
-
-
 
     @hybrid_property
     def obsmjd(self):
@@ -1442,8 +1451,10 @@ class Coadd(CalibratableImage):
         coadd.header['FID'] = coadd.fid = images[0].fid
 
         if data_product:
-            archive.archive(coadd)
-            archive.archive(coaddmask)
+            coadd_copy = HTTPArchiveCopy.from_product(coadd)
+            coaddmask_copy = HTTPArchiveCopy.from_product(coaddmask)
+            archive.archive(coadd_copy)
+            archive.archive(coaddmask_copy)
 
         return coadd
 
@@ -1466,10 +1477,19 @@ class ReferenceImage(Coadd):
 
 
 class ScienceCoadd(Coadd):
-    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'), primary_key=True)
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
+                   primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'scicoadd',
                        'inherit_condition': id == Coadd.id}
-    subtraction = relationship('MultiEpochSubtraction', uselist=False, cascade='all')
+    subtraction = relationship('MultiEpochSubtraction', uselist=False,
+                               cascade='all')
+
+    binleft = sa.Column(sa.DateTime, nullable=False)
+    binright = sa.Column(sa.DateTime, nullable=False)
+
+    @hybrid_property
+    def winsize(self):
+        return self.binright - self.binleft
 
 
 # Subtractions #############################################################################################
