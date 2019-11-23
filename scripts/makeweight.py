@@ -14,6 +14,7 @@ sci_fns = mpi.get_my_share_of_work(infile)
 
 # load the objects into memory
 for fn in sci_fns:
+    # this line assumes that .mskimg.fits is in the same directory
     sci = db.ScienceImage.from_file(fn)
     sci.weight_image.save()
     sci.rms_image.save()
