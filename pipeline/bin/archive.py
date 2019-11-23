@@ -72,3 +72,5 @@ def archive(copy):
         os.chmod(path, perm)
     else:
         archive_copy_over_http(copy)
+
+    db.DBSession()
