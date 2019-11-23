@@ -48,7 +48,6 @@ from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
 
 
-
 BKG_BOX_SIZE = 1024
 DETECT_NSIGMA = 1.5
 DETECT_NPIX = 5
@@ -1260,10 +1259,11 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         if segmpath.exists():
             obj._segmimg = SegmentationImage.from_file(f'{segmpath}')
 
-        if obj.mask_image is not None:
-            mskpath = dir / obj.mask_image.basename
-            if mskpath.exists():
-                obj.mask_image.map_to_local_file(mskpath)
+        with DBSession().no_autoflush:
+            if obj.mask_image is not None:
+                mskpath = dir / obj.mask_image.basename
+                if mskpath.exists():
+                    obj.mask_image.map_to_local_file(mskpath)
 
         return obj
 
