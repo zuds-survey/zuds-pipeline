@@ -26,16 +26,15 @@ for fn in sci_fns:
     # save the results
     os.chdir(os.path.dirname(fn))
     if not os.path.exists(weightname):
+
         sci.weight_image.save()
+
 
     if not os.path.exists(rmsname):
         sci.rms_image.save()
 
     os.chdir(cwd)
 
-    # clean up
-    sci.unmap()
-    del sci
-
-    db.DBSession().close()
+    # save new header 
+    db.DBSession().commit()
 
