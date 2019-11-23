@@ -1450,7 +1450,7 @@ class ReferenceImage(Coadd):
     __mapper_args__ = {'polymorphic_identity': 'ref',
                        'inherit_condition': id == Coadd.id}
 
-    version = sa.Column(sa.Integer)
+    version = sa.Column(sa.Text)
 
     single_epoch_subtractions = relationship('SingleEpochSubtraction',
                                              cascade='all')
