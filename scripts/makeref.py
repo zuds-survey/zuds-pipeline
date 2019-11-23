@@ -52,6 +52,11 @@ for d in my_dirs:
         print(e, [t.basename for t in top], coaddname)
         db.DBSession().rollback()
         continue
+
+    pwd = os.getcwd()
+    os.chdir(d)
+    coadd.rms_image.save()
+    os.chdir(pwd)
     db.DBSession().add(coadd)
     db.DBSession().commit()
 
