@@ -1415,7 +1415,7 @@ class Coadd(CalibratableImage):
         images = np.atleast_1d(images)
         mskoutname = outfile_name.replace('.fits', '.mask.fits')
 
-        basename = os.path.abspath(outfile_name)
+        basename = os.path.basename(outfile_name)
 
         # see if a file with this name already exists in the DB
         cond = cls.basename == basename
