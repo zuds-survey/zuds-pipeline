@@ -62,7 +62,7 @@ def archive(copy):
             f'Cannot archive object "{copy}", must be an instance of'
             f'Copy.')
 
-    path = copy.archive_path
+    path = Path(copy.archive_path)
     product = copy.product
 
     if os.getenv('NERSC_HOST') == 'cori':

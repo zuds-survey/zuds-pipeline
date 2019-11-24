@@ -2,7 +2,6 @@ import db
 import os
 import sys
 import mpi
-import glob
 import pandas as pd
 from pathlib import Path
 
@@ -15,9 +14,9 @@ db.init_db()
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
 
-infile = sys.argv[0]  # file listing all the directories to build refs for
-min_date = pd.to_datetime(sys.argv[1])  # minimum allowable date for refimgs
-max_date = pd.to_datetime(sys.argv[2])  # maximum allowable date for refimgs
+infile = sys.argv[1]  # file listing all the directories to build refs for
+min_date = pd.to_datetime(sys.argv[2])  # minimum allowable date for refimgs
+max_date = pd.to_datetime(sys.argv[3])  # maximum allowable date for refimgs
 
 # get the work
 my_dirs = mpi.get_my_share_of_work(infile)
@@ -27,7 +26,7 @@ for d in my_dirs:
 
     # get all the science images
     image_objects = []
-    sci_fns = glob.glob(Path(d) / 'ztf*sciimg.fits')
+    sci_fns = Path(d).glob('ztf*sciimg.fits')
 
     # load the objects partway into memory
     ok = []

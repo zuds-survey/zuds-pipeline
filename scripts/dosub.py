@@ -20,19 +20,11 @@ imgs = mpi.get_my_share_of_work(infile)
 # make a reference for each directory
 for fn in imgs:
     sci = db.ScienceImage.from_file(fn)
-
-    # find the reference
-    copy = db.DBSession().query(db.HTTPArchiveCopy)\
-        .join(db.ReferenceImage,
-              db.ReferenceImage.id == db.HTTPArchiveCopy.product_id) \
-        .filter(
-        db.ReferenceImage.field == sci.field,
-        db.ReferenceImage.ccdid == sci.ccdid,
-        db.ReferenceImage.qid == sci.qid,
-        db.ReferenceImage.fid == sci.fid,
-    ).options(db.sa.joinedload('copies')).first()
-
-    ref = db.DBSession().from_file(copy.archive_path)
+    field = f'{sci.field:06d}'
+    ccdid = f'c{sci.ccdid:02d}'
+    qid = f'q{sci.qid}'
+    fid = f'{fmap[sci.fid]}'
+    ref = db.DBSession().from_file(f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/{fid}/ref.{field}_{ccdid}_{qid}_{fid}.fits')
 
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref, data_product=True)
