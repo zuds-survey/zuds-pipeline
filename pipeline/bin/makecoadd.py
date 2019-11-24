@@ -60,16 +60,26 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
             wgtpath = image.weight_image.local_path
         wgtpaths.append(wgtpath)
 
-    # get the images in string form
-    allwgts = ','.join(wgtpaths)
-    allims = ' '.join(impaths)
+    # need to write the images to a list, to avoid shell commands that are too
+    # long and trigger SIGSEGV
+    inlist = directory / 'images.in'
+    with open(inlist, 'w') as f:
+        for p in impaths:
+            f.write(f'{p}\n')
+
+    inweight = directory / 'weight.in'
+    with open(inweight, 'w') as f:
+        for p in wgtpaths:
+            f.write(f'{p}\n')
+
+    # get the output weight image in string form
     wgtout = outname.replace('.fits', '.weight.fits')
 
-    syscall = f'swarp -c {conf} {allims} ' \
+    syscall = f'swarp -c {conf} @{inlist} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
-              f'-WEIGHT_IMAGE {allwgts} ' \
+              f'-WEIGHT_IMAGE @{inweight} ' \
               f'-WEIGHTOUT_NAME {wgtout} ' \
               f'-NTHREADS {nthreads}'
 
@@ -111,7 +121,16 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
                                 nthreads=nthreads)
 
     # run swarp
-    subprocess.check_call(command.split())
+    while True:
+        try:
+            subprocess.check_call(command.split())
+        except OSError as e:
+            if e.errno == 14:
+                continue
+            else:
+                raise e
+        else:
+            break
 
     # now swarp together the masks
     masks = [image.mask_image for image in images]
