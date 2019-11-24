@@ -1415,6 +1415,17 @@ class Coadd(CalibratableImage):
         images = np.atleast_1d(images)
         mskoutname = outfile_name.replace('.fits', '.mask.fits')
 
+        basename = os.path.abspath(outfile_name)
+
+        # see if a file with this name already exists in the DB
+        cond = cls.basename == basename
+        predecessor = DBSession().query(cls).filter(cond).first()
+
+        if predecessor is not None:
+            warnings.warn(f'WARNING: A "{cls}" object with the basename '
+                          f'"{basename}" already exists. The record will be '
+                          f'updated...')
+
         # make sure all images have the same field, filter, ccdid, qid:
         ensure_images_have_the_same_properties(images, GROUP_PROPERTIES)
 
