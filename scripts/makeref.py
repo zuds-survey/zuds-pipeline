@@ -2,14 +2,17 @@ import db
 import os
 import sys
 import mpi
+import time
 import pandas as pd
 from pathlib import Path
+
 
 fmap = {1: 'zg',
         2: 'zr',
         3: 'zi'}
 
 db.init_db()
+db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
@@ -17,12 +20,15 @@ __whatami__ = 'Make the references for ZUDS.'
 infile = sys.argv[1]  # file listing all the directories to build refs for
 min_date = pd.to_datetime(sys.argv[2])  # minimum allowable date for refimgs
 max_date = pd.to_datetime(sys.argv[3])  # maximum allowable date for refimgs
+version = sys.argv[4]
 
 # get the work
 my_dirs = mpi.get_my_share_of_work(infile)
 
 # make a reference for each directory
 for d in my_dirs:
+
+    t_start = time.time()
 
     # get all the science images
     image_objects = []
@@ -41,7 +47,7 @@ for d in my_dirs:
     # get the very best images
     top = sorted(ok, key=lambda i: i.maglimit, reverse=True)[:50]
     coaddname = os.path.join(d, f'ref.{ok[0].field:06d}_c{ok[0].ccdid:02d}'
-                                f'_q{ok[0].qid}_{fmap[ok[0].fid]}.fits')
+                                f'_q{ok[0].qid}_{fmap[ok[0].fid]}.{version}.fits')
     try:
         coadd = db.ReferenceImage.from_images(top, coaddname,
                                               data_product=True,
@@ -52,12 +58,9 @@ for d in my_dirs:
         db.DBSession().rollback()
         continue
 
-    pwd = os.getcwd()
-    os.chdir(d)
-    coadd.rms_image.save()
-    os.chdir(pwd)
-    db.DBSession().add(coadd)
-    db.DBSession().commit()
+    t_stop = time.time()
+    print(f'it took {t_stop - t_start} sec to make {coaddname}.', flush=True)
+    
 
 
 
