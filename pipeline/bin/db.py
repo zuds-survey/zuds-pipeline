@@ -986,6 +986,10 @@ class MaskImage(ZTFFile, IntegerFITSImage):
         self.data = mskarr
         self.refresh_bit_mask_entries_in_header()
 
+    @classmethod
+    def from_file(cls, f, use_existing_record=True):
+        return super().from_file(f, use_existing_record=use_existing_record)
+
     @property
     def boolean(self):
         """A boolean array that is True when a masked pixel is 'bad', i.e.,
