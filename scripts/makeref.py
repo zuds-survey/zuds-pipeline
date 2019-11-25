@@ -55,8 +55,9 @@ for d in my_dirs:
                                               tmpdir='./tmp')
     except TypeError as e:
         print(e, [t.basename for t in top], coaddname)
-        db.DBSession().rollback()
         continue
+    finally:
+        db.DBSession().rollback()        
 
     t_stop = time.time()
     print(f'it took {t_stop - t_start} sec to make {coaddname}.', flush=True)
