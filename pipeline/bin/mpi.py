@@ -7,7 +7,7 @@ def get_my_share_of_work(fname):
     try:
         from mpi4py import MPI
     except ImportError:
-        return np.genfromtxt(fname, dtype=None, encoding='ascii')
+        return np.atleast_1d(np.genfromtxt(fname, dtype=None, encoding='ascii'))
     else:
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
@@ -17,6 +17,7 @@ def get_my_share_of_work(fname):
 
         if rank == 0:
             files = np.genfromtxt(fname, dtype=None, encoding='ascii')
+            files = np.atleast_1d(files)
 
             # this is the job array part
             if is_jobarray:
