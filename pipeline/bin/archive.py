@@ -73,4 +73,4 @@ def archive(copy):
     else:
         archive_copy_over_http(copy)
 
-    db.DBSession()
+
