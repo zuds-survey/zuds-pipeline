@@ -544,14 +544,19 @@ class FITSFile(File):
         return DBSession().query(cls).filter(cls.basename == basename).first()
 
     @classmethod
-    def from_file(cls, f):
+    def from_file(cls, f, use_existing_record=False):
         """Read a file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy.
 
         This is a 'get_or_create' method."""
         f = Path(f)
-        if issubclass(cls, models.Base):
+
+        load_from_db = issubclass(cls, models.Base) and \
+                       issubclass(cls, FITSFile) and \
+                       use_existing_record
+
+        if load_from_db:
             obj = cls.get_by_basename(f.name)
         else:
             obj = None
@@ -681,11 +686,11 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         return WCS(self.astropy_header)
 
     @classmethod
-    def from_file(cls, fname):
+    def from_file(cls, fname, use_existing_record=False):
         """Read a fits file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy. """
-        self = super(HasWCS, cls).from_file(fname)
+        self = super(HasWCS, cls).from_file(fname, use_existing_record=use_existing_record)
         corners = self.wcs.calc_footprint()
         for i, row in enumerate(corners):
             setattr(self, f'ra{i+1}', row[0])
@@ -981,6 +986,10 @@ class MaskImage(ZTFFile, IntegerFITSImage):
         self.data = mskarr
         self.refresh_bit_mask_entries_in_header()
 
+    @classmethod
+    def from_file(cls, f, use_existing_record=True):
+        return super().from_file(f, use_existing_record=use_existing_record)
+
     @property
     def boolean(self):
         """A boolean array that is True when a masked pixel is 'bad', i.e.,
@@ -1221,8 +1230,8 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         return self._sourcelist
 
     @classmethod
-    def from_file(cls, fname):
-        obj = super().from_file(fname)
+    def from_file(cls, fname, use_existing_record=False):
+        obj = super().from_file(fname, use_existing_record=use_existing_record)
         dir = Path(fname).parent
 
         weightpath = dir / obj.basename.replace('.fits', '.weight.fits')
@@ -1328,15 +1337,16 @@ class ScienceImage(CalibratedImage):
 
     # __tablename__ = 'ipacrecords'
 
+    # we dont want science image records to be deleted in a cascade.
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
-                                             ondelete='CASCADE'),
+                                             ondelete='RESTRICT'),
                    primary_key=True)
     __mapper_args__ = {'polymorphic_identity': 'sci',
                        'inherit_condition': id == CalibratedImage.id}
 
     @classmethod
-    def from_file(cls, f):
-        obj = super().from_file(f)
+    def from_file(cls, f, use_existing_record=True):
+        obj = super().from_file(f, use_existing_record=use_existing_record)
         obj.field = obj.header['FIELDID']
         obj.ccdid = obj.header['CCDID']
         obj.qid = obj.header['QID']
@@ -1468,6 +1478,8 @@ class ReferenceImage(Coadd):
     multi_epoch_subtractions = relationship('MultiEpochSubtraction',
                                             cascade='all')
 
+    uidx = sa.Index('ref_basename_version_unique_idx', id, version, unique=True)
+
 
 class ScienceCoadd(Coadd):
     id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
@@ -1479,6 +1491,9 @@ class ScienceCoadd(Coadd):
 
     binleft = sa.Column(sa.DateTime, nullable=False)
     binright = sa.Column(sa.DateTime, nullable=False)
+
+    uidx = sa.Index('coadd_basename_window_unique_idx',
+                    id, binleft, binright, unique=True)
 
     @hybrid_property
     def winsize(self):
