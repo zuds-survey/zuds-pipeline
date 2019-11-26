@@ -1047,12 +1047,6 @@ class MaskImage(ZTFFile, IntegerFITSImage):
     idx = Index('maskimages_parent_image_id_idx', parent_image_id)
 
 
-class SegmentationImage(IntegerFITSImage,
-                        photutils.segmentation.SegmentationImage):
-                        
-    pass
-
-
 class CalibratableImage(FloatingPointFITSImage, ZTFFile):
     __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
                                         '_bkgimg', '_filter_kernel', '_rmsimg',
@@ -1184,7 +1178,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
         segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
         if segmpath.exists():
-            obj._segmimg = SegmentationImage.from_file(f'{segmpath}')
+            obj._segmimg = IntegerFITSImage.from_file(f'{segmpath}')
 
         if obj.mask_image is not None:
             mskpath = dir / obj.mask_image.basename
