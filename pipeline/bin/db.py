@@ -594,6 +594,15 @@ class FITSFile(File):
             data = data.astype(bool)
         self._data = data
 
+    def unload_data(self):
+        try:
+            del self._data
+        except AttributeError:
+            raise RuntimeError(f'Object "<{self.__class__.__name__} at '
+                               f'{hex(id(self))}>" has no data loaded. '
+                               f'Load some data with .load_data() and '
+                               f'try again.')
+
     @property
     def data(self):
         """Data are read directly from a mapped file on disk, and cached in
@@ -1069,9 +1078,9 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         interval = ZScaleInterval()
         return interval.get_limits(self.data[~self.mask_image.boolean.data])
 
-    def _call_source_extractor(self, checkimage_types=None):
+    def _call_source_extractor(self, checkimage_type=None):
         results = sextractor.run_sextractor(self,
-                                            checkimage_types=checkimage_types)
+                                            checkimage_type=checkimage_type)
 
         for result in results:
             if result.basename.endswith('.cat'):
@@ -1121,7 +1130,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._rmsimg
         except AttributeError:
-            self._call_source_extractor(checkimage_types=['rms'])
+            self._call_source_extractor(checkimage_type=['rms'])
         return self._rmsimg
 
     @property
@@ -1129,7 +1138,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._bkgimg
         except AttributeError:
-            self._call_source_extractor(checkimage_types=['bkg'])
+            self._call_source_extractor(checkimage_type=['bkg'])
         return self._bkgimg
 
     @property
@@ -1137,7 +1146,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._bkgsubimg
         except AttributeError:
-            self._call_source_extractor(checkimage_types=['bkgsub'])
+            self._call_source_extractor(checkimage_type=['bkgsub'])
         return self._bkgsubimg
 
     @property
@@ -1146,7 +1155,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
             return self._segmimg
         except AttributeError:
             # segm is set here
-            self._call_source_extractor(checkimage_types=['segm'])
+            self._call_source_extractor(checkimage_type=['segm'])
         return self._segmimg
 
 
