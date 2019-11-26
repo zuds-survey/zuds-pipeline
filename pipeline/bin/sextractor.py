@@ -1,5 +1,4 @@
-import uuid
-import shutil
+import numpy as np
 import subprocess
 from pathlib import Path
 
@@ -21,16 +20,18 @@ checkimage_map = {
 }
 
 
-def prepare_sextractor(image, checkimage_types=None, catalog_type='FITS_LDAC'):
+def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
     """Set up the pipeline to do a run of source extractor."""
 
     conf = SEX_CONF
     valid_types = ['rms', 'segm', 'bkgsub', 'bkg']
 
+    checkimage_type = checkimage_type or []
+    checkimage_types = np.atleast_1d(checkimage_type).tolist()
+
     # poor man's atleast_1d
-    if checkimage_types == 'all':
+    if 'all' in checkimage_types:
         checkimage_types = valid_types
-    checkimage_types = checkimage_types or []
 
     for t in checkimage_types:
         if t not in valid_types:
@@ -66,13 +67,13 @@ def prepare_sextractor(image, checkimage_types=None, catalog_type='FITS_LDAC'):
     return syscall, outnames
 
 
-def run_sextractor(image, checkimage_types=None, catalog_type='FITS_LDAC'):
+def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
     """Run SExtractor on """
 
     import db
 
     command, outnames = prepare_sextractor(image,
-                                           checkimage_types=checkimage_types,
+                                           checkimage_type=checkimage_type,
                                            catalog_type=catalog_type)
     # run it
     subprocess.check_call(command.split())
