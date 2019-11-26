@@ -61,6 +61,7 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
               f'-PARAMETERS_NAME {PARAM_FILE} ' \
               f'-STARNNW_NAME {NNW_FILE} ' \
               f'-FILTER_NAME {CONV_FILE} ' \
+              f'-FLAG_IMAGE {image.mask_image.local_path}' \
 
     outnames = [outname] + coutnames
 

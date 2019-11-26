@@ -655,6 +655,7 @@ class FITSFile(File):
         else:
             data = self.data
         fits.writeto(f, data, self.astropy_header, overwrite=True)
+        self.unload_data()
 
     def load(self):
         self.load_header()
