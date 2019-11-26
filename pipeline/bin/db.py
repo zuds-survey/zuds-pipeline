@@ -24,6 +24,8 @@ from makecoadd import ensure_images_have_the_same_properties, run_coadd
 import archive
 from makesub import prepare_hotpants
 
+import sextractor
+
 import requests
 
 import subprocess
@@ -923,7 +925,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
 
     # since this object maps a fits binary table, the data lives in the first
     #  extension, not in the primary hdu
-    _DATA_HDU = 1
+    _DATA_HDU = 2
 
     @classmethod
     def from_image(cls, image):
@@ -931,11 +933,11 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
             raise ValueError('Image is not an instance of '
                              'CalibratableImage.')
 
-        cat = cls()
+        image._call_source_extractor()
+        cat = image.catalog
+
         for prop in GROUP_PROPERTIES:
             setattr(cat, prop, getattr(image, prop))
-        tab = image.sourcelist.to_table(TABLE_COLUMNS)
-        df = tab.to_pandas()
 
         if isinstance(image, CalibratedImage):
             phot = aperture_photometry(image,
@@ -1064,6 +1066,22 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         interval = ZScaleInterval()
         return interval.get_limits(self.data[~self.mask_image.boolean.data])
 
+    def _call_source_extractor(self, checkimage_types=None):
+        results = sextractor.run_sextractor(self,
+                                            checkimage_types=checkimage_types)
+
+        for result in results:
+            if result.basename.endswith('.cat'):
+                self.catalog = result
+            elif result.basename.endswith('.rms.fits'):
+                self._rmsimg = result
+            elif result.basename.endswith('.bkg.fits'):
+                self._bkgimg = result
+            elif results.basename.endswith('.bkgsub.fits'):
+                self._bkgsubimg = result
+            elif results.basename.endswith('.segm.fits'):
+                self._segmimg = result
+
     @property
     def weight_image(self):
         """Image representing the inverse variance map of this calibratable
@@ -1100,13 +1118,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._rmsimg
         except AttributeError:
-            data = self.background_object.background_rms
-            rmsi = FloatingPointFITSImage()
-            rmsi.basename = self.basename.replace('.fits', '.rms.fits')
-            rmsi.data = data.astype('<f4')
-            self._rmsimg = rmsi
-            self._rmsimg.header = self.header
-            self._rmsimg.header_comments = self.header_comments
+            self._call_source_extractor(checkimage_types=['rms'])
         return self._rmsimg
 
     @property
@@ -1114,13 +1126,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._bkgimg
         except AttributeError:
-            data = self.background_object.background
-            bkgi = FloatingPointFITSImage()
-            bkgi.basename = self.basename.replace('.fits', '.bkg.fits')
-            bkgi.data = data
-            self._bkgimg = bkgi
-            self._bkgimg.header = self.header
-            self._bkgimg.header_comments = self.header_comments
+            self._call_source_extractor(checkimage_types=['bkg'])
         return self._bkgimg
 
     @property
@@ -1128,13 +1134,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._bkgsubimg
         except AttributeError:
-            data = self.data - self.background_image.data
-            bkgsubi = FloatingPointFITSImage()
-            bkgsubi.basename = self.basename.replace('.fits', '.bkgsub.fits')
-            bkgsubi.data = data
-            bkgsubi.header = self.header
-            bkgsubi.header_comments = self.header_comments
-            self._bkgsubimg = bkgsubi
+            self._call_source_extractor(checkimage_types=['bkgsub'])
         return self._bkgsubimg
 
     @property
@@ -1142,92 +1142,10 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         try:
             return self._segmimg
         except AttributeError:
-
-            fk = self.filter_kernel
-            segm = photutils.detect_sources(self.data,
-                                            self.threshold_image.data,
-                                            DETECT_NPIX,
-                                            filter_kernel=fk,
-                                            mask=self.mask_image.boolean.data)
-
-            deblended = photutils.deblend_sources(self.data,
-                                                  segm,
-                                                  DETECT_NPIX,
-                                                  filter_kernel=fk,
-                                                  contrast=0.0001).data
-
-            basename = self.basename.replace('.fits', '.segm.fits')
-            segmi = SegmentationImage(deblended)
-            segmi.basename = basename
-            segmi.header = self.header
-            segmi.header_comments = self.header_comments
-            self._segmimg = segmi
-
+            # segm is set here
+            self._call_source_extractor(checkimage_types=['segm'])
         return self._segmimg
 
-    @property
-    def background_object(self):
-        try:
-            return self._bkg
-        except AttributeError:
-            self._bkg = photutils.Background2D(self.data,
-                                               box_size=BKG_BOX_SIZE,
-                                               mask=self.mask_image.boolean.data)
-        return self._bkg
-
-    @property
-    def filter_kernel(self):
-        try:
-            return self._filter_kernel
-        except AttributeError:
-            try:
-                # equivalent to SExtractor "all ground" default.conv
-                sigma = 2. / 2.355
-            except KeyError:
-                # no filter kernel can be calculated for this image
-                # as it does not yet have an estimate of the seeing
-                return None
-            kern = convolution.Gaussian2DKernel(x_stddev=sigma, y_stddev=sigma)
-            kern.normalize()
-            self._filter_kernel = kern
-        return self._filter_kernel
-
-    @property
-    def threshold_image(self):
-        try:
-            return self._threshimg
-        except AttributeError:
-
-            bkg = self.background_image.data
-            rms = self.rms_image.data
-            msk = self.mask_image.boolean.data
-            data = photutils.detect_threshold(self.data,
-                                              DETECT_NSIGMA,
-                                              background=bkg,
-                                              error=rms,
-                                              mask=msk)
-            threshi = FloatingPointFITSImage()
-            threshi.data = data
-            threshi.basename = self.basename.replace('.fits', '.thresh.fits')
-            self._threshimg = threshi
-            self._threshimg.header = self.header
-            self._threshimg.header_comments = self.header_comments
-        return self._threshimg
-
-    @property
-    def sourcelist(self):
-        try:
-            return self._sourcelist
-        except AttributeError:
-            f = photutils.source_properties
-            self._sourcelist = f(self.data - self.background_image.data,
-                                 self.segm_image,
-                                 error=self.rms_image.data,
-                                 mask=self.mask_image.boolean.data,
-                                 background=self.background_image.data,
-                                 filter_kernel=self.filter_kernel,
-                                 wcs=self.wcs)
-        return self._sourcelist
 
     @classmethod
     def from_file(cls, fname, use_existing_record=False):
@@ -1500,7 +1418,7 @@ class ScienceCoadd(Coadd):
         return self.binright - self.binleft
 
 
-# Subtractions #############################################################################################
+# Subtractions ################################################################
 
 class Subtraction(HasWCS):
 
@@ -1608,7 +1526,7 @@ class MultiEpochSubtraction(CalibratableImage, Subtraction):
         return tuple()
 
 
-# Detections & Photometry ###################################################################################
+# Detections & Photometry #####################################################
 
 class ObjectWithFlux(models.Base):
     type = sa.Column(sa.Text)
