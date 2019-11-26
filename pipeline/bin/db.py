@@ -20,7 +20,7 @@ from skyportal.model_util import create_tables, drop_tables
 
 from secrets import get_secret
 from photometry import aperture_photometry, APER_KEY
-from makecoadd import ensure_images_have_the_same_properties, run_coadd
+from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
 import archive
 from makesub import prepare_hotpants
 
@@ -735,7 +735,8 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         ps2 = (scales[1] * u2).to('arcsec').value
         return np.asarray([ps1, ps2]) * u.arcsec
 
-    def aligned_to(self, other):
+    def aligned_to(self, other, persist_aligned=False, tmpdir='/tmp',
+                   nthreads=1):
         """Return a version of this object that is pixel-by-pixel aligned to
         the WCS solution of another image with a WCS solution."""
 
@@ -744,30 +745,11 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
                              f'HasWCS (got "{other.__class__}").')
 
         target_header = other.astropy_header
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=DeprecationWarning)
-            data, footprint = reproject_interp((self.data, self.astropy_header),
-                                               target_header, order=0)
-
-        # replace nans with zeros
-        data[np.isnan(data)] = 0
-
-        if isinstance(self, MaskImage):
-            data = data.astype(int)
-            data[footprint == 0] += 2 ** 16
-
-        # make the new object and load it up with data
-        new = self.__class__()
-        new.data = data
-
-        # create a header for the new object that reflects the new WCS
-        header = self.astropy_header
-        target_wcs = WCS(target_header)
-        header.update(target_wcs.to_header())
-
-        new.header = dict(header)
-        new.header_comments = {card.keyword: card.comment for card in
-                               header.cards}
+        myclass = type(self)
+        new = run_align(myclass, target_header,
+                        tmpdir=tmpdir,
+                        nthreads=nthreads,
+                        persist_aligned=persist_aligned)
 
         return new
 
