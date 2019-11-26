@@ -57,15 +57,8 @@ for d in my_dirs:
         print(e, [t.basename for t in top], coaddname)
         continue
     finally:
-        db.DBSession().rollback()        
+        db.DBSession().rollback()
 
     t_stop = time.time()
     print(f'it took {t_stop - t_start} sec to make {coaddname}.', flush=True)
-    
-
-
-
-
-
-
 
