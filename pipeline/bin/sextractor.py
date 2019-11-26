@@ -76,7 +76,8 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
 
 
 def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
-    """Run SExtractor on """
+    """Run SExtractor on an image and produce the requested checkimages and
+    catalogs, returning the results as ZUDS objects (potentially DB-backed)."""
 
     import db
 
