@@ -140,7 +140,9 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
               f'-SUBTRACT_BACK N ' \
-              f'-WEIGHTOUT_NAME {weightname}'
+              f'-WEIGHTOUT_NAME {weightname} ' \
+              f'-WEIGHT_TYPE NONE' \
+              f'-COPY_KEYWORDS OBJECT'
 
     return syscall, outname, weightname
 
