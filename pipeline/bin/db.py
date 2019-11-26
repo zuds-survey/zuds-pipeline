@@ -745,8 +745,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
                              f'HasWCS (got "{other.__class__}").')
 
         target_header = other.astropy_header
-        myclass = type(self)
-        new = run_align(myclass, target_header,
+        new = run_align(self, target_header,
                         tmpdir=tmpdir,
                         nthreads=nthreads,
                         persist_aligned=persist_aligned)

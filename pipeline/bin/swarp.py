@@ -145,7 +145,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     return syscall, outname, weightname
 
 
-def run_align(cls, image, align_header, tmpdir='/tmp',
+def run_align(image, align_header, tmpdir='/tmp',
               nthreads=1, persist_aligned=False):
 
     directory = Path(tmpdir) / uuid.uuid4().hex
@@ -168,7 +168,7 @@ def run_align(cls, image, align_header, tmpdir='/tmp',
         else:
             break
 
-    result = cls.from_file(outname)
+    result = type(image).from_file(outname)
     weightimage = db.FloatingPointFITSImage.from_file(outweight)
 
     if isinstance(result, db.MaskImage):
