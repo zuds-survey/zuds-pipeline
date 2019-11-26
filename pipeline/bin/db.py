@@ -1047,8 +1047,9 @@ class MaskImage(ZTFFile, IntegerFITSImage):
     idx = Index('maskimages_parent_image_id_idx', parent_image_id)
 
 
-class SegmentationImage(photutils.segmentation.SegmentationImage,
-                        IntegerFITSImage):
+class SegmentationImage(IntegerFITSImage,
+                        photutils.segmentation.SegmentationImage):
+                        
     pass
 
 
