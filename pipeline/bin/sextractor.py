@@ -52,6 +52,8 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
     else:
         ctypestr = cnamestr = 'None'
 
+    useweight = hasattr(image, '_rmsimg')
+
     syscall = f'sex -c {conf} {impath} ' \
               f'-CHECKIMAGE_TYPE {ctypestr} ' \
               f'-CHECKIMAGE_NAME {cnamestr} ' \
@@ -61,7 +63,12 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
               f'-PARAMETERS_NAME {PARAM_FILE} ' \
               f'-STARNNW_NAME {NNW_FILE} ' \
               f'-FILTER_NAME {CONV_FILE} ' \
-              f'-FLAG_IMAGE {image.mask_image.local_path}' \
+              f'-FLAG_IMAGE {image.mask_image.local_path} ' \
+
+    if useweight:
+        image.weight_image.save()
+        syscall += f'-WEIGHT_IMAGE {image.weight_image.local_path} ' \
+                   f'-WEIGHT_TYPE MAP_WEIGHT'
 
     outnames = [outname] + coutnames
 
