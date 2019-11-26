@@ -58,7 +58,7 @@ def prepare_sextractor(image, checkimage_types=None, catalog_type='FITS_LDAC'):
               f'-CATALOG_TYPE {catalog_type} ' \
               f'-BACK_SIZE {BACKGROUND_BOXSIZE} ' \
               f'-PARAMETERS_NAME {PARAM_FILE} ' \
-              f'-NNW_NAME {NNW_FILE} ' \
+              f'-STARNNW_NAME {NNW_FILE} ' \
               f'-FILTER_NAME {CONV_FILE} ' \
 
     outnames = [outname] + coutnames
