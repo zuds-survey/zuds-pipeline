@@ -33,6 +33,8 @@ import uuid
 import warnings
 from reproject import reproject_interp
 
+import pandas as pd
+
 import photutils
 from astropy.wcs.utils import proj_plane_pixel_scales
 from astropy import units as u
@@ -939,10 +941,11 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         for prop in GROUP_PROPERTIES:
             setattr(cat, prop, getattr(image, prop))
 
+        df = pd.DataFrame(cat)
         if isinstance(image, CalibratedImage):
             phot = aperture_photometry(image,
-                                       tab['sky_centroid_icrs'].ra.deg,
-                                       tab['sky_centroid_icrs'].dec.deg,
+                                       cat.data['X_WORLD'],
+                                       cat.data['Y_WORLD'],
                                        apply_calibration=True)
             names = ['mag', 'magerr', 'flux', 'fluxerr', 'flags']
             for name in names:
@@ -952,7 +955,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         cat.data = rec
         cat.header = image.header
         cat.header_comments = image.header_comments
-        cat.basename = image.basename.replace('.fits', '.cat.fits')
+        cat.basename = image.basename.replace('.fits', '.cat')
         cat.image_id = image.id
         cat.image = image
         image.catalog = cat
@@ -1077,9 +1080,9 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
                 self._rmsimg = result
             elif result.basename.endswith('.bkg.fits'):
                 self._bkgimg = result
-            elif results.basename.endswith('.bkgsub.fits'):
+            elif result.basename.endswith('.bkgsub.fits'):
                 self._bkgsubimg = result
-            elif results.basename.endswith('.segm.fits'):
+            elif result.basename.endswith('.segm.fits'):
                 self._segmimg = result
 
     @property
