@@ -1463,7 +1463,7 @@ class Subtraction(HasWCS):
         # pixel-by-pixel subtracted from the science image. both will be written
         # to this subtraction's working directory (i.e., `directory`)
         remapped_ref = ref.aligned_to(sci)
-        remapped_refmask = ref.mask_image.aligned_to(sci.mask_image)
+        remapped_refmask = remapped_ref.mask_image
         remapped_ref_basename = f'{ref.basename}.remap.fits'
         remapped_refname = directory / remapped_ref_basename
         remapped_refname = str(remapped_refname.absolute())
@@ -1474,7 +1474,6 @@ class Subtraction(HasWCS):
         remapped_refmask.map_to_local_file(remapped_refmaskname)
         remapped_ref.save()
         remapped_refmask.save()
-        remapped_ref.mask_image = remapped_refmask
         remapped_ref.basename = remapped_ref_basename
         remapped_refmask.basename = os.path.basename(remapped_refmaskname)
 
