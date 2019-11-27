@@ -14,8 +14,8 @@ db.DBSession().get_bind().echo = True
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
 
-infile = sys.argv[0]  # file listing all the images to make subtractions of
-refvers = sys.argv[1]
+infile = sys.argv[1]  # file listing all the images to make subtractions of
+refvers = sys.argv[2]
 
 # get the work
 imgs = mpi.get_my_share_of_work(infile)
