@@ -34,7 +34,7 @@ for fn in imgs:
         print(f'Ref {refname} does not exist. Skipping...')
         continue
 
-    ref = db.DBSession().from_file(refname)
+    ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
 
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref,
