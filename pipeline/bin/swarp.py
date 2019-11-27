@@ -179,7 +179,9 @@ def run_align(image, align_header, tmpdir='/tmp',
     # deleted
     if not persist_aligned:
         result.load()
-        result.unmap()
+
+        # unmap the object from disk, but preserve the loaded attrs.
+        del result._path
 
     # clean up the swarp working dir
     shutil.rmtree(directory)
