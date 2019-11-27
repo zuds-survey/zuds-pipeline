@@ -542,6 +542,7 @@ class FITSFile(File):
     header_comments = sa.Column(psql.JSONB)
     __diskmapped_cached_properties__ = ['_path', '_data']
     _DATA_HDU = 0
+    _HEADER_HDU = 0
 
     @classmethod
     def get_by_basename(cls, basename):
@@ -576,7 +577,7 @@ class FITSFile(File):
         database-backed variables that store metadata. These can later be
         flushed to the database using SQLalchemy."""
         with fits.open(self.local_path) as hdul:
-            hd = dict(hdul[0].header)
+            hd = dict(hdul[self._HEADER_HDU].header)
             hdc = {card.keyword: card.comment for card in hdul[0].header.cards}
         hd2 = hd.copy()
         for k in hd:
@@ -926,6 +927,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     # since this object maps a fits binary table, the data lives in the first
     #  extension, not in the primary hdu
     _DATA_HDU = 2
+    _HEADER_HDU = 2
 
     @classmethod
     def from_image(cls, image):
