@@ -117,7 +117,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     impath = str(directory / image.basename)
 
     # now get the WCS keys to align the header to
-    head = WCS(align_header).to_header_string(relax=True)
+    head = WCS(align_header).to_header(relax=True)
 
     # and write the results to a file that swarp will read
 
@@ -128,7 +128,8 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     headpath = impath.replace('.fits', '.head')
 
     with open(headpath, 'w') as f:
-        f.write(head)
+        for card in head:
+            f.write(f'{card.image}\n')
 
     # make a random file for the weightmap -> we dont want to use it
     weightname = directory / image.basename.replace('.fits',
