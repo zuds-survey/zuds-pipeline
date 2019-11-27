@@ -578,7 +578,8 @@ class FITSFile(File):
         flushed to the database using SQLalchemy."""
         with fits.open(self.local_path) as hdul:
             hd = dict(hdul[self._HEADER_HDU].header)
-            hdc = {card.keyword: card.comment for card in hdul[0].header.cards}
+            hdc = {card.keyword: card.comment
+                   for card in hdul[self._HEADER_HDU].header.cards}
         hd2 = hd.copy()
         for k in hd:
             if not isinstance(hd[k], (int, str, bool, float)):
