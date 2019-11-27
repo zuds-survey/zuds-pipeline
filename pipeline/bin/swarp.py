@@ -128,6 +128,9 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     headpath = impath.replace('.fits', '.head')
 
     with open(headpath, 'w') as f:
+        for card in image.header.cards:
+            if card.keyword.startswith('NAXIS'):
+                f.write(f'{card.image}\n')
         for card in head.cards:
             f.write(f'{card.image}\n')
 
