@@ -1,6 +1,7 @@
 import db
 import sys
 import mpi
+import os
 import archive
 
 fmap = {1: 'zg',
@@ -8,11 +9,13 @@ fmap = {1: 'zg',
         3: 'zi'}
 
 db.init_db()
+db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
 
 infile = sys.argv[0]  # file listing all the images to make subtractions of
+refvers = sys.argv[1]
 
 # get the work
 imgs = mpi.get_my_share_of_work(infile)
@@ -24,17 +27,26 @@ for fn in imgs:
     ccdid = f'c{sci.ccdid:02d}'
     qid = f'q{sci.qid}'
     fid = f'{fmap[sci.fid]}'
-    ref = db.DBSession().from_file(f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/{fid}/ref.{field}_{ccdid}_{qid}_{fid}.fits')
+    refname = f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/' \
+              f'{fid}/ref.{field}_{ccdid}_{qid}_{fid}.{refvers}.fits'
+
+    if not os.path.exists(refname):
+        print(f'Ref {refname} does not exist. Skipping...')
+        continue
+
+    ref = db.DBSession().from_file(refname)
 
     try:
-        sub = db.SingleEpochSubtraction.from_images(sci, ref, data_product=True)
+        sub = db.SingleEpochSubtraction.from_images(sci, ref,
+                                                    data_product=False)
     except Exception as e:
         print(e, [sci.basename, ref.basename])
         db.DBSession().rollback()
         continue
 
     db.DBSession().add(sub)
-    db.DBSession().commit()
+    db.DBSession().rollback()
+
 
 
 
