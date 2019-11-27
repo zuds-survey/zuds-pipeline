@@ -134,6 +134,8 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     weightname = directory / image.basename.replace('.fits',
                                                     '.remap.weight.fits')
 
+    combtype = 'OR' if isinstance(image, db.MaskImage) else 'CLIPPED'
+
     syscall = f'swarp -c {conf} {impath} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-NTHREADS {nthreads} ' \
@@ -142,6 +144,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
               f'-SUBTRACT_BACK N ' \
               f'-WEIGHTOUT_NAME {weightname} ' \
               f'-WEIGHT_TYPE NONE ' \
+              f'-COMBINE_TYPE {combtype} '
 
     return syscall, outname, weightname
 
