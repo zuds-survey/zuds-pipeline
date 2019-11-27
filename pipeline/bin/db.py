@@ -750,6 +750,13 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
                         nthreads=nthreads,
                         persist_aligned=persist_aligned)
 
+        if hasattr(self, 'mask_image'):
+            newmask = run_align(self.mask_image, target_header,
+                                tmpdir=tmpdir,
+                                nthreads=nthreads,
+                                persist_aligned=persist_aligned)
+            new.mask_image = newmask
+
         return new
 
 
