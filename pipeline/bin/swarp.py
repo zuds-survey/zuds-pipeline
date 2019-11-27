@@ -128,7 +128,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     headpath = impath.replace('.fits', '.head')
 
     with open(headpath, 'w') as f:
-        for card in head:
+        for card in head.cards:
             f.write(f'{card.image}\n')
 
     # make a random file for the weightmap -> we dont want to use it
