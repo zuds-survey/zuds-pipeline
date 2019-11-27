@@ -939,7 +939,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         for prop in GROUP_PROPERTIES:
             setattr(cat, prop, getattr(image, prop))
 
-        df = pd.DataFrame(cat)
+        df = pd.DataFrame(cat.data)
         if isinstance(image, CalibratedImage):
             phot = aperture_photometry(image,
                                        cat.data['X_WORLD'],
