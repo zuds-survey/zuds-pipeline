@@ -1064,8 +1064,22 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         return interval.get_limits(self.data[~self.mask_image.boolean.data])
 
     def _call_source_extractor(self, checkimage_type=None):
-        results = sextractor.run_sextractor(self,
-                                            checkimage_type=checkimage_type)
+
+        rs = sextractor.run_sextractor
+        success = False
+        for _ in range(3):
+            try:
+                results = rs(self, checkimage_type=checkimage_type)
+            except subprocess.CalledProcessError as e:
+                print(f'Caught CalledProcessError {e}, retrying... {_+1} / 3')
+                continue
+            else:
+                success = True
+                break
+
+        if not success:
+            raise ValueError(f'Unable to run SExtractor on {self}...')
+
 
         for result in results:
             if result.basename.endswith('.cat'):
