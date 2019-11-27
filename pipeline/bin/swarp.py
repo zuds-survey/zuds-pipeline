@@ -125,7 +125,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
         outname = image.local_path.replace('.fits', '.remap.fits')
     else:
         outname = impath.replace('.fits', '.remap.fits')
-    headpath = impath.replace('.fits', '.head')
+    headpath = impath.replace('.fits', '.remap.head')
 
     with open(headpath, 'w') as f:
         for card in image.astropy_header.cards:
