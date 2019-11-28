@@ -22,7 +22,7 @@ from secrets import get_secret
 from photometry import aperture_photometry, APER_KEY
 from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
 import archive
-from makesub import prepare_hotpants
+from hotpants import prepare_hotpants
 
 import sextractor
 
@@ -1080,7 +1080,6 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         if not success:
             raise ValueError(f'Unable to run SExtractor on {self}...')
 
-
         for result in results:
             if result.basename.endswith('.cat'):
                 self.catalog = result
@@ -1454,6 +1453,18 @@ class Subtraction(HasWCS):
         outname = sub_name(sci.local_path, ref.local_path)
         outmask = sub_name(sci.mask_image.local_path, ref.mask_image.local_path)
 
+        remapped_ref = ref.aligned_to(sci)
+        remapped_refmask = remapped_ref.mask_image
+
+        remapped_refname = str(directory / remapped_ref.basename)
+        remapped_refmaskname = remapped_refname.replace('.fits', '.mask.fits')
+
+        # flush to the disk
+        remapped_ref.map_to_local_file(remapped_refname)
+        remapped_refmask.map_to_local_file(remapped_refmaskname)
+        remapped_ref.save()
+        remapped_refmask.save()
+
         # create the mask
         submask = MaskImage()
         submask.basename = os.path.basename(outmask)
@@ -1464,18 +1475,6 @@ class Subtraction(HasWCS):
         # to this subtraction's working directory (i.e., `directory`)
         remapped_ref = ref.aligned_to(sci)
         remapped_refmask = remapped_ref.mask_image
-        remapped_ref_basename = f'{ref.basename}.remap.fits'
-        remapped_refname = directory / remapped_ref_basename
-        remapped_refname = str(remapped_refname.absolute())
-        remapped_refmaskname = remapped_refname.replace('.fits', '.mask.fits')
-
-        # flush to the disk
-        remapped_ref.map_to_local_file(remapped_refname)
-        remapped_refmask.map_to_local_file(remapped_refmaskname)
-        remapped_ref.save()
-        remapped_refmask.save()
-        remapped_ref.basename = remapped_ref_basename
-        remapped_refmask.basename = os.path.basename(remapped_refmaskname)
 
         badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix

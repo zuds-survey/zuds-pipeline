@@ -280,7 +280,6 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
         impaths = [im.local_path for im in [sci, ref]]
     scipath, refpath = impaths
 
-
     if 'SEEING' not in sci.header:
         estimate_seeing(sci)
         sci.save()
@@ -307,11 +306,11 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
         refrms.map_to_local_file(refrms_tmpnam)
         refrms.save()
 
-    scibkg = sci.background_object.background_median
-    refbkg = ref.background_object.background_median
+    scibkg = np.median(sci.data)
+    refbkg = np.median(ref.data)
 
-    scibkgstd = sci.background_object.background_rms_median
-    refbkgstd = ref.background_object.background_rms_median
+    scibkgstd = np.median(sci.rms_image.data)
+    refbkgstd = 1.4826 * np.median(np.abs(ref.data - np.median(ref.data)))
 
     il = scibkg - 10 * scibkgstd
     tl = refbkg - 10 * refbkgstd
