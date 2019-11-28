@@ -1453,6 +1453,10 @@ class Subtraction(HasWCS):
         outname = sub_name(sci.local_path, ref.local_path)
         outmask = sub_name(sci.mask_image.local_path, ref.mask_image.local_path)
 
+        # create the remapped ref, and remapped ref mask. the former will be
+        # pixel-by-pixel subtracted from the science image. both will be written
+        # to this subtraction's working directory (i.e., `directory`)
+
         remapped_ref = ref.aligned_to(sci)
         remapped_refmask = remapped_ref.mask_image
 
@@ -1470,12 +1474,6 @@ class Subtraction(HasWCS):
         submask.basename = os.path.basename(outmask)
         submask.map_to_local_file(outmask)
 
-        # create the remapped ref, and remapped ref mask. the former will be
-        # pixel-by-pixel subtracted from the science image. both will be written
-        # to this subtraction's working directory (i.e., `directory`)
-        remapped_ref = ref.aligned_to(sci)
-        remapped_refmask = remapped_ref.mask_image
-
         badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix
         submask.header = sci.mask_image.header
@@ -1489,6 +1487,7 @@ class Subtraction(HasWCS):
 
         sub = cls.from_file(outname)
         sub.mask_image = submask
+        sub.reference_image = ref
 
         if isinstance(sub, CalibratedImage):
             sub.header['MAGZP'] = sci.header['MAGZP']
