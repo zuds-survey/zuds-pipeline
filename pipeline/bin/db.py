@@ -1478,6 +1478,7 @@ class Subtraction(HasWCS):
         submask.data = badpix
         submask.header = sci.mask_image.header
         submask.header_comments = sci.mask_image.header_comments
+        submask.boolean.map_to_local_file(directory / submask.basename)
         submask.boolean.save()
 
         command = prepare_hotpants(sci, remapped_ref, outname, submask.boolean,
@@ -1486,6 +1487,12 @@ class Subtraction(HasWCS):
         subprocess.check_call(command.split())
 
         sub = cls.from_file(outname)
+
+        sub.header['FIELD'] = sub.field = sci.field
+        sub.header['CCDID'] = sub.ccdid = sci.ccdid
+        sub.header['QID'] = sub.qid = sci.qid
+        sub.header['FID'] = sub.fid = sci.fid
+
         sub.mask_image = submask
         sub.reference_image = ref
 
