@@ -4,6 +4,7 @@ import requests
 import numpy as np
 from numpy.lib import recfunctions
 from pathlib import Path
+import shutil
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -1475,6 +1476,7 @@ class Subtraction(HasWCS):
         submask = MaskImage()
         submask.basename = os.path.basename(outmask)
         submask.map_to_local_file(outmask)
+        submask.save()
 
         badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix
@@ -1510,6 +1512,7 @@ class Subtraction(HasWCS):
         if data_product:
             archive.archive(sub)
             archive.archive(sub.mask_image)
+        shutil.rmtree(directory)
 
         return sub
 
