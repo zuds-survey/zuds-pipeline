@@ -868,6 +868,7 @@ class ZTFFile(models.Base, File):
     }
 
 
+
 class PipelineRegionFile(ZTFFile):
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
@@ -1457,7 +1458,7 @@ class Subtraction(HasWCS):
         # pixel-by-pixel subtracted from the science image. both will be written
         # to this subtraction's working directory (i.e., `directory`)
 
-        remapped_ref = ref.aligned_to(sci)
+        remapped_ref = ref.aligned_to(sci, tmpdir=tmpdir)
         remapped_refmask = remapped_ref.mask_image
 
         remapped_refname = str(directory / remapped_ref.basename)
@@ -1483,7 +1484,8 @@ class Subtraction(HasWCS):
         submask.boolean.save()
 
         command = prepare_hotpants(sci, remapped_ref, outname, submask.boolean,
-                                   directory, copy_inputs=copy_inputs)
+                                   directory, copy_inputs=copy_inputs,
+                                   tmpdir=tmpdir)
 
         subprocess.check_call(command.split())
 

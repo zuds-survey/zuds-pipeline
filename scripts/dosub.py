@@ -38,7 +38,8 @@ for fn in imgs:
 
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref,
-                                                    data_product=False)
+                                                    data_product=False,
+                                                    tmpdir='tmp')
     except Exception as e:
         print(e, [sci.basename, ref.basename])
         db.DBSession().rollback()
