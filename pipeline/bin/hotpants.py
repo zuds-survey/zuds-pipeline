@@ -293,7 +293,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
 
     # get the background for the input images
     scirms = sci.rms_image
-    refrms = ref.rms_image
+    refrms = ref.parent_image.rms_image.aligned_to(scirms)
 
     # save temporary copies of rms images if necessary
     if not scirms.ismapped or copy_inputs:
@@ -306,11 +306,22 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
         refrms.map_to_local_file(refrms_tmpnam)
         refrms.save()
 
-    scibkg = np.median(sci.data)
-    refbkg = np.median(ref.data)
+    # we only need a quick estimate of the bkg.
+    # so we mask out any pixels where the MASK value is non zero.
 
-    scibkgstd = np.median(sci.rms_image.data)
-    refbkgstd = 1.4826 * np.median(np.abs(ref.data - np.median(ref.data)))
+    NSAMP = 10000
+
+    scibkgpix = sci.data[sci.mask_image.data == 0]
+    scibkgpix = np.random.choice(scibkgpix, size=NSAMP)
+
+    refbkgpix = ref.data[ref.mask_image.data == 0]
+    refbkgpix = np.random.choice(refbkgpix, size=NSAMP)
+
+    scibkg = np.median(scibkgpix)
+    refbkg = np.median(refbkgpix)
+
+    scibkgstd = np.std(scibkgpix)
+    refbkgstd = np.std(refbkgpix)
 
     il = scibkg - 10 * scibkgstd
     tl = refbkg - 10 * refbkgstd

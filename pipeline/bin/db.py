@@ -1451,7 +1451,7 @@ class Subtraction(HasWCS):
         directory.mkdir(exist_ok=True, parents=True)
 
         outname = sub_name(sci.local_path, ref.local_path)
-        outmask = sub_name(sci.mask_image.local_path, ref.mask_image.local_path)
+        outmask = outname.replace('.fits', '.mask.fits')
 
         # create the remapped ref, and remapped ref mask. the former will be
         # pixel-by-pixel subtracted from the science image. both will be written
@@ -1468,6 +1468,7 @@ class Subtraction(HasWCS):
         remapped_refmask.map_to_local_file(remapped_refmaskname)
         remapped_ref.save()
         remapped_refmask.save()
+        remapped_ref.parent_image = ref
 
         # create the mask
         submask = MaskImage()
