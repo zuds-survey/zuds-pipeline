@@ -1496,6 +1496,7 @@ class Subtraction(HasWCS):
 
         sub.mask_image = submask
         sub.reference_image = ref
+        sub.target_image = sci
 
         if isinstance(sub, CalibratedImage):
             sub.header['MAGZP'] = sci.header['MAGZP']
