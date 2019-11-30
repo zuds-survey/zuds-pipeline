@@ -550,7 +550,7 @@ class FITSFile(File):
         return DBSession().query(cls).filter(cls.basename == basename).first()
 
     @classmethod
-    def from_file(cls, f, use_existing_record=False):
+    def from_file(cls, f, use_existing_record=True):
         """Read a file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy.
@@ -703,7 +703,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         return WCS(self.astropy_header)
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=False):
+    def from_file(cls, fname, use_existing_record=True):
         """Read a fits file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy. """
@@ -1160,7 +1160,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=False):
+    def from_file(cls, fname, use_existing_record=True):
         obj = super().from_file(fname, use_existing_record=use_existing_record)
         dir = Path(fname).parent
 
