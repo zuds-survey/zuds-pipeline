@@ -1476,12 +1476,12 @@ class Subtraction(HasWCS):
         submask = MaskImage()
         submask.basename = os.path.basename(outmask)
         submask.map_to_local_file(outmask)
-        submask.save()
-
         badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix
         submask.header = sci.mask_image.header
         submask.header_comments = sci.mask_image.header_comments
+        submask.save()
+
         submask.boolean.map_to_local_file(directory / submask.basename)
         submask.boolean.save()
 
