@@ -2,6 +2,7 @@ import db
 import sys
 import mpi
 import os
+import time
 import archive
 
 fmap = {1: 'zg',
@@ -22,6 +23,7 @@ imgs = mpi.get_my_share_of_work(infile)
 
 # make a reference for each directory
 for fn in imgs:
+    tstart = time.time()
     sci = db.ScienceImage.from_file(fn)
     field = f'{sci.field:06d}'
     ccdid = f'c{sci.ccdid:02d}'
@@ -47,6 +49,9 @@ for fn in imgs:
 
     db.DBSession().add(sub)
     db.DBSession().rollback()
+    tstop = time.time()
+
+    print(f'took {tstop - tstart} sec to make "{sub.basename}"')
 
 
 
