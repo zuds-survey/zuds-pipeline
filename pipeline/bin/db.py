@@ -1473,8 +1473,11 @@ class Subtraction(HasWCS):
         remapped_ref.parent_image = ref
 
         # create the mask
-        submask = MaskImage()
+        submask = MaskImage.get_by_basename(os.path.basename(outmask))
+        if submask is None:
+            submask = MaskImage()
         submask.basename = os.path.basename(outmask)
+
         submask.map_to_local_file(outmask)
         badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix
@@ -1491,7 +1494,7 @@ class Subtraction(HasWCS):
 
         subprocess.check_call(command.split())
 
-        sub = cls.from_file(outname)
+        sub = cls.from_file(outname, use_existing_record=True)
 
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
