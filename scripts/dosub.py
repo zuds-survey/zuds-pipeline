@@ -38,6 +38,12 @@ for fn in imgs:
 
     ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
 
+    basename = db.sub_name(sci.basename, ref.basename)
+    prev = db.SingleEpochSubtraction.get_by_basename(basename)
+
+    if prev is not None:
+        continue
+
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref,
                                                     data_product=False,
