@@ -102,7 +102,7 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
     allims = ' '.join([c.local_path for c in masks])
 
     syscall = f'swarp -c {conf} {allims} ' \
-              f'-SUBTRACT_BACK N' \
+              f'-SUBTRACT_BACK N ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
