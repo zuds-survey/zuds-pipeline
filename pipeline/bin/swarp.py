@@ -262,8 +262,8 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     coadd.save()
 
     # clean up
-    for im in [i.weight_image for i in [coadd] + images.tolist()]:
-        if f'{directory}' in im.local_path:
+    for im in [coadd] + images.tolist():
+        if f'{directory}' in im.weight_image.local_path:
             del im._weightimg
 
     shutil.rmtree(directory)
