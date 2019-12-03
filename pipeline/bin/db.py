@@ -906,7 +906,7 @@ class PipelineRegionFile(ZTFFile):
         return reg
 
 
-class Thumbnail(ZTFFile):
+class Stamp(ZTFFile):
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
@@ -931,7 +931,7 @@ class Thumbnail(ZTFFile):
     )
     image = relationship('CalibratableImage',
                          cascade='all',
-                         back_populates='thumbnails')
+                         back_populates='stamps')
 
     source_id = sa.Column(
         sa.Text,
@@ -944,12 +944,8 @@ class Thumbnail(ZTFFile):
     source = relationship(
         'Source',
         cascade='all',
-        back_populates='thumbnails'
+        back_populates='stamps'
     )
-
-
-# overwrite thumbnail
-models.Thumbnail = Thumbnail
 
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
@@ -1107,7 +1103,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
-    thumbnails = relationship('Thumbnail')
+    stamps = relationship('Stamp')
 
     def cmap_limits(self):
         interval = ZScaleInterval()
@@ -1681,6 +1677,7 @@ class HPSSJob(models.Base):
     status = sa.Column(sa.Boolean, default=False)
     reason = sa.Column(sa.Text)
 
+models.Source.stamps = relationship('Stamp', cascade='all')
 
 """
 def images(self):
