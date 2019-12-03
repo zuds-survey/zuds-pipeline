@@ -261,8 +261,11 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     # save the coadd to disk
     coadd.save()
 
-    # clean up -- this also deletes the mask weight map
-    del coadd._weightimg
+    # clean up
+    for im in [i.weight_image for i in [coadd] + images]:
+        if f'{directory}' in im.local_path:
+            del im._weightimg
+
     shutil.rmtree(directory)
     return coadd
 
