@@ -27,7 +27,6 @@ def _read_clargs(val):
     return np.asarray(val)
 
 
-
 def filter_sexcat(cat):
     """Read in sextractor catalog `incat` and filter it using Peter's technique.
     Write the results to sextractor catalog `outcat`."""
@@ -79,7 +78,6 @@ def filter_sexcat(cat):
     bpm_table = aperture_photometry(bpm, apertures)
 
     rmsbig = rms_table['aperture_sum']
-
     bpmbig = bpm_table['aperture_sum']
 
     bpm_cut = Column(bpmbig)
@@ -105,7 +103,7 @@ def filter_sexcat(cat):
 
     table['GOODCUT'][np.where(table['RMSCUT'] > medcut)] = 0
     print('Number of candidates after rms cuts: ', np.sum(table['GOODCUT']))
-    
+
     table['GOODCUT'][np.where(table['FLUX_BEST'] / table['FLUXERR_BEST'] < 5)] = 0
     print('Number of candidates after s/n > 5 cut: ', np.sum(table['GOODCUT']))
 
@@ -145,28 +143,6 @@ def filter_sexcat(cat):
                     if (cutaround > 5).any():
                         row['GOODCUT'] = 0.
                         break
-
-                """
-                nbad = len(np.argwhere(sigim < -10))
-
-
-                if nbad >= 3:
-                    row['GOODCUT'] = 0.
-
-                nbad = len(np.argwhere(sigim < -5))
-                if nbad >= 5:
-                    row['GOODCUT'] = 0.
-
-                nbad = len(np.argwhere(sigim < -20))
-                if nbad >= 1:
-                    row['GOODCUT'] = 0.
-
-                normcutout = imcutout / imcutout.max()
-                gradient = np.gradient(normcutout)
-                for g in gradient:
-                    if (g < -1.).any():
-                        row['GOODCUT'] = 0.
-                """
 
     table.write(cat.replace('cat', 'cat.out.fits'), format='fits', overwrite=True)
 

@@ -24,6 +24,7 @@ from photometry import aperture_photometry, APER_KEY
 from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
 import archive
 from hotpants import prepare_hotpants
+from filterobjects import filter_sexcat
 
 import sextractor
 
@@ -869,7 +870,6 @@ class ZTFFile(models.Base, File):
     }
 
 
-
 class PipelineRegionFile(ZTFFile):
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
@@ -904,6 +904,47 @@ class PipelineRegionFile(ZTFFile):
                         f'color=blue\n')
 
         return reg
+
+
+class Thumbnail(ZTFFile):
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'stamp',
+        'inherit_condition': id == ZTFFile.id
+    }
+
+    # this can be filled optionally. if the jpeg is not written to data then
+    # use .copies to get the public url of the HTTP servable JPG
+
+    data = sa.Column(psql.BYTEA, nullable=True)
+
+    image_id = sa.Column(
+        sa.Integer,
+        sa.ForeignKey(
+            'calibratableimages.id',
+            ondelete='CASCADE'
+        ),
+    )
+    image = relationship('CalibratableImage',
+                         cascade='all',
+                         back_populates='thumbnails')
+
+    source_id = sa.Column(
+        sa.Text,
+        sa.ForeignKey(
+            'sources.id',
+            ondelete='CASCADE'
+        )
+    )
+    source = relationship(
+        'Source',
+        cascade='all',
+        back_populates='thumbnails'
+    )
+
 
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
@@ -1586,7 +1627,27 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     __mapper_args__ = {'polymorphic_identity': 'detection',
                        'inherit_condition': id == ObjectWithFlux.id}
 
+    xwin_image = sa.Column(sa.Float)
+    ywin_image = sa.Column(sa.Float)
 
+    elongation = sa.Column(sa.Float)
+    awin_image = sa.Column(sa.Float)
+    bwin_image = sa.Column(sa.Float)
+    fwhm_image = sa.Column(sa.Float)
+
+    #replace with ra, dec
+    #x_world = sa.Column(sa.Float)
+    #y_world = sa.Column(sa.Float)
+
+    flags = sa.Column(sa.Integer)
+    imaflags_iso = sa.Column(sa.Integer)
+
+
+    @classmethod
+    def from_catalog(cls, cat, filter=True):
+
+
+        pass
 
 class ForcedPhotometry(ObjectWithFlux):
     id = sa.Column(sa.Integer,
