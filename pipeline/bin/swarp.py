@@ -143,7 +143,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     combtype = 'OR' if isinstance(image, db.MaskImage) else 'CLIPPED'
 
     syscall = f'swarp -c {conf} {impath} ' \
-              f'-BACK_SIZE {db.BKG_BOX_SIZE}' \
+              f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-NTHREADS {nthreads} ' \
               f'-VMEM_DIR {directory} ' \
