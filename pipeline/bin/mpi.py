@@ -1,9 +1,23 @@
 import numpy as np
 import os
 
+NTHREADS_PER_NODE = 64
 
 def default_reader(f):
     return np.atleast_1d(np.genfromtxt(f, dtype=None, encoding='ascii'))
+
+
+def get_nthreads():
+    try:
+        from mpi4py import MPI
+    except ImportError:
+        return NTHREADS_PER_NODE
+    else:
+        slurm_count = os.getenv('SLURM_CPUS_PER_TASK')
+        if slurm_count is None:
+            return NTHREADS_PER_NODE
+        else:
+            return slurm_count
 
 
 def get_my_share_of_work(fname, reader=default_reader):
