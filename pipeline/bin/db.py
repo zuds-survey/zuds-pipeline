@@ -927,6 +927,7 @@ class Thumbnail(ZTFFile):
             'calibratableimages.id',
             ondelete='CASCADE'
         ),
+        index=True
     )
     image = relationship('CalibratableImage',
                          cascade='all',
@@ -937,7 +938,8 @@ class Thumbnail(ZTFFile):
         sa.ForeignKey(
             'sources.id',
             ondelete='CASCADE'
-        )
+        ),
+        index=True
     )
     source = relationship(
         'Source',
@@ -1101,6 +1103,8 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
+
+    thumbnails = relationship('Thumbnail')
 
     def cmap_limits(self):
         interval = ZScaleInterval()
