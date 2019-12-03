@@ -1587,6 +1587,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                        'inherit_condition': id == ObjectWithFlux.id}
 
 
+
 class ForcedPhotometry(ObjectWithFlux):
     id = sa.Column(sa.Integer,
                    sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),

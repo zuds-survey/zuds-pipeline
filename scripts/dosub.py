@@ -32,7 +32,8 @@ for fn in imgs:
     refname = f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/' \
               f'{fid}/ref.{field}_{ccdid}_{qid}_{fid}.{refvers}.fits'
 
-    if not os.path.exists(refname):
+    if not (db.ReferenceImage.get_by_basename(os.path.basename(refname))
+            and os.path.exists(refname)):
         print(f'Ref {refname} does not exist. Skipping...')
         continue
 
