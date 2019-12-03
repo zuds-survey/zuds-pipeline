@@ -78,6 +78,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
     wgtout = outname.replace('.fits', '.weight.fits')
 
     syscall = f'swarp -c {conf} @{inlist} ' \
+              f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
@@ -101,6 +102,7 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
     allims = ' '.join([c.local_path for c in masks])
 
     syscall = f'swarp -c {conf} {allims} ' \
+              f'-SUBTRACT_BACK N' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
@@ -141,6 +143,7 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     combtype = 'OR' if isinstance(image, db.MaskImage) else 'CLIPPED'
 
     syscall = f'swarp -c {conf} {impath} ' \
+              f'-BACK_SIZE {db.BKG_BOX_SIZE}' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-NTHREADS {nthreads} ' \
               f'-VMEM_DIR {directory} ' \

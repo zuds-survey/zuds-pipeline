@@ -45,6 +45,7 @@ for fn in imgs:
         db.DBSession().rollback()
         continue
 
+
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref,
                                                     data_product=False,
