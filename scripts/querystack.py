@@ -41,7 +41,7 @@ res = db.DBSession().query(db.SingleEpochSubtraction.field,
                            target).select_from(
     db.sa.join(db.SingleEpochSubtraction, db.ScienceImage.__table__,
                db.SingleEpochSubtraction.target_image_id ==
-               db.ScienceImage.id).innerjoin(daterange, jcond)
+               db.ScienceImage.id).join(daterange, jcond)
 ).group_by(
     db.SingleEpochSubtraction.field,
     db.SingleEpochSubtraction.ccdid,
@@ -68,7 +68,4 @@ final = db.DBSession().query(res).outerjoin(
 )
 
 result = pd.read_sql(final.statement, db.DBSession().get_bind())
-
-with open(outfile, 'w') as f:
-    for _, row in result.iterrows():
-        f.write(f'{",".join(row["target"])}\n')
+result.to_csv(outfile, index=False)
