@@ -2,12 +2,16 @@ import numpy as np
 import os
 
 
-def get_my_share_of_work(fname):
+def default_reader(f):
+    return np.atleast_1d(np.genfromtxt(f, dtype=None, encoding='ascii'))
+
+
+def get_my_share_of_work(fname, reader=default_reader):
 
     try:
         from mpi4py import MPI
     except ImportError:
-        return np.atleast_1d(np.genfromtxt(fname, dtype=None, encoding='ascii'))
+        return reader(fname)
     else:
         comm = MPI.COMM_WORLD
         rank = comm.Get_rank()
@@ -16,8 +20,7 @@ def get_my_share_of_work(fname):
         is_jobarray = os.getenv('SLURM_ARRAY_JOB_ID') is not None
 
         if rank == 0:
-            files = np.genfromtxt(fname, dtype=None, encoding='ascii')
-            files = np.atleast_1d(files)
+            files = reader(fname)
 
             # this is the job array part
             if is_jobarray:
