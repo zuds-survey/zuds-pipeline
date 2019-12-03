@@ -931,7 +931,8 @@ class Stamp(ZTFFile):
     )
     image = relationship('CalibratableImage',
                          cascade='all',
-                         back_populates='stamps')
+                         back_populates='stamps',
+                         foreign_keys=[image_id])
 
     source_id = sa.Column(
         sa.Text,
@@ -944,7 +945,8 @@ class Stamp(ZTFFile):
     source = relationship(
         'Source',
         cascade='all',
-        back_populates='stamps'
+        back_populates='stamps',
+        foreign_keys=[source_id]
     )
 
 
