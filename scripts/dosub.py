@@ -42,6 +42,7 @@ for fn in imgs:
     prev = db.SingleEpochSubtraction.get_by_basename(basename)
 
     if prev is not None:
+        db.DBSession().rollback()
         continue
 
     try:
@@ -54,7 +55,7 @@ for fn in imgs:
         continue
 
     db.DBSession().add(sub)
-    db.DBSession().rollback()
+    db.DBSession().commit()
     tstop = time.time()
 
     print(f'took {tstop - tstart} sec to make "{sub.basename}"')
