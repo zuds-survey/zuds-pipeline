@@ -1394,7 +1394,7 @@ class Coadd(CalibratableImage):
 
     @classmethod
     def from_images(cls, images, outfile_name, nthreads=1, data_product=False,
-                    tmpdir='/tmp', copy_inputs=False):
+                    tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
         """Make a coadd from a bunch of input images"""
 
         images = np.atleast_1d(images)
@@ -1420,7 +1420,8 @@ class Coadd(CalibratableImage):
         # call swarp
         coadd = run_coadd(cls, images, outfile_name, mskoutname,
                           reference=isref, addbkg=True, nthreads=nthreads,
-                          tmpdir=tmpdir, copy_inputs=copy_inputs)
+                          tmpdir=tmpdir, copy_inputs=copy_inputs,
+                          swarp_kws=swarp_kws)
         coaddmask = coadd.mask_image
 
         coadd.header['FIELD'] = coadd.field = images[0].field

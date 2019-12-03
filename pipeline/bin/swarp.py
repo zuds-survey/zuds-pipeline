@@ -25,7 +25,7 @@ BKG_VAL = 150.  # counts
 
 
 def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
-                      reference=False, nthreads=1):
+                      reference=False, nthreads=1, swarp_kws=None):
     conf = REF_CONF if reference else SCI_CONF
     initialize_directory(directory)
 
@@ -84,7 +84,11 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
               f'-RESAMPLE_DIR {directory} ' \
               f'-WEIGHT_IMAGE @{inweight} ' \
               f'-WEIGHTOUT_NAME {wgtout} ' \
-              f'-NTHREADS {nthreads}'
+              f'-NTHREADS {nthreads} '
+
+    if swarp_kws is not None:
+        for kw in swarp_kws:
+            syscall += f'-{kw.upper()} {swarp_kws[kw]} '
 
     return syscall
 
@@ -199,9 +203,8 @@ def run_align(image, align_header, tmpdir='/tmp',
     return result
 
 
-
 def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
-              nthreads=1, tmpdir='/tmp', copy_inputs=False):
+              nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
     """Run swarp on images `images`"""
 
     directory = Path(tmpdir) / uuid.uuid4().hex
@@ -210,7 +213,8 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     command = prepare_swarp_sci(images, outname, directory,
                                 reference=reference,
                                 copy_inputs=copy_inputs,
-                                nthreads=nthreads)
+                                nthreads=nthreads,
+                                swarp_kws=swarp_kws)
 
     # run swarp
     while True:
