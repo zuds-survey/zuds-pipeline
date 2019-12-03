@@ -1105,7 +1105,8 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
-    stamps = relationship('Stamp')
+    stamps = relationship('Stamp',
+                          primaryjoin=Stamp.image_id == id)
 
     def cmap_limits(self):
         interval = ZScaleInterval()
