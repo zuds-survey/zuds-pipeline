@@ -172,10 +172,10 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
 
             if catalog is not None:
                 for row in catalog.data:
-                    e = Ellipse(xy=(row['xcentroid'], row['ycentroid']),
-                                width=6 * row['semimajor_axis_sigma'],
-                                height=6 * row['semiminor_axis_sigma'],
-                                angle=row['orientation'] * 180. / np.pi)
+                    e = Ellipse(xy=(row['X_IMAGE'], row['Y_IMAGE']),
+                                width=6 * row['A_IMAGE'],
+                                height=6 * row['B_IMAGE'],
+                                angle=row['THETA_IMAGE'] * 180. / np.pi)
                     e.set_facecolor('none')
                     e.set_edgecolor('red')
                     a.add_artist(e)
