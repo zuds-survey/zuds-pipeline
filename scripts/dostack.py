@@ -26,9 +26,9 @@ for _, job in jobs.iterrows():
 
     tstart = time.time()
     images = db.DBSession().query(db.ZTFFile).filter(
-        db.ZTFFile.id.in_(job['target'].tolist())
+        db.ZTFFile.id.in_(eval(job['target']))
     ).all()
-    db.ensure_images_have_the_same_properties(images)
+    db.ensure_images_have_the_same_properties(images, db.GROUP_PROPERTIES)
 
     field = f'{images[0].field:06d}'
     ccdid = f'c{images[0].ccdid:02d}'
@@ -41,8 +41,8 @@ for _, job in jobs.iterrows():
         image.map_to_local_file(path)
         image.mask_image.map_to_local_file(path.replace('.fits', '.mask.fits'))
 
-    basename = f'sub.{field}_{ccdid}_{qid}_{fid}_{job["binleft"]}_' \
-               f'{job["binright"]}.coadd.fits'
+    basename = f'sub.{field}_{ccdid}_{qid}_{fid}_{job["left"]}_' \
+               f'{job["right"]}.coadd.fits'
     prev = db.ScienceCoadd.get_by_basename(basename)
     outname = os.path.join(os.path.dirname(images[0].local_path), basename)
 
@@ -53,7 +53,8 @@ for _, job in jobs.iterrows():
         sub = db.ScienceCoadd.from_images(images, outname,
                                           nthreads=mpi.get_nthreads(),
                                           data_product=False,
-                                          tmpdir='tmp')
+                                          tmpdir='tmp',
+                                          swarp_kws={'COMBINE_TYPE': 'MEDIAN'})
     except Exception as e:
         print(e, [i.basename for i in images])
         db.DBSession().rollback()
