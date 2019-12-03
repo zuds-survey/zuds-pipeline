@@ -4,13 +4,9 @@ import numpy as np
 import shutil
 import pandas as pd
 
-from utils import initialize_directory
+from utils import initialize_directory, quick_background_estimate
 from seeing import estimate_seeing
 
-
-import tempfile
-from pathlib import Path
-import paramiko
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
@@ -22,30 +18,6 @@ def chunk(iterable, chunksize):
     nchunks = isize // chunksize if isize % chunksize == 0 else isize // chunksize + 1
     for i in range(nchunks):
         yield i, iterable[i * chunksize : (i + 1) * chunksize]
-
-
-def make_coadd_bins(science_rows, window_size=3, rolling=False):
-
-    mindate = pd.to_datetime(science_rows['obsdate'].min())
-    maxdate = pd.to_datetime(science_rows['obsdate'].max())
-
-
-    if rolling:
-        dates = pd.date_range(mindate, maxdate, freq='1D')
-        bins = []
-        for i, date in enumerate(dates):
-            if i + window_size >= len(dates):
-                break
-            bins.append((date, dates[i + window_size]))
-
-    else:
-        binedges = pd.date_range(mindate, maxdate, freq=f'{window_size}D')
-
-        bins = []
-        for i, lbin in enumerate(binedges[:-1]):
-            bins.append((lbin, binedges[i + 1]))
-
-    return bins
 
 
 def prepare_hotpants(sci, ref, outname, submask, directory,
@@ -90,21 +62,8 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
         refrms.save()
 
     # we only need a quick estimate of the bkg.
-    # so we mask out any pixels where the MASK value is non zero.
-
-    NSAMP = 10000
-
-    scibkgpix = sci.data[sci.mask_image.data == 0]
-    scibkgpix = np.random.choice(scibkgpix, size=NSAMP)
-
-    refbkgpix = ref.data[ref.mask_image.data == 0]
-    refbkgpix = np.random.choice(refbkgpix, size=NSAMP)
-
-    scibkg = np.median(scibkgpix)
-    refbkg = np.median(refbkgpix)
-
-    scibkgstd = np.std(scibkgpix)
-    refbkgstd = np.std(refbkgpix)
+    scibkg, scibkgstd = quick_background_estimate(sci)
+    refbkg, refbkgstd = quick_background_estimate(ref)
 
     il = scibkg - 10 * scibkgstd
     tl = refbkg - 10 * refbkgstd
