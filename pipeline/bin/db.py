@@ -948,6 +948,9 @@ class Thumbnail(ZTFFile):
     )
 
 
+# overwrite thumbnail
+models.Thumbnail = Thumbnail
+
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
