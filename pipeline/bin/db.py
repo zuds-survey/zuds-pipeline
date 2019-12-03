@@ -1558,6 +1558,11 @@ class Subtraction(HasWCS):
         if data_product:
             archive.archive(sub)
             archive.archive(sub.mask_image)
+
+        # clean up
+        if f'{directory}' in sub.mask_image.boolean.local_path:
+            del sub.mask_image._boolean
+
         shutil.rmtree(directory)
 
         return sub
