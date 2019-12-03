@@ -21,8 +21,8 @@ def estimate_seeing(image):
     # get a list of gaia stars
     coordlist = []
     for row in catalog.data:
-        ra = row['sky_centroid_icrs.ra']
-        dec = row['sky_centroid_icrs.dec']
+        ra = row['X_WORLD']
+        dec = row['Y_WORLD']
         coordlist.append((ra, dec))
 
     q = {"query_type": "cone_search",
@@ -59,7 +59,7 @@ def estimate_seeing(image):
             matchdec.append(d[0]['dec'])
 
     matchcoord = SkyCoord(matchra, matchdec, unit='deg')
-    catcoord = catalog['sky_centroid_icrs']
+    catcoord = SkyCoord(catalog['X_WORLD'], catalog['Y_WORLD'], unit='deg')
 
     idx, d2d, _ = catcoord.match_to_catalog_sky(matchcoord)
     ind = d2d < 1 * u.arcsec
@@ -67,8 +67,8 @@ def estimate_seeing(image):
 
     seeings = []
     for row in catok:
-        fwhm = 2 * np.sqrt(np.log(2) * (row['semimajor_axis_sigma']**2 +
-                                        row['semiminor_axis_sigma']**2))
+        fwhm = 2 * np.sqrt(np.log(2) * (row['A_IMAGE']**2 +
+                                        row['B_IMAGE']**2))
         seeings.append(fwhm.value)
 
     medsee = np.nanmedian(seeings) * np.median(image.pixel_scale)
