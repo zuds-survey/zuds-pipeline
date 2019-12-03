@@ -1408,8 +1408,6 @@ class ReferenceImage(Coadd):
     multi_epoch_subtractions = relationship('MultiEpochSubtraction',
                                             cascade='all')
 
-    uidx = sa.Index('ref_basename_version_unique_idx', id, version, unique=True)
-
 
 class ScienceCoadd(Coadd):
     id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
@@ -1419,11 +1417,8 @@ class ScienceCoadd(Coadd):
     subtraction = relationship('MultiEpochSubtraction', uselist=False,
                                cascade='all')
 
-    binleft = sa.Column(sa.DateTime, nullable=False)
-    binright = sa.Column(sa.DateTime, nullable=False)
-
-    uidx = sa.Index('coadd_basename_window_unique_idx',
-                    id, binleft, binright, unique=True)
+    binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
+    binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
 
     @hybrid_property
     def winsize(self):

@@ -44,6 +44,7 @@ for fn in imgs:
     if prev is not None:
         continue
 
+
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref,
                                                     data_product=False,
