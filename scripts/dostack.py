@@ -67,8 +67,8 @@ for _, job in jobs.iterrows():
         db.DBSession().rollback()
         continue
 
-    sub.binleft = pd.to_datetime(job['binleft'])
-    sub.binright = pd.to_datetime(job['binright'])
+    sub.binleft = pd.to_datetime(job['left'])
+    sub.binright = pd.to_datetime(job['right'])
 
     db.DBSession().add(sub)
     db.DBSession().add(catalog)
