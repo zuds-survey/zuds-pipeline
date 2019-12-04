@@ -382,16 +382,13 @@ class File(object):
     def map_to_local_file(self, path):
         self._path = str(Path(path).absolute())
 
-    def clear_from_memory(self):
+    def unmap(self):
         if not self.ismapped:
             raise UnmappedFileError(f"Cannot unmap file '{self.basename}', "
                                     f"file is not mapped")
         for attr in self.__diskmapped_cached_properties__:
             if hasattr(self, attr):
                 delattr(self, attr)
-
-    def unmap_from_disk(self):
-        del self._path
 
     def save(self):
         """Update the data and metadata of a mapped file on disk to reflect
@@ -906,8 +903,15 @@ class PipelineRegionFile(ZTFFile):
     @classmethod
     def from_catalog(cls, catalog):
         reg = cls()
-        reg.basename = catalog.basename.replace('.cat', '.reg')
-        reg.map_to_local_file(reg.basename)
+        reg.basename = catalog.basename.replace('.cat ', '.reg')
+        catdir = os.path.dirname(catalog.local_path)
+        reg.map_to_local_file(os.path.join(catdir, reg.basename))
+
+        reg.field = catalog.field
+        reg.ccdid = catalog.ccdid
+        reg.qid = catalog.qid
+        reg.fid = catalog.fid
+
         reg.catalog = catalog
         with open(reg.local_path, 'w') as f:
             f.write('global color=green dashlist=8 3 width=1 font="helvetica '
