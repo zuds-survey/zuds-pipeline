@@ -1539,6 +1539,7 @@ class Subtraction(HasWCS):
         os.remove(old)
         bn = sci.background_subtracted_image.basename
         sci.background_subtracted_image.map_to_local_file(directory / bn)
+        sci.background_subtracted_image.save()
         sci.background_subtracted_image.data += 100
         scimbkg = sci.background_subtracted_image
 
