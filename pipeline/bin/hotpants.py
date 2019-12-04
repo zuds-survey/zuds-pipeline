@@ -1,11 +1,10 @@
 import os
 import db
-import numpy as np
 import shutil
-import pandas as pd
 
 from utils import initialize_directory, quick_background_estimate
 from seeing import estimate_seeing
+from swarp import BKG_VAL
 
 
 # split an iterable over some processes recursively
@@ -30,9 +29,10 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
     os.remove(old)
     bn = sci.background_subtracted_image.basename
     sci.background_subtracted_image.map_to_local_file(directory / bn)
+    sci.background_subtracted_image.data += BKG_VAL
     sci.background_subtracted_image.save()
-    sci.background_subtracted_image.data += 100
     scimbkg = sci.background_subtracted_image
+
 
     # if requested, copy the input images to a temporary working directory
     if copy_inputs:
