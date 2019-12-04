@@ -1490,7 +1490,7 @@ class Subtraction(HasWCS):
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
-                    copy_inputs=False):
+                    copy_inputs=False, use_existing_record=True):
 
         directory = Path(tmpdir) / uuid.uuid4().hex
         directory.mkdir(exist_ok=True, parents=True)
@@ -1538,7 +1538,7 @@ class Subtraction(HasWCS):
 
         subprocess.check_call(command.split())
 
-        sub = cls.from_file(outname, use_existing_record=True)
+        sub = cls.from_file(outname, use_existing_record=use_existing_record)
 
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
