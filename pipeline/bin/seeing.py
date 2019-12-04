@@ -59,19 +59,17 @@ def estimate_seeing(image):
             matchdec.append(d[0]['dec'])
 
     matchcoord = SkyCoord(matchra, matchdec, unit='deg')
-    catcoord = SkyCoord(catalog['X_WORLD'], catalog['Y_WORLD'], unit='deg')
+    catcoord = SkyCoord(catalog.data['X_WORLD'], catalog.data['Y_WORLD'], unit='deg')
 
     idx, d2d, _ = catcoord.match_to_catalog_sky(matchcoord)
     ind = d2d < 1 * u.arcsec
-    catok = catalog[ind]
+    catok = catalog.data[ind]
 
     seeings = []
     for row in catok:
-        fwhm = 2 * np.sqrt(np.log(2) * (row['A_IMAGE']**2 +
-                                        row['B_IMAGE']**2))
-        seeings.append(fwhm.value)
+        fwhm = 2 * np.sqrt(np.log(2) * row['FWHM_IMAGE']**2)
+        seeings.append(fwhm)
 
-    medsee = np.nanmedian(seeings) * np.median(image.pixel_scale)
-    seeing = (medsee / image.pixel_scale).value
+    seeing = np.nanmedian(seeings)
     image.header['SEEING'] = seeing
     image.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
