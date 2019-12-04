@@ -1561,6 +1561,11 @@ class Subtraction(HasWCS):
             submask = MaskImage()
         submask.basename = os.path.basename(outmask)
 
+        submask.field = sci.field
+        submask.ccdid = sci.ccdid
+        submask.qid = sci.qid
+        submask.fid = sci.fid
+
         submask.map_to_local_file(outmask)
         badpix = remapped_refmask.data | sci.mask_image.data
         submask.data = badpix
