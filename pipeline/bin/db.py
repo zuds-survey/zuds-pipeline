@@ -230,6 +230,14 @@ models.Base.modified = sa.Column(
 )
 
 
+from sqlalchemy import event
+
+
+@event.listens_for(models.Base, 'before_update')
+def bump_modified(mapper, connection, target):
+    target.modified = sa.func.now()
+
+
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
                fk_1='id', fk_2='id', base=models.Base):
     """Helper function to create a join table for a many-to-many relationship.
