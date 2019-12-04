@@ -10,7 +10,7 @@ fmap = {1: 'zg',
         3: 'zi'}
 
 db.init_db()
-db.DBSession().get_bind().echo = True
+#db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
@@ -42,9 +42,9 @@ for fn in imgs:
     basename = db.sub_name(sci.basename, ref.basename)
     prev = db.SingleEpochSubtraction.get_by_basename(basename)
 
-    if prev is not None:
-        db.DBSession().rollback()
-        continue
+    #if prev is not None:
+    #    db.DBSession().rollback()
+    #    continue
 
 
     try:
