@@ -1198,6 +1198,11 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
             self._weightimg.data = wgt
             self._weightimg.header = self.header
             self._weightimg.header_comments = self.header_comments
+            if self.ismapped:
+                dirname = os.path.dirname(self.local_path)
+                bn = self.basename
+                join = os.path.join(dirname, bn)
+                self._weightimg.map_to_local_file(join)
         return self._weightimg
 
     @property
