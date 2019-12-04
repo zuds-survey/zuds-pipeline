@@ -71,7 +71,8 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
         refrms.save()
 
     # we only need a quick estimate of the bkg.
-    scibkg, scibkgstd = quick_background_estimate(scimbkg)
+    scibkg, scibkgstd = quick_background_estimate(scimbkg,
+                                                  mask_image=sci.mask_image)
     refbkg, refbkgstd = quick_background_estimate(ref)
 
     il = scibkg - 10 * scibkgstd
