@@ -869,6 +869,20 @@ class ZTFFile(models.Base, File):
 
     }
 
+    def find_in_dir(self, directory):
+        target = os.path.join(directory, self.basename)
+        if os.path.exists(target):
+            self.map_to_local_file(target)
+        else:
+            raise FileNotFoundError(
+                f'Cannot map "{self.basename}" to "{target}", '
+                f'file does not exist.'
+            )
+
+    def find_in_dir_of(self, ztffile):
+        dirname = os.path.dirname(ztffile.local_path)
+        self.find_in_dir(dirname)
+
 
 class PipelineRegionFile(ZTFFile):
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
