@@ -1531,7 +1531,20 @@ class Subtraction(HasWCS):
         submask.boolean.map_to_local_file(directory / submask.basename)
         submask.boolean.save()
 
-        command = prepare_hotpants(sci, remapped_ref, outname, submask.boolean,
+        if hasattr(sci, '_bkgsubimg'):
+            del sci._bkgsubimg
+
+        # this both creates and unmaps the background subtracted image
+        old = sci.background_subtracted_image.local_path
+        os.remove(old)
+        sci.background_subtracted_image.unmap()
+        bn = sci.background_subtracted_image.basename
+        sci.background_subtracted_image.map_to_local_file(directory / bn)
+        sci.background_subtracted_image.data += 100
+        scimbkg = sci.background_subtracted_image
+
+        command = prepare_hotpants(scimbkg, remapped_ref, outname,
+                                   submask.boolean,
                                    directory, copy_inputs=copy_inputs,
                                    tmpdir=tmpdir)
 
@@ -1562,6 +1575,9 @@ class Subtraction(HasWCS):
         # clean up
         if f'{directory}' in sub.mask_image.boolean.local_path:
             del sub.mask_image._boolean
+
+        if f'{directory}' in sci.background_subtracted_image.local_path:
+            del sci._bkgsubimg
 
         shutil.rmtree(directory)
 
