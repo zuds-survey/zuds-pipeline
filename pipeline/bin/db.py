@@ -1535,7 +1535,9 @@ class Subtraction(HasWCS):
             del sci._bkgsubimg
 
         # this both creates and unmaps the background subtracted image
+        sci.background_subtracted_image.load()
         old = sci.background_subtracted_image.local_path
+
         os.remove(old)
         bn = sci.background_subtracted_image.basename
         sci.background_subtracted_image.map_to_local_file(directory / bn)
