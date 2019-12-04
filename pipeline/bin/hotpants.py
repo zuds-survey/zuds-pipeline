@@ -24,15 +24,24 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
                      copy_inputs=False, tmpdir='/tmp'):
 
     initialize_directory(directory)
+    # this both creates and unmaps the background subtracted image
+    sci.background_subtracted_image.load()
+    old = sci.background_subtracted_image.local_path
+    os.remove(old)
+    bn = sci.background_subtracted_image.basename
+    sci.background_subtracted_image.map_to_local_file(directory / bn)
+    sci.background_subtracted_image.save()
+    sci.background_subtracted_image.data += 100
+    scimbkg = sci.background_subtracted_image
 
     # if requested, copy the input images to a temporary working directory
     if copy_inputs:
         impaths = []
-        for image in [sci, ref]:
+        for image in [scimbkg, ref]:
             shutil.copy(image.local_path, directory)
             impaths.append(str(directory / image.basename))
     else:
-        impaths = [im.local_path for im in [sci, ref]]
+        impaths = [im.local_path for im in [scimbkg, ref]]
     scipath, refpath = impaths
 
     if 'SEEING' not in sci.header:
@@ -62,7 +71,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
         refrms.save()
 
     # we only need a quick estimate of the bkg.
-    scibkg, scibkgstd = quick_background_estimate(sci)
+    scibkg, scibkgstd = quick_background_estimate(scimbkg)
     refbkg, refbkgstd = quick_background_estimate(ref)
 
     il = scibkg - 10 * scibkgstd
