@@ -223,6 +223,11 @@ def model_representation(o):
 
 
 models.Base.__repr__ = model_representation
+models.Base.modified = sa.Column(
+    sa.DateTime(timezone=False),
+    default=sa.func.now(),
+    onupdate=sa.func.now()
+)
 
 
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
