@@ -19,6 +19,8 @@ from skyportal import models
 from skyportal.models import (DBSession, init_db as idb)
 from skyportal.model_util import create_tables, drop_tables
 
+from datetime import datetime
+
 from secrets import get_secret
 from photometry import aperture_photometry, APER_KEY
 from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
@@ -229,13 +231,15 @@ models.Base.modified = sa.Column(
     onupdate=sa.func.now()
 )
 
-
 from sqlalchemy import event
 
 
-@event.listens_for(models.Base, 'before_update')
-def bump_modified(mapper, connection, target):
-    target.modified = sa.func.now()
+@event.listens_for(DBSession(), 'before_flush')
+def bump_modified(session, flush_context, instances):
+    for object in session.dirty:
+        if session.is_modified(object):
+            object.modified = datetime.now()
+
 
 
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
