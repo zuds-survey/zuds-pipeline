@@ -231,16 +231,6 @@ models.Base.modified = sa.Column(
     onupdate=sa.func.now()
 )
 
-from sqlalchemy import event
-
-
-@event.listens_for(DBSession(), 'before_flush')
-def bump_modified(session, flush_context, instances):
-    for object in session.dirty:
-        if session.is_modified(object):
-            object.modified = datetime.now()
-
-
 
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
                fk_1='id', fk_2='id', base=models.Base):
@@ -2021,3 +2011,15 @@ class DR8South(models.Base, DR8):
     # @declared_attr
     # def __table_args__(cls):
     #    return tuple()
+
+init_db()
+
+from sqlalchemy import event
+
+
+@event.listens_for(DBSession(), 'before_flush')
+def bump_modified(session, flush_context, instances):
+    for object in session.dirty:
+        if session.is_modified(object):
+            object.modified = datetime.now()
+
