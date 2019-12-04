@@ -913,8 +913,8 @@ class PipelineRegionFile(ZTFFile):
             f.write('icrs\n')
             rad = 13 * 0.26667 * 0.00027777
             for line in catalog.data:
-                f.write(f'circle({line["sky_centroid_icrs.ra"]},'
-                        f'{line["sky_centroid_icrs.dec"]},{rad}) # width=2 '
+                f.write(f'circle({line["X_WORLD"]},'
+                        f'{line["Y_WORLD"]},{rad}) # width=2 '
                         f'color=blue\n')
 
         return reg
