@@ -1307,6 +1307,13 @@ class CalibratedImage(CalibratableImage):
     def apcor(self):
         return self.header[APER_KEY]
 
+    def find_in_dir(self, directory):
+        super().find_in_dir(directory)
+        try:
+            self.mask_image.find_in_dir(directory)
+        except FileNotFoundError:
+            pass
+
 
 # class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
 class ScienceImage(CalibratedImage):
