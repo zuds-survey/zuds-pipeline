@@ -2020,6 +2020,7 @@ from sqlalchemy import event
 @event.listens_for(DBSession(), 'before_flush')
 def bump_modified(session, flush_context, instances):
     for object in session.dirty:
-        if session.is_modified(object):
-            object.modified = datetime.now()
+        if isinstance(object, models.Base) and session.is_modified(object):
+            object.modified = sa.func.now()
+
 
