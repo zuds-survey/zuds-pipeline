@@ -176,9 +176,9 @@ if __name__ == '__main__':
             icookie = ipac_authenticate()
 
         to_download = db.DBSession().query(db.ZTFFile).outerjoin(
-            db.TapeCopy
+            db.TapeCopy, db.ZTFFile.id == db.TapeCopy.product_id
         ).outerjoin(
-            db.HTTPArchiveCopy
+            db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
         ).filter(
             db.sa.or_(
                 db.ZTFFile.basename.ilike('ztf%sciimg.fits'),
