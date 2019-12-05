@@ -175,7 +175,7 @@ if __name__ == '__main__':
             tstart = time.time()
             icookie = ipac_authenticate()
 
-        idownload_q = db.DBSession().query(db.ZTFFile).outerjoin(
+        idownload_q = db.DBSession().query(db.ZTFFile).join(
             db.TapeCopy, db.ZTFFile.id == db.TapeCopy.product_id
         ).outerjoin(
             db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
@@ -184,7 +184,9 @@ if __name__ == '__main__':
                 db.ZTFFile.basename.ilike('ztf%sciimg.fits'),
                 db.ZTFFile.basename.ilike('ztf%mskimg.fits'),
             ),
-            db.ZTFFile.field.in_(ZUDS_FIELDS)
+            db.ZTFFile.field.in_(ZUDS_FIELDS),
+            db.HTTPArchiveCopy.product_id == None,
+            db.TapeCopy.product_id == None
         ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
             db.ZTFFile.field,
             db.ZTFFile.ccdid,
