@@ -205,6 +205,8 @@ def sub_name(frame, template):
     return sub
 
 
+from sqlalchemy import exc
+
 def init_db(old=False):
     hpss_dbhost = get_secret('hpss_dbhost')
     hpss_dbport = get_secret('hpss_dbport')
@@ -212,8 +214,9 @@ def init_db(old=False):
     hpss_dbname = get_secret('hpss_dbname') if not old else get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
 
-    if DBSession().get_bind() is None:
-
+    try:
+        DBSession().get_bind()
+    except exc.UnboundExecutionError:
         idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost,
             hpss_dbport)
 
