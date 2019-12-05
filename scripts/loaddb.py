@@ -36,7 +36,7 @@ my_inds = splinds[rank]
 lb = min(my_inds)
 skiprows = lambda r: 0 < r < lb
 
-nrows = len(my_inds)  # number of DATA ROWS to read 
+nrows = len(my_inds)  # number of DATA ROWS to read
 
 myframes = pd.read_csv('/global/cscratch1/sd/dgold/image.csv',
                        skiprows=skiprows, nrows=nrows)
@@ -75,12 +75,12 @@ for i, row in myframes.iterrows():
                        qid=row['qid'], **poly_dict)
 
     hpss_sci_path = row['hpss_sci_path']
-    if hpss_sci_path is not None:
+    if not hpss_sci_path.isna():
         scicopy = db.TapeCopy(archive_id=hpss_sci_path, product=sci)
         db.DBSession().add(scicopy)
 
     hpss_mask_path = row['hpss_mask_path']
-    if hpss_mask_path is not None:
+    if not hpss_mask_path.isna():
         maskcopy = db.TapeCopy(archive_id=hpss_mask_path, product=msk)
         db.DBSession().add(maskcopy)
 
