@@ -190,7 +190,7 @@ if __name__ == '__main__':
             db.ZTFFile.field,
             db.ZTFFile.ccdid,
             db.ZTFFile.qid,
-            db.ZTFFile.filtercode
+            db.ZTFFile.fid
         ).limit(CHUNK_SIZE).all()
 
         if len(to_download) == 0:
