@@ -175,7 +175,7 @@ if __name__ == '__main__':
             tstart = time.time()
             icookie = ipac_authenticate()
 
-        idownload_q = db.DBSession().query(db.ZTFFile).join(
+        idownload_q = db.DBSession().query(db.ZTFFile).outerjoin(
             db.TapeCopy, db.ZTFFile.id == db.TapeCopy.product_id
         ).outerjoin(
             db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
