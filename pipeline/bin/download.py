@@ -4,13 +4,13 @@ import time
 import stat
 import requests
 import logging
-import tempfile
 import sys
 from uuid import uuid4
-from libztf import ipac_authenticate
-import paramiko
+import subprocess
 from pathlib import Path
 from sqlalchemy.sql.expression import case
+
+from secrets import get_secret
 
 # read/write for group
 os.umask(0o007)
@@ -24,12 +24,36 @@ TAR_SIZE = 2048
 # this script does not use shifter
 # it is meant to be run on the data transfer nodes
 
+ipac_root = 'https://irsa.ipac.caltech.edu/'
+ipac_username = get_secret('ipac_username')
+ipac_password = get_secret('ipac_password')
 
-def submit_to_tape(items, tarname):
 
-    cmdlist = Path(os.getenv("STAGING_CMDDIR")) / f'{os.path.basename(tarname)}.cmd'
+def ipac_authenticate():
+    target = os.path.join(ipac_root, 'account', 'signon', 'login.do')
+
+    r = requests.post(target, data={'josso_username':ipac_username,
+                                    'josso_password':ipac_password,
+                                    'josso_cmd': 'login'})
+
+    if r.status_code != 200:
+        raise ValueError('Unable to Authenticate')
+
+    if r.cookies.get('JOSSO_SESSIONID') is None:
+        raise ValueError('Unable to login to IPAC - bad credentials')
+
+    return r.cookies
+
+
+def submit_to_tape(tape_archive):
+
+    tarname = tape_archive.id
+
+    cmdlist = Path(get_secret("staging_cmddir")) / \
+              f'{os.path.basename(tarname)}.cmd'
     cmdlist.parent.mkdir(parents=True, exist_ok=True)
 
+    items = [copy.member_name for copy in archive.contents]
     with open(cmdlist, 'w') as f:
         for destination in items:
             f.write(f'{destination}\n')
@@ -48,27 +72,25 @@ for f in `cat {cmdlist}`; do
     rm -v $f
 done
 """
-
-    ssh_client = paramiko.SSHClient()
-    ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh_client.connect(hostname=os.getenv("NERSC_HOST"), password=os.getenv("NERSC_PASSWORD"),
-                       username=os.getenv('NERSC_XFER_USERNAME'))
-
     shfile = f'{cmdlist.resolve()}.sh'
     with open(shfile, 'w') as f:
         f.write(script)
 
-    submit_command = f'PATH="/global/common/cori/software/hypnotoad:/opt/esslurm/bin:$PATH" ' \
-                     f'LD_LIBRARY_PATH="/opt/esslurm/lib64" sbatch {Path(shfile).resolve()}'
+    subfile = shfile.replace('.sh', '.sub.sh')
+    with open(subfile, 'w') as f:
+        f.write(f'''#!/bin/bash
+        module load esslurm
+        sbatch {Path(shfile).resolve()}'''
+    )
 
-    stdin, stdout, stderr = ssh_client.exec_command(submit_command)
-    print(stdout.readlines())
-    print(stderr.readlines())
-    ssh_client.close()
+    subprocess.check_call(f'bash {subfile}'.split())
 
 
 def reset_tarball():
-    return list(), f'/nersc/projects/ptf/ztf/{uuid4().hex}.tar'
+    archive = db.TapeArchive(
+        id=f'/nersc/projects/ptf/ztf/{uuid4().hex}.tar'
+    )
+    return list(), archive
 
 
 def download_file(target, destination, cookie):
@@ -112,13 +134,23 @@ def safe_download(target, destination, cookie, logger):
         logger.warning(f'File "{target}" does not exist. Continuing...')
 
 
+ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
+               627,670,671,672,673,674,675,714,715,
+               716,717,718,719,754,755,756,757,758,
+               759,789,790,791,792,793,819,820,821,
+               822,823,843,844,845,846,861,862,863]
+
+
+fmap = {
+    1: 'zg',
+    2: 'zr',
+    3: 'zi'
+}
+
 if __name__ == '__main__':
 
-    env, cfg = db.load_env()
-    db.init_db(**cfg['database'])
-
     hostname = os.getenv('HOSTNAME')
-    current_tarball, tar_name = reset_tarball()
+    current_tarball, archive = reset_tarball()
 
     tstart = time.time()
     icookie = ipac_authenticate()
@@ -133,7 +165,7 @@ if __name__ == '__main__':
 
     # download the partnership images first, caltech second, public last
     _gid_priorities = {2: 1, 3: 2, 1: 3}
-    sort_order = case(value=db.Image.ipac_gid, whens=_gid_priorities)
+    sort_order = case(value=db.ScienceImage.ipac_gid, whens=_gid_priorities)
 
     while True:
 
@@ -143,66 +175,68 @@ if __name__ == '__main__':
             tstart = time.time()
             icookie = ipac_authenticate()
 
-        to_download = db.DBSession().query(db.Image).filter(db.sa.or_(
-            db.Image.hpss_sci_path == None,
-            db.Image.hpss_mask_path == None,
-            db.sa.and_(
-                db.Image.disk_sub_path == None,
-                db.Image.subtraction_exists != False
-                ),
-            db.sa.and_(
-                db.Image.disk_psf_path == None,
-                db.Image.subtraction_exists != False
-            )
-        )
-        ).with_for_update(skip_locked=True).order_by(sort_order,
-                                                     db.Image.field,
-                                                     db.Image.ccdid,
-                                                     db.Image.qid,
-                                                     db.Image.filtercode,
-                                                     db.Image.obsjd).limit(CHUNK_SIZE).all()
+        to_download = db.DBSession().query(db.ZTFFile).outerjoin(
+            db.TapeCopy
+        ).outerjoin(
+            db.HTTPArchiveCopy
+        ).filter(
+            db.sa.or_(
+                db.ZTFFile.basename.ilike('ztf%sciimg.fits'),
+                db.ZTFFile.basename.ilike('ztf%mskimg.fits'),
+            ),
+            db.ZTFFile.field.in_(ZUDS_FIELDS)
+        ).with_for_update(skip_locked=True).order_by(
+            sort_order,
+            db.ZTFFile.field,
+            db.ZTFFile.ccdid,
+            db.ZTFFile.qid,
+            db.ZTFFile.filtercode
+        ).limit(CHUNK_SIZE).all()
 
         if len(to_download) == 0:
-            time.sleep(1800.)  # sleep for half an hour
+            time.sleep(180.)  # sleep for 3 minutes
             continue
 
         for image in to_download:
 
-            if image.hpss_sci_path is None:
+            if image.type == 'sci':
                 target = image.ipac_path('sciimg.fits')
-                destination = image.hpss_staging_path('sciimg.fits')
-                safe_download(target, destination, icookie, logger)
-                image.hpss_sci_path = tar_name
-                current_tarball.append(destination)
+            else:
+                # it's a mask
+                target = image.parent_image.ipac_path('mskimg.fits')
 
-            if image.hpss_mask_path is None:
-                target = image.ipac_path('mskimg.fits')
-                destination = image.hpss_staging_path('mskimg.fits')
-                safe_download(target, destination, icookie, logger)
-                image.hpss_mask_path = tar_name
-                current_tarball.append(destination)
+            # ensure this has 12 components so that it can be used with
+            # retrieve
+            destination_base = Path(
+                f'/global/cscratch1/sd/dgold/zuds/data/xfer/{hostname}/'
+                f'{image.field:06d}/'
+                f'c{image.ccdid:02d}/'
+                f'q{image.qid}/'
+                f'{fmap[image.fid]}'
+            )
 
-            if image.disk_sub_path is None and image.subtraction_exists != False:
-                target = image.ipac_path('scimrefdiffimg.fits.fz')
-                destination = image.disk_path('scimrefdiffimg.fits.fz')
+            destination = destination_base / image.basename
+            safe_download(target, destination, icookie, logger)
+            image.map_to_local_file(destination)
 
-                try:
-                    download_file(target, destination, icookie)
-                except requests.RequestException as e:
-                    image.subtraction_exists = False
-                    logger.warning(f'File "{target}" does not exist. Continuing...')
-                else:
-                    image.subtraction_exists = True
-                    image.disk_sub_path = destination
+            # associate it with the tape archive
+            tcopy = db.TapeCopy(
+                member_name=destination,
+                archive=archive,
+                product=image
+            )
 
-            if image.disk_psf_path is None and image.subtraction_exists != False:
-                target = image.ipac_path('diffimgpsf.fits')
-                destination = image.disk_path('diffimgpsf.fits')
-                safe_download(target, destination, icookie, logger)
-                image.disk_psf_path = destination
+            # and archive the file to disk
+            acopy = db.HTTPArchiveCopy.from_product(image)
+            acopy.put()
+            db.DBSession().add(acopy)
 
             if len(current_tarball) >= TAR_SIZE:
-                submit_to_tape(current_tarball, tar_name)
+                # write the archive to the database
+                db.DBSession().add(archive)
+
+                # submit it to tape
+                submit_to_tape(archive)
                 current_tarball, tar_name = reset_tarball()
 
         db.DBSession().add_all(to_download)
