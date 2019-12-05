@@ -185,7 +185,7 @@ if __name__ == '__main__':
                 db.ZTFFile.basename.ilike('ztf%mskimg.fits'),
             ),
             db.ZTFFile.field.in_(ZUDS_FIELDS)
-        ).with_for_update(skip_locked=True, of=db.ZTFFiled).order_by(
+        ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
             db.ZTFFile.field,
             db.ZTFFile.ccdid,
             db.ZTFFile.qid,
