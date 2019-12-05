@@ -208,6 +208,9 @@ if __name__ == '__main__':
                 # it's a mask
                 target = image.parent_image.ipac_path('mskimg.fits')
 
+            # ensure the image header is written to the DB
+            image.load_header()
+
             # ensure this has 12 components so that it can be used with
             # retrieve
             destination_base = Path(
