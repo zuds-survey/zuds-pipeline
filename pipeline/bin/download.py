@@ -61,7 +61,7 @@ def submit_to_tape(tape_archive):
     script = f"""#!/bin/bash
 #SBATCH -q xfer
 #SBATCH -N 1
-#SBATCH -A {os.getenv("NERSC_ACCOUNT")}
+#SBATCH -A {get_secret("nersc_account")}
 #SBATCH -t 48:00:00
 #SBATCH -L project,SCRATCH
 #SBATCH -C haswell
