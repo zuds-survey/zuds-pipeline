@@ -218,7 +218,7 @@ if __name__ == '__main__':
                 f'{fmap[image.fid]}'
             )
 
-            destination = destination_base / image.basename
+            destination = f'{destination_base / image.basename}'
             safe_download(target, destination, icookie, logger)
             image.map_to_local_file(destination)
 
@@ -237,6 +237,12 @@ if __name__ == '__main__':
             if len(current_tarball) >= TAR_SIZE:
                 # write the archive to the database
                 db.DBSession().add(archive)
+
+                size = 0
+                for file in archive.contents:
+                    size += os.path.getsize(file.local_path)
+
+                archive.size = size
 
                 # submit it to tape
                 submit_to_tape(archive)
