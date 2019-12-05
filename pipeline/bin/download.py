@@ -240,8 +240,8 @@ if __name__ == '__main__':
                 db.DBSession().add(archive)
 
                 size = 0
-                for file in archive.contents:
-                    size += os.path.getsize(file.local_path)
+                for copy in archive.contents:
+                    size += os.path.getsize(copy.member_name)
 
                 archive.size = size
 
