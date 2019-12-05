@@ -208,8 +208,6 @@ if __name__ == '__main__':
                 # it's a mask
                 target = image.parent_image.ipac_path('mskimg.fits')
 
-            # ensure the image header is written to the DB
-            image.load_header()
 
             # ensure this has 12 components so that it can be used with
             # retrieve
@@ -224,6 +222,9 @@ if __name__ == '__main__':
             destination = f'{destination_base / image.basename}'
             safe_download(target, destination, icookie, logger)
             image.map_to_local_file(destination)
+
+            # ensure the image header is written to the DB
+            image.load_header()
 
             # associate it with the tape archive
             tcopy = db.TapeCopy(
