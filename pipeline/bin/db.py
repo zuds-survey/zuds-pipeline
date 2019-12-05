@@ -205,29 +205,14 @@ def sub_name(frame, template):
     return sub
 
 
-from sqlalchemy import exc
-
 def init_db(old=False):
     hpss_dbhost = get_secret('hpss_dbhost')
     hpss_dbport = get_secret('hpss_dbport')
     hpss_dbusername = get_secret('hpss_dbusername')
     hpss_dbname = get_secret('hpss_dbname') if not old else get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
-
-    try:
-        DBSession().get_bind()
-    except exc.UnboundExecutionError:
-        idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost,
-            hpss_dbport)
-
-        if not old:
-            from sqlalchemy import event
-            @event.listens_for(DBSession(), 'before_flush')
-            def bump_modified(session, flush_context, instances):
-                for object in session.dirty:
-                    if isinstance(object, models.Base) and session.is_modified(
-                            object):
-                        object.modified = sa.func.now()
+    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword,
+               hpss_dbhost, hpss_dbport)
 
 
 def model_representation(o):
@@ -2059,4 +2044,16 @@ class DR8South(models.Base, DR8):
     # @declared_attr
     # def __table_args__(cls):
     #    return tuple()
+
+init_db()
+
+from sqlalchemy import event
+
+
+@event.listens_for(DBSession(), 'before_flush')
+def bump_modified(session, flush_context, instances):
+    for object in session.dirty:
+        if isinstance(object, models.Base) and session.is_modified(object):
+            object.modified = sa.func.now()
+
 
