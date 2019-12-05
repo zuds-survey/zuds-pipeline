@@ -1483,6 +1483,7 @@ class Coadd(CalibratableImage):
 CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
 
 
+
 class ReferenceImage(Coadd):
     id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
                    primary_key=True)
@@ -1507,6 +1508,25 @@ class ScienceCoadd(Coadd):
 
     binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
     binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
+
+    @hybrid_property
+    def winsize(self):
+        return self.binright - self.binleft
+
+
+class StackedSubtraction(Coadd):
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'stackedsub',
+                       'inherit_condition': id == Coadd.id}
+
+    binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
+    binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
+
+
+    input_images = relationship('SingleEpochSubtraction',
+                                secondary='stackedsubtraction_frames',
+                                cascade='all')
 
     @hybrid_property
     def winsize(self):
@@ -1646,6 +1666,9 @@ class MultiEpochSubtraction(CalibratableImage, Subtraction):
     @declared_attr
     def __table_args__(cls):
         return tuple()
+
+StackedSubtractionFrame = join_model('stackedsubtraction_frames',
+                                     StackedSubtraction, SingleEpochSubtraction)
 
 
 # Detections & Photometry #####################################################
