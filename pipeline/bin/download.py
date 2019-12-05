@@ -175,7 +175,7 @@ if __name__ == '__main__':
             tstart = time.time()
             icookie = ipac_authenticate()
 
-        to_download = db.DBSession().query(db.ZTFFile).outerjoin(
+        idownload_q = db.DBSession().query(db.ZTFFile).outerjoin(
             db.TapeCopy, db.ZTFFile.id == db.TapeCopy.product_id
         ).outerjoin(
             db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
@@ -185,12 +185,14 @@ if __name__ == '__main__':
                 db.ZTFFile.basename.ilike('ztf%mskimg.fits'),
             ),
             db.ZTFFile.field.in_(ZUDS_FIELDS)
-        ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
+        ).with_for_update(skip_locked=True, of=db.ZTFFiled).order_by(
             db.ZTFFile.field,
             db.ZTFFile.ccdid,
             db.ZTFFile.qid,
             db.ZTFFile.fid
-        ).limit(CHUNK_SIZE).all()
+        ).limit(CHUNK_SIZE)
+
+        to_download = idownload_q.all()
 
         if len(to_download) == 0:
             time.sleep(180.)  # sleep for 3 minutes
