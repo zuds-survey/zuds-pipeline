@@ -228,6 +228,7 @@ if __name__ == '__main__':
                 archive=archive,
                 product=image
             )
+            current_tarball.append(tcopy)
 
             # and archive the file to disk
             acopy = db.HTTPArchiveCopy.from_product(image)
@@ -246,7 +247,7 @@ if __name__ == '__main__':
 
                 # submit it to tape
                 submit_to_tape(archive)
-                current_tarball, tar_name = reset_tarball()
+                current_tarball, archive = reset_tarball()
 
         db.DBSession().add_all(to_download)
         db.DBSession().commit()
