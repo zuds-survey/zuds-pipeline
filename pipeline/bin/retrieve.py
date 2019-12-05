@@ -8,7 +8,7 @@ from secrets import get_secret
 import db
 import tempfile
 import io
-
+import shutil
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
@@ -106,8 +106,14 @@ def retrieve_images(image_whereclause,
                     frame_destination='.', log_destination='.',
                     preserve_dirs=False, n_jobs=14):
 
+    """Image whereclause should be a clause element on ZTFFile."""
+
     jt = db.sa.join(db.ZTFFile, db.TapeCopy,
-                    db.ZTFFile.id == db.TapeCopy.product_id)
+                    db.ZTFFile.id == db.TapeCopy.product_id).outerjoin(
+        db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
+    ).filter(
+        db.HTTPArchiveCopy.product_id == None
+    )
     full_query = db.DBSession().query(db.ZTFFile, db.TapeCopy).select_from(jt)
     full_query = full_query.filter(image_whereclause)
 
@@ -204,5 +210,30 @@ def retrieve_images(image_whereclause,
         for image in df[[name in tarnames for name in df['tarpath']]][
             'basename']:
             dependency_dict[image] = jobid
+
+    # now do the ones that are on disk
+
+    jt = db.sa.join(db.ZTFFile, db.HTTPArchiveCopy,
+                    db.ZTFFile.id == db.HTTPArchiveCopy.product_id)
+
+    full_query = db.DBSession().query(
+        db.ZTFFile, db.HTTPArchiveCopy
+    ).select_from(jt)
+
+    full_query = full_query.filter(image_whereclause)
+
+    # this is the query to get the image paths
+    metatable2 = pd.read_sql(full_query.statement, db.DBSession().get_bind())
+
+    # copy each image over
+    for _, row in metatable2.iterrows():
+        path = row['archive_path']
+        if preserve_dirs:
+            target = Path(os.path.join(*path.split('/')[-5:]))
+        else:
+            target = Path(os.path.basename(path))
+
+        target.parent.mkdir(exist_ok=True, parents=True)
+        shutil.copy(path, target)
 
     return dependency_dict, metatable
