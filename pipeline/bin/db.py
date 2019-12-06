@@ -51,6 +51,7 @@ from matplotlib import colors
 import matplotlib.pyplot as plt
 from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
+import publish
 
 BKG_BOX_SIZE = 128
 DETECT_NSIGMA = 1.5
@@ -69,6 +70,7 @@ CMAP_RANDOM_SEED = 8675309
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
+MATCH_RADIUS_DEG = 0.0002777 * 1.5
 
 MASK_BITS = {
     'BIT00': 0,
@@ -919,6 +921,8 @@ class PipelineRegionFile(ZTFFile):
         reg.qid = catalog.qid
         reg.fid = catalog.fid
 
+        filtered = 'GOODCUT' in catalog.data.type.names
+
         reg.catalog = catalog
         with open(reg.local_path, 'w') as f:
             f.write('global color=green dashlist=8 3 width=1 font="helvetica '
@@ -927,9 +931,14 @@ class PipelineRegionFile(ZTFFile):
             f.write('icrs\n')
             rad = 13 * 0.26667 * 0.00027777
             for line in catalog.data:
+                if not filtered:
+                    color = 'blue'
+                else:
+                    color = 'green' if line['GOODCUT'] else 'red'
+
                 f.write(f'circle({line["X_WORLD"]},'
                         f'{line["Y_WORLD"]},{rad}) # width=2 '
-                        f'color=blue\n')
+                        f'color={color}\n')
 
         return reg
 
@@ -1088,10 +1097,11 @@ class MaskImage(ZTFFile, IntegerFITSImage):
             # “AND” the resulting image with 2050 (= 21 + 211) and retain
             # pixels where this operation is non-zero.
 
-            # DG: also have to add 2^16 (my custom bit)
-            # So 6141 -> 71677
+            # DG: also have to add 2^16 (my custom bit) and 2^17 (hotpants
+            # masked, another of my custom bits)
+            # So 6141 -> 71677 --> 202749
 
-            maskpix = (self.data & 71677) > 0
+            maskpix = (self.data & 202749) > 0
             _boolean = IntegerFITSImage()
             _boolean.data = maskpix
             _boolean.header = self.header
@@ -1326,6 +1336,10 @@ class CalibratedImage(CalibratableImage):
     def apcor(self):
         return self.header[APER_KEY]
 
+    @property
+    def mjd(self):
+        pass
+
     def find_in_dir(self, directory):
         super().find_in_dir(directory)
         try:
@@ -1400,6 +1414,10 @@ class ScienceImage(CalibratedImage):
     def obsmjd(self):
         return self.obsjd - 2400000.5
 
+    @property
+    def mjd(self):
+        return self.obsmjd
+
     @hybrid_property
     def filter(self):
         return 'ztf' + self.filtercode[-1]
@@ -1429,6 +1447,24 @@ class Coadd(CalibratableImage):
     input_images = relationship('CalibratableImage',
                                 secondary='coadd_images',
                                 cascade='all')
+
+
+    @property
+    def mjd(self):
+        return DBSession().query(
+            sa.func.percentile_cont(
+                0.5
+            ).within_group(
+                (ScienceImage.obsjd - 2400000.5).asc()
+            )
+        ).join(
+            CoaddImage
+        ).join(
+            type(self)
+        ).filter(
+            type(self).id == self.id
+        ).first()[0]
+
 
     @declared_attr
     def __table_args__(cls):
@@ -1469,7 +1505,7 @@ class Coadd(CalibratableImage):
                           tmpdir=tmpdir, copy_inputs=copy_inputs,
                           swarp_kws=swarp_kws)
         coaddmask = coadd.mask_image
-        
+
         coadd.header['FIELD'] = coadd.field = images[0].field
         coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
         coadd.header['QID'] = coadd.qid = images[0].qid
@@ -1494,6 +1530,7 @@ class ReferenceImage(Coadd):
     __mapper_args__ = {'polymorphic_identity': 'ref',
                        'inherit_condition': id == Coadd.id}
 
+
     version = sa.Column(sa.Text)
 
     single_epoch_subtractions = relationship('SingleEpochSubtraction',
@@ -1509,6 +1546,7 @@ class ScienceCoadd(Coadd):
                        'inherit_condition': id == Coadd.id}
     subtraction = relationship('MultiEpochSubtraction', uselist=False,
                                cascade='all')
+
 
     binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
     binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
@@ -1532,6 +1570,25 @@ class StackedSubtraction(Coadd):
                                 secondary='stackedsubtraction_frames',
                                 cascade='all')
 
+    @property
+    def mjd(self):
+        return DBSession().query(
+            sa.func.percentile_cont(
+                0.5
+            ).within_group(
+                (ScienceImage.obsjd - 2400000.5).asc()
+            )
+        ).join(
+            SingleEpochSubtraction
+        ).join(
+            StackedSubtractionFrame
+        ).join(
+            type(self)
+        ).filter(
+            type(self).id == self.id
+        ).first()[0]
+
+
     @hybrid_property
     def winsize(self):
         return self.binright - self.binleft
@@ -1551,6 +1608,10 @@ class Subtraction(HasWCS):
     def reference_image(self):
         return relationship('ReferenceImage', cascade='all',
                             foreign_keys=[self.reference_image_id])
+
+    @property
+    def mjd(self):
+        return self.target_image.mjd
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
@@ -1726,27 +1787,83 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     __mapper_args__ = {'polymorphic_identity': 'detection',
                        'inherit_condition': id == ObjectWithFlux.id}
 
-    xwin_image = sa.Column(sa.Float)
-    ywin_image = sa.Column(sa.Float)
+    x_image = sa.Column(sa.Float)
+    y_image = sa.Column(sa.Float)
 
     elongation = sa.Column(sa.Float)
-    awin_image = sa.Column(sa.Float)
-    bwin_image = sa.Column(sa.Float)
+    a_image = sa.Column(sa.Float)
+    b_image = sa.Column(sa.Float)
     fwhm_image = sa.Column(sa.Float)
-
-    #replace with ra, dec
-    #x_world = sa.Column(sa.Float)
-    #y_world = sa.Column(sa.Float)
 
     flags = sa.Column(sa.Integer)
     imaflags_iso = sa.Column(sa.Integer)
+    goodcut = sa.Column(sa.Boolean)
 
 
     @classmethod
     def from_catalog(cls, cat, filter=True):
+        result = []
+        if filter:
+            filter_sexcat(cat)
 
+        for row in cat.data:
 
-        pass
+            if filter and row['GOODCUT'] != 1:
+                continue
+
+            # ra and dec are inherited from SpatiallyIndexed
+            detection = cls(
+                ra=row['X_WORLD'], dec=row['Y_WORLD'],
+                image=cat.image, flux=row['FLUX_APER'],
+                fluxerr=row['FLUXERR_APER'], elongation=row['ELONGATION'],
+                flags=row['FLAGS'], imaflags_iso=row['IMAFLAGS_ISO'],
+                a_image=row['A_IMAGE'], b_image=row['B_IMAGE'],
+                fwhm_image=row['FWHM_IMAGE']
+            )
+
+            if filter:
+                detection.goodcut = True
+
+            # query for nearby sources to determine if a new source needs to
+            # be created
+
+            source = DBSession().query(models.Source).filter(
+                sa.func.q3c_radial_query(
+                    detection.ra,
+                    detection.dec,
+                    models.Source.ra,
+                    models.Source.dec,
+                    MATCH_RADIUS_DEG
+                )
+            )
+
+            if source is None:
+                # need to create a new source
+                name = publish.get_next_name()
+                source = models.Source(
+                    id=name,
+                    ra=detection.ra,
+                    dec=detection.dec
+                )
+
+            detection.source = source
+
+            # update the source ra and dec
+            best = source.best_detection
+
+            # just doing this in case the new LC point
+            # isn't yet flushed to the DB
+
+            if detection.snr > best.snr:
+                best = detection
+
+            source.ra = best.ra
+            source.dec = best.dec
+
+            result.append(detection)
+
+        return result
+
 
 class ForcedPhotometry(ObjectWithFlux):
     id = sa.Column(sa.Integer,
@@ -1766,55 +1883,52 @@ class ForcedPhotometry(ObjectWithFlux):
     def magerr(self):
         return 1.08573620476 * self.fluxerr / self.flux
 
-
-class HPSSJob(models.Base):
-    user = sa.Column(sa.Text)
-    status = sa.Column(sa.Boolean, default=False)
-    reason = sa.Column(sa.Text)
-
 models.Source.stamps = relationship('Stamp', cascade='all')
 
-"""
-def images(self):
-    candidates = DBSession().query(IPACRecord).filter(func.q3c_radial_query(IPACRecord.ra, IPACRecord.dec, self.ra, self.dec, 0.64))\
-                                         .filter(func.q3c_poly_query(self.ra, self.dec, IPACRecord.poly))
+def images(self, type=CalibratableImage):
+
+    candidates = DBSession().query(type).filter(
+        func.q3c_radial_query(type.ra,
+                              type.dec,
+                              self.ra, self.dec,
+                              0.64)
+    ).filter(
+        func.q3c_poly_query(self.ra, self.dec, type.poly)
+    )
+
     return candidates.all()
 
-"""
 
-# keep track of the images that the photometry came from
-"""
-models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'), index=True)
-models.Photometry.image = relationship('Image', back_populates='photometry')
-models.Photometry.provenance = sa.Column(sa.Text)
-models.Photometry.method = sa.Column(sa.Text)
+def best_detection(self):
+    return DBSession().query(
+        Detection
+    ).join(models.Source).filter(
+        models.Source.id == self.id
+    ).order_by(
+        (Detection.flux / Detection.fluxerr).desc()
+    ).first()
 
-
-
-models.Source.images = property(images)
-models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
-models.Source.stack_detections = relationship('StackDetection', cascade='all')
-
-def best_stack_detection(self):
-    sds = self.stack_detections
-
-    # only keep stack detections that have shape parameters
-    sds = [s for s in sds if (s.a_image is not None and s.b_image is not None and s.theta_image is not None)]
-    return max(sds, key=lambda sd: sd.flux / sd.fluxerr)
-
-
-models.Source.best_stack_detection = property(best_stack_detection)
+models.Source.images = images
+models.Source.q3c = Index(
+    f'sources_q3c_ang2ipix_idx',
+    func.q3c_ang2ipix(
+        models.Source.ra,
+        models.Source.dec)
+)
+models.Source.detections = relationship('Detection', cascade='all')
+models.Source.photometry = relationship('ForcedPhotometry', cascade='all')
+models.Source.best_detection = property(best_detection)
 
 
+from astropy.table import Table
 def light_curve(self):
-    photometry = self.photometry
     lc_raw = []
 
-    for photpoint in photometry:
-        photd = {'mjd': photpoint.mjd,
-                 'filter': photpoint.filter,
-                 'zp': photpoint.zp,
-                 'zpsys': photpoint.zpsys,
+    for photpoint in self.photometry:
+        photd = {'mjd': photpoint.image.mjd,
+                 'filter': 'ztf' + fid_map[photpoint.image.fid][-1],
+                 'zp': photpoint.image.magzp,
+                 'zpsys': 'ab',
                  'flux': photpoint.flux,
                  'fluxerr': photpoint.fluxerr}
         lc_raw.append(photd)
@@ -1822,7 +1936,7 @@ def light_curve(self):
     return Table(lc_raw)
 
 models.Source.light_curve = light_curve
-"""
+
 
 
 class FilterRun(models.Base):
@@ -1858,6 +1972,7 @@ class Fit(models.Base):
 
 
 models.Source.fits = relationship('Fit', cascade='all')
+
 
 
 class DR8(SpatiallyIndexed):
