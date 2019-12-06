@@ -1605,6 +1605,17 @@ class Subtraction(HasWCS):
 
         sub = cls.from_file(outname, use_existing_record=use_existing_record)
 
+        # now modify the sub mask to include the stuff that's masked out from
+        # hotpants
+        hotbad = np.zeros_like(submask.data, dtype=int)
+        hotbad[sub.data == 1e-30] = 2**17
+
+        # flip the bits
+        submask.data |= hotbad
+        submask.header['BIT17'] = 17
+        submask.header_comments['BIT17'] = 'MASKED BY HOTPANTS (1e-30) / DG'
+        submask.save()
+
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
         sub.header['QID'] = sub.qid = sci.qid
