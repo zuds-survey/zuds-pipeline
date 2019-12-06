@@ -3,6 +3,7 @@ import os
 import sys
 import mpi
 import time
+import archive
 import pandas as pd
 from pathlib import Path
 
@@ -51,14 +52,21 @@ for d in my_dirs:
     try:
         coadd = db.ReferenceImage.from_images(top, coaddname,
                                               data_product=True,
-                                              nthreads=64,
+                                              nthreads=4,
                                               tmpdir='./tmp')
+        coadd.version = version
     except TypeError as e:
         print(e, [t.basename for t in top], coaddname)
-        continue
-    finally:
         db.DBSession().rollback()
-
+        continue
+    else:
+        db.DBSession().add(coadd)
+        catalog = db.PipelineFITSCatalog.from_image(coadd)
+        catcopy = db.HTTPArchiveCopy.from_product(catalog)
+        archive.archive(catcopy)
+        db.DBSession().add(catcopy)
+        db.DBSession().commit()
+        
     t_stop = time.time()
     print(f'it took {t_stop - t_start} sec to make {coaddname}.', flush=True)
 
