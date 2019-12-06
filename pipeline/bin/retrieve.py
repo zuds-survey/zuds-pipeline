@@ -8,7 +8,7 @@ from secrets import get_secret
 import db
 import tempfile
 import io
-
+import shutil
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
@@ -101,26 +101,27 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(query, exclude_masks=False, job_script_destination='.',
+def retrieve_images(image_whereclause,
+                    job_script_destination='.',
                     frame_destination='.', log_destination='.',
-                    preserve_dirs=False):
+                    preserve_dirs=False, n_jobs=14):
+
+    """Image whereclause should be a clause element on ZTFFile."""
+
+    jt = db.sa.join(db.ZTFFile, db.TapeCopy,
+                    db.ZTFFile.id == db.TapeCopy.product_id).outerjoin(
+        db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
+    ).filter(
+        db.HTTPArchiveCopy.product_id == None
+    )
+    full_query = db.DBSession().query(db.ZTFFile, db.TapeCopy).select_from(jt)
+    full_query = full_query.filter(image_whereclause)
 
     # this is the query to get the image paths
-    metatable = pd.read_sql(query.statement, db.DBSession().get_bind())
+    metatable = pd.read_sql(full_query.statement, db.DBSession().get_bind())
 
-    df = metatable[['path', 'hpss_sci_path', 'hpss_mask_path']]
-    dfsci = df[['path', 'hpss_sci_path']]
-    dfsci = dfsci.rename({'hpss_sci_path': 'tarpath'}, axis='columns')
-
-    if not exclude_masks:
-        dfmask = df[['path', 'hpss_mask_path']].copy()
-        dfmask.loc[:, 'path'] = [im.replace('sciimg', 'mskimg') for im in dfmask['path']]
-        dfmask = dfmask.rename({'hpss_mask_path': 'tarpath'}, axis='columns')
-        dfmask.dropna(inplace=True)
-        df = pd.concat((dfsci, dfmask))
-    else:
-        df = dfsci
-
+    df = metatable[['basename', 'archive_id']]
+    df = df.rename({'archive_id': 'tarpath'}, axis='columns')
     tars = df['tarpath'].unique()
 
     # if nothing is found raise valueerror
@@ -195,17 +196,44 @@ def retrieve_images(query, exclude_masks=False, job_script_destination='.',
 
     import numpy as np
     for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
-            ordered) // 14)):
+            ordered) // n_jobs)):
 
         # get the tarfiles
         tarnames = group['hpsspath'].tolist()
-        images = [df[df['tarpath'] == tarname]['path'].tolist() for tarname in tarnames]
+        images = [df[df['tarpath'] == tarname]['basename'].tolist() for tarname
+                  in tarnames]
 
         jobid = submit_hpss_job(tarnames, images, job_script_destination,
                                 frame_destination, log_destination, tape,
                                 preserve_dirs)
 
-        for image in df[[name in tarnames for name in df['tarpath']]]['path']:
+        for image in df[[name in tarnames for name in df['tarpath']]][
+            'basename']:
             dependency_dict[image] = jobid
+
+    # now do the ones that are on disk
+
+    jt = db.sa.join(db.ZTFFile, db.HTTPArchiveCopy,
+                    db.ZTFFile.id == db.HTTPArchiveCopy.product_id)
+
+    full_query = db.DBSession().query(
+        db.ZTFFile, db.HTTPArchiveCopy
+    ).select_from(jt)
+
+    full_query = full_query.filter(image_whereclause)
+
+    # this is the query to get the image paths
+    metatable2 = pd.read_sql(full_query.statement, db.DBSession().get_bind())
+
+    # copy each image over
+    for _, row in metatable2.iterrows():
+        path = row['archive_path']
+        if preserve_dirs:
+            target = Path(os.path.join(*path.split('/')[-5:]))
+        else:
+            target = Path(os.path.basename(path))
+
+        target.parent.mkdir(exist_ok=True, parents=True)
+        shutil.copy(path, target)
 
     return dependency_dict, metatable
