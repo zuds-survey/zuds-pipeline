@@ -52,11 +52,31 @@ for fn in imgs:
                                                     data_product=False,
                                                     tmpdir='tmp')
     except Exception as e:
-        print(e, [sci.basename, ref.basename])
+        print(e, [sci.basename, ref.basename], flush=True)
         db.DBSession().rollback()
         continue
 
+    try:
+        cat = db.PipelineFITSCatalog.from_image(sub)
+    except Exception as e:
+        print(e, [sub.basename], flush=True)
+        db.DBSession.rollback()
+        continue
+
+    try:
+        detections = db.Detection.from_catalog(cat, filter=True)
+    except Exception as e:
+        print(e, [cat.basename], flush=True)
+        db.DBSession.rollback()
+        continue
+
     db.DBSession().add(sub)
+    db.DBSession().add(cat)
+    db.DBSession().add_all(detections)
+
+    archive.archive(sub)
+    archive.archive(cat)
+
     db.DBSession().commit()
     tstop = time.time()
 

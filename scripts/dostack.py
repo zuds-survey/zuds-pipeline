@@ -50,18 +50,13 @@ for _, job in jobs.iterrows():
         continue
 
     try:
-        sub = db.ScienceCoadd.from_images(images, outname,
-                                          nthreads=mpi.get_nthreads(),
-                                          data_product=False,
-                                          tmpdir='tmp',
-                                          swarp_kws={'COMBINE_TYPE': 'MEDIAN'})
-    except Exception as e:
-        print(e, [i.basename for i in images])
-        db.DBSession().rollback()
-        continue
-
-    try:
-        catalog = db.PipelineFITSCatalog.from_image(sub)
+        sub = db.StackedSubtraction.from_images(
+            images, outname,
+            nthreads=mpi.get_nthreads(),
+            data_product=False,
+            tmpdir='tmp',
+            swarp_kws={'COMBINE_TYPE': 'MEDIAN'}
+        )
     except Exception as e:
         print(e, [i.basename for i in images])
         db.DBSession().rollback()
@@ -70,8 +65,27 @@ for _, job in jobs.iterrows():
     sub.binleft = pd.to_datetime(job['left'])
     sub.binright = pd.to_datetime(job['right'])
 
+    try:
+        catalog = db.PipelineFITSCatalog.from_image(sub)
+    except Exception as e:
+        print(e, [i.basename for i in images])
+        db.DBSession().rollback()
+        continue
+
+
+    try:
+        detections = db.Detection.from_catalog(catalog, filter=True)
+    except Exception as e:
+        print(e, [i.basename for i in images])
+        db.DBSession().rollback()
+        continue
+
     db.DBSession().add(sub)
     db.DBSession().add(catalog)
+    db.DBSession().add_all(detections)
+
+    archive.archive(sub)
+    archive.archive(catalog)
 
     db.DBSession().rollback()
     tstop = time.time()
