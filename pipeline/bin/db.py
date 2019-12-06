@@ -1453,8 +1453,12 @@ class Coadd(CalibratableImage):
                           f'"{basename}" already exists. The record will be '
                           f'updated...')
 
+        properties = GROUP_PROPERTIES
+        if issubclass(cls, StackedSubtraction):
+            properties.append('reference_image_id')
+
         # make sure all images have the same field, filter, ccdid, qid:
-        ensure_images_have_the_same_properties(images, GROUP_PROPERTIES)
+        ensure_images_have_the_same_properties(images, properties)
 
         # is this a reference image?
         isref = issubclass(cls, ReferenceImage)
@@ -1465,7 +1469,7 @@ class Coadd(CalibratableImage):
                           tmpdir=tmpdir, copy_inputs=copy_inputs,
                           swarp_kws=swarp_kws)
         coaddmask = coadd.mask_image
-
+        
         coadd.header['FIELD'] = coadd.field = images[0].field
         coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
         coadd.header['QID'] = coadd.qid = images[0].qid
