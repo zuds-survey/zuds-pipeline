@@ -1845,12 +1845,13 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
             # ra and dec are inherited from SpatiallyIndexed
             detection = cls(
-                ra=row['X_WORLD'], dec=row['Y_WORLD'],
-                image=cat.image, flux=row['FLUX_APER'],
-                fluxerr=row['FLUXERR_APER'], elongation=row['ELONGATION'],
-                flags=row['FLAGS'], imaflags_iso=row['IMAFLAGS_ISO'],
-                a_image=row['A_IMAGE'], b_image=row['B_IMAGE'],
-                fwhm_image=row['FWHM_IMAGE']
+                ra=float(row['X_WORLD']), dec=float(row['Y_WORLD']),
+                image=cat.image, flux=float(row['FLUX_APER']),
+                fluxerr=float(row['FLUXERR_APER']),
+                elongation=float(row['ELONGATION']),
+                flags=int(row['FLAGS']), imaflags_iso=int(row['IMAFLAGS_ISO']),
+                a_image=float(row['A_IMAGE']), b_image=float(row['B_IMAGE']),
+                fwhm_image=float(row['FWHM_IMAGE'])
             )
 
             if filter:
