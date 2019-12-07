@@ -80,8 +80,7 @@ def filter_sexcat(cat):
     bad_bits = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 12, 16, 17])
     bad_bits = int(np.sum(2**bad_bits))
 
-
-    table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] & bad_bits) > 0] = 0
+    table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] & bad_bits > 0)] = 0
     print('Number of candidates after external flag cut: ', np.sum(table['GOODCUT']))
 
     table['GOODCUT'][np.where(table['FLAGS'] > 2)] = 0
