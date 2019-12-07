@@ -1458,9 +1458,9 @@ class Coadd(CalibratableImage):
                 (ScienceImage.obsjd - 2400000.5).asc()
             )
         ).join(
-            CoaddImage
+            CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
         ).join(
-            type(self)
+            type(self), type(self).id == CoaddImage.coadd_id
         ).filter(
             type(self).id == self.id
         ).first()[0]
@@ -1579,11 +1579,15 @@ class StackedSubtraction(Coadd):
                 (ScienceImage.obsjd - 2400000.5).asc()
             )
         ).join(
-            SingleEpochSubtraction
+            SingleEpochSubtraction,
+            SingleEpochSubtraction.target_image_id == ScienceImage.id
         ).join(
-            StackedSubtractionFrame
+            StackedSubtractionFrame,
+            StackedSubtractionFrame.singleepochsubtraction_id ==
+            SingleEpochSubtraction.id
         ).join(
-            type(self)
+            type(self),
+            type(self).id == StackedSubtractionFrame.stackedsubtraction_id
         ).filter(
             type(self).id == self.id
         ).first()[0]
@@ -1672,7 +1676,7 @@ class Subtraction(HasWCS):
         # clear out any previous _data attributes that may be associated with
         #  this database object and force future accessors to load data
         # directly from disk
-        
+
         if hasattr(sub, '_data'):
             del sub._data
 
