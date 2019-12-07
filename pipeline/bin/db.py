@@ -667,7 +667,25 @@ class FITSFile(File):
             data = self.data.astype('uint8')
         else:
             data = self.data
-        fits.writeto(f, data, self.astropy_header, overwrite=True)
+
+        nhdu = max(self._DATA_HDU, self._HEADER_HDU) + 1
+        if nhdu == 1:
+            fits.writeto(f, data, self.astropy_header, overwrite=True)
+        else:
+            hdul = []
+            for i in range(nhdu):
+                if i == 0:
+                    hdu = fits.PrimaryHDU()
+                elif isinstance(self, FITSImage):
+                    hdu = fits.ImageHDU()
+                elif isinstance(self, PipelineFITSCatalog):
+                    hdu = fits.BinTableHDU()
+                hdul.append(hdu)
+            hdul = fits.HDUList(hdul)
+            hdul[self._HEADER_HDU].header = self.astropy_header
+            hdul[self._DATA_HDU].data = data
+            hdul.writeto(f, overwrite=True)
+
         self.unload_data()
 
     def load(self):
