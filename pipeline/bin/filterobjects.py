@@ -45,9 +45,6 @@ def filter_sexcat(cat):
     med = np.median(rms)
     medcut = med * 1.25
 
-    print('Working on:', cat)
-    print('Median: ', med)
-
     last = table['X_IMAGE'].size
     print('Total number of candidates: ', last)
 
