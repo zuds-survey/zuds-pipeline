@@ -1658,7 +1658,7 @@ class Subtraction(HasWCS):
         submask.header_comments = sci.mask_image.header_comments
         submask.save()
 
-        submask.boolean.map_to_local_file(directory / submask.basename)
+        submask.boolean.map_to_local_file(directory / submask.boolean.basename)
         submask.boolean.save()
 
         command = prepare_hotpants(sci, remapped_ref, outname,
@@ -1667,8 +1667,15 @@ class Subtraction(HasWCS):
                                    tmpdir=tmpdir)
 
         subprocess.check_call(command.split())
-
         sub = cls.from_file(outname, use_existing_record=use_existing_record)
+
+        # clear out any previous _data attributes that may be associated with
+        #  this database object and force future accessors to load data
+        # directly from disk
+        
+        if hasattr(sub, '_data'):
+            del sub._data
+
 
         # now modify the sub mask to include the stuff that's masked out from
         # hotpants
@@ -1695,7 +1702,7 @@ class Subtraction(HasWCS):
             sub.header[APER_KEY] = sci.header[APER_KEY]
             sub.header_comments['MAGZP'] = sci.header_comments['MAGZP']
             sub.header_comments[APER_KEY] = sci.header_comments[APER_KEY]
-            sub.save()
+        sub.save()
 
         if data_product:
             archive.archive(sub)
