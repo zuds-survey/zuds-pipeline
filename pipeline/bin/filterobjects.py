@@ -137,7 +137,7 @@ def filter_sexcat(cat):
                     row['GOODCUT'] = 0.
                     break
 
-    cat.data = table.to_pandas().to_records()
+    cat.data = table.to_pandas().to_records(index=False)
     cat.save()
 
     # make the region file
