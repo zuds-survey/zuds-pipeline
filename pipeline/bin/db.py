@@ -601,7 +601,8 @@ class FITSFile(File):
 
     def load_data(self):
         """Load data from disk into memory"""
-        with fits.open(self.local_path) as hdul:  # throws UnmappedFileError
+        with fits.open(self.local_path, memmap=False) as hdul:  # throws
+            # UnmappedFileError
             data = hdul[self._DATA_HDU].data
         if data.dtype.name == 'uint8':
             data = data.astype(bool)
