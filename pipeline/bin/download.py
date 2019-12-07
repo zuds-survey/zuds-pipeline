@@ -202,6 +202,9 @@ if __name__ == '__main__':
         if len(to_download) == 0:
             # download for other fields
             to_download = idownload_base.limit(CHUNK_SIZE).all()
+            http = False
+        else:
+            http = True
 
         if len(to_download) == 0:
             time.sleep(180.)  # sleep for 3 minutes
@@ -242,9 +245,11 @@ if __name__ == '__main__':
             current_tarball.append(tcopy)
 
             # and archive the file to disk
-            acopy = db.HTTPArchiveCopy.from_product(image)
-            acopy.put()
-            db.DBSession().add(acopy)
+
+            if http:
+                acopy = db.HTTPArchiveCopy.from_product(image)
+                acopy.put()
+                db.DBSession().add(acopy)
 
             if len(current_tarball) >= TAR_SIZE:
                 # write the archive to the database
