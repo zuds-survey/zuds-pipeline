@@ -1867,7 +1867,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                     models.Source.dec,
                     MATCH_RADIUS_DEG
                 )
-            )
+            ).first()
 
             if source is None:
                 # need to create a new source
