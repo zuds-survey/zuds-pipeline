@@ -947,7 +947,9 @@ class PipelineRegionFile(ZTFFile):
                     '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
                     'delete=1 include=1 source=1\n')
             f.write('icrs\n')
-            rad = 13 * catalog.image.pixscale.mean() * 0.00027777
+            rad = 13 * catalog.image.pixel_scale.to(
+                'arcsec'
+            ).value.mean() * 0.00027777
             for row in catalog.data:
                 if not filtered:
                     color = 'blue'
