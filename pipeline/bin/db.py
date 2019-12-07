@@ -939,7 +939,7 @@ class PipelineRegionFile(ZTFFile):
         reg.qid = catalog.qid
         reg.fid = catalog.fid
 
-        filtered = 'GOODCUT' in catalog.data.type.names
+        filtered = 'GOODCUT' in catalog.data.dtype.names
 
         reg.catalog = catalog
         with open(reg.local_path, 'w') as f:
