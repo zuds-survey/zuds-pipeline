@@ -98,7 +98,8 @@ def filter_sexcat(cat):
     table['GOODCUT'][np.where(table['RMSCUT'] > medcut)] = 0
     print('Number of candidates after rms cuts: ', np.sum(table['GOODCUT']))
 
-    table['GOODCUT'][np.where(table['FLUX_BEST'] / table['FLUXERR_BEST'] < 5)] = 0
+    table['GOODCUT'][np.where(table['FLUX_APER'] / table['FLUXERR_APER'] < 5)]\
+        = 0
     print('Number of candidates after s/n > 5 cut: ', np.sum(table['GOODCUT']))
 
     # cut on anything with more than 3 10 sigma negative pixels in a 10x10 box
