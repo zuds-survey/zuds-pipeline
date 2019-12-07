@@ -1724,7 +1724,7 @@ class Subtraction(HasWCS):
         return sub
 
 
-class SingleEpochSubtraction(CalibratedImage, Subtraction):
+class SingleEpochSubtraction(Subtraction, CalibratedImage):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
@@ -1738,7 +1738,7 @@ class SingleEpochSubtraction(CalibratedImage, Subtraction):
                                 foreign_keys=[target_image_id])
 
 
-class MultiEpochSubtraction(CalibratableImage, Subtraction):
+class MultiEpochSubtraction(Subtraction, CalibratableImage):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
