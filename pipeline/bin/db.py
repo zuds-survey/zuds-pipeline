@@ -931,7 +931,7 @@ class PipelineRegionFile(ZTFFile):
     @classmethod
     def from_catalog(cls, catalog):
         reg = cls()
-        reg.basename = catalog.basename.replace('.cat ', '.reg')
+        reg.basename = catalog.basename.replace('.cat', '.reg')
         catdir = os.path.dirname(catalog.local_path)
         reg.map_to_local_file(os.path.join(catdir, reg.basename))
 
