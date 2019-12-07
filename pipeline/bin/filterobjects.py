@@ -1,12 +1,6 @@
-import sys, subprocess
 import numpy as np
-import argparse, sys, subprocess, os, re, glob, time
-
-from astropy.io import fits
-from astropy.io.ascii import SExtractor
 from astropy.table import Column
 from photutils import CircularAperture
-from photutils import CircularAnnulus
 from photutils import aperture_photometry
 from astropy.table import Table
 from seeing import estimate_seeing
@@ -85,7 +79,12 @@ def filter_sexcat(cat):
     rms_cut = Column(rmsbig / area)
     table.add_column(rms_cut, name='RMSCUT')
 
-    table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] > 0)] = 0
+    # the following bits are disqualifying:
+    bad_bits = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 12, 16, 17])
+    bad_bits = int(np.sum(2**bad_bits))
+
+
+    table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] & bad_bits) > 0] = 0
     print('Number of candidates after external flag cut: ', np.sum(table['GOODCUT']))
 
     table['GOODCUT'][np.where(table['FLAGS'] > 2)] = 0
