@@ -1048,7 +1048,8 @@ class Stamp(ZTFFile):
 
             data, _ = reproject_interp(
                 (cutout.data, cutout.wcs),
-                wcs_out
+                wcs_out,
+                shape_out=cutout.data.shape
             )
 
         else:
