@@ -82,8 +82,10 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
-    db.DBSession().add(sub)
-    db.DBSession().add(cat)
+    subcopy = db.HTTPArchiveCopy.from_product(sub)
+    db.DBSession().add(subcopy)
+    catcopy = db.HTTPArchiveCopy.from_product(cat)
+    db.DBSession().add(catcopy)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 

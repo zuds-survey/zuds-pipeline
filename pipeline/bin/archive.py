@@ -59,7 +59,7 @@ def archive(copy):
 
     if not isinstance(copy, db.HTTPArchiveCopy):
         raise ValueError(
-            f'Cannot archive object "{copy}", must be an instance of'
+            f'Cannot archive object "{copy.basename}", must be an instance of'
             f'Copy.')
 
     path = Path(copy.archive_path)
