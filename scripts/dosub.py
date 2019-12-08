@@ -70,9 +70,22 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
+    try:
+        remapped = sub.reference_image.aligned_to(sub)
+        stamps = []
+        for i in [sub, sub.target_image, remapped]:
+            for detection in detections:
+                stamp = db.Stamp.from_detection(detection, i)
+                stamps.append(stamp)
+    except Exception as e:
+        print(e, [cat.basename], flush=True)
+        db.DBSession.rollback()
+        continue
+
     db.DBSession().add(sub)
     db.DBSession().add(cat)
     db.DBSession().add_all(detections)
+    db.DBSession().add_all(stamps)
 
     archive.archive(sub)
     archive.archive(cat)
