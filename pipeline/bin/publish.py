@@ -57,9 +57,10 @@ def num_to_alpha(num):
     return ''.join(updates[::-1])
 
 
-def make_stamp(name, ra, dec, vmin, vmax, data, wcs, save=True):
+def make_stamp(name, ra, dec, vmin, vmax, data, wcs, save=True,
+               size=CUTOUT_SIZE):
     coord = SkyCoord(ra, dec, frame='icrs', unit='deg')
-    cutout = Cutout2D(data, coord, CUTOUT_SIZE, wcs=wcs, fill_value=0.)
+    cutout = Cutout2D(data, coord, size, wcs=wcs, fill_value=0.)
 
     if save:
         plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax,

@@ -1037,7 +1037,8 @@ class Stamp(ZTFFile):
         vmin, vmax = image.cmap_limits()
         cutout = publish.make_stamp(
             None, detection.ra, detection.dec, vmin,
-            vmax, image.data, image.wcs, save=False
+            vmax, image.data, image.wcs, save=False,
+            size=int(publish.CUTOUT_SIZE * np.sqrt(2))
         )
 
         if force_icrs:
@@ -1049,7 +1050,8 @@ class Stamp(ZTFFile):
             data, _ = reproject_exact(
                 (cutout.data, cutout.wcs),
                 wcs_out,
-                shape_out=cutout.data.shape
+                shape_out=(publish.CUTOUT_SIZE,
+                           publish.CUTOUT_SIZE)
             )
 
         else:
