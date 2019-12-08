@@ -1020,9 +1020,8 @@ class Stamp(ZTFFile):
         foreign_keys=[source_id]
     )
 
-
     @classmethod
-    def from_detection(cls, detection, image, aligned_to=None):
+    def from_detection(cls, detection, image):
         source = detection.source
         basename = f'stamp.{source.id}.{image.basename}.jpg'
         stamp = cls.get_by_basename(basename)
@@ -1038,22 +1037,10 @@ class Stamp(ZTFFile):
         cutout = publish.make_stamp(
             None, detection.ra, detection.dec, vmin,
             vmax, image.data, image.wcs, save=False,
-            size=int(publish.CUTOUT_SIZE * np.sqrt(2))
+            size=publish.CUTOUT_SIZE
         )
 
-        if aligned_to is not None:
-
-            data, _ = reproject_interp(
-                (cutout.data, cutout.wcs),
-                aligned_to,
-                shape_out=(publish.CUTOUT_SIZE,
-                           publish.CUTOUT_SIZE)
-            )
-
-        else:
-            data = cutout.data
-
-        stamp.data = data.tolist()
+        stamp.data = cutout.data.tolist()
         return stamp
 
     def show(self, axis=None):
