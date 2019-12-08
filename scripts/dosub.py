@@ -92,9 +92,6 @@ for fn in imgs:
     archive.archive(subcopy)
     archive.archive(catcopy)
 
-    os.remove(remapped.local_path)
-    del remapped
-
     db.DBSession().commit()
     tstop = time.time()
 
