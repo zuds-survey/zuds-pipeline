@@ -1042,7 +1042,7 @@ class Stamp(ZTFFile):
 
         if force_icrs:
             wcs_out, _ = find_optimal_celestial_wcs(
-                (cutout.data, cutout.wcs),
+                ((cutout.data, cutout.wcs),),
                 frame='icrs'
             )
 
