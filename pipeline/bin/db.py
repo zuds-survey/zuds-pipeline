@@ -35,7 +35,7 @@ import requests
 import subprocess
 import uuid
 import warnings
-from reproject import reproject_exact
+from reproject import reproject_interp
 from reproject.mosaicking.wcs_helpers import find_optimal_celestial_wcs
 
 import pandas as pd
@@ -1022,7 +1022,7 @@ class Stamp(ZTFFile):
 
 
     @classmethod
-    def from_detection(cls, detection, image, force_icrs=True):
+    def from_detection(cls, detection, image, aligned_to=None):
         source = detection.source
         basename = f'stamp.{source.id}.{image.basename}.jpg'
         stamp = cls.get_by_basename(basename)
@@ -1041,15 +1041,11 @@ class Stamp(ZTFFile):
             size=int(publish.CUTOUT_SIZE * np.sqrt(2))
         )
 
-        if force_icrs:
-            wcs_out, _ = find_optimal_celestial_wcs(
-                ((cutout.data, cutout.wcs),),
-                frame='icrs'
-            )
+        if aligned_to is not None:
 
-            data, _ = reproject_exact(
+            data, _ = reproject_interp(
                 (cutout.data, cutout.wcs),
-                wcs_out,
+                aligned_to,
                 shape_out=(publish.CUTOUT_SIZE,
                            publish.CUTOUT_SIZE)
             )
