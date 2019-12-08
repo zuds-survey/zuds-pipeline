@@ -35,7 +35,7 @@ import requests
 import subprocess
 import uuid
 import warnings
-from reproject import reproject_interp
+from reproject import reproject_interp, find_optimal_celestial_wcs
 
 import pandas as pd
 
@@ -1019,8 +1019,9 @@ class Stamp(ZTFFile):
         foreign_keys=[source_id]
     )
 
+
     @classmethod
-    def from_detection(cls, detection, image):
+    def from_detection(cls, detection, image, force_icrs=True):
         source = detection.source
         basename = f'stamp.{source.id}.{image.basename}.jpg'
         stamp = cls.get_by_basename(basename)
@@ -1038,7 +1039,21 @@ class Stamp(ZTFFile):
             vmax, image.data, image.wcs, save=False
         )
 
-        stamp.data = np.flipud(cutout.data).tolist()
+        if force_icrs:
+            wcs_out, _ = find_optimal_celestial_wcs(
+                (cutout.data, cutout.wcs),
+                frame='icrs'
+            )
+
+            data, _ = reproject_interp(
+                (cutout.data, cutout.wcs),
+                wcs_out
+            )
+
+        else:
+            data = cutout.data
+
+        stamp.data = data.tolist()
         return stamp
 
     def show(self, axis=None):
