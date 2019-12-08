@@ -92,6 +92,9 @@ def filter_sexcat(cat):
     table['GOODCUT'][np.where(table['FWHM_IMAGE'] / see > 2.0)] = 0
     print('Number of candidates after fwhm cuts: ', np.sum(table['GOODCUT']))
 
+    table['GOODCUT'][np.where(table['FWHM_IMAGE'] < 0.8 * see)] = 0
+    print('Number of candidates after sharp cuts: ', np.sum(table['GOODCUT']))
+
     table['GOODCUT'][np.where(table['BPMCUT'] > 0)] = 0
     print('Number of candidates after bpm cuts: ', np.sum(table['GOODCUT']))
 

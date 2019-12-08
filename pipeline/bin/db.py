@@ -187,7 +187,7 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
                     e.set_facecolor('none')
 
                     if filtered and row['GOODCUT'] == 1:
-                        e.set_edgecolor('green')
+                        e.set_edgecolor('lime')
                     else:
                         e.set_edgecolor('red')
                     a.add_artist(e)
