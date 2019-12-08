@@ -171,17 +171,25 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
         for a in ax.ravel()[n:]:
             a.set_visible(False)
 
+
         for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
             im.show(a, align_to=align_target if reproject else None)
 
             if catalog is not None:
+
+                filtered = 'GOODCUT' in catalog.data.dtype.names
+
                 for row in catalog.data:
                     e = Ellipse(xy=(row['X_IMAGE'], row['Y_IMAGE']),
                                 width=6 * row['A_IMAGE'],
                                 height=6 * row['B_IMAGE'],
                                 angle=row['THETA_IMAGE'] * 180. / np.pi)
                     e.set_facecolor('none')
-                    e.set_edgecolor('red')
+
+                    if filtered and row['GOODCUT'] == 1:
+                        e.set_edgecolor('green')
+                    else:
+                        e.set_edgecolor('red')
                     a.add_artist(e)
 
             if titles is not None:
