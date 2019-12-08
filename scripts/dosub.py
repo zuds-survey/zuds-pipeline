@@ -83,14 +83,17 @@ for fn in imgs:
         continue
 
     subcopy = db.HTTPArchiveCopy.from_product(sub)
-    db.DBSession().add(subcopy)
     catcopy = db.HTTPArchiveCopy.from_product(cat)
-    db.DBSession().add(catcopy)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 
-    archive.archive(sub)
-    archive.archive(cat)
+    db.DBSession().add(catcopy)
+    db.DBSession().add(subcopy)
+    archive.archive(subcopy)
+    archive.archive(catcopy)
+
+    os.remove(remapped.local_path)
+    del remapped
 
     db.DBSession().commit()
     tstop = time.time()
