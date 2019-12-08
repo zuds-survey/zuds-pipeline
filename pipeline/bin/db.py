@@ -1033,7 +1033,7 @@ class Stamp(ZTFFile):
         vmin, vmax = image.cmap_limits()
         cutout = publish.make_stamp(
             None, detection.ra, detection.dec, vmin,
-            vmax, image.data, image.wcs
+            vmax, image.data, image.wcs, save=False
         )
 
         stamp.data = np.flipud(cutout.data).tobytes()
