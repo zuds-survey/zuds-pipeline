@@ -989,7 +989,7 @@ class Stamp(ZTFFile):
     # this can be filled optionally. if the jpeg is not written to data then
     # use .copies to get the public url of the HTTP servable JPG
 
-    data = sa.Column(psql.BYTEA, nullable=True)
+    data = sa.Column(models.NumpyArray, nullable=True)
 
     image_id = sa.Column(
         sa.Integer,
@@ -1019,7 +1019,6 @@ class Stamp(ZTFFile):
         foreign_keys=[source_id]
     )
 
-
     @classmethod
     def from_detection(cls, detection, image):
         source = detection.source
@@ -1039,18 +1038,15 @@ class Stamp(ZTFFile):
             vmax, image.data, image.wcs, save=False
         )
 
-        stamp.data = np.flipud(cutout.data).astype('float32').tobytes()
+        stamp.data = np.flipud(cutout.data)
         return stamp
 
     def show(self, axis=None):
         if axis is None:
             fig, axis = plt.subplots()
         vmin, vmax = self.image.cmap_limits()
-        data = np.frombuffer(self.data, dtype='float32').byteswap()
-        nside = int(np.sqrt(len(data)))
-        data = data.reshape(nside, nside)
 
-        axis.imshow(data,
+        axis.imshow(self.data,
                     vmin=vmin,
                     vmax=vmax,
                     norm=self.image.cmap_norm(),
