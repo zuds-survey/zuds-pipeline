@@ -35,7 +35,8 @@ import requests
 import subprocess
 import uuid
 import warnings
-from reproject import reproject_interp, find_optimal_celestial_wcs
+from reproject import reproject_interp
+from reproject.mosaicking.wcs_helpers import find_optimal_celestial_wcs
 
 import pandas as pd
 
