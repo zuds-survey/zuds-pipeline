@@ -1117,7 +1117,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
             for name in names:
                 df[name] = phot[name]
 
-        rec = df.to_records()
+        rec = df.to_records(index=False)
         cat.data = rec
         cat.basename = image.basename.replace('.fits', '.cat')
         cat.image_id = image.id
