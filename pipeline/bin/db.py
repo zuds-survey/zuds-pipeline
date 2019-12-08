@@ -35,7 +35,7 @@ import requests
 import subprocess
 import uuid
 import warnings
-from reproject import reproject_interp
+from reproject import reproject_exact
 from reproject.mosaicking.wcs_helpers import find_optimal_celestial_wcs
 
 import pandas as pd
@@ -1046,7 +1046,7 @@ class Stamp(ZTFFile):
                 frame='icrs'
             )
 
-            data, _ = reproject_interp(
+            data, _ = reproject_exact(
                 (cutout.data, cutout.wcs),
                 wcs_out,
                 shape_out=cutout.data.shape
