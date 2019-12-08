@@ -1025,12 +1025,13 @@ class Stamp(ZTFFile):
         source = detection.source
         basename = f'stamp.{source.id}.{image.basename}.jpg'
         stamp = cls.get_by_basename(basename)
-        stamp.image = image
-        stamp.source = source
 
         if stamp is None:
             stamp = cls()
             stamp.basename = basename
+
+        stamp.image = image
+        stamp.source = source
 
         vmin, vmax = image.cmap_limits()
         cutout = publish.make_stamp(
