@@ -1039,14 +1039,16 @@ class Stamp(ZTFFile):
             vmax, image.data, image.wcs, save=False
         )
 
-        stamp.data = np.flipud(cutout.data).tobytes()
+        stamp.data = np.flipud(cutout.data).astype('float32').tobytes()
         return stamp
 
     def show(self, axis=None):
         if axis is None:
             fig, axis = plt.subplots()
         vmin, vmax = self.image.cmap_limits()
-        data = np.frombuffer(self.data)
+        data = np.frombuffer(self.data, dtype='float32').byteswap()
+        nside = int(np.sqrt(len(data)))
+        data = data.reshape(nside, nside)
 
         axis.imshow(data,
                     vmin=vmin,
