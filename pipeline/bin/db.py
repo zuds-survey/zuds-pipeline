@@ -1038,7 +1038,7 @@ class Stamp(ZTFFile):
             vmax, image.data, image.wcs, save=False
         )
 
-        stamp.data = np.flipud(cutout.data)
+        stamp.data = np.flipud(cutout.data).tolist()
         return stamp
 
     def show(self, axis=None):
