@@ -564,10 +564,6 @@ class FITSFile(File):
     _HEADER_HDU = 0
 
     @classmethod
-    def get_by_basename(cls, basename):
-        return DBSession().query(cls).filter(cls.basename == basename).first()
-
-    @classmethod
     def from_file(cls, f, use_existing_record=True):
         """Read a file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
@@ -919,6 +915,10 @@ class ZTFFile(models.Base, File):
         dirname = os.path.dirname(ztffile.local_path)
         self.find_in_dir(dirname)
 
+    @classmethod
+    def get_by_basename(cls, basename):
+        return DBSession().query(cls).filter(cls.basename == basename).first()
+
 
 class PipelineRegionFile(ZTFFile):
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
@@ -938,8 +938,12 @@ class PipelineRegionFile(ZTFFile):
 
     @classmethod
     def from_catalog(cls, catalog):
-        reg = cls()
-        reg.basename = catalog.basename.replace('.cat', '.reg')
+        basename = catalog.basename.replace('.cat', '.reg')
+        reg = cls.get_by_basename(basename)
+        if reg is None:
+            reg = cls()
+            reg.basename = basename
+
         catdir = os.path.dirname(catalog.local_path)
         reg.map_to_local_file(os.path.join(catdir, reg.basename))
 
@@ -1014,6 +1018,39 @@ class Stamp(ZTFFile):
         back_populates='stamps',
         foreign_keys=[source_id]
     )
+
+
+    @classmethod
+    def from_detection(cls, detection, image):
+        source = detection.source
+        basename = f'stamp.{source.id}.{image.basename}.jpg'
+        stamp = cls.get_by_basename(basename)
+
+        if stamp is None:
+            stamp = cls()
+            stamp.basename = basename
+
+        vmin, vmax = image.cmap_limits()
+        cutout = publish.make_stamp(
+            None, detection.ra, detection.dec, vmin,
+            vmax, image.data, image.wcs
+        )
+
+        stamp.data = np.flipud(cutout.data).tobytes()
+        return stamp
+
+    def show(self, axis=None):
+        if axis is None:
+            fig, axis = plt.subplots()
+        vmin, vmax = self.image.cmap_limits()
+        data = np.frombuffer(self.data)
+
+        axis.imshow(data,
+                    vmin=vmin,
+                    vmax=vmax,
+                    norm=self.image.cmap_norm(),
+                    cmap=self.image.cmap(),
+                    interpolation='none')
 
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
@@ -1859,7 +1896,8 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 elongation=float(row['ELONGATION']),
                 flags=int(row['FLAGS']), imaflags_iso=int(row['IMAFLAGS_ISO']),
                 a_image=float(row['A_IMAGE']), b_image=float(row['B_IMAGE']),
-                fwhm_image=float(row['FWHM_IMAGE'])
+                fwhm_image=float(row['FWHM_IMAGE']),
+                x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE'])
             )
 
             if filter:
