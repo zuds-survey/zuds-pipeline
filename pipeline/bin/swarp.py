@@ -116,22 +116,24 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
     return syscall
 
 
-def prepare_swarp_align(image, align_header, directory, nthreads=1,
+def prepare_swarp_align(image, other, directory, nthreads=1,
                         persist_aligned=False):
     conf = SCI_CONF
     shutil.copy(image.local_path, directory)
     impath = str(directory / image.basename)
+    align_header = other.astropy_header
 
     # now get the WCS keys to align the header to
     head = WCS(align_header).to_header(relax=True)
 
     # and write the results to a file that swarp will read
+    extension = f'.aligned_to_{other.basename[:-5]}.remap.fits'
 
     if persist_aligned:
-        outname = image.local_path.replace('.fits', '.remap.fits')
+        outname = image.local_path.replace('.fits', extension)
     else:
-        outname = impath.replace('.fits', '.remap.fits')
-    headpath = impath.replace('.fits', '.remap.head')
+        outname = impath.replace('.fits', extension)
+    headpath = impath.replace('.fits', extension.replace('.fits', '.head'))
 
     with open(headpath, 'w') as f:
         for card in align_header.cards:
@@ -142,7 +144,10 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
 
     # make a random file for the weightmap -> we dont want to use it
     weightname = directory / image.basename.replace('.fits',
-                                                    '.remap.weight.fits')
+                                                    extension.replace(
+                                                        '.fits',
+                                                        '.weight.fits'
+                                                    ))
 
     combtype = 'OR' if isinstance(image, db.MaskImage) else 'CLIPPED'
 
@@ -160,13 +165,13 @@ def prepare_swarp_align(image, align_header, directory, nthreads=1,
     return syscall, outname, weightname
 
 
-def run_align(image, align_header, tmpdir='/tmp',
+def run_align(image, other, tmpdir='/tmp',
               nthreads=1, persist_aligned=False):
 
     directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
-    command, outname, outweight = prepare_swarp_align(image, align_header,
+    command, outname, outweight = prepare_swarp_align(image, other,
                                                       directory,
                                                       nthreads=nthreads,
                                                       persist_aligned=persist_aligned)

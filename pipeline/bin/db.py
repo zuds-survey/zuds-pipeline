@@ -808,14 +808,13 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
             raise ValueError(f'WCS Alignment target must be an instance of '
                              f'HasWCS (got "{other.__class__}").')
 
-        target_header = other.astropy_header
-        new = run_align(self, target_header,
+        new = run_align(self, other,
                         tmpdir=tmpdir,
                         nthreads=nthreads,
                         persist_aligned=persist_aligned)
 
         if hasattr(self, 'mask_image'):
-            newmask = run_align(self.mask_image, target_header,
+            newmask = run_align(self.mask_image, other,
                                 tmpdir=tmpdir,
                                 nthreads=nthreads,
                                 persist_aligned=persist_aligned)
