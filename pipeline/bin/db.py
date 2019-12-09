@@ -331,7 +331,6 @@ class SpatiallyIndexed(object):
 
     @declared_attr
     def __table_args__(cls):
-        """"""
         tn = cls.__tablename__
         return sa.Index(f'{tn}_q3c_ang2ipix_idx', sa.func.q3c_ang2ipix(
             cls.ra, cls.dec)),
@@ -565,7 +564,7 @@ class FITSFile(File):
     _HEADER_HDU = 0
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True, load_header=False):
+    def from_file(cls, f, use_existing_record=True):
         """Read a file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy.
@@ -585,9 +584,8 @@ class FITSFile(File):
             obj = cls()
             obj.basename = f.name
         obj.map_to_local_file(str(f.absolute()))
+        obj.load_header()
 
-        if load_header:
-            obj.load_header()
         return obj
 
     def load_header(self):
@@ -728,6 +726,17 @@ class HasPoly(object):
                       self.ra3, self.dec3, self.ra4, self.dec4))
 
 
+def needs_update(obj, key, value):
+    # determine if an angle has changed enough in an object to warrant being
+    # updated
+
+    if not hasattr(obj, key):
+        return True
+    else:
+        curval = getattr(obj, key)
+        return not np.isclose(curval, value)
+
+
 class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
     """Mixin indicating that an object represents a fits file with a WCS
     solution."""
@@ -739,22 +748,30 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         return WCS(self.astropy_header)
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=True, load_header=False):
+    def from_file(cls, fname, use_existing_record=True):
         """Read a fits file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy. """
         self = super(HasWCS, cls).from_file(
             fname, use_existing_record=use_existing_record,
-            load_header=load_header
         )
         corners = self.wcs.calc_footprint()
-        for i, row in enumerate(corners):
-            setattr(self, f'ra{i+1}', row[0])
-            setattr(self, f'dec{i+1}', row[1])
+        for i, values in enumerate(corners):
+            keys = [f'ra{i+1}', f'dec{i+1}']
+            for key, value in zip(keys, values):
+                if needs_update(self, key, value):
+                    setattr(self, key, value)
+
         naxis1 = self.header['NAXIS1']
         naxis2 = self.header['NAXIS2']
-        self.ra, self.dec = self.wcs.all_pix2world([[naxis1 / 2,
-                                                     naxis2 / 2]], 1)[0]
+        ra, dec = self.wcs.all_pix2world(
+            [[naxis1 / 2, naxis2 / 2]], 1
+        )[0]
+
+        for key, value in zip(['ra', 'dec'], [ra, dec]):
+            if needs_update(self, key, value):
+                setattr(self, key, value)
+
         return self
 
     @property
@@ -1148,10 +1165,9 @@ class MaskImage(ZTFFile, IntegerFITSImage):
         self.refresh_bit_mask_entries_in_header()
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True, load_header=False):
+    def from_file(cls, f, use_existing_record=True):
         return super().from_file(
             f, use_existing_record=use_existing_record,
-            load_header=load_header
         )
 
     @property
@@ -1327,10 +1343,9 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=True, load_header=False):
+    def from_file(cls, fname, use_existing_record=True):
         obj = super().from_file(
             fname, use_existing_record=use_existing_record,
-            load_header=load_header
         )
         dir = Path(fname).parent
 
@@ -1456,10 +1471,9 @@ class ScienceImage(CalibratedImage):
                        'inherit_condition': id == CalibratedImage.id}
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True, load_header=False):
+    def from_file(cls, f, use_existing_record=True):
         obj = super().from_file(
             f, use_existing_record=use_existing_record,
-            load_header=load_header
         )
         obj.field = obj.header['FIELDID']
         obj.ccdid = obj.header['CCDID']
