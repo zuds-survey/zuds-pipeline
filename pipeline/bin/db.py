@@ -1447,7 +1447,6 @@ class CalibratedImage(CalibratableImage):
             pass
 
 
-# class IPACRecord(models.Base, SpatiallyIndexed, HasPoly):
 class ScienceImage(CalibratedImage):
     """IPAC record of a science image from their pipeline. Contains some
     metadata that IPAC makes available through its irsa metadata query

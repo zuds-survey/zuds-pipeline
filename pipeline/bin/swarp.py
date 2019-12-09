@@ -127,13 +127,13 @@ def prepare_swarp_align(image, other, directory, nthreads=1,
     head = WCS(align_header).to_header(relax=True)
 
     # and write the results to a file that swarp will read
-    extension = f'.aligned_to_{other.basename[:-5]}.remap.fits'
+    extension = f'_aligned_to_{other.basename[:-5]}.remap'
 
     if persist_aligned:
-        outname = image.local_path.replace('.fits', extension)
+        outname = image.local_path.replace('.fits', f'{extension}.fits')
     else:
-        outname = impath.replace('.fits', extension)
-    headpath = impath.replace('.fits', extension.replace('.fits', '.head'))
+        outname = impath.replace('.fits', f'{extension}.fits')
+    headpath = impath.replace('.fits', f'{extension}.head')
 
     with open(headpath, 'w') as f:
         for card in align_header.cards:
@@ -143,11 +143,10 @@ def prepare_swarp_align(image, other, directory, nthreads=1,
             f.write(f'{card.image}\n')
 
     # make a random file for the weightmap -> we dont want to use it
-    weightname = directory / image.basename.replace('.fits',
-                                                    extension.replace(
-                                                        '.fits',
-                                                        '.weight.fits'
-                                                    ))
+    weightname = directory / image.basename.replace(
+        '.fits',
+        f'{extension}.weight.fits'
+    )
 
     combtype = 'OR' if isinstance(image, db.MaskImage) else 'CLIPPED'
 
@@ -171,10 +170,12 @@ def run_align(image, other, tmpdir='/tmp',
     directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
-    command, outname, outweight = prepare_swarp_align(image, other,
-                                                      directory,
-                                                      nthreads=nthreads,
-                                                      persist_aligned=persist_aligned)
+    command, outname, outweight = prepare_swarp_align(
+        image, other,
+        directory,
+        nthreads=nthreads,
+        persist_aligned=persist_aligned
+    )
 
     # run swarp
     while True:
@@ -189,6 +190,11 @@ def run_align(image, other, tmpdir='/tmp',
             break
 
     result = type(image).from_file(outname)
+    result.field = image.field
+    result.ccdid = image.ccdid
+    result.qid = image.qid
+    result.fid = image.fid
+
     weightimage = db.FloatingPointFITSImage.from_file(outweight)
 
     if isinstance(result, db.MaskImage):
