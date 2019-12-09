@@ -565,7 +565,7 @@ class FITSFile(File):
     _HEADER_HDU = 0
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True):
+    def from_file(cls, f, use_existing_record=True, load_header=False):
         """Read a file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy.
@@ -585,7 +585,9 @@ class FITSFile(File):
             obj = cls()
             obj.basename = f.name
         obj.map_to_local_file(str(f.absolute()))
-        obj.load_header()
+
+        if load_header:
+            obj.load_header()
         return obj
 
     def load_header(self):
@@ -737,11 +739,14 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         return WCS(self.astropy_header)
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=True):
+    def from_file(cls, fname, use_existing_record=True, load_header=False):
         """Read a fits file into memory from disk, and set the values of
         database-backed variables that store metadata (e.g., header). These
         can later be flushed to the database using SQLalchemy. """
-        self = super(HasWCS, cls).from_file(fname, use_existing_record=use_existing_record)
+        self = super(HasWCS, cls).from_file(
+            fname, use_existing_record=use_existing_record,
+            load_header=load_header
+        )
         corners = self.wcs.calc_footprint()
         for i, row in enumerate(corners):
             setattr(self, f'ra{i+1}', row[0])
@@ -1143,8 +1148,11 @@ class MaskImage(ZTFFile, IntegerFITSImage):
         self.refresh_bit_mask_entries_in_header()
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True):
-        return super().from_file(f, use_existing_record=use_existing_record)
+    def from_file(cls, f, use_existing_record=True, load_header=False):
+        return super().from_file(
+            f, use_existing_record=use_existing_record,
+            load_header=load_header
+        )
 
     @property
     def boolean(self):
@@ -1319,8 +1327,11 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
 
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=True):
-        obj = super().from_file(fname, use_existing_record=use_existing_record)
+    def from_file(cls, fname, use_existing_record=True, load_header=False):
+        obj = super().from_file(
+            fname, use_existing_record=use_existing_record,
+            load_header=load_header
+        )
         dir = Path(fname).parent
 
         weightpath = dir / obj.basename.replace('.fits', '.weight.fits')
@@ -1445,8 +1456,11 @@ class ScienceImage(CalibratedImage):
                        'inherit_condition': id == CalibratedImage.id}
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True):
-        obj = super().from_file(f, use_existing_record=use_existing_record)
+    def from_file(cls, f, use_existing_record=True, load_header=False):
+        obj = super().from_file(
+            f, use_existing_record=use_existing_record,
+            load_header=load_header
+        )
         obj.field = obj.header['FIELDID']
         obj.ccdid = obj.header['CCDID']
         obj.qid = obj.header['QID']
@@ -2000,6 +2014,28 @@ models.Source.q3c = Index(
 models.Source.detections = relationship('Detection', cascade='all')
 models.Source.photometry = relationship('ForcedPhotometry', cascade='all')
 models.Source.best_detection = property(best_detection)
+
+
+def unphotometered_images(self):
+    q = DBSession().query(SingleEpochSubtraction.id).filter(
+        func.q3c_radial_query(self.ra,
+                              self.dec,
+                              self.ra, self.dec,
+                              0.64)
+    ).filter(
+        func.q3c_poly_query(self.ra, self.dec, SingleEpochSubtraction.poly)
+    ).outerjoin(
+        ForcedPhotometry, ForcedPhotometry.image_id == SingleEpochSubtraction.id
+    ).filter(
+        SingleEpochSubtraction.id
+    ).having(
+        ~self.id.in_(sa.func.array_agg(ForcedPhotometry.source_id))
+    )
+
+
+def force_photometry(self):
+    pass
+
 
 
 from astropy.table import Table
