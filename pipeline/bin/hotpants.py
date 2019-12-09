@@ -86,7 +86,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path} ' \
-              f'-nsx {nsx} -nsy {nsy}'
+              f'-nsx {nsx} -nsy {nsy}  -v 0'
 
     return syscall
 

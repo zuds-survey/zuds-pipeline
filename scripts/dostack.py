@@ -43,7 +43,7 @@ for _, job in jobs.iterrows():
 
     basename = f'sub.{field}_{ccdid}_{qid}_{fid}_{job["left"]}_' \
                f'{job["right"]}.coadd.fits'
-    prev = db.ScienceCoadd.get_by_basename(basename)
+    prev = db.StackedSubtraction.get_by_basename(basename)
     outname = os.path.join(os.path.dirname(images[0].local_path), basename)
 
     if prev is not None:
