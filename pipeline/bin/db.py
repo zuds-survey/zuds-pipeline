@@ -734,7 +734,12 @@ def needs_update(obj, key, value):
         return True
     else:
         curval = getattr(obj, key)
-        return not np.isclose(curval, value)
+        try:
+            return not np.isclose(curval, value)
+        except TypeError:
+            # Duck typing - if np.isclose fails then curval is not a number
+            # but instead is probably an sqlalchemy Column, thus needs an update
+            return True
 
 
 class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
