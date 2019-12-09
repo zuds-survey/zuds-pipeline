@@ -189,11 +189,9 @@ def run_align(image, other, tmpdir='/tmp',
         else:
             break
 
-    result = type(image).from_file(outname)
-    result.field = image.field
-    result.ccdid = image.ccdid
-    result.qid = image.qid
-    result.fid = image.fid
+    result = type(image)(**image.to_dict())
+    result.map_to_local_file(outname)
+    result.load()
 
     weightimage = db.FloatingPointFITSImage.from_file(outweight)
 
