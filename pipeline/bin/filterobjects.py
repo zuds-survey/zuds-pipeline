@@ -3,6 +3,7 @@ from astropy.table import Column
 from photutils import CircularAperture
 from photutils import aperture_photometry
 from astropy.table import Table
+import time
 from seeing import estimate_seeing
 
 import db
@@ -34,6 +35,7 @@ def filter_sexcat(cat):
     if 'GOODCUT' in cat.data.dtype.names:
         return cat
 
+
     image = cat.image
     rms = image.rms_image
     bpm = image.mask_image.boolean
@@ -52,7 +54,11 @@ def filter_sexcat(cat):
     positions = pos.tolist()
 
     if not 'SEEING' in image.astropy_header:
+        start = time.time()
         estimate_seeing(image)
+        stop = time.time()
+        print(f'filter: {stop - start:.2f} sec to estimate '
+              f'seeing for {cat.basename}', flush=True)
     see = image.astropy_header['SEEING']
 
     good = np.ones(last, dtype='uint8')
@@ -80,6 +86,8 @@ def filter_sexcat(cat):
     bad_bits = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 12, 16, 17])
     bad_bits = int(np.sum(2**bad_bits))
 
+    start = time.time()
+
     table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] & bad_bits > 0)] = 0
     print('Number of candidates after external flag cut: ', np.sum(table['GOODCUT']))
 
@@ -104,6 +112,12 @@ def filter_sexcat(cat):
     table['GOODCUT'][np.where(table['FLUX_APER'] / table['FLUXERR_APER'] < 5)]\
         = 0
     print('Number of candidates after s/n > 5 cut: ', np.sum(table['GOODCUT']))
+
+    stop = time.time()
+    print(f'filter: {stop - start:.2f} sec to do initial cuts '
+          f'for {cat.basename}', flush=True)
+
+    start = time.time()
 
     # cut on anything with more than 3 10 sigma negative pixels in a 10x10 box
     imdata = image.data
@@ -140,8 +154,16 @@ def filter_sexcat(cat):
                     row['GOODCUT'] = 0.
                     break
 
+    stop = time.time()
+
+    print('Number of candidates after negpix cut: ', np.sum(table['GOODCUT']))
+    print(f'filter: {stop - start:.2f} sec to negpix cut for {cat.basename}')
+
+    start = time.time()
     cat.data = table.to_pandas().to_records(index=False)
     cat.save()
+    stop = time.time()
+    print(f'filter: {stop - start:.2f} sec to save {cat.basename} to disk')
 
     # make the region file
     db.PipelineRegionFile.from_catalog(cat)
