@@ -1936,16 +1936,16 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             detection.source = source
 
             # update the source ra and dec
-            best = source.best_detection
+            #best = source.best_detection
 
             # just doing this in case the new LC point
             # isn't yet flushed to the DB
 
-            if detection.snr > best.snr:
-                best = detection
+            #if detection.snr > best.snr:
+            #    best = detection
 
-            source.ra = best.ra
-            source.dec = best.dec
+            #source.ra = best.ra
+            #source.dec = best.dec
 
             result.append(detection)
 
