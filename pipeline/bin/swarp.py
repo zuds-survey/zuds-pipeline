@@ -189,19 +189,7 @@ def run_align(image, other, tmpdir='/tmp',
         else:
             break
 
-    # is this beautiful and clever or stupid and risky?
-    # or all four? i am not totally sure at the moment
-
-    result = type(image)(**image.to_dict())
-    result.map_to_local_file(outname)
-    result.load()
-
-    # let these attributes be filled in automatically
-
-    result.modified = None
-    result.created_at = db.sa.func.now()
-    result.id = None
-
+    result = type(image).from_file(outname)
     weightimage = db.FloatingPointFITSImage.from_file(outweight)
 
     if isinstance(result, db.MaskImage):
