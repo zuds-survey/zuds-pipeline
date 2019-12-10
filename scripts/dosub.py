@@ -39,7 +39,8 @@ for fn in imgs:
         print(f'Ref {refname} does not exist. Skipping...')
         continue
 
-    ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
+    ref = db.ReferenceImage.from_file(refname, use_existing_record=True,
+                                      load_header=False)
 
     basename = db.sub_name(sci.basename, ref.basename)
     #prev = db.SingleEpochSubtraction.get_by_basename(basename)
@@ -67,12 +68,18 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
+    dstart = time.time()
     try:
         detections = db.Detection.from_catalog(cat, filter=True)
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
         continue
+    dstop = time.time()
+    print(
+        f'det: {dstop-dstart:.2f} sec to make detections for {sub.basename}',
+        flush=True
+    )
 
     try:
         remapped = sub.reference_image.aligned_to(sub)
@@ -88,13 +95,16 @@ for fn in imgs:
 
     subcopy = db.HTTPArchiveCopy.from_product(sub)
     catcopy = db.HTTPArchiveCopy.from_product(cat)
+    mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 
+    db.DBSession().add(mskcopy)
     db.DBSession().add(catcopy)
     db.DBSession().add(subcopy)
     archive.archive(subcopy)
     archive.archive(catcopy)
+    archive.archive(mskcopy)
 
     db.DBSession().commit()
     tstop = time.time()
