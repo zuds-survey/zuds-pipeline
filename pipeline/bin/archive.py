@@ -35,7 +35,7 @@ def archive_copy_over_http(copy):
 
     # prepare the destination directory to receive the file
     target = f'https://newt.nersc.gov/newt/command/cori'
-    cmd = f'/usr/bin/mkdir -p {os.path.dirname(product.archive_path)}'
+    cmd = f'/usr/bin/mkdir -p {os.path.dirname(copy.archive_path)}'
     loginenv = False
     r = requests.post(target, data={
         'executable': cmd,
@@ -45,7 +45,7 @@ def archive_copy_over_http(copy):
 
     # upload the file, delete leading "/" for newt
     target = f'https://newt.nersc.gov/newt/file/cori/' \
-             f'{str(self.archive_path)[1:]}'
+             f'{str(copy.archive_path)[1:]}'
     with open(product.local_path, 'rb') as f:
         contents = f.read()
     r = requests.put(target, data=contents, cookies=auth_cookie)

@@ -984,20 +984,14 @@ class PipelineRegionFile(ZTFFile):
         return reg
 
 
-class Stamp(ZTFFile):
-    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
-                                             ondelete='CASCADE'),
-                   primary_key=True)
-
-    __mapper_args__ = {
-        'polymorphic_identity': 'stamp',
-        'inherit_condition': id == ZTFFile.id
-    }
+class Stamp(models.Base):
 
     # this can be filled optionally. if the jpeg is not written to data then
     # use .copies to get the public url of the HTTP servable JPG
 
-    data = sa.Column(models.NumpyArray, nullable=True)
+
+    public_url = sa.Column(sa.String(), nullable=True, index=False,
+                           unique=False)
 
     image_id = sa.Column(
         sa.Integer,
@@ -1005,7 +999,7 @@ class Stamp(ZTFFile):
             'calibratableimages.id',
             ondelete='CASCADE'
         ),
-        index=True
+        primary_key=True
     )
     image = relationship('CalibratableImage',
                          cascade='all',
@@ -1018,7 +1012,8 @@ class Stamp(ZTFFile):
             'sources.id',
             ondelete='CASCADE'
         ),
-        index=True
+        index=True,
+        primary_key=True
     )
     source = relationship(
         'Source',
@@ -1030,40 +1025,37 @@ class Stamp(ZTFFile):
     @classmethod
     def from_detection(cls, detection, image):
         source = detection.source
-        basename = f'stamp.{source.id}.{image.basename}.jpg'
-        stamp = cls.get_by_basename(basename)
 
-        if stamp is None:
-            stamp = cls()
-            stamp.basename = basename
+        if os.getenv('NERSC_HOST') != 'cori':
+            raise ValueError('Cannot create stamp; must be on cori.')
 
         if isinstance(image, models.Base):
-            stamp.image = image
+            linkimage = image
         else:
-            stamp.image = image.parent_image
-        stamp.source = source
+            linkimage = image.parent_image
 
-        vmin, vmax = image.cmap_limits()
-        cutout = publish.make_stamp(
-            None, detection.ra, detection.dec, vmin,
-            vmax, image.data, image.wcs, save=False,
+        stamp = DBSession().query(cls).get((linkimage.id, source.id)).first()
+        if stamp is None:
+            stamp = cls(source=source, image=linkimage)
+
+        outname = Path(NERSC_PREFIX) / f'{image.field:06d}/' \
+                                       f'c{image.ccdid:02d}/' \
+                                       f'q{image.qid}/' \
+                                       f'{fid_map[image.fid]}/' \
+                                       f'stamps'
+        outname = outname / 'stamp.{source.id}.{image.basename}.jpg'
+        vmin, vmax = linkimage.cmap_limits()
+        stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
+
+        outname.parent.mkdir(exist_ok=True, parents=True)
+
+        publish.make_stamp(
+            outname, detection.ra, detection.dec, vmin,
+            vmax, image.data, image.wcs, save=True,
             size=publish.CUTOUT_SIZE
         )
 
-        stamp.data = cutout.data.tolist()
         return stamp
-
-    def show(self, axis=None):
-        if axis is None:
-            fig, axis = plt.subplots()
-        vmin, vmax = self.image.cmap_limits()
-
-        axis.imshow(self.data,
-                    vmin=vmin,
-                    vmax=vmax,
-                    norm=self.image.cmap_norm(),
-                    cmap=self.image.cmap(),
-                    interpolation='none')
 
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
