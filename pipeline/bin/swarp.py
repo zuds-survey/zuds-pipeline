@@ -190,7 +190,7 @@ def run_align(image, other, tmpdir='/tmp',
             break
 
     result = type(image).from_file(outname)
-    weightimage = db.FloatingPointFITSImage.from_file(outweight)
+    weightimage = db.FITSImage.from_file(outweight)
 
     if isinstance(result, db.MaskImage):
         result.update_from_weight_map(weightimage)
@@ -247,7 +247,7 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     # load the result
     coadd = cls.from_file(outname)
     coaddmask = db.MaskImage.from_file(mskoutname)
-    coaddweight = db.FloatingPointFITSImage.from_file(mskoutweightname)
+    coaddweight = db.FITSImage.from_file(mskoutweightname)
     coaddmask.update_from_weight_map(coaddweight)
 
     # keep a record of the images that went into the coadd

@@ -35,9 +35,6 @@ import requests
 import subprocess
 import uuid
 import warnings
-from reproject import reproject_interp
-from reproject.mosaicking.wcs_helpers import find_optimal_celestial_wcs
-
 import pandas as pd
 
 import photutils
@@ -846,51 +843,35 @@ class FITSImage(HasWCS):
                     cmap=self.cmap(),
                     interpolation='none')
 
-    def cmap_limits(self):
-        raise NotImplemented
-
-    def cmap(self):
-        raise NotImplemented
-
-    def cmap_norm(self):
-        raise NotImplemented
-
-
-class FloatingPointFITSImage(FITSImage):
-    """A `FITSImage` with a data member that contains a two dimensional array
-    of floating point numbers.
-
-    Suitable for representing a science image, rms image, background image,
-    coadd, etc."""
+    @property
+    def datatype(self):
+        dtype = self.data.dtype.name
+        if 'float' in dtype:
+            return 'float'
+        else:
+            return 'int'
 
     def cmap_limits(self):
-        interval = ZScaleInterval()
-        return interval.get_limits(self.data)
+        if self.datatype == 'float':
+            interval = ZScaleInterval()
+            return interval.get_limits(self.data)
+        else:  # integer
+            return (None, None)
 
     def cmap(self):
-        return 'gray'
+        if self.datatype == 'float':
+            return 'gray'
+        else:
+            ncolors = len(np.unique(self.data))
+            return discrete_cmap(ncolors)
 
     def cmap_norm(self):
-        return None
-
-
-class IntegerFITSImage(FITSImage):
-    """A `FITSImage` with a data member that contains a two dimensional array
-    of integers.
-
-    Suitable for representing a mask image, segmentation image, etc."""
-
-    def cmap_limits(self):
-        return (None, None)
-
-    def cmap(self):
-        ncolors = len(np.unique(self.data))
-        return discrete_cmap(ncolors)
-
-    def cmap_norm(self):
-        boundaries = np.unique(self.data)
-        ncolors = len(boundaries)
-        return colors.BoundaryNorm(boundaries, ncolors)
+        if self.datatype == 'float':
+            return None
+        else:
+            boundaries = np.unique(self.data)
+            ncolors = len(boundaries)
+            return colors.BoundaryNorm(boundaries, ncolors)
 
 
 class ZTFFile(models.Base, File):
@@ -1140,8 +1121,8 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         return cat
 
 
-class MaskImage(ZTFFile, IntegerFITSImage):
-    __diskmapped_cached_properties__ = IntegerFITSImage.__diskmapped_cached_properties__ + [
+class MaskImage(ZTFFile, FITSImage):
+    __diskmapped_cached_properties__ = FITSImage.__diskmapped_cached_properties__ + [
         '_boolean']
 
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
@@ -1199,7 +1180,7 @@ class MaskImage(ZTFFile, IntegerFITSImage):
             # So 6141 -> 71677 --> 202749
 
             maskpix = (self.data & 202749) > 0
-            _boolean = IntegerFITSImage()
+            _boolean = FITSImage()
             _boolean.data = maskpix
             _boolean.header = self.header
             _boolean.header_comments = self.header_comments
@@ -1217,7 +1198,7 @@ class MaskImage(ZTFFile, IntegerFITSImage):
     idx = Index('maskimages_parent_image_id_idx', parent_image_id)
 
 
-class CalibratableImage(FloatingPointFITSImage, ZTFFile):
+class CalibratableImage(FITSImage, ZTFFile):
     __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
                                         '_bkgimg', '_filter_kernel', '_rmsimg',
                                         '_threshimg', '_segmimg',
@@ -1299,7 +1280,7 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
                 saturind = self.data >= 0.9 * saturval
                 wgt[saturind] = 0.
 
-            self._weightimg = FloatingPointFITSImage()
+            self._weightimg = FITSImage()
             self._weightimg.basename = self.basename.replace('.fits',
                                                              '.weight.fits')
             self._weightimg.data = wgt
@@ -1358,20 +1339,17 @@ class CalibratableImage(FloatingPointFITSImage, ZTFFile):
         bkgpath = dir / obj.basename.replace('.fits', '.bkg.fits')
         threshpath = dir / obj.basename.replace('.fits', '.thresh.fits')
         bkgsubpath = dir / obj.basename.replace('.fits', '.bkgsub.fits')
+        segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
 
         paths = [weightpath, rmspath, bkgpath, threshpath,
-                 bkgsubpath]
+                 bkgsubpath, segmpath]
 
         types = ['_weightimg', '_rmsimg', '_bkgimg', '_threshimg',
-                 '_bkgsubimg']
+                 '_bkgsubimg', '_segmimg']
 
         for path, t in zip(paths, types):
             if path.exists():
-                setattr(obj, t, FloatingPointFITSImage.from_file(f'{path}'))
-
-        segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
-        if segmpath.exists():
-            obj._segmimg = IntegerFITSImage.from_file(f'{segmpath}')
+                setattr(obj, t, FITSImage.from_file(f'{path}'))
 
         if obj.mask_image is not None:
             mskpath = dir / obj.mask_image.basename

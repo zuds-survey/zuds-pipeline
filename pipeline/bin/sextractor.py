@@ -94,12 +94,10 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
         if name.endswith('.cat'):
             product = db.PipelineFITSCatalog.from_file(name,
                                                        use_existing_record=True)
-        elif name.endswith('.segm.fits'):
-            product = db.IntegerFITSImage.from_file(name,
-                                                    use_existing_record=True)
         else:
-            product = db.FloatingPointFITSImage.from_file(name,
-                                                          use_existing_record=True)
+            product = db.IntegerFITSImage.from_file(
+                name, use_existing_record=True
+            )
 
         product.field = image.field
         product.ccdid = image.ccdid
