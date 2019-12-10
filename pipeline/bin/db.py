@@ -999,7 +999,7 @@ class Stamp(models.Base):
             'calibratableimages.id',
             ondelete='CASCADE'
         ),
-        primary_key=True
+        index=True
     )
     image = relationship('CalibratableImage',
                          cascade='all',
@@ -1013,7 +1013,6 @@ class Stamp(models.Base):
             ondelete='CASCADE'
         ),
         index=True,
-        primary_key=True
     )
     source = relationship(
         'Source',
@@ -1041,12 +1040,12 @@ class Stamp(models.Base):
         if stamp is None:
             stamp = cls(source=source, image=linkimage)
 
-        outname = Path(NERSC_PREFIX) / f'{image.field:06d}/' \
-                                       f'c{image.ccdid:02d}/' \
-                                       f'q{image.qid}/' \
-                                       f'{fid_map[image.fid]}/' \
+        outname = Path(NERSC_PREFIX) / f'{linkimage.field:06d}/' \
+                                       f'c{linkimage.ccdid:02d}/' \
+                                       f'q{linkimage.qid}/' \
+                                       f'{fid_map[linkimage.fid]}/' \
                                        f'stamps'
-        outname = outname / 'stamp.{source.id}.{image.basename}.jpg'
+        outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
         vmin, vmax = linkimage.cmap_limits()
         stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
 
