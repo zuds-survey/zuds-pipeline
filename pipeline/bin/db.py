@@ -1037,7 +1037,7 @@ class Stamp(ZTFFile):
             stamp = cls()
             stamp.basename = basename
 
-        if issubclass(models.Base):
+        if issubclass(cls, models.Base):
             stamp.image = image
         else:
             stamp.image = image.parent_image
