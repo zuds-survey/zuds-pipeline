@@ -1034,7 +1034,10 @@ class Stamp(models.Base):
         else:
             linkimage = image.parent_image
 
-        stamp = DBSession().query(cls).get((linkimage.id, source.id)).first()
+        stamp = DBSession().query(cls).filter(
+            cls.image_id == linkimage.id,
+            cls.source_id == source.id
+        ).first()
         if stamp is None:
             stamp = cls(source=source, image=linkimage)
 
