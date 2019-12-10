@@ -66,7 +66,7 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
 CMAP_RANDOM_SEED = 8675309
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
-URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data/'
+URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 1.5
 
@@ -1049,8 +1049,7 @@ class Stamp(models.Base):
         vmin, vmax = linkimage.cmap_limits()
         stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
 
-        outname.parent.mkdir(exist_ok=True, parents=True)
-
+        archive._mkdir_recursive(outname.parent)
         publish.make_stamp(
             outname, detection.ra, detection.dec, vmin,
             vmax, image.data, image.wcs, save=True,
