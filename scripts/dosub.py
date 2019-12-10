@@ -39,8 +39,7 @@ for fn in imgs:
         print(f'Ref {refname} does not exist. Skipping...')
         continue
 
-    ref = db.ReferenceImage.from_file(refname, use_existing_record=True,
-                                      load_header=False)
+    ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
 
     basename = db.sub_name(sci.basename, ref.basename)
     #prev = db.SingleEpochSubtraction.get_by_basename(basename)
