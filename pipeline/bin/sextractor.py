@@ -95,7 +95,7 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
             product = db.PipelineFITSCatalog.from_file(name,
                                                        use_existing_record=True)
         else:
-            product = db.IntegerFITSImage.from_file(
+            product = db.FITSImage.from_file(
                 name, use_existing_record=True
             )
 
