@@ -68,7 +68,7 @@ CMAP_RANDOM_SEED = 8675309
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
-MATCH_RADIUS_DEG = 0.0002777 * 1.5
+MATCH_RADIUS_DEG = 0.0002777 * 2.0
 
 MASK_BITS = {
     'BIT00': 0,
