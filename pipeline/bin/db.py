@@ -1037,7 +1037,10 @@ class Stamp(ZTFFile):
             stamp = cls()
             stamp.basename = basename
 
-        stamp.image = image
+        if issubclass(models.Base):
+            stamp.image = image
+        else:
+            stamp.image = image.parent_image
         stamp.source = source
 
         vmin, vmax = image.cmap_limits()
