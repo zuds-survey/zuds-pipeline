@@ -1107,7 +1107,8 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
 
     image_id = sa.Column(sa.Integer,
                          sa.ForeignKey('calibratableimages.id',
-                                       ondelete='CASCADE'))
+                                       ondelete='CASCADE'),
+                         index=True)
     image = relationship('CalibratableImage', cascade='all',
                          foreign_keys=[image_id])
 
