@@ -4,13 +4,14 @@ import mpi
 import os
 import time
 import archive
+from datetime import datetime, timedelta
 
 fmap = {1: 'zg',
         2: 'zr',
         3: 'zi'}
 
 db.init_db()
-db.DBSession().autoflush = False
+#db.DBSession().autoflush = False
 #db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
@@ -38,15 +39,16 @@ for fn in imgs:
         print(f'Ref {refname} does not exist. Skipping...')
         continue
 
-    ref = db.ReferenceImage.from_file(refname, use_existing_record=True,
-                                      load_header=False)
+    ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
 
     basename = db.sub_name(sci.basename, ref.basename)
-    prev = db.SingleEpochSubtraction.get_by_basename(basename)
+    #prev = db.SingleEpochSubtraction.get_by_basename(basename)
+    prev=None
 
-    #if prev is not None:
-    #    db.DBSession().rollback()
-    #    continue
+    if (prev is not None) and (prev.modified is not None) and \
+       (prev.modified > datetime.now() - timedelta(hours=15)):
+        db.DBSession().rollback()
+        continue
 
 
     try:
@@ -106,14 +108,4 @@ for fn in imgs:
     db.DBSession().commit()
     tstop = time.time()
 
-    print(f'took {tstop - tstart} sec to make "{sub.basename}"')
-
-
-
-
-
-
-
-
-
-
+    print(f'took {tstop - tstart} sec to make "{sub.basename}"', flush=True)
