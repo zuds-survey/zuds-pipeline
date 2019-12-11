@@ -499,7 +499,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
 
         # check to see if a copy with this URL already exists.
         # if so return it
-        
+
         old = DBSession().query(cls).filter(
             cls.url == url
         ).first()
@@ -1132,15 +1132,6 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
             setattr(cat, prop, getattr(image, prop))
 
         df = pd.DataFrame(cat.data)
-        if isinstance(image, CalibratedImage):
-            phot = aperture_photometry(image,
-                                       cat.data['X_WORLD'],
-                                       cat.data['Y_WORLD'],
-                                       apply_calibration=True)
-            names = ['mag', 'magerr', 'flux', 'fluxerr', 'flags']
-            for name in names:
-                df[name] = phot[name]
-
         rec = df.to_records(index=False)
         cat.data = rec
         cat.basename = image.basename.replace('.fits', '.cat')
