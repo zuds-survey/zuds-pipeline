@@ -973,7 +973,8 @@ class PipelineRegionFile(ZTFFile):
     }
 
     catalog_id = sa.Column(sa.Integer, sa.ForeignKey(
-        'pipelinefitscatalogs.id', ondelete='CASCADE'))
+        'pipelinefitscatalogs.id', ondelete='CASCADE'
+    ), index=True)
     catalog = relationship('PipelineFITSCatalog', cascade='all',
                            foreign_keys=[catalog_id],
                            back_populates='regionfile')
