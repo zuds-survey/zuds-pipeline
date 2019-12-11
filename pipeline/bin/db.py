@@ -32,6 +32,7 @@ import sextractor
 
 import requests
 
+import fitsio
 import subprocess
 import uuid
 import warnings
@@ -459,7 +460,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
                                              ondelete='CASCADE'),
                    primary_key=True)
 
-    url = sa.Column(sa.Text)
+    url = sa.Column(sa.Text, index=True, unique=True)
     archive_path = sa.Column(sa.Text)
 
     def get(self):
@@ -493,12 +494,25 @@ class HTTPArchiveCopy(ZTFFileCopy):
                                     f'{band}/' \
                                     f'{product.basename}'
 
-        copy = cls()
-        copy.archive_path = f'{path.absolute()}'
-        copy.url = f'{path.absolute()}'.replace(NERSC_PREFIX,
-                                                URL_PREFIX)
-        copy.product = product
-        return copy
+        archive_path = f'{path.absolute()}'
+        url = f'{path.absolute()}'.replace(NERSC_PREFIX, URL_PREFIX)
+
+        # check to see if a copy with this URL already exists.
+        # if so return it
+        
+        old = DBSession().query(cls).filter(
+            cls.url == url
+        ).first()
+
+        if old is None:
+            copy = cls()
+            copy.archive_path = archive_path
+            copy.url = url
+            copy.product = product
+            return copy
+
+        else:
+            return old
 
 
 class TapeCopy(ZTFFileCopy):
@@ -672,22 +686,42 @@ class FITSFile(File):
             data = self.data
 
         nhdu = max(self._DATA_HDU, self._HEADER_HDU) + 1
-        if nhdu == 1:
-            fits.writeto(f, data, self.astropy_header, overwrite=True)
-        else:
-            hdul = []
-            for i in range(nhdu):
-                if i == 0:
-                    hdu = fits.PrimaryHDU()
-                elif isinstance(self, FITSImage):
-                    hdu = fits.ImageHDU()
-                elif isinstance(self, PipelineFITSCatalog):
-                    hdu = fits.BinTableHDU()
-                hdul.append(hdu)
-            hdul = fits.HDUList(hdul)
-            hdul[self._HEADER_HDU].header = self.astropy_header
-            hdul[self._DATA_HDU].data = data
-            hdul.writeto(f, overwrite=True)
+
+
+        if isinstance(self, FITSImage):
+            if nhdu == 1:
+                fits.writeto(f, data, self.astropy_header, overwrite=True)
+            else:
+                hdul = []
+                for i in range(nhdu):
+                    if i == 0:
+                        hdu = fits.PrimaryHDU()
+                    else:
+                        hdu = fits.ImageHDU()
+                    hdul.append(hdu)
+                hdul = fits.HDUList(hdul)
+                hdul[self._HEADER_HDU].header = self.astropy_header
+                hdul[self._DATA_HDU].data = data
+
+                hdul.writeto(f, overwrite=True)
+        else:  # it's a catalog
+            with fitsio.FITS(f, 'rw', clobber=True) as out:
+                for i in range(nhdu):
+                    data = None
+                    header = None
+                    if i == self._DATA_HDU:
+                        data = self.data
+                    if i == self._HEADER_HDU:
+                        header = []
+                        for key in self.header:
+                            card = {
+                                'name': key,
+                                'value': self.header[key],
+                                'comment': self.header_comments[key]
+                            }
+                            header.append(card)
+                    out.write(data, header=header)
+
 
         self.unload_data()
 
