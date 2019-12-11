@@ -26,7 +26,15 @@ imgs = mpi.get_my_share_of_work(infile)
 # make a reference for each directory
 for fn in imgs:
     tstart = time.time()
+
+    sstart = time.time()
     sci = db.ScienceImage.from_file(fn)
+    sstop = time.time()
+    print(
+        f'sci: {sstop-sstart:.2f} sec to load  {sci.basename}',
+        flush=True
+    )
+
     field = f'{sci.field:06d}'
     ccdid = f'c{sci.ccdid:02d}'
     qid = f'q{sci.qid}'
@@ -39,7 +47,15 @@ for fn in imgs:
         print(f'Ref {refname} does not exist. Skipping...')
         continue
 
+    rstart = time.time()
     ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
+    rstop = time.time()
+
+    print(
+        f'ref: {rstop-rstart:.2f} sec to load ref for {sci.basename}',
+        flush=True
+    )
+
 
     basename = db.sub_name(sci.basename, ref.basename)
 
@@ -53,6 +69,7 @@ for fn in imgs:
         continue
     '''
 
+    substart = time.time()
     try:
         sub = db.SingleEpochSubtraction.from_images(sci, ref,
                                                     data_product=False,
@@ -62,12 +79,25 @@ for fn in imgs:
         db.DBSession().rollback()
         continue
 
+    substop = time.time()
+    print(
+        f'sub: {substop-substart:.2f} sec to make {sub.basename}',
+        flush=True
+    )
+
+
+    catstart = time.time()
     try:
         cat = db.PipelineFITSCatalog.from_image(sub)
     except Exception as e:
         print(e, [sub.basename], flush=True)
         db.DBSession.rollback()
         continue
+    catstop = time.time()
+    print(
+        f'cat: {catstop-catstart:.2f} sec to make catalog for {sub.basename}',
+        flush=True
+    )
 
     dstart = time.time()
     try:
@@ -82,6 +112,7 @@ for fn in imgs:
         flush=True
     )
 
+    stampstart = time.time()
     try:
         remapped = sub.reference_image.aligned_to(sub)
         stamps = []
@@ -94,6 +125,13 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
+    stampstop = time.time()
+    print(
+        f'stamp: {stampstop-stampstart:.2f} sec to make stamps for {sub.basename}',
+        flush=True
+    )
+
+    archstart = time.time()
     subcopy = db.HTTPArchiveCopy.from_product(sub)
     catcopy = db.HTTPArchiveCopy.from_product(cat)
     mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
@@ -106,6 +144,13 @@ for fn in imgs:
     archive.archive(subcopy)
     archive.archive(catcopy)
     archive.archive(mskcopy)
+
+    archstop = time.time()
+    print(
+        f'archive: {archstop-archstart:.2f} sec to archive stuff for '
+        f'{sub.basename}',
+        flush=True
+    )
 
     db.DBSession().commit()
     tstop = time.time()
