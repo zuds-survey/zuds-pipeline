@@ -1941,10 +1941,10 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
             source = DBSession().query(models.Source).filter(
                 sa.func.q3c_radial_query(
-                    detection.ra,
-                    detection.dec,
                     models.Source.ra,
                     models.Source.dec,
+                    detection.ra,
+                    detection.dec,
                     MATCH_RADIUS_DEG
                 )
             ).first()
