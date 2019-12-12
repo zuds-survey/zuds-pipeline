@@ -57,7 +57,7 @@ for _, job in jobs.iterrows():
     stackstart = time.time()
     try:
         stack = db.ScienceCoadd.from_images(
-            images,
+            images, outfile_name=outname,
             data_product=False,
             tmpdir='tmp'
         )
