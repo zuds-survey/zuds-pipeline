@@ -39,7 +39,9 @@ res = db.DBSession().query(db.ScienceImage.field,
                            db.ScienceImage.fid,
                            daterange.c.left, daterange.c.right,
                            target).select_from(
-    db.sa.join(db.ScienceImage, daterange, jcond)
+    db.sa.join(db.SingleEpochSubtraction, db.ScienceImage.__table__,
+               db.SingleEpochSubtraction.target_image_id ==
+               db.ScienceImage.id).join(daterange, jcond)
 ).group_by(
     db.ScienceImage.field,
     db.ScienceImage.ccdid,
