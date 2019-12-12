@@ -15,7 +15,7 @@ db.init_db()
 #db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
-__whatami__ = 'Make the references for ZUDS.'
+__whatami__ = 'Make the subtractions for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 refvers = sys.argv[2]

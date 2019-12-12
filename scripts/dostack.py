@@ -3,7 +3,6 @@ import sys
 import mpi
 import os
 import time
-import archive
 import pandas as pd
 
 fmap = {1: 'zg',
@@ -17,7 +16,6 @@ __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the images to make subtractions of
-
 # get the work
 jobs = mpi.get_my_share_of_work(infile, reader=pd.read_csv)
 
@@ -25,6 +23,7 @@ jobs = mpi.get_my_share_of_work(infile, reader=pd.read_csv)
 for _, job in jobs.iterrows():
 
     tstart = time.time()
+    sstart = time.time()
     images = db.DBSession().query(db.ZTFFile).filter(
         db.ZTFFile.id.in_(eval(job['target']))
     ).all()
@@ -41,56 +40,67 @@ for _, job in jobs.iterrows():
         image.map_to_local_file(path)
         image.mask_image.map_to_local_file(path.replace('.fits', '.mask.fits'))
 
-    basename = f'sub.{field}_{ccdid}_{qid}_{fid}_{job["left"]}_' \
+    basename = f'{field}_{ccdid}_{qid}_{fid}_{job["left"]}_' \
                f'{job["right"]}.coadd.fits'
-    prev = db.StackedSubtraction.get_by_basename(basename)
+
+
+    prev = db.ScienceCoadd.get_by_basename(basename)
     outname = os.path.join(os.path.dirname(images[0].local_path), basename)
+    sstop = time.time()
 
-    if prev is not None:
-        continue
 
+    print(
+        f'load: {sstop-sstart:.2f} sec to load input images for {outname}',
+        flush=True
+    )
+
+    stackstart = time.time()
     try:
-        sub = db.StackedSubtraction.from_images(
-            images, outname,
-            nthreads=mpi.get_nthreads(),
+        stack = db.ScienceCoadd.from_images(
+            images,
             data_product=False,
-            tmpdir='tmp',
-            swarp_kws={'COMBINE_TYPE': 'MEDIAN'}
+            tmpdir='tmp'
         )
     except Exception as e:
-        print(e, [i.basename for i in images])
+        print(e, [i.basename for i in images], flush=True)
         db.DBSession().rollback()
         continue
+    stackstop = time.time()
+    print(
+        f'stack: {stackstop-stackstart:.2f} sec to make {stack.basename}',
+        flush=True
+    )
 
-    sub.binleft = pd.to_datetime(job['left'])
-    sub.binright = pd.to_datetime(job['right'])
+    archstart = time.time()
+    db.DBSession().add(stack)
+    db.DBSession().commit()
+    archstop = time.time()
 
-    try:
-        catalog = db.PipelineFITSCatalog.from_image(sub)
-    except Exception as e:
-        print(e, [i.basename for i in images])
-        db.DBSession().rollback()
-        continue
+    print(
+        f'archive: {archstop-archstart:.2f} sec to archive {stack.basename}',
+        flush=True
+    )
 
+    cleanstart = time.time()
+    targets = []
+    for sci in images + [stack]:
+        if hasattr(sci, '_rmsimg'):
+            targets.append(sci.rms_image.local_path)
+        if hasattr(sci, '_weightimg'):
+            targets.append(sci.weight_image.local_path)
 
-    try:
-        detections = db.Detection.from_catalog(catalog, filter=True)
-    except Exception as e:
-        print(e, [i.basename for i in images])
-        db.DBSession().rollback()
-        continue
+        sci.unmap()
 
-    db.DBSession().add(sub)
-    db.DBSession().add(catalog)
-    db.DBSession().add_all(detections)
+    for target in targets:
+        os.remove(target)
 
-    archive.archive(sub)
-    archive.archive(catalog)
+    cleanstop = time.time()
 
-    db.DBSession().rollback()
     tstop = time.time()
-
-    print(f'took {tstop - tstart} sec to make "{sub.basename}"')
+    print(f'clean: took {cleanstop - cleanstart} sec to clean '
+          f'up after {sub.basename}"',
+          flush=True)
+    print(f'took {tstop - tstart} sec to make "{sub.basename}"', flush=True)
 
 
 

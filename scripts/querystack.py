@@ -64,7 +64,7 @@ excludecond = db.sa.and_(
 )
 
 
-# get the coadds where there is no existing coadd already 
+# get the coadds where there is no existing coadd already
 final = db.DBSession().query(res).outerjoin(
     db.ScienceCoadd, excludecond
 ).filter(
