@@ -63,8 +63,12 @@ excludecond = db.sa.and_(
     db.ScienceCoadd.binright == res.c.right
 )
 
+
+# get the coadds where there is no existing coadd already 
 final = db.DBSession().query(res).outerjoin(
     db.ScienceCoadd, excludecond
+).filter(
+    db.ScienceCoadd.id == None
 )
 
 result = pd.read_sql(final.statement, db.DBSession().get_bind())
