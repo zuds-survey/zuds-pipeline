@@ -27,26 +27,24 @@ rcol = gs(mindate + STACK_INTERVAL,
 
 daterange = db.DBSession().query(lcol, rcol).subquery()
 
-target = db.sa.func.array_agg(db.SingleEpochSubtraction.id).label('target')
+target = db.sa.func.array_agg(db.ScienceImage.id).label('target')
 stacksize = db.sa.func.array_length(target, 1).label('stacksize')
 stackcond = stacksize >= 3
 jcond = db.sa.and_(db.ScienceImage.obsdate > daterange.c.left,
                    db.ScienceImage.obsdate <= daterange.c.right)
 
-res = db.DBSession().query(db.SingleEpochSubtraction.field,
-                           db.SingleEpochSubtraction.ccdid,
-                           db.SingleEpochSubtraction.qid,
-                           db.SingleEpochSubtraction.fid,
+res = db.DBSession().query(db.ScienceImage.field,
+                           db.ScienceImage.ccdid,
+                           db.ScienceImage.qid,
+                           db.ScienceImage.fid,
                            daterange.c.left, daterange.c.right,
                            target).select_from(
-    db.sa.join(db.SingleEpochSubtraction, db.ScienceImage.__table__,
-               db.SingleEpochSubtraction.target_image_id ==
-               db.ScienceImage.id).join(daterange, jcond)
+    db.sa.join(db.ScienceImage, daterange, jcond)
 ).group_by(
-    db.SingleEpochSubtraction.field,
-    db.SingleEpochSubtraction.ccdid,
-    db.SingleEpochSubtraction.qid,
-    db.SingleEpochSubtraction.fid,
+    db.ScienceImage.field,
+    db.ScienceImage.ccdid,
+    db.ScienceImage.qid,
+    db.ScienceImage.fid,
     daterange.c.left, daterange.c.right
 ).having(
     stackcond
