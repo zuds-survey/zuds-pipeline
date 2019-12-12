@@ -59,15 +59,14 @@ for fn in imgs:
 
     basename = db.sub_name(sci.basename, ref.basename)
 
-    '''
-    #prev = db.SingleEpochSubtraction.get_by_basename(basename)
-    prev=None
+    prev = db.SingleEpochSubtraction.get_by_basename(basename)
+    #prev=None
 
     if (prev is not None) and (prev.modified is not None) and \
-       (prev.modified > datetime.now() - timedelta(hours=15)):
+       (prev.modified > datetime.now() - timedelta(hours=4)):
         db.DBSession().rollback()
         continue
-    '''
+
 
     substart = time.time()
     try:
@@ -132,18 +131,18 @@ for fn in imgs:
     )
 
     archstart = time.time()
-    subcopy = db.HTTPArchiveCopy.from_product(sub)
-    catcopy = db.HTTPArchiveCopy.from_product(cat)
-    mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
+    #subcopy = db.HTTPArchiveCopy.from_product(sub)
+    #catcopy = db.HTTPArchiveCopy.from_product(cat)
+    #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 
-    db.DBSession().add(mskcopy)
-    db.DBSession().add(catcopy)
-    db.DBSession().add(subcopy)
-    archive.archive(subcopy)
-    archive.archive(catcopy)
-    archive.archive(mskcopy)
+    #db.DBSession().add(mskcopy)
+    #db.DBSession().add(catcopy)
+    #db.DBSession().add(subcopy)
+    #archive.archive(subcopy)
+    #archive.archive(catcopy)
+    #archive.archive(mskcopy)
 
     archstop = time.time()
     print(
