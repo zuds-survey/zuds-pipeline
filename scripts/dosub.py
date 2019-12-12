@@ -118,7 +118,7 @@ for fn in imgs:
         for i in [sub, sub.target_image, remapped]:
             for detection in detections:
                 if len(detection.source.detections) == 0:
-                    # make a stamp for the first detection 
+                    # make a stamp for the first detection
                     stamp = db.Stamp.from_detection(detection, i)
                     stamps.append(stamp)
     except Exception as e:
@@ -160,7 +160,7 @@ for fn in imgs:
     if hasattr(sci, '_rmsimg'):
         targets.append(sci.rms_image.local_path)
     if hasattr(sci, '_weightimg'):
-        targets.append(sci.weight_image.rms)
+        targets.append(sci.weight_image.local_path)
 
     sci.unmap()
     for target in targets:
