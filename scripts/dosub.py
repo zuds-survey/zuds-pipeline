@@ -118,8 +118,10 @@ for fn in imgs:
         stamps = []
         for i in [sub, sub.target_image, remapped]:
             for detection in detections:
-                stamp = db.Stamp.from_detection(detection, i)
-                stamps.append(stamp)
+                if len(detection.source.detections) == 0:
+                    # make a stamp for the first detection 
+                    stamp = db.Stamp.from_detection(detection, i)
+                    stamps.append(stamp)
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
