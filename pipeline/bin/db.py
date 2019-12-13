@@ -1314,6 +1314,7 @@ class CalibratableImage(FITSImage, ZTFFile):
                 bn = self._weightimg.basename
                 join = os.path.join(dirname, bn)
                 self._weightimg.map_to_local_file(join)
+                self._weightimg.save()  #  to guarantee mapped file exists 
         return self._weightimg
 
     @property
