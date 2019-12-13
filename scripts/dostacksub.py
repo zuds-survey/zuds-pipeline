@@ -41,7 +41,7 @@ for _, job in jobs.iterrows():
         path = f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/' \
                f'{fid}/{image.basename}'
         image.map_to_local_file(path)
-        image.mask_image.map_to_local_file(path.replace('sciimg', 'mskimg'))
+        image.mask_image.map_to_local_file(path.replace('.fits', '.mask.fits'))
 
     basename = f'sub.{field}_{ccdid}_{qid}_{fid}_{job["left"]}_' \
                f'{job["right"]}.coadd.fits'
