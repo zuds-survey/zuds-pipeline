@@ -865,7 +865,7 @@ class FITSImage(HasWCS):
             fig, axis = plt.subplots()
 
         if align_to is not None:
-            image = self.aligned_to(align_to).data
+            image = self.aligned_to(align_to)
         else:
             image = self
 
