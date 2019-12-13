@@ -61,7 +61,7 @@ def estimate_seeing(image):
 
     seeings = []
     for row in catok:
-        fwhm = 2 * np.sqrt(np.log(2) * row['FWHM_IMAGE']**2)
+        fwhm = row['FWHM_IMAGE']
         seeings.append(fwhm)
 
     seeing = np.nanmedian(seeings)
