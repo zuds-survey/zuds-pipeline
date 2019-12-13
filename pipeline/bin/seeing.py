@@ -48,9 +48,9 @@ def estimate_seeing(image):
     matchra = []
     matchdec = []
     for d in stars.values():
-        if len(d) > 0:
-            matchra.append(d[0]['ra'])
-            matchdec.append(d[0]['dec'])
+        for dd in d:
+            matchra.append(dd['ra'])
+            matchdec.append(dd['dec'])
 
     matchcoord = SkyCoord(matchra, matchdec, unit='deg')
     catcoord = SkyCoord(catalog.data['X_WORLD'], catalog.data['Y_WORLD'], unit='deg')
