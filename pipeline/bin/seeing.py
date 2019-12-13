@@ -18,18 +18,12 @@ def estimate_seeing(image):
     if catalog is None:
         catalog = db.PipelineFITSCatalog.from_image(image)
 
-    # get a list of gaia stars
-    coordlist = []
-    for row in catalog.data:
-        ra = row['X_WORLD']
-        dec = row['Y_WORLD']
-        coordlist.append((ra, dec))
 
     q = {"query_type": "cone_search",
          "object_coordinates": {
-             "radec": coordlist,
-             "cone_search_radius": "1",
-             "cone_search_unit": "arcsec"
+             "radec": [(image.ra, image.dec)],
+             "cone_search_radius": "1.2",
+             "cone_search_unit": "deg"
          },
          "catalogs": {
              "Gaia_DR2": {
