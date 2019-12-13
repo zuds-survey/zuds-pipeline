@@ -3,6 +3,7 @@ import sys
 import mpi
 import os
 import time
+import archive
 import pandas as pd
 
 fmap = {1: 'zg',
@@ -76,6 +77,10 @@ for _, job in jobs.iterrows():
     )
 
     archstart = time.time()
+
+    scopy = db.HTTPArchiveCopy.from_product(stack)
+    archive.archive(scopy)
+    db.DBSession().add(scopy)
     db.DBSession().add(stack)
     db.DBSession().commit()
     archstop = time.time()
@@ -105,13 +110,3 @@ for _, job in jobs.iterrows():
           f'up after {stack.basename}"',
           flush=True)
     print(f'took {tstop - tstart} sec to make "{stack.basename}"', flush=True)
-
-
-
-
-
-
-
-
-
-
