@@ -65,6 +65,10 @@ for _, job in jobs.iterrows():
         print(e, [i.basename for i in images], flush=True)
         db.DBSession().rollback()
         continue
+
+    stack.binleft = job['left']
+    stack.binright = job['right']
+    
     stackstop = time.time()
     print(
         f'stack: {stackstop-stackstart:.2f} sec to make {stack.basename}',
