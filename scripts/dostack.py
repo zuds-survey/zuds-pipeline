@@ -102,9 +102,9 @@ for _, job in jobs.iterrows():
 
     tstop = time.time()
     print(f'clean: took {cleanstop - cleanstart} sec to clean '
-          f'up after {sub.basename}"',
+          f'up after {stack.basename}"',
           flush=True)
-    print(f'took {tstop - tstart} sec to make "{sub.basename}"', flush=True)
+    print(f'took {tstop - tstart} sec to make "{stack.basename}"', flush=True)
 
 
 

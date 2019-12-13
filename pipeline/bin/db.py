@@ -863,18 +863,19 @@ class FITSImage(HasWCS):
     def show(self, axis=None, align_to=None):
         if axis is None:
             fig, axis = plt.subplots()
-        vmin, vmax = self.cmap_limits()
 
         if align_to is not None:
-            data = self.aligned_to(align_to).data
+            image = self.aligned_to(align_to).data
         else:
-            data = self.data
+            image = self
 
-        axis.imshow(data,
+        vmin, vmax = image.cmap_limits()
+
+        axis.imshow(image.data,
                     vmin=vmin,
                     vmax=vmax,
-                    norm=self.cmap_norm(),
-                    cmap=self.cmap(),
+                    norm=image.cmap_norm(),
+                    cmap=image.cmap(),
                     interpolation='none')
 
     @property
@@ -1314,7 +1315,7 @@ class CalibratableImage(FITSImage, ZTFFile):
                 bn = self._weightimg.basename
                 join = os.path.join(dirname, bn)
                 self._weightimg.map_to_local_file(join)
-                self._weightimg.save()  #  to guarantee mapped file exists 
+                self._weightimg.save()  #  to guarantee mapped file exists
         return self._weightimg
 
     @property
