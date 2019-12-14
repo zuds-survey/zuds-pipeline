@@ -41,10 +41,10 @@ def filter_sexcat(cat):
     bpm = image.mask_image.boolean
     table = Table(cat.data)
 
-    rms = rms.data[~bpm.data]
+    rms = rms.data
     bpm = bpm.data
 
-    med = np.median(rms)
+    med = np.median(rms[~bpm.data])
     medcut = med * 1.25
 
     last = table['X_IMAGE'].size
