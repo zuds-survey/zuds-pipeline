@@ -137,6 +137,7 @@ def retrieve_images(image_whereclause,
 
     with open(hpss_in, 'w') as f:
         f.write("\n".join([f'ls -P {tar}' for tar in tars]))
+        f.write("\n")  # always end with a \n
 
     syscall = f'/usr/common/mss/bin/hsi -O {hpss_out} in {hpss_in}'
 
