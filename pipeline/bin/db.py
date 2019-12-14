@@ -2066,12 +2066,18 @@ def force_photometry(self):
     pass
 
 
-
 from astropy.table import Table
 def light_curve(self):
     lc_raw = []
 
-    for photpoint in self.photometry:
+    phot = DBSession().query(ForcedPhotometry).filter(
+        ForcedPhotometry.source_id == self.id
+    ).options(sa.orm.joinedload(
+        ForcedPhotometry.image,
+        ForcedPhotometry.image_id == CalibratedImage.id
+    ))
+
+    for photpoint in phot:
         photd = {'mjd': photpoint.image.mjd,
                  'filter': 'ztf' + fid_map[photpoint.image.fid][-1],
                  'zp': photpoint.image.magzp,
