@@ -2074,7 +2074,9 @@ def light_curve(self):
         ForcedPhotometry.source_id == self.id
     ).options(sa.orm.joinedload(
         ForcedPhotometry.image,
-        ForcedPhotometry.image_id == CalibratedImage.id
+        ForcedPhotometry.image_id == SingleEpochSubtraction.id
+    ).joinedload(
+        SingleEpochSubtraction.target_image
     ))
 
     for photpoint in phot:
