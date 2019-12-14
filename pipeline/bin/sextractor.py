@@ -1,9 +1,8 @@
 import numpy as np
 import subprocess
 from pathlib import Path
-from astropy.io import fits
-import os
-
+import shutil
+import uuid
 import db
 
 from utils import initialize_directory
@@ -25,7 +24,9 @@ checkimage_map = {
 
 
 
-def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
+def prepare_sextractor(image, directory, checkimage_type=None,
+                       catalog_type='FITS_LDAC'):
+
     """Set up the pipeline to do a run of source extractor."""
 
     conf = SEX_CONF
@@ -83,31 +84,38 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
         # this means the weight map will have weight=0 for masked pixels and
         # weight = 1 for unmasked pixels
 
-        bpmname = impath.replace('.fits', '.bpm.fits')
-        data = (~image.mask_image.boolean.data).astype('int')
-        fits.writeto(bpmname, data, overwrite=True)
-        delnames.append(bpmname)
+        bpmweight = db.FITSImage()
+        bpmweight.data = (~image.mask_image.boolean.data).astype(int)
+        bpmweight.header = image.mask_image.header
+        bpmweight.header_comments= image.mask_image.header_comments
+        bpmweight.basename = image.basename.replace('.fits', '.bpmweight.fits')
+        bpmwpath = f'{(directory / bpmweight.basename).absolute()}'
+        bpmweight.map_to_local_file(bpmwpath)
+        bpmweight.save()
 
-        syscall += f'-WEIGHT_IMAGE {bpmname} ' \
+        syscall += f'-WEIGHT_IMAGE {bpmweight.local_path} ' \
                    f'-WEIGHT_TYPE MAP_WEIGHT'
 
     outnames = [outname] + coutnames
 
-    return syscall, outnames, delnames
+    return syscall, outnames
 
 
-def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
+def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
+                   tmpdir='/tmp'):
     """Run SExtractor on an image and produce the requested checkimages and
     catalogs, returning the results as ZUDS objects (potentially DB-backed)."""
 
-    command, outnames, delnames = prepare_sextractor(image,
-                                           checkimage_type=checkimage_type,
-                                           catalog_type=catalog_type)
+    directory = Path(tmpdir) / uuid.uuid4().hex
+    directory.mkdir(exist_ok=True, parents=True)
+
+    command, outnames = prepare_sextractor(
+        image, directory, checkimage_type=checkimage_type,
+        catalog_type=catalog_type
+    )
+
     # run it
     subprocess.check_call(command.split())
-
-    for name in delnames:
-        os.remove(name)
 
     # load up the results into objects
 
@@ -127,4 +135,5 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
         product.fid = image.fid
         result.append(product)
 
+    shutil.rmtree(directory)
     return result

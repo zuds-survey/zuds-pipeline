@@ -1123,12 +1123,12 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     _HEADER_HDU = 2
 
     @classmethod
-    def from_image(cls, image):
+    def from_image(cls, image, tmpdir='/tmp'):
         if not isinstance(image, CalibratableImage):
             raise ValueError('Image is not an instance of '
                              'CalibratableImage.')
 
-        image._call_source_extractor()
+        image._call_source_extractor(tmpdir=tmpdir)
         cat = image.catalog
 
         for prop in GROUP_PROPERTIES:
@@ -1252,13 +1252,15 @@ class CalibratableImage(FITSImage, ZTFFile):
         interval = ZScaleInterval()
         return interval.get_limits(self.data[~self.mask_image.boolean.data])
 
-    def _call_source_extractor(self, checkimage_type=None):
+    def _call_source_extractor(self, checkimage_type=None, tmpdir='/tmp'):
 
         rs = sextractor.run_sextractor
         success = False
         for _ in range(3):
             try:
-                results = rs(self, checkimage_type=checkimage_type)
+                results = rs(
+                    self, checkimage_type=checkimage_type, tmpdir=tmpdir
+                )
             except subprocess.CalledProcessError as e:
                 print(f'Caught CalledProcessError {e}, retrying... {_+1} / 3')
                 continue
