@@ -1799,12 +1799,14 @@ class Subtraction(HasWCS):
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
         sub.header['QID'] = sub.qid = sci.qid
         sub.header['FID'] = sub.fid = sci.fid
-        sub.header['SEEING'] = sub.image.header['SEEING']
-        sub.header_comments['SEEING'] = sub.image.header_comments['SEEING']
 
         sub.mask_image = submask
         sub.reference_image = ref
         sub.target_image = sci
+
+        sub.header['SEEING'] = sci.header['SEEING']
+        sub.header_comments['SEEING'] = sci.header_comments['SEEING']
+
 
         if isinstance(sub, CalibratedImage):
             sub.header['MAGZP'] = sci.header['MAGZP']
