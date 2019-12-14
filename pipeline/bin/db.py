@@ -2070,22 +2070,32 @@ from astropy.table import Table
 def light_curve(self):
     lc_raw = []
 
-    phot = DBSession().query(ForcedPhotometry).filter(
+    phot = DBSession().query(
+        ScienceImage.obsmjd,
+        ScienceImage.filtercode,
+        ScienceImage.magzp,
+        ForcedPhotometry.flux,
+        ForcedPhotometry.fluxerr
+    ).select_from(
+        sa.join(
+            ForcedPhotometry,
+            SingleEpochSubtraction,
+            ForcedPhotometry.image_id == SingleEpochSubtraction.id
+        ).join(
+            ScienceImage,
+            SingleEpochSubtraction.target_image_id, ScienceImage.id
+        )
+    ).filter(
         ForcedPhotometry.source_id == self.id
-    ).options(sa.orm.joinedload(
-        ForcedPhotometry.image,
-        ForcedPhotometry.image_id == SingleEpochSubtraction.id
-    ).joinedload(
-        SingleEpochSubtraction.target_image
-    ))
+    )
 
     for photpoint in phot:
-        photd = {'mjd': photpoint.image.mjd,
-                 'filter': 'ztf' + fid_map[photpoint.image.fid][-1],
-                 'zp': photpoint.image.magzp,
+        photd = {'mjd': photpoint[0],
+                 'filter': 'ztf' + photpoint[1][-1],
+                 'zp': photpoint[2],
                  'zpsys': 'ab',
-                 'flux': photpoint.flux,
-                 'fluxerr': photpoint.fluxerr}
+                 'flux': photpoint[3],
+                 'fluxerr': photpoint[4]}
         lc_raw.append(photd)
 
     return Table(lc_raw)
