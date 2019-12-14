@@ -41,7 +41,7 @@ def filter_sexcat(cat):
     bpm = image.mask_image.boolean
     table = Table(cat.data)
 
-    rms = rms.data
+    rms = rms.data[~bpm.data]
     bpm = bpm.data
 
     med = np.median(rms)
