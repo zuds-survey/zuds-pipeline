@@ -84,7 +84,7 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
         # weight = 1 for unmasked pixels
 
         bpmname = impath.replace('.fits', '.bpm.fits')
-        data = ~image.mask_image.boolean.data.astype('int')
+        data = (~image.mask_image.boolean.data).astype('int')
         fits.writeto(bpmname, data, overwrite=True)
         delnames.append(bpmname)
 
