@@ -85,7 +85,7 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
 
         bpmname = impath.replace('.fits', '.bpm.fits')
         data = ~image.mask_image.boolean.data.astype('int')
-        fits.writeto(bpmname, data)
+        fits.writeto(bpmname, data, overwrite=True)
         delnames.append(bpmname)
 
         syscall += f'-WEIGHT_IMAGE {bpmname} ' \
