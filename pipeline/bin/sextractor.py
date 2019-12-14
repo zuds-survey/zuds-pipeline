@@ -1,6 +1,10 @@
 import numpy as np
 import subprocess
 from pathlib import Path
+from astropy.io import fits
+import os
+
+import db
 
 from utils import initialize_directory
 
@@ -18,6 +22,7 @@ checkimage_map = {
     'bkgsub': '-BACKGROUND',
     'bkg': 'BACKGROUND'
 }
+
 
 
 def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
@@ -52,7 +57,7 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
     else:
         ctypestr = cnamestr = 'None'
 
-    useweight = hasattr(image, '_rmsimg')
+    hasweight = hasattr(image, '_rmsimg')
 
     syscall = f'sex -c {conf} {impath} ' \
               f'-CHECKIMAGE_TYPE {ctypestr} ' \
@@ -65,27 +70,44 @@ def prepare_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
               f'-FILTER_NAME {CONV_FILE} ' \
               f'-FLAG_IMAGE {image.mask_image.local_path} ' \
 
-    if useweight:
+    delnames = []
+    if hasweight:
         image.weight_image.save()
         syscall += f'-WEIGHT_IMAGE {image.weight_image.local_path} ' \
+                   f'-WEIGHT_TYPE MAP_WEIGHT'
+    else:
+        # we will use the (inverted) bad pixel mask as the initial weight map
+        #  if a weight map is not specified. this ensures that sextractor
+        # does not use masked pixels in its estimates of the background, etc.
+
+        # this means the weight map will have weight=0 for masked pixels and
+        # weight = 1 for unmasked pixels
+
+        bpmname = impath.replace('.fits', '.bpm.fits')
+        data = ~image.mask_image.boolean.data.astype('int')
+        fits.writeto(bpmname, data)
+        delnames.append(bpmname)
+
+        syscall += f'-WEIGHT_IMAGE {bpmname} ' \
                    f'-WEIGHT_TYPE MAP_WEIGHT'
 
     outnames = [outname] + coutnames
 
-    return syscall, outnames
+    return syscall, outnames, delnames
 
 
 def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC'):
     """Run SExtractor on an image and produce the requested checkimages and
     catalogs, returning the results as ZUDS objects (potentially DB-backed)."""
 
-    import db
-
-    command, outnames = prepare_sextractor(image,
+    command, outnames, delnames = prepare_sextractor(image,
                                            checkimage_type=checkimage_type,
                                            catalog_type=catalog_type)
     # run it
     subprocess.check_call(command.split())
+
+    for name in delnames:
+        os.remove(name)
 
     # load up the results into objects
 
