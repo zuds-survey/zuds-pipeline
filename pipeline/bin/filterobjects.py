@@ -45,7 +45,7 @@ def filter_sexcat(cat):
     bpm = bpm.data
 
     med = np.median(rms[~bpm.data])
-    medcut = med * 1.25
+    medcut = med * 1.18
 
     last = table['X_IMAGE'].size
     print('Total number of candidates: ', last)
