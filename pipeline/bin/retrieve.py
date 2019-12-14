@@ -109,12 +109,14 @@ def retrieve_images(image_whereclause,
     """Image whereclause should be a clause element on ZTFFile."""
 
     jt = db.sa.join(db.ZTFFile, db.TapeCopy,
-                    db.ZTFFile.id == db.TapeCopy.product_id).outerjoin(
+                    db.ZTFFile.id == db.TapeCopy.product_id)
+    full_query = db.DBSession().query(
+        db.ZTFFile, db.TapeCopy
+    ).select_from(jt).outerjoin(
         db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
     ).filter(
         db.HTTPArchiveCopy.product_id == None
     )
-    full_query = db.DBSession().query(db.ZTFFile, db.TapeCopy).select_from(jt)
     full_query = full_query.filter(image_whereclause)
 
     # this is the query to get the image paths
