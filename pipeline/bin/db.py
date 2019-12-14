@@ -52,6 +52,7 @@ from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
 import publish
 
+BIG_RMS = np.sqrt(50000.)
 BKG_BOX_SIZE = 128
 DETECT_NSIGMA = 1.5
 DETECT_NPIX = 5
@@ -1326,6 +1327,8 @@ class CalibratableImage(FITSImage, ZTFFile):
             return self._rmsimg
         except AttributeError:
             self._call_source_extractor(checkimage_type=['rms'])
+        ind = self.mask_image.boolean.data
+        self._rmsimg.data[ind] = BIG_RMS
         return self._rmsimg
 
     @property
