@@ -85,7 +85,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
         # weight = 1 for unmasked pixels
 
         bpmweight = db.FITSImage()
-        bpmweight.data = (~image.mask_image.boolean.data).astype(int)
+        bpmweight.data = (~image.mask_image.boolean.data).astype(float)
         bpmweight.header = image.mask_image.header
         bpmweight.header_comments= image.mask_image.header_comments
         bpmweight.basename = image.basename.replace('.fits', '.bpmweight.fits')
