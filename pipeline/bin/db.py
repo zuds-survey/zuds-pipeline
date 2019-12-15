@@ -1934,6 +1934,8 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             if filter and row['GOODCUT'] != 1:
                 continue
 
+
+
             # ra and dec are inherited from SpatiallyIndexed
             detection = cls(
                 ra=float(row['X_WORLD']), dec=float(row['Y_WORLD']),
@@ -2075,15 +2077,16 @@ def light_curve(self):
         ScienceImage.filtercode,
         ScienceImage.magzp,
         ForcedPhotometry.flux,
-        ForcedPhotometry.fluxerr
+        ForcedPhotometry.fluxerr,
+        ForcedPhotometry.flags
     ).select_from(
         sa.join(
             ForcedPhotometry,
-            SingleEpochSubtraction,
+            SingleEpochSubtraction.__table__,
             ForcedPhotometry.image_id == SingleEpochSubtraction.id
         ).join(
-            ScienceImage,
-            SingleEpochSubtraction.target_image_id, ScienceImage.id
+            ScienceImage.__table__,
+            SingleEpochSubtraction.target_image_id == ScienceImage.id
         )
     ).filter(
         ForcedPhotometry.source_id == self.id
@@ -2095,7 +2098,8 @@ def light_curve(self):
                  'zp': photpoint[2],
                  'zpsys': 'ab',
                  'flux': photpoint[3],
-                 'fluxerr': photpoint[4]}
+                 'fluxerr': photpoint[4],
+                 'flags': photpoint[5]}
         lc_raw.append(photd)
 
     return Table(lc_raw)
