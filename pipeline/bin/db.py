@@ -2355,4 +2355,19 @@ def bump_modified(session, flush_context, instances):
         if isinstance(object, models.Base) and session.is_modified(object):
             object.modified = sa.func.now()
 
-
+class CLU(models.Base):
+    cluid = sa.Column(sa.Integer, primary_key=True)
+    id_other = sa.Column(sa.Text)
+    name = sa.Column(sa.Text)
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
+    dm = sa.Column(sa.Float)
+    dm_method = sa.Column(sa.Text)
+    distmpc = sa.Column(sa.Float)
+    dm_kin = sa.Column(sa.Float)
+    z = sa.Column(sa.Float)
+    zerr = sa.Column(sa.Float)
+    a = sa.Column(sa.Float)
+    b2a = sa.Column(sa.Float)
+    pa = sa.Column(sa.Float)
+    type_ned = sa.Column(sa.Text)
