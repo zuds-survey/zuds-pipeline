@@ -1934,8 +1934,6 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             if filter and row['GOODCUT'] != 1:
                 continue
 
-
-
             # ra and dec are inherited from SpatiallyIndexed
             detection = cls(
                 ra=float(row['X_WORLD']), dec=float(row['Y_WORLD']),
@@ -2069,7 +2067,7 @@ def force_photometry(self):
 
 
 from astropy.table import Table
-def light_curve(self):
+def light_curve(sourceid):
     lc_raw = []
 
     phot = DBSession().query(
@@ -2078,7 +2076,9 @@ def light_curve(self):
         ScienceImage.magzp,
         ForcedPhotometry.flux,
         ForcedPhotometry.fluxerr,
-        ForcedPhotometry.flags
+        ForcedPhotometry.flags,
+        ScienceImage.maglimit,
+        ScienceImage.apcor
     ).select_from(
         sa.join(
             ForcedPhotometry,
@@ -2089,22 +2089,26 @@ def light_curve(self):
             SingleEpochSubtraction.target_image_id == ScienceImage.id
         )
     ).filter(
-        ForcedPhotometry.source_id == self.id
+        ForcedPhotometry.source_id == sourceid
     )
 
     for photpoint in phot:
         photd = {'mjd': photpoint[0],
                  'filter': 'ztf' + photpoint[1][-1],
-                 'zp': photpoint[2],
+                 'zp': photpoint[2] + photpoint[7],  # ap-correct the ZP
                  'zpsys': 'ab',
                  'flux': photpoint[3],
                  'fluxerr': photpoint[4],
-                 'flags': photpoint[5]}
+                 'flags': photpoint[5],
+                 'lim_mag': photpoint[6]}
         lc_raw.append(photd)
 
     return Table(lc_raw)
 
-models.Source.light_curve = light_curve
+def lcprop(self):
+    return light_curve(self.id)
+
+models.Source.light_curve = lcprop
 
 
 
