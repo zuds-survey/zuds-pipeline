@@ -7,7 +7,6 @@ import shutil
 import pandas as pd
 from datetime import datetime, timedelta
 from pathlib import Path
-import paramiko
 import subprocess
 import tempfile
 from astropy.wcs import WCS
