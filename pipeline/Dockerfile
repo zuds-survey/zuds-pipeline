@@ -279,6 +279,8 @@ RUN pip install \
     noaodatalab \
     sfdmap \
     sep \
+    boto3 \
+    awscli \
     -r requirements1.txt \
     -r requirements2.txt \
     git+https://github.com/dmitryduev/kowalski.git
