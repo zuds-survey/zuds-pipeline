@@ -41,6 +41,11 @@ DB_FTP_PORT = 222
 
 lookup = dict(zip(range(0, 25), 'abcdefghijklmnopqrstuvwxyz'))
 
+def get_next_name():
+    seqquery = "SELECT nextval('namenum')"
+    num = db.DBSession().execute(seqquery).fetchone()[0]
+    name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
+    return name
 
 def num_to_alpha(num):
     updates = []
@@ -52,11 +57,17 @@ def num_to_alpha(num):
     return ''.join(updates[::-1])
 
 
-def make_stamp(name, ra, dec, vmin, vmax, data, wcs):
+def make_stamp(name, ra, dec, vmin, vmax, data, wcs, save=True,
+               size=CUTOUT_SIZE):
     coord = SkyCoord(ra, dec, frame='icrs', unit='deg')
-    cutout = Cutout2D(data, coord, CUTOUT_SIZE, wcs=wcs, fill_value=0.)
-    plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax, cmap='gray')
-    os.chmod(name, 0o774)
+    cutout = Cutout2D(data, coord, size, wcs=wcs, fill_value=0.)
+
+    if save:
+        plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax,
+                   cmap='gray')
+        os.chmod(name, 0o774)
+    else:
+        return cutout
 
 
 def annotate(source):

@@ -1,80 +1,1500 @@
+import os
+import sncosmo
+import requests
+import numpy as np
+from numpy.lib import recfunctions
+from pathlib import Path
+import shutil
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
-import numpy as np
-
-from sqlalchemy.orm import relationship, column_property
-from sqlalchemy.dialects.postgresql import array
-from sqlalchemy.ext.declarative import declared_attr
-from sqlalchemy.ext.automap import automap_base
-
-import math
 from sqlalchemy import Index
 from sqlalchemy import func
-
-from pathlib import Path
-import os
-from skyportal import models
-from skyportal.models import (join_model, DBSession, ACL,
-                              Role, User, Token, Group, init_db as idb)
-
-from skyportal.model_util import create_tables, drop_tables
+from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import array
+from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 
-import sncosmo
-
-from photometry import phot_sex_auto
-
-from astropy.io import fits
-from libztf.yao import yao_photometry_single
-
-from astropy.coordinates import SkyCoord
-
-from astropy.table import Table
-
-import requests
-
-from download import safe_download
-from secrets import get_secret
+from skyportal import models
+from skyportal.models import (DBSession, init_db as idb)
+from skyportal.model_util import create_tables, drop_tables
 
 from datetime import datetime
 
+from secrets import get_secret
+from photometry import aperture_photometry, APER_KEY
+from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
+import archive
+from hotpants import prepare_hotpants
+from filterobjects import filter_sexcat
 
-def init_db():
+import sextractor
+
+import requests
+
+import fitsio
+import subprocess
+import uuid
+import warnings
+import pandas as pd
+
+import photutils
+from astropy.wcs.utils import proj_plane_pixel_scales
+from astropy import units as u
+from astropy.io import fits
+from astropy.wcs import WCS
+from astropy import convolution
+from astropy.coordinates import SkyCoord
+
+from matplotlib import colors
+import matplotlib.pyplot as plt
+from astropy.visualization import ZScaleInterval
+from matplotlib.patches import Ellipse
+import publish
+
+BIG_RMS = np.sqrt(50000.)
+BKG_BOX_SIZE = 128
+DETECT_NSIGMA = 1.5
+DETECT_NPIX = 5
+TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
+                 'sky_centroid_icrs', 'source_sum', 'source_sum_err',
+                 'orientation', 'eccentricity', 'semimajor_axis_sigma',
+                 'semiminor_axis_sigma']
+
+SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
+                          'Y_WORLD', 'FLUX_APER', 'FLUXERR_APER',
+                          'THETA_WORLD', 'ELLIPTICITY', 'A_IMAGE', 'B_IMAGE']
+
+CMAP_RANDOM_SEED = 8675309
+
+NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
+URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
+GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
+MATCH_RADIUS_DEG = 0.0002777 * 2.0
+
+MASK_BITS = {
+    'BIT00': 0,
+    'BIT01': 1,
+    'BIT02': 2,
+    'BIT03': 3,
+    'BIT04': 4,
+    'BIT05': 5,
+    'BIT06': 6,
+    'BIT07': 7,
+    'BIT08': 8,
+    'BIT09': 9,
+    'BIT10': 10,
+    'BIT11': 11,
+    'BIT12': 12,
+    'BIT13': 13,
+    'BIT14': 14,
+    'BIT15': 15,
+    'BIT16': 16
+}
+
+MASK_COMMENTS = {
+    'BIT00': 'AIRCRAFT/SATELLITE TRACK',
+    'BIT01': 'CONTAINS SEXTRACTOR DETECTION',
+    'BIT02': 'LOW RESPONSIVITY',
+    'BIT03': 'HIGH RESPONSIVITY',
+    'BIT04': 'NOISY',
+    'BIT05': 'GHOST FROM BRIGHT SOURCE',
+    'BIT06': 'RESERVED FOR FUTURE USE',
+    'BIT07': 'PIXEL SPIKE (POSSIBLE RAD HIT)',
+    'BIT08': 'SATURATED',
+    'BIT09': 'DEAD (UNRESPONSIVE)',
+    'BIT10': 'NAN (not a number)',
+    'BIT11': 'CONTAINS PSF-EXTRACTED SOURCE POSITION',
+    'BIT12': 'HALO FROM BRIGHT SOURCE',
+    'BIT13': 'RESERVED FOR FUTURE USE',
+    'BIT14': 'RESERVED FOR FUTURE USE',
+    'BIT15': 'RESERVED FOR FUTURE USE',
+    'BIT16': 'NON-DATA SECTION FROM SWARP ALIGNMENT'
+}
+
+fid_map = {
+    1: 'zg',
+    2: 'zr',
+    3: 'zi'
+}
+
+
+def discrete_cmap(ncolors):
+    """Create a ListedColorMap with `ncolors` randomly-generated colors
+    that can be used to color an IntegerFITSImage.
+
+    The first color in the list is always black."""
+
+    prng = np.random.RandomState(CMAP_RANDOM_SEED)
+    h = prng.uniform(low=0.0, high=1.0, size=ncolors)
+    s = prng.uniform(low=0.2, high=0.7, size=ncolors)
+    v = prng.uniform(low=0.5, high=1.0, size=ncolors)
+    hsv = np.dstack((h, s, v))
+    rgb = np.squeeze(colors.hsv_to_rgb(hsv))
+    rgb[0] = (0.,) * 3
+    return colors.ListedColormap(rgb)
+
+
+def show_images(image_or_images, catalog=None, titles=None, reproject=False,
+                ds9=False):
+    imgs = np.atleast_1d(image_or_images)
+    n = len(imgs)
+
+    if ds9:
+        if catalog is not None:
+            reg = PipelineRegionFile.from_catalog(catalog)
+        cmd = '%ds9 -zscale '
+        for img in imgs:
+            img.save()
+            cmd += f' {img.local_path}'
+            if catalog is not None:
+                cmd += f' -region {reg.local_path}'
+        cmd += ' -lock frame wcs'
+        print(cmd)
+    else:
+
+        if titles is not None and len(titles) != n:
+            raise ValueError('len(titles) != len(images)')
+
+        ncols = min(n, 3)
+        nrows = (n - 1) // 3 + 1
+
+        align_target = imgs[0]
+        fig, ax = plt.subplots(ncols=ncols, nrows=nrows, sharex=True,
+                               sharey=True,
+                               subplot_kw={
+                                   'projection': WCS(
+                                       align_target.astropy_header)
+                               } if reproject else None)
+
+        ax = np.atleast_1d(ax)
+        for a in ax.ravel()[n:]:
+            a.set_visible(False)
+
+
+        for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
+            im.show(a, align_to=align_target if reproject else None)
+
+            if catalog is not None:
+
+                filtered = 'GOODCUT' in catalog.data.dtype.names
+
+                for row in catalog.data:
+                    e = Ellipse(xy=(row['X_IMAGE'], row['Y_IMAGE']),
+                                width=6 * row['A_IMAGE'],
+                                height=6 * row['B_IMAGE'],
+                                angle=row['THETA_IMAGE'] * 180. / np.pi)
+                    e.set_facecolor('none')
+
+                    if filtered and row['GOODCUT'] == 1:
+                        e.set_edgecolor('lime')
+                    else:
+                        e.set_edgecolor('red')
+                    a.add_artist(e)
+
+            if titles is not None:
+                a.set_title(titles[i])
+
+        fig.tight_layout()
+        fig.show()
+        return fig
+
+
+def sub_name(frame, template):
+    frame = f'{frame}'
+    template = f'{template}'
+
+    refp = os.path.basename(template)[:-5]
+    newp = os.path.basename(frame)[:-5]
+
+    outdir = os.path.dirname(frame)
+
+    subp = '_'.join([newp, refp])
+
+    sub = os.path.join(outdir, 'sub.%s.fits' % subp)
+    return sub
+
+
+def init_db(old=False):
     hpss_dbhost = get_secret('hpss_dbhost')
     hpss_dbport = get_secret('hpss_dbport')
     hpss_dbusername = get_secret('hpss_dbusername')
-    hpss_dbname = get_secret('hpss_dbname')
+    hpss_dbname = get_secret('hpss_dbname') if not old else get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
-    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword, hpss_dbhost, hpss_dbport)
+    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword,
+               hpss_dbhost, hpss_dbport)
 
 
-class IPACProgram(models.Base):
-    groups = relationship('Group', secondary='ipacprogram_groups',  back_populates='ipacprograms')#, cascade='all')
-    images = relationship('Image', back_populates='ipac_program', cascade='all')
+def model_representation(o):
+    if sa.inspection.inspect(o).expired:
+        DBSession().refresh(o)
+    inst = sa.inspect(o)
+    attr_list = [f"{g.key}={getattr(o, g.key)}"
+                 for g in inst.mapper.column_attrs]
+    return f"<{type(o).__name__}({', '.join(attr_list)})>"
 
 
-IPACProgramGroup = join_model('ipacprogram_groups', IPACProgram, Group)
-Group.ipacprograms = relationship('IPACProgram', secondary='ipacprogram_groups', back_populates='groups', cascade='all')
+models.Base.__repr__ = model_representation
+models.Base.modified = sa.Column(
+    sa.DateTime(timezone=False),
+    default=sa.func.now(),
+    onupdate=sa.func.now()
+)
 
 
-class Image(models.Base):
+def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
+               fk_1='id', fk_2='id', base=models.Base):
+    """Helper function to create a join table for a many-to-many relationship.
 
-    __tablename__ = 'image'
+    Parameters
+    ----------
+    join_table : str
+        Name of the new table to be created.
+    model_1 : str
+        First model in the relationship.
+    model_2 : str
+        Second model in the relationship.
+    column_1 : str, optional
+        Name of the join table column corresponding to `model_1`. If `None`,
+        then {`table1`[:-1]_id} will be used (e.g., `user_id` for `users`).
+    column_2 : str, optional
+        Name of the join table column corresponding to `model_2`. If `None`,
+        then {`table2`[:-1]_id} will be used (e.g., `user_id` for `users`).
+    fk_1 : str, optional
+        Name of the column from `model_1` that the foreign key should refer to.
+    fk_2 : str, optional
+        Name of the column from `model_2` that the foreign key should refer to.
+    base : sqlalchemy.ext.declarative.api.DeclarativeMeta
+        SQLAlchemy model base to subclass.
 
-    created_at = sa.Column(sa.DateTime(), nullable=True, default=func.now())
-    path = sa.Column(sa.Text, unique=True)
-    filtercode = sa.Column(sa.CHAR(2))
-    qid = sa.Column(sa.Integer)
-    field = sa.Column(sa.Integer)
-    ccdid = sa.Column(sa.Integer)
-    obsjd = sa.Column(psql.DOUBLE_PRECISION)
-    good = sa.Column(sa.Boolean)
-    hasvariance = sa.Column(sa.Boolean)
+    Returns
+    -------
+    sqlalchemy.ext.declarative.api.DeclarativeMeta
+        SQLAlchemy association model class
+    """
+    table_1 = model_1.__tablename__
+    table_2 = model_2.__tablename__
+    if column_1 is None:
+        column_1 = f'{table_1[:-1]}_id'
+    if column_2 is None:
+        column_2 = f'{table_2[:-1]}_id'
+
+    model_attrs = {
+        '__tablename__': join_table,
+        'id': None,
+        column_1: sa.Column(column_1, sa.ForeignKey(f'{table_1}.{fk_1}',
+                                                    ondelete='CASCADE'),
+                            primary_key=True),
+        column_2: sa.Column(column_2, sa.ForeignKey(f'{table_2}.{fk_2}',
+                                                    ondelete='CASCADE'),
+                            primary_key=True),
+    }
+
+    model_attrs.update({
+        model_1.__name__.lower(): relationship(model_1, cascade='all',
+                                               foreign_keys=[
+                                                   model_attrs[column_1]
+                                               ]),
+        model_2.__name__.lower(): relationship(model_2, cascade='all',
+                                               foreign_keys=[
+                                                   model_attrs[column_2]
+                                               ])
+    })
+    model = type(model_1.__name__ + model_2.__name__, (base,), model_attrs)
+
+    return model
+
+
+class SpatiallyIndexed(object):
+    """A mixin indicating to the database that an object has sky coordinates.
+    Classes that mix this class get a q3c spatial index on ra and dec.
+
+    Columns:
+        ra: the icrs right ascension of the object in degrees
+        dec: the icrs declination of the object in degrees
+
+    Indexes:
+        q3c index on ra, dec
+
+    Properties: skycoord: astropy.coordinates.SkyCoord representation of the
+    object's coordinate
+    """
+
+    # database-mapped
     ra = sa.Column(psql.DOUBLE_PRECISION)
     dec = sa.Column(psql.DOUBLE_PRECISION)
-    infobits = sa.Column(sa.Integer)
+
+    @property
+    def skycoord(self):
+        return SkyCoord(self.ra, self.dec, unit='deg')
+
+    @declared_attr
+    def __table_args__(cls):
+        tn = cls.__tablename__
+        return sa.Index(f'{tn}_q3c_ang2ipix_idx', sa.func.q3c_ang2ipix(
+            cls.ra, cls.dec)),
+
+
+class UnmappedFileError(FileNotFoundError):
+    """Error raised when a user attempts to call a method of a `File` that
+    requires the file to be mapped to a file on disk, but the file is not
+    mapped. """
+    pass
+
+
+class File(object):
+    """A python object mappable to a file on spinning disk, with metadata
+    mappable to rows in a database.`File`s should be thought of as python
+    objects that live in memory that can represent the data and metadata of
+    files on disk. If mapped to database records, they can serve as an
+    intermediary between database records and files that live on disk.
+
+    `File`s can read and write data and metadata to and from disk and to and
+    from the database. However, there are some general rules about this that
+    should be heeded to ensure good performance.
+
+    In general, files that live on disk and are represented by `File`s
+    contain data that users and subclasses may want to use. It is imperative
+    that file metadata, and only file metadata, should be mapped to the
+    database by instances of File. Data larger than a few kb from disk-mapped
+    files should never be stored in the database. Instead it should reside on
+    disk. Putting the file data directly into the database would slow it down
+    and make queries take too long.
+
+    Files represented by this class can reside on spinning disk only. This
+    class does not make any attempt to represent files that reside on tape.
+
+    The user is responsible for manually associating `File`s  with files on
+    disk. This frees `File`s  from being tied to specific blocks of disk on
+    specific machines.  The class makes no attempt to enforce that the user
+    maps python objects tied to particular database records to the "right"
+    files on disk. This is the user's responsibility!
+
+    `property`s of Files should be assumed to represent what is in memory
+    only, not necessarily what is on disk. Disk-memory synchronization is up
+    to the user and can be achived using the save() function.
+    """
+
+    basename = sa.Column(sa.Text, unique=True, index=True)
+    __diskmapped_cached_properties__ = ['_path']
+
+    @property
+    def local_path(self):
+        try:
+            return self._path
+        except AttributeError:
+            errormsg = f'File "{self.basename}" is not mapped to the local ' \
+                       f'file system. ' \
+                       f'Identify the file corresponding to this object on ' \
+                       f'the local file system, ' \
+                       f'then call the `map_to_local_file` to identify the ' \
+                       f'path. '
+            raise UnmappedFileError(errormsg)
+
+    @property
+    def ismapped(self):
+        return hasattr(self, '_path')
+
+    def map_to_local_file(self, path):
+        self._path = str(Path(path).absolute())
+
+    def unmap(self):
+        if not self.ismapped:
+            raise UnmappedFileError(f"Cannot unmap file '{self.basename}', "
+                                    f"file is not mapped")
+        for attr in self.__diskmapped_cached_properties__:
+            if hasattr(self, attr):
+                delattr(self, attr)
+
+    def save(self):
+        """Update the data and metadata of a mapped file on disk to reflect
+        their values in this object."""
+        raise NotImplemented
+
+    def load(self):
+        """Load the data and metadata of a mapped file on disk into memory
+        and set the values of database mapped columns, which can later be
+        flushed into the DB."""
+        raise NotImplemented
+
+
+class ZTFFileCopy(models.Base):
+    """Record of a *permanent* (i.e., will not be deleted or modified,
+    or will only be touched extremely rarely and by someone who can do it in
+    concert with the database).
+
+    A Copy is diferent from a File in that a copy cannot be mapped to a file
+    on local disk, whereas a File is mappable. A copy is just a record of a
+    file that lives in a permanent place somewhere."""
+
+    __tablename__ = 'ztffilecopies'
+
+    __mapper_args__ = {
+        'polymorphic_on': 'type',
+        'polymorphic_identity': 'copy'
+    }
+
+    type = sa.Column(sa.Text)
+    product_id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                                     ondelete='CASCADE'),
+                           index=True)
+    product = relationship('ZTFFile', back_populates='copies',
+                           cascade='all')
+
+    def get(self):
+        """Pull the Copy to local disk and return the corresponding
+        Product (File subclass) that the Copy is mapped to."""
+        raise NotImplemented
+
+
+class HTTPArchiveCopy(ZTFFileCopy):
+    """Record of a copy of a ZTFFile that lives on the ZUDS disk
+    archive at NERSC (on project) and is accessible via HTTP."""
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'http'
+    }
+
+    __tablename__ = 'httparchivecopies'
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffilecopies.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    url = sa.Column(sa.Text, index=True, unique=True)
+    archive_path = sa.Column(sa.Text)
+
+    def get(self):
+        product = self.product
+        with open(product.basename, 'wb') as f:
+            r = requests.get(self.url)
+            r.raise_for_status()
+            f.write(r.content)
+            product.map_to_local_file(product.basename)
+        return product
+
+    def put(self):
+        archive.archive(self)
+
+    @classmethod
+    def from_product(cls, product):
+        if not isinstance(product, ZTFFile):
+            raise ValueError(
+                f'Cannot archive object "{product}", must be an instance of'
+                f'PipelineFITSProduct.')
+
+        field = product.field
+        qid = product.qid
+        ccdid = product.ccdid
+        fid = product.fid
+        band = fid_map[fid]
+
+        path = Path(NERSC_PREFIX) / f'{field:06d}/' \
+                                    f'c{ccdid:02d}/' \
+                                    f'q{qid}/' \
+                                    f'{band}/' \
+                                    f'{product.basename}'
+
+        archive_path = f'{path.absolute()}'
+        url = f'{path.absolute()}'.replace(NERSC_PREFIX, URL_PREFIX)
+
+        # check to see if a copy with this URL already exists.
+        # if so return it
+
+        old = DBSession().query(cls).filter(
+            cls.url == url
+        ).first()
+
+        if old is None:
+            copy = cls()
+            copy.archive_path = archive_path
+            copy.url = url
+            copy.product = product
+            return copy
+
+        else:
+            return old
+
+
+class TapeCopy(ZTFFileCopy):
+    """Record of a copy of a ZTFFile that lives inside a
+    tape archive on HPSS."""
+
+    __tablename__ = 'tapecopies'
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'tape'
+    }
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffilecopies.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    archive_id = sa.Column(sa.Text, sa.ForeignKey('tapearchives.id',
+                                                  ondelete='CASCADE'),
+                           index=True)
+    archive = relationship('TapeArchive', back_populates='contents')
+
+    # The exact name of the TAR archive member
+    member_name = sa.Column(sa.Text)
+
+
+class TapeArchive(models.Base):
+    """Record of a tape archive that contains copies of ZTFFiles."""
+    id = sa.Column(sa.Text, primary_key=True)
+    contents = relationship('TapeCopy', cascade='all')
+    size = sa.Column(psql.BIGINT)  # size of the archive in bytes
+
+    @classmethod
+    def from_directories(cls, path):
+        raise NotImplemented
+
+    def get(self, extract=False, extract_kws=None):
+        # use retrieve.retrieve for now
+        raise NotImplemented
+
+
+class FITSFile(File):
+    """A python object that maps a fits file. Instances of classes mixed with
+    FITSFile that implement `Base` map to database rows that store fits file
+    metadata.
+
+    Assumes the fits file has only one extension. TODO: add support for
+    multi-extension fits files.
+
+    Provides methods for loading fits file data from disk to memory,
+    and writing it to disk from memory.
+
+    Methods for loading fits file metadata from the database and back are
+    handled by sqlalchemy.
+    """
+
+    header = sa.Column(psql.JSONB)
+    header_comments = sa.Column(psql.JSONB)
+    __diskmapped_cached_properties__ = ['_path', '_data']
+    _DATA_HDU = 0
+    _HEADER_HDU = 0
+
+    @classmethod
+    def from_file(cls, f, use_existing_record=True):
+        """Read a file into memory from disk, and set the values of
+        database-backed variables that store metadata (e.g., header). These
+        can later be flushed to the database using SQLalchemy.
+
+        This is a 'get_or_create' method."""
+        f = Path(f)
+
+        load_from_db = issubclass(cls, models.Base) and \
+                       issubclass(cls, FITSFile) and \
+                       use_existing_record
+
+        if load_from_db:
+            obj = cls.get_by_basename(f.name)
+        else:
+            obj = None
+        if obj is None:
+            obj = cls()
+            obj.basename = f.name
+        obj.map_to_local_file(str(f.absolute()))
+        obj.load_header()
+
+        return obj
+
+    def load_header(self):
+        """Load a header from disk into memory. Sets the values of
+        database-backed variables that store metadata. These can later be
+        flushed to the database using SQLalchemy."""
+        with fits.open(self.local_path) as hdul:
+            hd = dict(hdul[self._HEADER_HDU].header)
+            hdc = {card.keyword: card.comment
+                   for card in hdul[self._HEADER_HDU].header.cards}
+        hd2 = hd.copy()
+        for k in hd:
+            if not isinstance(hd[k], (int, str, bool, float)):
+                del hd2[k]
+                del hdc[k]
+        self.header = hd2
+        self.header_comments = hdc
+
+    def load_data(self):
+        """Load data from disk into memory"""
+        with fits.open(self.local_path, memmap=False) as hdul:  # throws
+            # UnmappedFileError
+            data = hdul[self._DATA_HDU].data
+        if data.dtype.name == 'uint8':
+            data = data.astype(bool)
+        self._data = data
+
+    def unload_data(self):
+        try:
+            del self._data
+        except AttributeError:
+            raise RuntimeError(f'Object "<{self.__class__.__name__} at '
+                               f'{hex(id(self))}>" has no data loaded. '
+                               f'Load some data with .load_data() and '
+                               f'try again.')
+
+    @property
+    def data(self):
+        """Data are read directly from a mapped file on disk, and cached in
+        memory to avoid unnecessary IO.
+
+        This property can be modified, but in order to save the resulting
+        changes to disk the save() method must be called.
+        """
+        try:
+            return self._data
+        except AttributeError:
+            # load the data into memory
+            self.load_data()
+        return self._data
+
+    @data.setter
+    def data(self, d):
+        """Update the data member of this object in memory only. To flush
+        this to disk you must call `save`."""
+        self._data = d
+
+    @property
+    def astropy_header(self):
+        """astropy.io.fits.Header representation of the database-mapped
+        metadata columns header and header_comments. This attribute may not
+        reflect the current header on disk"""
+        if self.header is None or self.header_comments is None:
+            # haven't seen the file on disk yet
+            raise AttributeError(f'This image does not have a header '
+                                 f'or headercomments record yet. Please map '
+                                 f'this object to the corresponding '
+                                 f'ScienceImage file on disk, load the header '
+                                 f'with .load_header(), and retry.')
+        else:
+            header = fits.Header()
+            header.update(self.header)
+            for key in self.header_comments:
+                header.comments[key] = self.header_comments[key]
+            return header
+
+    def save(self):
+        try:
+            f = self.local_path
+        except UnmappedFileError:
+            f = self.basename
+            self.map_to_local_file(f)
+        dname = self.data.dtype.name
+        if dname == 'bool':
+            data = self.data.astype('uint8')
+        else:
+            data = self.data
+
+        nhdu = max(self._DATA_HDU, self._HEADER_HDU) + 1
+
+
+        if isinstance(self, FITSImage):
+            if nhdu == 1:
+                fits.writeto(f, data, self.astropy_header, overwrite=True)
+            else:
+                hdul = []
+                for i in range(nhdu):
+                    if i == 0:
+                        hdu = fits.PrimaryHDU()
+                    else:
+                        hdu = fits.ImageHDU()
+                    hdul.append(hdu)
+                hdul = fits.HDUList(hdul)
+                hdul[self._HEADER_HDU].header = self.astropy_header
+                hdul[self._DATA_HDU].data = data
+
+                hdul.writeto(f, overwrite=True)
+        else:  # it's a catalog
+            with fitsio.FITS(f, 'rw', clobber=True) as out:
+                for i in range(nhdu):
+                    data = None
+                    header = None
+                    if i == self._DATA_HDU:
+                        data = self.data
+                    if i == self._HEADER_HDU:
+                        header = []
+                        for key in self.header:
+                            card = {
+                                'name': key,
+                                'value': self.header[key],
+                                'comment': self.header_comments[key]
+                            }
+                            header.append(card)
+                    out.write(data, header=header)
+
+
+        self.unload_data()
+
+    def load(self):
+        self.load_header()
+        self.load_data()
+
+
+class HasPoly(object):
+    """Mixin indicating that an object represents an entity with four corners
+    on the celestial sphere, connected by great circles.
+
+    The four corners, ra{1..4}, dec{1..4} are database-backed metadata,
+    and are thus queryable.
+
+    Provides a hybrid property `poly` (in-memory and in-db), which can be
+    used to query against the polygon in the database or to access the
+    polygon in memory.
+    """
+
+    ra1 = sa.Column(psql.DOUBLE_PRECISION)
+    dec1 = sa.Column(psql.DOUBLE_PRECISION)
+    ra2 = sa.Column(psql.DOUBLE_PRECISION)
+    dec2 = sa.Column(psql.DOUBLE_PRECISION)
+    ra3 = sa.Column(psql.DOUBLE_PRECISION)
+    dec3 = sa.Column(psql.DOUBLE_PRECISION)
+    ra4 = sa.Column(psql.DOUBLE_PRECISION)
+    dec4 = sa.Column(psql.DOUBLE_PRECISION)
+
+    @hybrid_property
+    def poly(self):
+        return array((self.ra1, self.dec1, self.ra2, self.dec2,
+                      self.ra3, self.dec3, self.ra4, self.dec4))
+
+
+def needs_update(obj, key, value):
+    # determine if an angle has changed enough in an object to warrant being
+    # updated
+
+    if not hasattr(obj, key):
+        return True
+    else:
+        curval = getattr(obj, key)
+        try:
+            return not np.isclose(curval, value)
+        except TypeError:
+            # Duck typing - if np.isclose fails then curval is not a number
+            # but instead is probably an sqlalchemy Column, thus needs an update
+            return True
+
+
+class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
+    """Mixin indicating that an object represents a fits file with a WCS
+    solution."""
+
+    @property
+    def wcs(self):
+        """Astropy representation of the fits file's WCS solution.
+        Lives in memory only."""
+        return WCS(self.astropy_header)
+
+    @classmethod
+    def from_file(cls, fname, use_existing_record=True):
+        """Read a fits file into memory from disk, and set the values of
+        database-backed variables that store metadata (e.g., header). These
+        can later be flushed to the database using SQLalchemy. """
+        self = super(HasWCS, cls).from_file(
+            fname, use_existing_record=use_existing_record,
+        )
+        corners = self.wcs.calc_footprint()
+        for i, values in enumerate(corners):
+            keys = [f'ra{i+1}', f'dec{i+1}']
+            for key, value in zip(keys, values):
+                if needs_update(self, key, value):
+                    setattr(self, key, value)
+
+        naxis1 = self.header['NAXIS1']
+        naxis2 = self.header['NAXIS2']
+        ra, dec = self.wcs.all_pix2world(
+            [[naxis1 / 2, naxis2 / 2]], 1
+        )[0]
+
+        for key, value in zip(['ra', 'dec'], [ra, dec]):
+            if needs_update(self, key, value):
+                setattr(self, key, value)
+
+        return self
+
+    @property
+    def sources_contained(self):
+        """Query the database and return all `Sources` contained by the
+        polygon of this object"""
+        return DBSession().query(models.Source) \
+            .filter(func.q3c_poly_query(models.Source.ra,
+                                        models.Source.dec,
+                                        self.poly))
+
+    @property
+    def pixel_scale(self):
+        """The pixel scales of the detector in the X and Y image dimensions. """
+        units = self.wcs.world_axis_units
+        u1 = getattr(u, units[0])
+        u2 = getattr(u, units[1])
+        scales = proj_plane_pixel_scales(self.wcs)
+        ps1 = (scales[0] * u1).to('arcsec').value
+        ps2 = (scales[1] * u2).to('arcsec').value
+        return np.asarray([ps1, ps2]) * u.arcsec
+
+    def aligned_to(self, other, persist_aligned=False, tmpdir='/tmp',
+                   nthreads=1):
+        """Return a version of this object that is pixel-by-pixel aligned to
+        the WCS solution of another image with a WCS solution."""
+
+        if not isinstance(other, HasWCS):
+            raise ValueError(f'WCS Alignment target must be an instance of '
+                             f'HasWCS (got "{other.__class__}").')
+
+        new = run_align(self, other,
+                        tmpdir=tmpdir,
+                        nthreads=nthreads,
+                        persist_aligned=persist_aligned)
+
+        if hasattr(self, 'mask_image'):
+            newmask = run_align(self.mask_image, other,
+                                tmpdir=tmpdir,
+                                nthreads=nthreads,
+                                persist_aligned=persist_aligned)
+            new.mask_image = newmask
+
+        return new
+
+
+class FITSImage(HasWCS):
+    """A `FITSFile` with a data member representing an image. Same as
+    FITSFile, but provides the method show() to render the image in
+    matplotlib. Also defines some properties that help to optimally render
+    the image (cmap, cmap_limits)"""
+
+    def show(self, axis=None, align_to=None):
+        if axis is None:
+            fig, axis = plt.subplots()
+
+        if align_to is not None:
+            image = self.aligned_to(align_to)
+        else:
+            image = self
+
+        vmin, vmax = image.cmap_limits()
+
+        axis.imshow(image.data,
+                    vmin=vmin,
+                    vmax=vmax,
+                    norm=image.cmap_norm(),
+                    cmap=image.cmap(),
+                    interpolation='none')
+
+    @property
+    def datatype(self):
+        dtype = self.data.dtype.name
+        if 'float' in dtype:
+            return 'float'
+        else:
+            return 'int'
+
+    def cmap_limits(self):
+        if self.datatype == 'float':
+            interval = ZScaleInterval()
+            return interval.get_limits(self.data)
+        else:  # integer
+            return (None, None)
+
+    def cmap(self):
+        if self.datatype == 'float':
+            return 'gray'
+        else:
+            ncolors = len(np.unique(self.data))
+            return discrete_cmap(ncolors)
+
+    def cmap_norm(self):
+        if self.datatype == 'float':
+            return None
+        else:
+            boundaries = np.unique(self.data)
+            ncolors = len(boundaries)
+            return colors.BoundaryNorm(boundaries, ncolors)
+
+
+class ZTFFile(models.Base, File):
+    """A database-mapped, disk-mappable memory-representation of a file that
+    is associated with a ZTF sky partition. This class is abstract and not
+    designed to be instantiated, but it is also not a mixin. Think of it as a
+    base class for the polymorphic hierarchy of products in SQLalchemy.
+
+    To create an disk-mappable representation of a fits file that stores data in
+    memory and is not mapped to rows in the database, instantiate FITSFile
+    directly.
+    """
+
+    # this is the discriminator that is used to keep track of different types
+    #  of fits files produced by the pipeline for the rest of the hierarchy
+    type = sa.Column(sa.Text)
+
+    # all pipeline fits products must implement these four key pieces of
+    # metadata. These are all assumed to be not None in valid instances of
+    # ZTFFile.
+
+    field = sa.Column(sa.Integer)
+    qid = sa.Column(sa.Integer)
     fid = sa.Column(sa.Integer)
-    rcid = sa.Column(sa.Integer)
+    ccdid = sa.Column(sa.Integer)
+
+    copies = relationship('ZTFFileCopy', cascade='all')
+
+    # An index on the four indentifying
+    idx = sa.Index('fitsproduct_field_ccdid_qid_fid', field, ccdid, qid, fid)
+
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_identity': 'fitsproduct'
+
+    }
+
+    def find_in_dir(self, directory):
+        target = os.path.join(directory, self.basename)
+        if os.path.exists(target):
+            self.map_to_local_file(target)
+        else:
+            raise FileNotFoundError(
+                f'Cannot map "{self.basename}" to "{target}", '
+                f'file does not exist.'
+            )
+
+    def find_in_dir_of(self, ztffile):
+        dirname = os.path.dirname(ztffile.local_path)
+        self.find_in_dir(dirname)
+
+    @classmethod
+    def get_by_basename(cls, basename):
+        return DBSession().query(cls).filter(cls.basename == basename).first()
+
+
+class PipelineRegionFile(ZTFFile):
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    __mapper_args__ = {
+        'polymorphic_identity': 'regionfile',
+        'inherit_condition': id == ZTFFile.id
+    }
+
+    catalog_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'pipelinefitscatalogs.id', ondelete='CASCADE'
+    ), index=True)
+    catalog = relationship('PipelineFITSCatalog', cascade='all',
+                           foreign_keys=[catalog_id],
+                           back_populates='regionfile')
+
+    @classmethod
+    def from_catalog(cls, catalog):
+        basename = catalog.basename.replace('.cat', '.reg')
+        reg = cls.get_by_basename(basename)
+        if reg is None:
+            reg = cls()
+            reg.basename = basename
+
+        catdir = os.path.dirname(catalog.local_path)
+        reg.map_to_local_file(os.path.join(catdir, reg.basename))
+
+        reg.field = catalog.field
+        reg.ccdid = catalog.ccdid
+        reg.qid = catalog.qid
+        reg.fid = catalog.fid
+
+        filtered = 'GOODCUT' in catalog.data.dtype.names
+
+        reg.catalog = catalog
+        with open(reg.local_path, 'w') as f:
+            f.write('global color=green dashlist=8 3 width=1 font="helvetica '
+                    '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
+                    'delete=1 include=1 source=1\n')
+            f.write('icrs\n')
+            rad = 13 * catalog.image.pixel_scale.to(
+                'arcsec'
+            ).value.mean() * 0.00027777
+            for row in catalog.data:
+                if not filtered:
+                    color = 'blue'
+                else:
+                    color = 'green' if row['GOODCUT'] else 'red'
+
+                f.write(f'circle({row["X_WORLD"]},'
+                        f'{row["Y_WORLD"]},{rad}) # width=2 '
+                        f'color={color}\n')
+
+        return reg
+
+
+class Stamp(models.Base):
+
+    # this can be filled optionally. if the jpeg is not written to data then
+    # use .copies to get the public url of the HTTP servable JPG
+
+
+    public_url = sa.Column(sa.String(), nullable=True, index=False,
+                           unique=False)
+
+    image_id = sa.Column(
+        sa.Integer,
+        sa.ForeignKey(
+            'calibratableimages.id',
+            ondelete='CASCADE'
+        ),
+        index=True
+    )
+    image = relationship('CalibratableImage',
+                         cascade='all',
+                         back_populates='stamps',
+                         foreign_keys=[image_id])
+
+    source_id = sa.Column(
+        sa.Text,
+        sa.ForeignKey(
+            'sources.id',
+            ondelete='CASCADE'
+        ),
+        index=True,
+    )
+    source = relationship(
+        'Source',
+        cascade='all',
+        back_populates='stamps',
+        foreign_keys=[source_id]
+    )
+
+    @classmethod
+    def from_detection(cls, detection, image):
+        source = detection.source
+
+        if os.getenv('NERSC_HOST') != 'cori':
+            raise ValueError('Cannot create stamp; must be on cori.')
+
+        if isinstance(image, models.Base):
+            linkimage = image
+        else:
+            linkimage = image.parent_image
+
+        stamp = DBSession().query(cls).filter(
+            cls.image_id == linkimage.id,
+            cls.source_id == source.id
+        ).first()
+        if stamp is None:
+            stamp = cls(source=source, image=linkimage)
+
+        outname = Path(NERSC_PREFIX) / f'{linkimage.field:06d}/' \
+                                       f'c{linkimage.ccdid:02d}/' \
+                                       f'q{linkimage.qid}/' \
+                                       f'{fid_map[linkimage.fid]}/' \
+                                       f'stamps'
+        outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
+        vmin, vmax = linkimage.cmap_limits()
+        stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
+
+        archive._mkdir_recursive(outname.parent)
+        publish.make_stamp(
+            outname, detection.ra, detection.dec, vmin,
+            vmax, image.data, image.wcs, save=True,
+            size=publish.CUTOUT_SIZE
+        )
+
+        return stamp
+
+
+class PipelineFITSCatalog(ZTFFile, FITSFile):
+    """Python object that maps a catalog stored on a fits file on disk."""
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {
+        'polymorphic_identity': 'catalog',
+        'inherit_condition': id == ZTFFile.id
+    }
+
+    image_id = sa.Column(sa.Integer,
+                         sa.ForeignKey('calibratableimages.id',
+                                       ondelete='CASCADE'),
+                         index=True)
+    image = relationship('CalibratableImage', cascade='all',
+                         foreign_keys=[image_id])
+
+    regionfile = relationship('PipelineRegionFile', cascade='all',
+                              uselist=False,
+                              primaryjoin=PipelineRegionFile.catalog_id == id)
+
+    # since this object maps a fits binary table, the data lives in the first
+    #  extension, not in the primary hdu
+    _DATA_HDU = 2
+    _HEADER_HDU = 2
+
+    @classmethod
+    def from_image(cls, image, tmpdir='/tmp'):
+        if not isinstance(image, CalibratableImage):
+            raise ValueError('Image is not an instance of '
+                             'CalibratableImage.')
+
+        image._call_source_extractor(tmpdir=tmpdir)
+        cat = image.catalog
+
+        for prop in GROUP_PROPERTIES:
+            setattr(cat, prop, getattr(image, prop))
+
+        df = pd.DataFrame(cat.data)
+        rec = df.to_records(index=False)
+        cat.data = rec
+        cat.basename = image.basename.replace('.fits', '.cat')
+        cat.image_id = image.id
+        cat.image = image
+        image.catalog = cat
+
+        return cat
+
+
+class MaskImage(ZTFFile, FITSImage):
+    __diskmapped_cached_properties__ = FITSImage.__diskmapped_cached_properties__ + [
+        '_boolean']
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {
+        'polymorphic_identity': 'mask',
+        'inherit_condition': id == ZTFFile.id
+    }
+
+    def refresh_bit_mask_entries_in_header(self):
+        """Update the database record and the disk record with a constant
+        bitmap information stored in in memory. """
+        self.header.update(MASK_BITS)
+        self.header_comments.update(MASK_COMMENTS)
+        self.save()
+
+    def update_from_weight_map(self, weight_image):
+        """Update what's in memory based on what's on disk (produced by
+        SWarp)."""
+        mskarr = self.data
+        ftsarr = weight_image.data
+        mskarr[ftsarr == 0] += 2 ** 16
+        self.data = mskarr
+        self.refresh_bit_mask_entries_in_header()
+
+    @classmethod
+    def from_file(cls, f, use_existing_record=True):
+        return super().from_file(
+            f, use_existing_record=use_existing_record,
+        )
+
+    @property
+    def boolean(self):
+        """A boolean array that is True when a masked pixel is 'bad', i.e.,
+        not usable for science, and False when a pixel is not masked."""
+        try:
+            return self._boolean
+        except AttributeError:
+
+            # From ZSDS document:
+
+            # For example, to find all science - image pixels which are
+            # uncontaminated, but which may contain clean extracted - source
+            # signal(bits 1 or 11), one would “logically AND” the
+            # corresponding mask - image with the template value 6141 (= 2^0
+            # + 2^2 +2^3 + 2^4 + 2^5 + 2^6 + 2^7 + 2^8 + 2^9 + 2^10 + 21^2)
+            # #and retain pixels where this operation yields zero. To then
+            # find which of these pixels contain source signal, one would
+            # “AND” the resulting image with 2050 (= 21 + 211) and retain
+            # pixels where this operation is non-zero.
+
+            # DG: also have to add 2^16 (my custom bit) and 2^17 (hotpants
+            # masked, another of my custom bits)
+            # So 6141 -> 71677 --> 202749
+
+            maskpix = (self.data & 202749) > 0
+            _boolean = FITSImage()
+            _boolean.data = maskpix
+            _boolean.header = self.header
+            _boolean.header_comments = self.header_comments
+            _boolean.basename = self.basename.replace('.fits', '.bpm.fits')
+            self._boolean = _boolean
+        return self._boolean
+
+    parent_image_id = sa.Column(sa.Integer,
+                                sa.ForeignKey('calibratableimages.id',
+                                              ondelete='CASCADE'))
+    parent_image = relationship('CalibratableImage', cascade='all',
+                                back_populates='mask_image',
+                                foreign_keys=[parent_image_id])
+
+    idx = Index('maskimages_parent_image_id_idx', parent_image_id)
+
+
+class CalibratableImage(FITSImage, ZTFFile):
+    __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
+                                        '_bkgimg', '_filter_kernel', '_rmsimg',
+                                        '_threshimg', '_segmimg',
+                                        '_sourcelist', '_bkgsubimg']
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
+                       'inherit_condition': id == ZTFFile.id}
+
+    detections = relationship('Detection', cascade='all')
+    objects = relationship('ObjectWithFlux', cascade='all')
+
+    mask_image = relationship('MaskImage',
+                              uselist=False,
+                              primaryjoin=MaskImage.parent_image_id == id)
+
+    catalog = relationship('PipelineFITSCatalog', uselist=False,
+                           primaryjoin=PipelineFITSCatalog.image_id == id)
+
+    stamps = relationship('Stamp',
+                          primaryjoin=Stamp.image_id == id)
+
+    def cmap_limits(self):
+        interval = ZScaleInterval()
+        return interval.get_limits(self.data[~self.mask_image.boolean.data])
+
+    def _call_source_extractor(self, checkimage_type=None, tmpdir='/tmp'):
+
+        rs = sextractor.run_sextractor
+        success = False
+        for _ in range(3):
+            try:
+                results = rs(
+                    self, checkimage_type=checkimage_type, tmpdir=tmpdir
+                )
+            except subprocess.CalledProcessError as e:
+                print(f'Caught CalledProcessError {e}, retrying... {_+1} / 3')
+                continue
+            else:
+                success = True
+                break
+
+        if not success:
+            raise ValueError(f'Unable to run SExtractor on {self}...')
+
+        for result in results:
+            if result.basename.endswith('.cat'):
+                self.catalog = result
+            elif result.basename.endswith('.rms.fits'):
+                self._rmsimg = result
+            elif result.basename.endswith('.bkg.fits'):
+                self._bkgimg = result
+            elif result.basename.endswith('.bkgsub.fits'):
+                self._bkgsubimg = result
+            elif result.basename.endswith('.segm.fits'):
+                self._segmimg = result
+
+    @property
+    def weight_image(self):
+        """Image representing the inverse variance map of this calibratable
+        image."""
+
+        try:
+            return self._weightimg
+        except AttributeError:
+            # need to calculate the weight map.
+
+            ind = self.mask_image.boolean.data
+            wgt = np.empty_like(ind, dtype='<f4')
+            wgt[~ind] = 1 / self.rms_image.data[~ind] ** 2
+            wgt[ind] = 0.
+
+            try:
+                saturval = self.header['SATURATE']
+            except KeyError:
+                pass
+            else:
+                saturind = self.data >= 0.9 * saturval
+                wgt[saturind] = 0.
+
+            self._weightimg = FITSImage()
+            self._weightimg.basename = self.basename.replace('.fits',
+                                                             '.weight.fits')
+            self._weightimg.data = wgt
+            self._weightimg.header = self.header
+            self._weightimg.header_comments = self.header_comments
+            if self.ismapped:
+                dirname = os.path.dirname(self.local_path)
+                bn = self._weightimg.basename
+                join = os.path.join(dirname, bn)
+                self._weightimg.map_to_local_file(join)
+                self._weightimg.save()  #  to guarantee mapped file exists
+        return self._weightimg
+
+    @property
+    def rms_image(self):
+        try:
+            return self._rmsimg
+        except AttributeError:
+            self._call_source_extractor(checkimage_type=['rms'])
+        ind = self.mask_image.boolean.data
+        self._rmsimg.data[ind] = BIG_RMS
+        return self._rmsimg
+
+    @property
+    def background_image(self):
+        try:
+            return self._bkgimg
+        except AttributeError:
+            self._call_source_extractor(checkimage_type=['bkg'])
+        return self._bkgimg
+
+    @property
+    def background_subtracted_image(self):
+        try:
+            return self._bkgsubimg
+        except AttributeError:
+            self._call_source_extractor(checkimage_type=['bkgsub'])
+        return self._bkgsubimg
+
+    @property
+    def segm_image(self):
+        try:
+            return self._segmimg
+        except AttributeError:
+            # segm is set here
+            self._call_source_extractor(checkimage_type=['segm'])
+        return self._segmimg
+
+
+    @classmethod
+    def from_file(cls, fname, use_existing_record=True):
+        obj = super().from_file(
+            fname, use_existing_record=use_existing_record,
+        )
+        dir = Path(fname).parent
+
+        weightpath = dir / obj.basename.replace('.fits', '.weight.fits')
+        rmspath = dir / obj.basename.replace('.fits', '.rms.fits')
+        bkgpath = dir / obj.basename.replace('.fits', '.bkg.fits')
+        threshpath = dir / obj.basename.replace('.fits', '.thresh.fits')
+        bkgsubpath = dir / obj.basename.replace('.fits', '.bkgsub.fits')
+        segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
+
+        paths = [weightpath, rmspath, bkgpath, threshpath,
+                 bkgsubpath, segmpath]
+
+        types = ['_weightimg', '_rmsimg', '_bkgimg', '_threshimg',
+                 '_bkgsubimg', '_segmimg']
+
+        for path, t in zip(paths, types):
+            if path.exists():
+                setattr(obj, t, FITSImage.from_file(f'{path}'))
+
+        if obj.mask_image is not None:
+            mskpath = dir / obj.mask_image.basename
+            if mskpath.exists():
+                obj.mask_image = MaskImage.from_file(mskpath)
+
+        return obj
+
+
+class CalibratedImage(CalibratableImage):
+    """An image on which photometry can be performed."""
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'calibratedimage',
+                       'inherit_condition': id == CalibratableImage.id}
+
+    forced_photometry = relationship('ForcedPhotometry', cascade='all')
+
+    def force_photometry(self, sources):
+        """Force aperture photometry at the locations of `sources`.
+        Assumes that calibration has already been done.
+
+        """
+
+        # ensure sources is at least 1d
+        sources = np.atleast_1d(sources)
+
+        ra = [source.ra for source in sources]
+        dec = [source.dec for source in sources]
+
+        result = aperture_photometry(self, ra, dec, apply_calibration=True)
+
+        photometry = []
+        for row, source in zip(result, sources):
+            phot = ForcedPhotometry(flux=row['flux'],
+                                    fluxerr=row['fluxerr'],
+                                    flags=int(row['flags']),
+                                    image=self,
+                                    source=source)
+            photometry.append(phot)
+
+        return photometry
+
+    @declared_attr
+    def __table_args__(cls):
+        # override spatial index - only need it on one table (calibratable images)
+        return tuple()
+
+    @hybrid_property
+    def seeing(self):
+        """FWHM of seeing in pixels."""
+        return self.header['SEEING']
+
+    @hybrid_property
+    def magzp(self):
+        return self.header['MAGZP']
+
+    @hybrid_property
+    def apcor(self):
+        return self.header[APER_KEY]
+
+    @property
+    def mjd(self):
+        pass
+
+    def find_in_dir(self, directory):
+        super().find_in_dir(directory)
+        try:
+            self.mask_image.find_in_dir(directory)
+        except FileNotFoundError:
+            pass
+
+
+class ScienceImage(CalibratedImage):
+    """IPAC record of a science image from their pipeline. Contains some
+    metadata that IPAC makes available through its irsa metadata query
+    service.  This class is primarily intended to enable the reflection of
+    IPAC's idea of its science images and which science images exist so that
+    IPAC's world can be compared against the results of this pipeline.
+
+    This class does not map to any file on disk, in the sense that it is not
+    designed to reflect the data or metadata of any local file to memory,
+    but it can be used to download files from the IRSA archive to disk (
+    again, it does not make any attempt to represent the contents of these
+    files, or synchronize their contents on disk to their representation in
+    memory).
+
+    This class represents immutable metadata only.
+    """
+
+    # __tablename__ = 'ipacrecords'
+
+    # we dont want science image records to be deleted in a cascade.
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
+                                             ondelete='RESTRICT'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'sci',
+                       'inherit_condition': id == CalibratedImage.id}
+
+    @classmethod
+    def from_file(cls, f, use_existing_record=True):
+        obj = super().from_file(
+            f, use_existing_record=use_existing_record,
+        )
+        obj.field = obj.header['FIELDID']
+        obj.ccdid = obj.header['CCDID']
+        obj.qid = obj.header['QID']
+        obj.fid = obj.header['FILTERID']
+        return obj
+
+    filtercode = sa.Column(sa.CHAR(2))
+    obsjd = sa.Column(psql.DOUBLE_PRECISION)
+    infobits = sa.Column(sa.Integer)
     pid = sa.Column(psql.BIGINT)
     nid = sa.Column(sa.Integer)
     expid = sa.Column(sa.Integer)
@@ -93,256 +1513,593 @@ class Image(models.Base):
     cd12 = sa.Column(sa.Float)
     cd21 = sa.Column(sa.Float)
     cd22 = sa.Column(sa.Float)
-    ra1 = sa.Column(psql.DOUBLE_PRECISION)
-    dec1 = sa.Column(psql.DOUBLE_PRECISION)
-    ra2 = sa.Column(psql.DOUBLE_PRECISION)
-    dec2 = sa.Column(psql.DOUBLE_PRECISION)
-    ra3 = sa.Column(psql.DOUBLE_PRECISION)
-    dec3 = sa.Column(psql.DOUBLE_PRECISION)
-    ra4 = sa.Column(psql.DOUBLE_PRECISION)
-    dec4 = sa.Column(psql.DOUBLE_PRECISION)
-    ipac_pub_date = sa.Column(sa.DateTime)
-    ipac_gid = sa.Column(sa.Integer, sa.ForeignKey('ipacprograms.id', ondelete='RESTRICT'))
+    ipac_gid = sa.Column(sa.Integer)
     imgtypecode = sa.Column(sa.CHAR(1))
     exptime = sa.Column(sa.Float)
     filefracday = sa.Column(psql.BIGINT)
-
-    hpss_sci_path = sa.Column(sa.Text)
-    hpss_mask_path = sa.Column(sa.Text)
-    hpss_sub_path = sa.Column(sa.Text)
-    hpss_psf_path = sa.Column(sa.Text)
-
-    disk_sci_path = sa.Column(sa.Text)
-    disk_mask_path = sa.Column(sa.Text)
-    disk_sub_path = sa.Column(sa.Text)
-    disk_psf_path = sa.Column(sa.Text)
-
-    instrument_id = sa.Column(sa.Integer, sa.ForeignKey('instruments.id', ondelete='RESTRICT'), default=1)
-    instrument = relationship('Instrument')
-
-    zp = sa.Column(sa.Float, default=None, nullable=True)
-    zpsys = sa.Column(sa.Text, default='ab')
-
-    subtraction_exists = sa.Column(sa.Boolean)
-
-    q3c = Index(f'image_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
-
-    def ipac_path(self, suffix):
-        sffd = str(self.filefracday)
-        return f'https://irsa.ipac.caltech.edu/ibe/data/ztf/products/sci/{sffd[:4]}/{sffd[4:8]}/{sffd[8:]}/' \
-               f'ztf_{sffd}_{self.field:06d}_{self.filtercode}_c{self.ccdid:02d}_' \
-               f'{self.imgtypecode}_q{self.qid}_{suffix}'
-
-    def disk_path(self, suffix):
-        sffd = str(self.filefracday)
-        base = Path(os.getenv('OUTPUT_DIRECTORY')) / \
-               f'{self.field:06d}/c{self.ccdid:02d}/q{self.qid}/{self.filtercode}/' \
-               f'ztf_{sffd}_{self.field:06d}_{self.filtercode}_c{self.ccdid:02d}_' \
-               f'{self.imgtypecode}_q{self.qid}_{suffix}'
-
-        return f'{base}'
-
-    def hpss_staging_path(self, suffix):
-        sffd = str(self.filefracday)
-        base = Path(os.getenv('STAGING_DIRECTORY')) / \
-               f'{self.field:06d}/c{self.ccdid:02d}/q{self.qid}/{self.filtercode}/' \
-               f'ztf_{sffd}_{self.field:06d}_{self.filtercode}_c{self.ccdid:02d}_' \
-               f'{self.imgtypecode}_q{self.qid}_{suffix}'
-
-        return f'{base}'
-
-
-    fcqfo = Index("image_field_ccdid_qid_filtercode_obsjd_idx",  field, ccdid, qid, filtercode, obsjd)
-    hmi = Index("image_hpss_mask_path_idx", hpss_mask_path)
-    hpi = Index("image_hpss_psf_path_idx", hpss_psf_path)
-    hshmi = Index("image_hpss_sci_path_hpss_mask_path_idx" ,hpss_sci_path, hpss_mask_path)
-    hsci = Index("image_hpss_sci_path_idx" ,hpss_sci_path)
-    hsubi = Index("image_hpss_sub_path_idx", hpss_sub_path)
-    obsjdi = Index("image_obsjd_idx", obsjd)
-    pathi = Index("image_path_idx", path)
-
-    #groups = relationship('Group', back_populates='images', secondary='join(IPACProgram, ipacprogram_groups).join(groups)')
-    ipac_program = relationship('IPACProgram', back_populates='images')
-    photometry = relationship('Photometry', cascade='all')
-
-    subtraction = relationship('SingleEpochSubtraction', back_populates='image', cascade='all')
-    references = relationship('Reference', back_populates='images', cascade='all', secondary='reference_images')
-    stacks = relationship('Stack', back_populates='images', cascade='all', secondary='stack_images')
-
-    @hybrid_property
-    def poly(self):
-        return array([self.ra1, self.dec1, self.ra2, self.dec2,
-                      self.ra3, self.dec3, self.ra4, self.dec4])
 
     @hybrid_property
     def obsmjd(self):
         return self.obsjd - 2400000.5
 
+    @property
+    def mjd(self):
+        return self.obsmjd
+
     @hybrid_property
     def filter(self):
         return 'ztf' + self.filtercode[-1]
 
+    def ipac_path(self, suffix):
+        """The url of a particular file corresponding to this metadata
+        record, with suffix `suffix`, in the IPAC archive. """
+        sffd = str(self.filefracday)
+        return f'https://irsa.ipac.caltech.edu/ibe/data/ztf/' \
+               f'products/sci/{sffd[:4]}/{sffd[4:8]}/{sffd[8:]}/' \
+               f'ztf_{sffd}_{self.field:06d}_' \
+               f'{self.filtercode}_c{self.ccdid:02d}_' \
+               f'{self.imgtypecode}_q{self.qid}_{suffix}'
+
+
+# Coadds #######################################################################
+
+class Coadd(CalibratableImage):
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {
+        'polymorphic_identity': 'coadd',
+        'inherit_condition': id == CalibratableImage.id
+    }
+
+    input_images = relationship('CalibratableImage',
+                                secondary='coadd_images',
+                                cascade='all')
+
+
     @property
-    def sources(self):
-        return DBSession().query(models.Source)\
-                          .filter(func.q3c_poly_query(models.Source.ra, models.Source.dec, self.poly))\
-                          .all()
-
-    def provided_photometry(self, photometry):
-        return photometry in self.photometry
-
-    def force_photometry(self):
-
-        sources_contained = self.sources
-        sources_contained_ids = [s.id for s in sources_contained]
-        photometered_sources = list(set([phot_point.source for phot_point in self.photometry]))
-
-        # this must be list or setdiff1d will fail
-        photometered_source_ids = list(set([s.id for s in photometered_sources]))
-
-        # reject sources where photometry has already been done
-        sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
-        sources_remaining = [s for s in sources_contained if s.id in sources_remaining_ids]
-
-        # get the paths to relevant files on disk
-        psf_path = self.disk_psf_path
-        sub_path = self.disk_sub_path
-
-        if self.zp is None:
-            try:
-                with fits.open(sub_path) as hdul:
-                    header = hdul[1].header
-            except OSError:  # ipac didn't make a subtraction
-                self.disk_sub_path = None
-                self.disk_psf_path = None
-                self.subtraction_exists = False
-                DBSession().add(self)
-                DBSession().commit()
-                raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
-            except ValueError:
-                raise FileNotFoundError(f'Subtraction for "{self.path}" does not exist or is not on disk.')
-            else:
-                self.zp = header['MAGZP']
-                self.zpsys = 'ab'
-                self.subtraction_exists = True
-                DBSession().add(self)
-                DBSession().commit()
+    def mjd(self):
+        return DBSession().query(
+            sa.func.percentile_cont(
+                0.5
+            ).within_group(
+                (ScienceImage.obsjd - 2400000.5).asc()
+            )
+        ).join(
+            CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
+        ).join(
+            type(self), type(self).id == CoaddImage.coadd_id
+        ).filter(
+            type(self).id == self.id
+        ).first()[0]
 
 
-        if psf_path.endswith('sciimgdaopsfcent.fits'):
-            self.disk_psf_path = sub_path.replace('scimrefdiffimg.fits.fz', 'diffimgpsf.fits')
-            psf_path = self.disk_psf_path
-            DBSession().add(self)
-            DBSession().commit()
+    @declared_attr
+    def __table_args__(cls):
+        return tuple()
 
-        if self.instrument is None:
-            self.instrument_id = 1
-            DBSession().add(self)
-            DBSession().commit()
+    @classmethod
+    def from_images(cls, images, outfile_name, nthreads=1, data_product=False,
+                    tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
+        """Make a coadd from a bunch of input images"""
+
+        images = np.atleast_1d(images)
+        mskoutname = outfile_name.replace('.fits', '.mask.fits')
+
+        basename = os.path.basename(outfile_name)
+
+        # see if a file with this name already exists in the DB
+        cond = cls.basename == basename
+        predecessor = DBSession().query(cls).filter(cond).first()
+
+        if predecessor is not None:
+            warnings.warn(f'WARNING: A "{cls}" object with the basename '
+                          f'"{basename}" already exists. The record will be '
+                          f'updated...')
+
+        properties = GROUP_PROPERTIES
+        if issubclass(cls, StackedSubtraction):
+            properties.append('reference_image_id')
+
+        # make sure all images have the same field, filter, ccdid, qid:
+        ensure_images_have_the_same_properties(images, properties)
+
+        # is this a reference image?
+        isref = issubclass(cls, ReferenceImage)
+
+        # call swarp
+        coadd = run_coadd(cls, images, outfile_name, mskoutname,
+                          reference=isref, addbkg=True, nthreads=nthreads,
+                          tmpdir=tmpdir, copy_inputs=copy_inputs,
+                          swarp_kws=swarp_kws)
+        coaddmask = coadd.mask_image
+
+        coadd.header['FIELD'] = coadd.field = images[0].field
+        coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
+        coadd.header['QID'] = coadd.qid = images[0].qid
+        coadd.header['FID'] = coadd.fid = images[0].fid
+
+        if data_product:
+            coadd_copy = HTTPArchiveCopy.from_product(coadd)
+            coaddmask_copy = HTTPArchiveCopy.from_product(coaddmask)
+            archive.archive(coadd_copy)
+            archive.archive(coaddmask_copy)
+
+        return coadd
 
 
-        # for all the remaining sources do forced photometry
-
-        new_photometry = []
-
-        for source in sources_remaining:
-            try:
-                pobj = yao_photometry_single(sub_path, psf_path, source.ra, source.dec)
-            except IndexError:
-                continue
-            phot_point = models.Photometry(image=self, flux=float(pobj.Fpsf), fluxerr=float(pobj.eFpsf),
-                                           zp=self.zp, zpsys=self.zpsys, lim_mag=self.maglimit,
-                                           filter=self.filter, source=source, instrument=self.instrument,
-                                           ra=source.ra, dec=source.dec, mjd=self.obsmjd, provenance='ipac',
-                                           method='yao')
-            new_photometry.append(phot_point)
-
-        DBSession().add_all(new_photometry)
-        DBSession().commit()
+CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
 
 
-class HPSSJob(models.Base):
-    user = sa.Column(sa.Text)
-    status = sa.Column(sa.Boolean, default=False)
-    reason = sa.Column(sa.Text)
+
+class ReferenceImage(Coadd):
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'ref',
+                       'inherit_condition': id == Coadd.id}
 
 
-class StackDetection(models.Base):
+    version = sa.Column(sa.Text)
 
-    ra = sa.Column(psql.DOUBLE_PRECISION)
-    dec = sa.Column(psql.DOUBLE_PRECISION)
+    single_epoch_subtractions = relationship('SingleEpochSubtraction',
+                                             cascade='all')
+    multi_epoch_subtractions = relationship('MultiEpochSubtraction',
+                                            cascade='all')
 
-    subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('multiepochsubtractions.id', ondelete='CASCADE'), index=True)
-    subtraction = relationship('MultiEpochSubtraction', back_populates='detections', cascade='all')
+
+class ScienceCoadd(Coadd):
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'scicoadd',
+                       'inherit_condition': id == Coadd.id}
+    subtraction = relationship('MultiEpochSubtraction', uselist=False,
+                               cascade='all')
+
+
+    binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
+    binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
+
+    @hybrid_property
+    def winsize(self):
+        return self.binright - self.binleft
+
+
+class StackedSubtraction(Coadd):
+    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'stackedsub',
+                       'inherit_condition': id == Coadd.id}
+
+    binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
+    binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
+
+
+    input_images = relationship('SingleEpochSubtraction',
+                                secondary='stackedsubtraction_frames',
+                                cascade='all')
+
+    @property
+    def mjd(self):
+        return DBSession().query(
+            sa.func.percentile_cont(
+                0.5
+            ).within_group(
+                (ScienceImage.obsjd - 2400000.5).asc()
+            )
+        ).join(
+            SingleEpochSubtraction,
+            SingleEpochSubtraction.target_image_id == ScienceImage.id
+        ).join(
+            StackedSubtractionFrame,
+            StackedSubtractionFrame.singleepochsubtraction_id ==
+            SingleEpochSubtraction.id
+        ).join(
+            type(self),
+            type(self).id == StackedSubtractionFrame.stackedsubtraction_id
+        ).filter(
+            type(self).id == self.id
+        ).first()[0]
+
+
+    @hybrid_property
+    def winsize(self):
+        return self.binright - self.binleft
+
+
+# Subtractions ################################################################
+
+class Subtraction(HasWCS):
+
+    @declared_attr
+    def reference_image_id(self):
+        return sa.Column(sa.Integer, sa.ForeignKey('referenceimages.id',
+                                                   ondelete='CASCADE'),
+                         index=True)
+
+    @declared_attr
+    def reference_image(self):
+        return relationship('ReferenceImage', cascade='all',
+                            foreign_keys=[self.reference_image_id])
+
+    @property
+    def mjd(self):
+        return self.target_image.mjd
+
+    @classmethod
+    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
+                    copy_inputs=False, use_existing_record=True):
+
+        directory = Path(tmpdir) / uuid.uuid4().hex
+        directory.mkdir(exist_ok=True, parents=True)
+
+        outname = sub_name(sci.local_path, ref.local_path)
+        outmask = outname.replace('.fits', '.mask.fits')
+
+        # create the remapped ref, and remapped ref mask. the former will be
+        # pixel-by-pixel subtracted from the science image. both will be written
+        # to this subtraction's working directory (i.e., `directory`)
+
+        remapped_ref = ref.aligned_to(sci, tmpdir=tmpdir)
+        remapped_refmask = remapped_ref.mask_image
+
+        remapped_refname = str(directory / remapped_ref.basename)
+        remapped_refmaskname = remapped_refname.replace('.fits', '.mask.fits')
+
+        # flush to the disk
+        remapped_ref.map_to_local_file(remapped_refname)
+        remapped_refmask.map_to_local_file(remapped_refmaskname)
+        remapped_ref.save()
+        remapped_refmask.save()
+        remapped_ref.parent_image = ref
+
+        # create the mask
+        submask = MaskImage.get_by_basename(os.path.basename(outmask))
+        if submask is None:
+            submask = MaskImage()
+        submask.basename = os.path.basename(outmask)
+
+        submask.field = sci.field
+        submask.ccdid = sci.ccdid
+        submask.qid = sci.qid
+        submask.fid = sci.fid
+
+        submask.map_to_local_file(outmask)
+        badpix = remapped_refmask.data | sci.mask_image.data
+        submask.data = badpix
+        submask.header = sci.mask_image.header
+        submask.header_comments = sci.mask_image.header_comments
+        submask.save()
+
+        submask.boolean.map_to_local_file(directory / submask.boolean.basename)
+        submask.boolean.save()
+
+        command = prepare_hotpants(sci, remapped_ref, outname,
+                                   submask.boolean,
+                                   directory, copy_inputs=copy_inputs,
+                                   tmpdir=tmpdir)
+
+        subprocess.check_call(command.split())
+        sub = cls.from_file(outname, use_existing_record=use_existing_record)
+
+        # clear out any previous _data attributes that may be associated with
+        #  this database object and force future accessors to load data
+        # directly from disk
+
+        if hasattr(sub, '_data'):
+            del sub._data
+
+
+        # now modify the sub mask to include the stuff that's masked out from
+        # hotpants
+        hotbad = np.zeros_like(submask.data, dtype=int)
+        hotbad[sub.data == 1e-30] = 2**17
+
+        # flip the bits
+        submask.data |= hotbad
+        submask.header['BIT17'] = 17
+        submask.header_comments['BIT17'] = 'MASKED BY HOTPANTS (1e-30) / DG'
+        submask.save()
+
+        sub.header['FIELD'] = sub.field = sci.field
+        sub.header['CCDID'] = sub.ccdid = sci.ccdid
+        sub.header['QID'] = sub.qid = sci.qid
+        sub.header['FID'] = sub.fid = sci.fid
+
+        sub.mask_image = submask
+        sub.reference_image = ref
+        sub.target_image = sci
+
+        sub.header['SEEING'] = sci.header['SEEING']
+        sub.header_comments['SEEING'] = sci.header_comments['SEEING']
+
+
+        if isinstance(sub, CalibratedImage):
+            sub.header['MAGZP'] = sci.header['MAGZP']
+            sub.header[APER_KEY] = sci.header[APER_KEY]
+            sub.header_comments['MAGZP'] = sci.header_comments['MAGZP']
+            sub.header_comments[APER_KEY] = sci.header_comments[APER_KEY]
+        sub.save()
+
+        if data_product:
+            archive.archive(sub)
+            archive.archive(sub.mask_image)
+
+        # clean up
+        if f'{directory}' in sub.mask_image.boolean.local_path:
+            del sub.mask_image._boolean
+
+        if f'{directory}' in sci.background_subtracted_image.local_path:
+            del sci._bkgsubimg
+
+        shutil.rmtree(directory)
+
+        return sub
+
+
+class SingleEpochSubtraction(Subtraction, CalibratedImage):
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'sesub',
+                       'inherit_condition': id == CalibratedImage.id}
+
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('scienceimages.id',
+                                                          ondelete='CASCADE'),
+                                index=True)
+    target_image = relationship('ScienceImage', cascade='all',
+                                foreign_keys=[target_image_id])
+
+
+class MultiEpochSubtraction(Subtraction, CalibratableImage):
+    id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {'polymorphic_identity': 'mesub',
+                       'inherit_condition': id == CalibratableImage.id}
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id',
+                                                          ondelete='CASCADE'),
+                                index=True)
+    target_image = relationship('ScienceCoadd', cascade='all',
+                                foreign_keys=[target_image_id])
+
+    @declared_attr
+    def __table_args__(cls):
+        return tuple()
+
+StackedSubtractionFrame = join_model('stackedsubtraction_frames',
+                                     StackedSubtraction, SingleEpochSubtraction)
+
+
+# Detections & Photometry #####################################################
+
+class ObjectWithFlux(models.Base):
+    type = sa.Column(sa.Text)
+
+    __tablename__ = 'objectswithflux'
+    __mapper_args__ = {
+        'polymorphic_on': type,
+        'polymorphic_identity': 'base'
+    }
+
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
+                                                   ondelete='CASCADE'),
+                         index=True)
+    image = relationship('CalibratableImage', back_populates='objects',
+                         cascade='all')
+
+    # thumbnails = relationship('Thumbnail', cascade='all')
+
+    source_id = sa.Column(sa.Text,
+                          sa.ForeignKey('sources.id', ondelete='CASCADE'),
+                          index=True)
+    source = relationship('Source', cascade='all')
 
     flux = sa.Column(sa.Float)
     fluxerr = sa.Column(sa.Float)
-    zp = sa.Column(sa.Float)
-    zpsys = sa.Column(sa.Text)
-    maglimit = sa.Column(sa.Float)
-    filter = sa.Column(sa.Text)
 
-    mjd = sa.Column(sa.Float)
-    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='CASCADE'), index=True)
-    source = relationship('Source', back_populates='stack_detections', cascade='all')
+    @hybrid_property
+    def snr(self):
+        return self.flux / self.fluxerr
 
-    thumbnails = relationship('StackThumbnail', cascade='all')
 
-    provenance = sa.Column(sa.Text)
-    method = sa.Column(sa.Text)
+class Detection(ObjectWithFlux, SpatiallyIndexed):
+    id = sa.Column(sa.Integer,
+                   sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
+                   primary_key=True)
+    __tablename__ = 'detections'
+    __mapper_args__ = {'polymorphic_identity': 'detection',
+                       'inherit_condition': id == ObjectWithFlux.id}
+
+    x_image = sa.Column(sa.Float)
+    y_image = sa.Column(sa.Float)
+
+    elongation = sa.Column(sa.Float)
     a_image = sa.Column(sa.Float)
     b_image = sa.Column(sa.Float)
-    theta_image = sa.Column(sa.Float)
+    fwhm_image = sa.Column(sa.Float)
 
-    photometry = relationship('Photometry', cascade='all')
-    q3c = Index('stackdetections_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
+    flags = sa.Column(sa.Integer)
+    imaflags_iso = sa.Column(sa.Integer)
+    goodcut = sa.Column(sa.Boolean)
 
-    @hybrid_property
+
+    @classmethod
+    def from_catalog(cls, cat, filter=True):
+        result = []
+        if filter:
+            filter_sexcat(cat)
+
+        for row in cat.data:
+
+            if filter and row['GOODCUT'] != 1:
+                continue
+
+
+
+            # ra and dec are inherited from SpatiallyIndexed
+            detection = cls(
+                ra=float(row['X_WORLD']), dec=float(row['Y_WORLD']),
+                image=cat.image, flux=float(row['FLUX_APER']),
+                fluxerr=float(row['FLUXERR_APER']),
+                elongation=float(row['ELONGATION']),
+                flags=int(row['FLAGS']), imaflags_iso=int(row['IMAFLAGS_ISO']),
+                a_image=float(row['A_IMAGE']), b_image=float(row['B_IMAGE']),
+                fwhm_image=float(row['FWHM_IMAGE']),
+                x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE'])
+            )
+
+            if filter:
+                detection.goodcut = True
+
+            # query for nearby sources to determine if a new source needs to
+            # be created
+
+            source = DBSession().query(models.Source).filter(
+                sa.func.q3c_radial_query(
+                    models.Source.ra,
+                    models.Source.dec,
+                    detection.ra,
+                    detection.dec,
+                    MATCH_RADIUS_DEG
+                )
+            ).first()
+
+            if source is None:
+                # need to create a new source
+                name = publish.get_next_name()
+                source = models.Source(
+                    id=name,
+                    ra=detection.ra,
+                    dec=detection.dec
+                )
+
+            detection.source = source
+
+            # update the source ra and dec
+            #best = source.best_detection
+
+            # just doing this in case the new LC point
+            # isn't yet flushed to the DB
+
+            #if detection.snr > best.snr:
+            #    best = detection
+
+            #source.ra = best.ra
+            #source.dec = best.dec
+
+            result.append(detection)
+
+        return result
+
+
+class ForcedPhotometry(ObjectWithFlux):
+    id = sa.Column(sa.Integer,
+                   sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
+                   primary_key=True)
+    __tablename__ = 'forcedphotometry'
+    __mapper_args__ = {'polymorphic_identity': 'photometry',
+                       'inherit_condition': id == ObjectWithFlux.id}
+
+    flags = sa.Column(sa.Integer)
+
+    @property
     def mag(self):
-        return -2.5 * sa.func.log(self.flux) + self.zp
+        return -2.5 * np.log10(self.flux) + self.image.header['MAGZP']
 
-    @hybrid_property
+    @property
     def magerr(self):
         return 1.08573620476 * self.fluxerr / self.flux
 
+models.Source.stamps = relationship('Stamp', cascade='all')
 
-def images(self):
-    candidates = DBSession().query(Image).filter(func.q3c_radial_query(Image.ra, Image.dec, self.ra, self.dec, 0.64))\
-                                         .filter(func.q3c_poly_query(self.ra, self.dec, Image.poly))
+def images(self, type=CalibratableImage):
+
+    candidates = DBSession().query(type).filter(
+        func.q3c_radial_query(type.ra,
+                              type.dec,
+                              self.ra, self.dec,
+                              0.64)
+    ).filter(
+        func.q3c_poly_query(self.ra, self.dec, type.poly)
+    )
+
     return candidates.all()
 
 
-# keep track of the images that the photometry came from
-models.Photometry.image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'), index=True)
-models.Photometry.image = relationship('Image', back_populates='photometry')
-models.Photometry.provenance = sa.Column(sa.Text)
-models.Photometry.method = sa.Column(sa.Text)
+def best_detection(self):
+    return DBSession().query(
+        Detection
+    ).join(models.Source).filter(
+        models.Source.id == self.id
+    ).order_by(
+        (Detection.flux / Detection.fluxerr).desc()
+    ).first()
 
-models.Source.images = property(images)
-models.Source.q3c = Index(f'sources_q3c_ang2ipix_idx', func.q3c_ang2ipix(models.Source.ra, models.Source.dec))
-models.Source.stack_detections = relationship('StackDetection', cascade='all')
+models.Source.images = images
+models.Source.q3c = Index(
+    f'sources_q3c_ang2ipix_idx',
+    func.q3c_ang2ipix(
+        models.Source.ra,
+        models.Source.dec)
+)
+models.Source.detections = relationship('Detection', cascade='all')
+models.Source.photometry = relationship('ForcedPhotometry', cascade='all')
+models.Source.best_detection = property(best_detection)
 
-def best_stack_detection(self):
-    sds = self.stack_detections
 
-    # only keep stack detections that have shape parameters
-    sds = [s for s in sds if (s.a_image is not None and s.b_image is not None and s.theta_image is not None)]
-    return max(sds, key=lambda sd: sd.flux / sd.fluxerr)
+def unphotometered_images(self):
+    q = DBSession().query(SingleEpochSubtraction.id).filter(
+        func.q3c_radial_query(self.ra,
+                              self.dec,
+                              self.ra, self.dec,
+                              0.64)
+    ).filter(
+        func.q3c_poly_query(self.ra, self.dec, SingleEpochSubtraction.poly)
+    ).outerjoin(
+        ForcedPhotometry, ForcedPhotometry.image_id == SingleEpochSubtraction.id
+    ).filter(
+        SingleEpochSubtraction.id
+    ).having(
+        ~self.id.in_(sa.func.array_agg(ForcedPhotometry.source_id))
+    )
 
 
-models.Source.best_stack_detection = property(best_stack_detection)
+def force_photometry(self):
+    pass
 
+
+from astropy.table import Table
 def light_curve(self):
-    photometry = self.photometry
     lc_raw = []
 
-    for photpoint in photometry:
-        photd = {'mjd': photpoint.mjd,
-                 'filter': photpoint.filter,
-                 'zp': photpoint.zp,
-                 'zpsys': photpoint.zpsys,
-                 'flux': photpoint.flux,
-                 'fluxerr': photpoint.fluxerr}
+    phot = DBSession().query(
+        ScienceImage.obsmjd,
+        ScienceImage.filtercode,
+        ScienceImage.magzp,
+        ForcedPhotometry.flux,
+        ForcedPhotometry.fluxerr,
+        ForcedPhotometry.flags
+    ).select_from(
+        sa.join(
+            ForcedPhotometry,
+            SingleEpochSubtraction.__table__,
+            ForcedPhotometry.image_id == SingleEpochSubtraction.id
+        ).join(
+            ScienceImage.__table__,
+            SingleEpochSubtraction.target_image_id == ScienceImage.id
+        )
+    ).filter(
+        ForcedPhotometry.source_id == self.id
+    )
+
+    for photpoint in phot:
+        photd = {'mjd': photpoint[0],
+                 'filter': 'ztf' + photpoint[1][-1],
+                 'zp': photpoint[2],
+                 'zpsys': 'ab',
+                 'flux': photpoint[3],
+                 'fluxerr': photpoint[4],
+                 'flags': photpoint[5]}
         lc_raw.append(photd)
 
     return Table(lc_raw)
@@ -350,52 +2107,12 @@ def light_curve(self):
 models.Source.light_curve = light_curve
 
 
+
 class FilterRun(models.Base):
     tstart = sa.Column(sa.DateTime)
     tend = sa.Column(sa.DateTime)
     status = sa.Column(sa.Boolean, default=None)
     reason = sa.Column(sa.Text, nullable=True)
-
-
-class PittObject(models.Base):
-
-    type = sa.Column(sa.Text)
-    ra = sa.Column(psql.DOUBLE_PRECISION)
-    dec = sa.Column(psql.DOUBLE_PRECISION)
-    gmag = sa.Column(sa.Float)
-    rmag = sa.Column(sa.Float)
-    zmag = sa.Column(sa.Float)
-    w1mag = sa.Column(sa.Float)
-    w2mag = sa.Column(sa.Float)
-    gmagerr = sa.Column(sa.Float)
-    rmagerr = sa.Column(sa.Float)
-    zmagerr = sa.Column(sa.Float)
-    w1magerr = sa.Column(sa.Float)
-    w2magerr = sa.Column(sa.Float)
-    z_phot = sa.Column(sa.Float)
-    z_phot_err = sa.Column(sa.Float)
-    z_spec = sa.Column(sa.Float)
-
-    gaiamatch = sa.Column(sa.Boolean)
-    milliquasmatch = sa.Column(sa.Boolean)
-    wisematch = sa.Column(sa.Boolean)
-    hitsmatch = sa.Column(sa.Boolean)
-
-    @hybrid_property
-    def needs_check(self):
-        return sa.or_(self.gaiamatch == None,
-                      self.milliquasmatch == None,
-                      self.wisematch == None,
-                      self.hitsmatch == None)
-
-    @hybrid_property
-    def lens_cand(self):
-        return sa.and_(self.gaiamatch == False,
-                       self.milliquasmatch == False,
-                       self.wisematch == False,
-                       self.hitsmatch == False)
-
-    q3c = Index('dr6object_q3c_ang2ipix_idx', func.q3c_ang2ipix(ra, dec))
 
 
 class Fit(models.Base):
@@ -411,9 +2128,9 @@ class Fit(models.Base):
     errors = sa.Column(psql.JSONB)
     nfit = sa.Column(sa.Integer)
     data_mask = sa.Column(psql.ARRAY(sa.Boolean))
-    source_id = sa.Column(sa.Text, sa.ForeignKey('sources.id', ondelete='SET NULL'))
+    source_id = sa.Column(sa.Text,
+                          sa.ForeignKey('sources.id', ondelete='SET NULL'))
     source = relationship('Source')
-
 
     @property
     def model(self):
@@ -426,251 +2143,20 @@ class Fit(models.Base):
 models.Source.fits = relationship('Fit', cascade='all')
 
 
-class File(object):
 
-    """Any tracked file (something that resides on disk or on tape) should implement these columns"""
-
-    disk_path = sa.Column(sa.Text)
-    hpss_path = sa.Column(sa.Text)
-
-
-class FITSBase(File):
-
-    """Base class for any FITS image. Any tracked pipeline image product must implement these columns """
-
-    simple = sa.Column(sa.Boolean)
-    bitpix = sa.Column(sa.Integer)
-    naxis = sa.Column(sa.Integer)
-    naxis1 = sa.Column(sa.Integer)
-    naxis2 = sa.Column(sa.Integer)
-    equinox = sa.Column(sa.Float)
-    ctype1 = sa.Column(sa.Text)
-    cunit1 = sa.Column(sa.Text)
-    crval1 = sa.Column(sa.Float)
-    crpix1 = sa.Column(sa.Float)
-    cd1_1 = sa.Column(sa.Float)
-    cd1_2 = sa.Column(sa.Float)
-    ctype2 = sa.Column(sa.Text)
-    cunit2 = sa.Column(sa.Text)
-    crval2 = sa.Column(sa.Float)
-    crpix2 = sa.Column(sa.Float)
-    cd2_1 = sa.Column(sa.Float)
-    cd2_2 = sa.Column(sa.Float)
-    exptime = sa.Column(sa.Float)
-    gain = sa.Column(sa.Float)
-    saturate = sa.Column(sa.Float)
-    filter = sa.Column(sa.Text)
-    pixscale = sa.Column(sa.Float)
-    magzp = sa.Column(sa.Float)
-    seeing = sa.Column(sa.Float)
-    medsky = sa.Column(sa.Float)
-    lmt_mg = sa.Column(sa.Float)
-    lmg_nsigma = sa.Column(sa.Float)
-
-    @declared_attr
-    def field(self):
-        return sa.Column(sa.Integer)
-
-    @declared_attr
-    def ccdid(self):
-        return sa.Column(sa.Integer)
-
-    @declared_attr
-    def qid(self):
-        return sa.Column(sa.Integer)
-
-    @declared_attr
-    def filtercode(self):
-        return sa.Column(sa.Text)
-
-
-class SubtractionMixin(FITSBase):
-
-    """Anything Produced by hotpants should implement these columns"""
-
-    bzero = sa.Column(sa.Float)
-    bscale = sa.Column(sa.Float)
-    region00 = sa.Column(sa.Text)
-    convol00 = sa.Column(sa.Text)
-    ksum00 = sa.Column(sa.Float)
-    sssig00 = sa.Column(sa.Float)
-    ssscat00 = sa.Column(sa.Float)
-    fsig00 = sa.Column(sa.Float)
-    fscat00 = sa.Column(sa.Float)
-    x2nrm00 = sa.Column(sa.Float)
-    dmean00 = sa.Column(sa.Float)
-    dsige00 = sa.Column(sa.Float)
-    dsig00 = sa.Column(sa.Float)
-    dmeano00 = sa.Column(sa.Float)
-    dsigeo00 = sa.Column(sa.Float)
-    dsigo00 = sa.Column(sa.Float)
-    diffcmd = sa.Column(sa.Text)
-    photnorm = sa.Column(sa.Text)
-    target = sa.Column(sa.Text)
-    template = sa.Column(sa.Text)
-    diffim = sa.Column(sa.Text)
-    nregion = sa.Column(sa.Integer)
-    maskval = sa.Column(sa.Float)
-    kerinfo = sa.Column(sa.Boolean)
-
-    @declared_attr
-    def reference_id(self):
-        return sa.Column('reference_id', sa.Integer, sa.ForeignKey('references.id', ondelete='CASCADE'))
-
-    @declared_attr
-    def reference(self):
-        return relationship('Reference')
-
-
-
-
-def redundantly_declare_thumbnails(source):
-    stack_thumbs = source.stack_thumbnails
-    photometry = source.photometry
-
-    if len(source.photometry) == 0:
-        return
-
-    highsnr = photometry[0]
-
-    seen = []
-
-    for thumb in stack_thumbs:
-
-        if thumb.type not in seen:
-
-            nthumb = models.Thumbnail(type=thumb.type, file_uri=thumb.file_uri,
-                                      public_url=thumb.public_url, photometry_id=highsnr.id)
-            DBSession().add(nthumb)
-
-            seen.append(thumb.type)
-
-    DBSession().commit()
-
-
-class SingleEpochSubtraction(SubtractionMixin, models.Base):
-
-    """These correspond to one science image - one reference"""
-
-    image_id = sa.Column(sa.Integer, sa.ForeignKey('image.id', ondelete='CASCADE'))
-    image = relationship('Image', back_populates='subtraction')
-
-    photometry = relationship('Photometry', cascade='all')
-
-    def force_photometry(self):
-
-        sources_contained = self.image.sources
-        sources_contained_ids = [s.id for s in sources_contained]
-        photometered_sources = list(set([phot_point.source for phot_point in self.photometry]))
-
-        # this must be list or setdiff1d will fail
-        photometered_source_ids = list(set([s.id for s in photometered_sources]))
-
-        # reject sources where photometry has already been done
-        sources_remaining_ids = np.setdiff1d(sources_contained_ids, photometered_source_ids)
-        sources_remaining = [s for s in sources_contained if s.id in sources_remaining_ids]
-
-        # we want a model of the PSF on the science image only. we download this here from ipac
-        # note the difference image psfs are not correct as they use a convolved science image
-
-        if self.image.instrument is None:
-            self.image.instrument_id = 1
-            DBSession().add(self)
-            DBSession().commit()
-
-        # for all the remaining sources do forced photometry
-
-        new_photometry = []
-
-        mask_path = self.disk_path.replace('.fits', '.bpm.fits')
-        for source in sources_remaining:
-
-            # get the best stack detection of the source
-            try:
-                bestpoint = source.best_stack_detection
-            except ValueError:
-                continue # this source has no stack detections
-
-            flux, fluxerr = phot_sex_auto(self.disk_path, bestpoint, mask_path=mask_path)
-
-            phot_point = models.Photometry(subtraction=self, stack_detection=bestpoint,
-                                           flux=float(flux), fluxerr=float(fluxerr),
-                                           zp=self.magzp, zpsys='ab', lim_mag=self.image.maglimit,
-                                           filter=self.filter, source=source, instrument=self.image.instrument,
-                                           ra=source.ra, dec=source.dec, mjd=self.image.obsmjd, provenance='gn',
-                                           method='sep')
-
-            new_photometry.append(phot_point)
-
-        DBSession().add_all(new_photometry)
-        DBSession().commit()
-
-
-class StackMixin(FITSBase):
-
-    combinet = sa.Column(sa.Text)
-    resampt1 = sa.Column(sa.Text)
-    centert1 = sa.Column(sa.Text)
-    pscalet1 = sa.Column(sa.Text)
-    resampt2 = sa.Column(sa.Text)
-    centert2 = sa.Column(sa.Text)
-    pscalet2 = sa.Column(sa.Text)
-
-
-class Stack(StackMixin, models.Base):
-
-    subtraction = relationship('MultiEpochSubtraction', back_populates='stack', cascade='all')
-    images = relationship('Image', cascade='all', secondary='stack_images')
-
-
-class Reference(StackMixin, models.Base):
-    images = relationship('Image', cascade='all', secondary='reference_images')
-    idx = Index('ref_field_idx', 'field', 'ccdid', 'qid', 'filtercode')
-
-ReferenceImage = join_model('reference_images', Reference, Image)
-StackImage = join_model('stack_images', Stack, Image)
-
-
-class MultiEpochSubtraction(StackMixin, SubtractionMixin, models.Base):
-
-    stack_id = sa.Column(sa.Integer, sa.ForeignKey('stacks.id', ondelete='CASCADE'))
-    stack = relationship('Stack', back_populates='subtraction', cascade='all')
-
-    detections = relationship('StackDetection', cascade='all')
-
-
-class StackThumbnail(models.Base):
-    type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'ps1', "new_gz",
-                             'ref_gz', 'sub_gz',
-                             name='stackthumbnail_types', validate_strings=True))
-    file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
-    public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
-    origin = sa.Column(sa.String, nullable=True)
-    stackdetection_id = sa.Column(sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
-                                  nullable=False, index=True)
-    stackdetection = relationship('StackDetection', back_populates='thumbnails', cascade='all')
-    source = relationship('Source', back_populates='stack_thumbnails', uselist=False,
-                          secondary='stackdetections', cascade='all')
-
-
-models.Source.stack_thumbnails = relationship('StackThumbnail', cascade='all', secondary='stackdetections')
-models.Photometry.subtraction_id = sa.Column(sa.Integer, sa.ForeignKey('singleepochsubtractions.id',
-                                                                       ondelete='CASCADE'), index=True)
-models.Photometry.subtraction = relationship('SingleEpochSubtraction', back_populates='photometry', cascade='all')
-
-models.Photometry.stack_detection_id = sa.Column(sa.Integer,
-                                                 sa.ForeignKey('stackdetections.id', ondelete='CASCADE'),
-                                                 index=True)
-models.Photometry.stack_detection = relationship('StackDetection', back_populates='photometry', cascade='all')
-
-
-class DR8Mixin(object):
-
-    def __repr__(self):
-        attr_list = [f"{c.name.lower()}={getattr(self, c.name.lower())}"
-                     for c in self.__table__.columns]
-        return f"<{type(self).__name__}({', '.join(attr_list)})>"
-
+class DR8(SpatiallyIndexed):
+    # hemisphere = sa.Column(sa.Text)
+
+    # __tablename__ = 'dr8'
+    # __mapper_args__ = {
+    #    'polymorphic_on': hemisphere,
+    #    'polymorphic_identity': 'base'
+    # }
+
+    # def __repr__(self):
+    #    attr_list = [f"{c.name.lower()}={getattr(self, c.name.lower())}"
+    #                 for c in self.__table__.columns]
+    #    return f"<{type(self).__name__}({', '.join(attr_list)})>"
 
     release = sa.Column('RELEASE', sa.Integer)
     brickid = sa.Column('BRICKID', sa.Integer)
@@ -773,17 +2259,27 @@ class DR8Mixin(object):
     ref_cat = sa.Column('REF_CAT', sa.Text)
     ref_id = sa.Column('REF_ID', sa.Integer)
     ref_epoch = sa.Column('REF_EPOCH', psql.DOUBLE_PRECISION)
-    gaia_phot_g_mean_mag = sa.Column('GAIA_PHOT_G_MEAN_MAG', psql.DOUBLE_PRECISION)
-    gaia_phot_g_mean_flux_over_error = sa.Column('GAIA_PHOT_G_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
-    gaia_phot_bp_mean_mag = sa.Column('GAIA_PHOT_BP_MEAN_MAG', psql.DOUBLE_PRECISION)
-    gaia_phot_bp_mean_flux_over_error = sa.Column('GAIA_PHOT_BP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
-    gaia_phot_rp_mean_mag = sa.Column('GAIA_PHOT_RP_MEAN_MAG', psql.DOUBLE_PRECISION)
-    gaia_phot_rp_mean_flux_over_error = sa.Column('GAIA_PHOT_RP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
-    gaia_astrometric_excess_noise = sa.Column('GAIA_ASTROMETRIC_EXCESS_NOISE', psql.DOUBLE_PRECISION)
+    gaia_phot_g_mean_mag = sa.Column('GAIA_PHOT_G_MEAN_MAG',
+                                     psql.DOUBLE_PRECISION)
+    gaia_phot_g_mean_flux_over_error = sa.Column(
+        'GAIA_PHOT_G_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
+    gaia_phot_bp_mean_mag = sa.Column('GAIA_PHOT_BP_MEAN_MAG',
+                                      psql.DOUBLE_PRECISION)
+    gaia_phot_bp_mean_flux_over_error = sa.Column(
+        'GAIA_PHOT_BP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
+    gaia_phot_rp_mean_mag = sa.Column('GAIA_PHOT_RP_MEAN_MAG',
+                                      psql.DOUBLE_PRECISION)
+    gaia_phot_rp_mean_flux_over_error = sa.Column(
+        'GAIA_PHOT_RP_MEAN_FLUX_OVER_ERROR', psql.DOUBLE_PRECISION)
+    gaia_astrometric_excess_noise = sa.Column('GAIA_ASTROMETRIC_EXCESS_NOISE',
+                                              psql.DOUBLE_PRECISION)
     gaia_duplicated_source = sa.Column('GAIA_DUPLICATED_SOURCE', sa.Boolean)
-    gaia_phot_bp_rp_excess_factor = sa.Column('GAIA_PHOT_BP_RP_EXCESS_FACTOR', psql.DOUBLE_PRECISION)
-    gaia_astrometric_sigma5d_max = sa.Column('GAIA_ASTROMETRIC_SIGMA5D_MAX', psql.DOUBLE_PRECISION)
-    gaia_astrometric_params_solved = sa.Column('GAIA_ASTROMETRIC_PARAMS_SOLVED', sa.Integer)
+    gaia_phot_bp_rp_excess_factor = sa.Column('GAIA_PHOT_BP_RP_EXCESS_FACTOR',
+                                              psql.DOUBLE_PRECISION)
+    gaia_astrometric_sigma5d_max = sa.Column('GAIA_ASTROMETRIC_SIGMA5D_MAX',
+                                             psql.DOUBLE_PRECISION)
+    gaia_astrometric_params_solved = sa.Column('GAIA_ASTROMETRIC_PARAMS_SOLVED',
+                                               sa.Integer)
     parallax = sa.Column('PARALLAX', psql.DOUBLE_PRECISION)
     parallax_ivar = sa.Column('PARALLAX_IVAR', psql.DOUBLE_PRECISION)
     pmra = sa.Column('PMRA', psql.DOUBLE_PRECISION)
@@ -827,55 +2323,51 @@ class DR8Mixin(object):
         return -2.5 * sa.func.log(self.flux_w1) + 22.5
 
 
-
-class DR8North(DR8Mixin, models.Base):
+class DR8North(models.Base, DR8):
+    # id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
+    # primary_key=True)
     __tablename__ = 'dr8_north'
+    # __mapper_args__ = {'polymorphic_identity': 'n'}
+
+    # @declared_attr
+    # def __table_args__(cls):
+    #    return tuple()
 
 
-class DR8South(DR8Mixin, models.Base):
+class DR8South(models.Base, DR8):
+    # id = sa.Column(sa.Integer, sa.ForeignKey('dr8.id', ondelete='CASCADE'),
+    # primary_key=True)
     __tablename__ = 'dr8_south'
+    # __mapper_args__ = {'polymorphic_identity': 's'}
+
+    # @declared_attr
+    # def __table_args__(cls):
+    #    return tuple()
+
+init_db()
+
+from sqlalchemy import event
 
 
-def create_ztf_groups_if_nonexistent():
-    groups = [1, 2, 3]
-    group_names = ['MSIP/Public', 'Partnership', 'Caltech']
-    for g, n in zip(groups, group_names):
-        dbe = DBSession().query(Group).get(g)
-        if dbe is None:
-            dbg = Group(name=f'IPAC GID {g} ({n})')
-            dbg.id = g  # match group id to ipac gid
-            DBSession().add(dbg)
-            iprog = IPACProgram()
-            iprog.id = g
-            DBSession().add(iprog)
-    DBSession().commit()
-    for g, n in zip(groups, group_names):
-        for i in range(g, 4):
-            ipg = DBSession().query(IPACProgramGroup)\
-                             .filter(sa.and_(IPACProgramGroup.ipacprogram_id == g, IPACProgramGroup.group_id == i))\
-                             .first()
-            if ipg is None:
-                ipg = IPACProgramGroup(ipacprogram_id=g, group_id=i)
-                DBSession.add(ipg)
-    DBSession().commit()
+@event.listens_for(DBSession(), 'before_flush')
+def bump_modified(session, flush_context, instances):
+    for object in session.dirty:
+        if isinstance(object, models.Base) and session.is_modified(object):
+            object.modified = sa.func.now()
 
-
-    # see if ZTF instrument and telescope exist
-    p48 = DBSession().query(models.Telescope).filter(models.Telescope.nickname.like('%p48%')).first()
-    if p48 is None:
-        p48 = models.Telescope(name='Palomar 48-inch', nickname='p48', lat=33.3581, lon=116.8663,
-                               elevation=1870.862, diameter=1.21)
-        DBSession().add(p48)
-        DBSession().commit()
-
-    ztf = DBSession().query(models.Instrument).get(1)
-    if ztf is None:
-        ztf = models.Instrument(name='ZTF', type='Camera', band='optical', telescope=p48)
-        DBSession().add(ztf)
-        DBSession().commit()
-
-
-def refresh_tables_groups():
-    create_tables()
-    create_ztf_groups_if_nonexistent()
-
+class CLU(models.Base):
+    cluid = sa.Column(sa.Integer, primary_key=True)
+    id_other = sa.Column(sa.Text)
+    name = sa.Column(sa.Text)
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
+    dm = sa.Column(sa.Float)
+    dm_method = sa.Column(sa.Text)
+    distmpc = sa.Column(sa.Float)
+    dm_kin = sa.Column(sa.Float)
+    z = sa.Column(sa.Float)
+    zerr = sa.Column(sa.Float)
+    a = sa.Column(sa.Float)
+    b2a = sa.Column(sa.Float)
+    pa = sa.Column(sa.Float)
+    type_ned = sa.Column(sa.Text)

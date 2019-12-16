@@ -1,62 +1,49 @@
-import sep
-from astropy.io import fits
-from astropy.wcs import WCS
+import photutils
 import numpy as np
+from astropy.coordinates import SkyCoord
+from astropy import units as u
 
 
-def phot_sex_auto(img_meas, stack_detection, mask_path=None):
+APERTURE_RADIUS = 3 * u.pixel
+APER_KEY = 'APCOR4'
 
-    rms_meas = img_meas.replace('.fits', '.rms.fits')
 
-    with fits.open(img_meas) as hdul, fits.open(rms_meas) as hdulr:
-        hd = hdul[0].header
-        meas_pix = hdul[0].data
-        meas_wcs = WCS(hd)
-        rms_pix = hdulr[0].data
-        gain = hd['GAIN']
+def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
 
-    if mask_path is not None:
-        with fits.open(mask_path) as hdul:
-            mask = hdul[0].data
-    else:
-        mask = None
+    ra = np.atleast_1d(ra)
+    dec = np.atleast_1d(dec)
+    coord = SkyCoord(ra, dec, unit='deg')
+    apertures = photutils.SkyCircularAperture(coord, r=APERTURE_RADIUS)
 
-    mask = mask.astype(float)
+    # something that is photometerable implements mask, background, and wcs
+    pixels_bkgsub = calibratable.data - calibratable.background_image.data
+    bkgrms = calibratable.rms_image.data
+    mask = calibratable.mask_image.data
+    wcs = calibratable.wcs
 
-    if mask.dtype.byteorder == '>':
-        mask = mask.byteswap().newbyteorder()
+    phot_table = photutils.aperture_photometry(pixels_bkgsub, apertures,
+                                               error=bkgrms,
+                                               wcs=wcs)
 
-    if meas_pix.dtype.byteorder == '>':
-        meas_pix = meas_pix.byteswap().newbyteorder()
+    pixap = apertures.to_pixel(wcs)
+    annulus_masks = pixap.to_mask(method='center')
+    maskpix = [annulus_mask.cutout(mask.data) for annulus_mask in annulus_masks]
 
-    if rms_pix.dtype.byteorder == '>':
-        rms_pix = rms_pix.byteswap().newbyteorder()
 
-    meas_x, meas_y = meas_wcs.all_world2pix([[stack_detection.ra, stack_detection.dec]], 0)[0]
+    if apply_calibration:
+        magzp = calibratable.header['MAGZP']
+        apcor = calibratable.header[APER_KEY]
 
-    # shape parameters
-    det_a = stack_detection.a_image
-    det_b = stack_detection.b_image
-    det_theta = stack_detection.theta_image * np.pi / 180.
+        phot_table['mag'] = -2.5 * np.log10(phot_table['aperture_sum']) + magzp + apcor
+        phot_table['magerr'] = 1.0826 * phot_table['aperture_sum_err'] / phot_table['aperture_sum']
 
-    # do the photometry (FLUX_AUTO equivalent)
-    kronrad, krflag = sep.kron_radius(meas_pix, meas_x, meas_y, det_a, det_b, det_theta, 6.0)
-    flux, fluxerr, flag = sep.sum_ellipse(meas_pix, meas_x, meas_y, det_a, det_b, det_theta,
-                                          2.5*kronrad, subpix=1, mask=mask, err=rms_pix, gain=gain)
 
-    flag |= krflag  # combine flags into 'flag'
+    # check for invalid photometry on masked pixels
+    phot_table['flags'] = [int(np.bitwise_or.reduce(m, axis=(0, 1))) for
+                           m in maskpix]
 
-    r_min = 1.75  # minimum diameter = 3.5
-    use_circle = kronrad * np.sqrt(det_a * det_b) < r_min
-    cflux, cfluxerr, cflag = sep.sum_circle(meas_pix, meas_x[use_circle], meas_y[use_circle], r_min, subpix=1,
-                                            mask=mask, gain=gain, err=rms_pix)
-    flux[use_circle] = cflux
-    fluxerr[use_circle] = cfluxerr
-    flag[use_circle] = cflag
+    # rename some columns
+    phot_table.rename_column('aperture_sum', 'flux')
+    phot_table.rename_column('aperture_sum_err', 'fluxerr')
 
-    # convert results to scalars
-    flux = np.squeeze(flux)[()]
-    fluxerr = np.squeeze(fluxerr)[()]
-
-    return flux, fluxerr
-
+    return phot_table
