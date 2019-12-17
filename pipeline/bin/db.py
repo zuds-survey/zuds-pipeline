@@ -2085,7 +2085,7 @@ def light_curve(sourceid):
             SingleEpochSubtraction,
             ForcedPhotometry.image_id == SingleEpochSubtraction.id
         ).join(
-            ScienceImage,
+            ScienceImage.__table__,
             SingleEpochSubtraction.target_image_id ==
             ScienceImage.id
         )
