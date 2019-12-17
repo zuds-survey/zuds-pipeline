@@ -66,6 +66,7 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
                           'THETA_WORLD', 'ELLIPTICITY', 'A_IMAGE', 'B_IMAGE']
 
 CMAP_RANDOM_SEED = 8675309
+DEFAULT_GROUP = 1
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
@@ -1021,12 +1022,52 @@ class PipelineRegionFile(ZTFFile):
         return reg
 
 
-class Stamp(models.Base):
+def add_linked_thumbnails(self, commit=True):
+
+    to_add = []
+    thumbtypes = [t.type for t in self.thumbnails]
+
+    if len(self.photometry) == 0:
+        return
+
+    if 'sdss' not in thumbtypes:
+        sdss_thumb = Thumbnail(public_url=self.get_sdss_url(),
+                               type='sdss',
+                               source=self)
+        to_add.append(sdss_thumb)
+
+    if 'ps1' not in thumbtypes:
+        ps1_thumb = Thumbnail(public_url=self.get_panstarrs_url(),
+                              type='ps1',
+                              source=self)
+        to_add.append(ps1_thumb)
+
+    if 'dr8-model' not in thumbtypes:
+        ls_thumb = Thumbnail(public_url=self.get_decals_url(layer='model'),
+                             type='dr8-model',
+                             source=self)
+        to_add.append(ls_thumb)
+
+    if 'dr8' not in thumbtypes:
+        ls_thumb_data = Thumbnail(public_url=self.get_decals_url(),
+                                  type='dr8',
+                                  source='self')
+        to_add.append(ls_thumb_data)
+
+    DBSession().add_all(to_add)
+
+    if commit:
+        DBSession().commit()
+models.Source.add_linked_thumbnails = add_linked_thumbnails
+
+
+class Thumbnail(models.Base):
 
     # this can be filled optionally. if the jpeg is not written to data then
     # use .copies to get the public url of the HTTP servable JPG
 
-
+    type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'dr8', 'dr8-model',
+                             'ps1'))
     public_url = sa.Column(sa.String(), nullable=True, index=False,
                            unique=False)
 
@@ -1036,11 +1077,12 @@ class Stamp(models.Base):
             'calibratableimages.id',
             ondelete='CASCADE'
         ),
-        index=True
+        index=True,
+        nullable=True
     )
     image = relationship('CalibratableImage',
                          cascade='all',
-                         back_populates='stamps',
+                         back_populates='thumbnails',
                          foreign_keys=[image_id])
 
     source_id = sa.Column(
@@ -1050,13 +1092,18 @@ class Stamp(models.Base):
             ondelete='CASCADE'
         ),
         index=True,
+        nullable=False
     )
+
     source = relationship(
         'Source',
         cascade='all',
-        back_populates='stamps',
+        back_populates='thumbnails',
         foreign_keys=[source_id]
     )
+
+    origin = sa.Column(sa.String, nullable=True)
+    file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
 
     @classmethod
     def from_detection(cls, detection, image):
@@ -1246,8 +1293,8 @@ class CalibratableImage(FITSImage, ZTFFile):
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
-    stamps = relationship('Stamp',
-                          primaryjoin=Stamp.image_id == id)
+    thumbnails = relationship('Thumbnail',
+                              primaryjoin=Thumbnail.image_id == id)
 
     def cmap_limits(self):
         interval = ZScaleInterval()
@@ -1963,13 +2010,22 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             ).first()
 
             if source is None:
+
+                default_group = DBSession().query(
+                    models.Group
+                ).get(DEFAULT_GROUP)
+
                 # need to create a new source
                 name = publish.get_next_name()
                 source = models.Source(
                     id=name,
                     ra=detection.ra,
-                    dec=detection.dec
+                    dec=detection.dec,
+                    groups=[default_group]
                 )
+
+                # dr8, sdss, ps1
+                source.add_linked_thumbnails(commit=False)
 
             detection.source = source
 
@@ -2009,7 +2065,7 @@ class ForcedPhotometry(ObjectWithFlux):
     def magerr(self):
         return 1.08573620476 * self.fluxerr / self.flux
 
-models.Source.stamps = relationship('Stamp', cascade='all')
+models.Source.thumbnails = relationship('Thumbnail', cascade='all')
 
 def images(self, type=CalibratableImage):
 
