@@ -43,7 +43,7 @@ res = db.DBSession().query(db.ScienceImage.field,
                db.SingleEpochSubtraction.target_image_id ==
                db.ScienceImage.id).join(daterange, jcond)
 ).filter(
-    db.ScienceImage.seeing < 3.5,
+    db.ScienceImage.seeing < 4.,
     db.ScienceImage.maglimit > 19.
 ).group_by(
     db.ScienceImage.field,
