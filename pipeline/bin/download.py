@@ -210,6 +210,9 @@ if __name__ == '__main__':
             time.sleep(180.)  # sleep for 3 minutes
             continue
 
+        # TODO: delete me when the disk quota goes up
+        http = False
+
         for image in to_download:
 
             if image.type == 'sci':
