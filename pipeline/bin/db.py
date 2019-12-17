@@ -1066,8 +1066,11 @@ class Thumbnail(models.Base):
     # this can be filled optionally. if the jpeg is not written to data then
     # use .copies to get the public url of the HTTP servable JPG
 
+    __table_args__ = {'extend_existing': True}
+
     type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'dr8', 'dr8-model',
-                             'ps1'))
+                             'ps1', name='thumbnail_types',
+                             validate_strings=True))
     public_url = sa.Column(sa.String(), nullable=True, index=False,
                            unique=False)
 
@@ -1095,15 +1098,22 @@ class Thumbnail(models.Base):
         nullable=False
     )
 
+    photometry_id = sa.Column(
+        sa.Integer,
+        sa.ForeignKey(
+            'photometry.id',
+            ondelete='SET NULL'
+        ),
+        index=False,
+        nullable=True
+    )
+
     source = relationship(
         'Source',
         cascade='all',
         back_populates='thumbnails',
         foreign_keys=[source_id]
     )
-
-    origin = sa.Column(sa.String, nullable=True)
-    file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
 
     @classmethod
     def from_detection(cls, detection, image):
@@ -1293,7 +1303,7 @@ class CalibratableImage(FITSImage, ZTFFile):
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
-    thumbnails = relationship('Thumbnail',
+    thumbnails = relationship(Thumbnail,
                               primaryjoin=Thumbnail.image_id == id)
 
     def cmap_limits(self):
@@ -2065,7 +2075,7 @@ class ForcedPhotometry(ObjectWithFlux):
     def magerr(self):
         return 1.08573620476 * self.fluxerr / self.flux
 
-models.Source.thumbnails = relationship('Thumbnail', cascade='all')
+models.Source.thumbnails = relationship(Thumbnail, cascade='all')
 
 def images(self, type=CalibratableImage):
 
@@ -2418,6 +2428,9 @@ def bump_modified(session, flush_context, instances):
             object.modified = sa.func.now()
 
 class CLU(models.Base):
+
+    __tablename__ = 'clu_20190625'
+
     cluid = sa.Column(sa.Integer, primary_key=True)
     id_other = sa.Column(sa.Text)
     name = sa.Column(sa.Text)
