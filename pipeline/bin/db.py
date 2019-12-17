@@ -1921,7 +1921,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     flags = sa.Column(sa.Integer)
     imaflags_iso = sa.Column(sa.Integer)
     goodcut = sa.Column(sa.Boolean)
-
+    rb = sa.Column(sa.Float)
 
     @classmethod
     def from_catalog(cls, cat, filter=True):
@@ -2002,7 +2002,8 @@ class ForcedPhotometry(ObjectWithFlux):
 
     @property
     def mag(self):
-        return -2.5 * np.log10(self.flux) + self.image.header['MAGZP']
+        return -2.5 * np.log10(self.flux) + self.image.header['MAGZP'] + \
+               self.image.header[APER_KEY]
 
     @property
     def magerr(self):
