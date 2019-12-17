@@ -2082,11 +2082,12 @@ def light_curve(sourceid):
     ).select_from(
         sa.join(
             ForcedPhotometry,
-            SingleEpochSubtraction.__table__,
+            SingleEpochSubtraction,
             ForcedPhotometry.image_id == SingleEpochSubtraction.id
         ).join(
-            ScienceImage.__table__,
-            SingleEpochSubtraction.target_image_id == ScienceImage.id
+            ScienceImage,
+            SingleEpochSubtraction.target_image_id ==
+            ScienceImage.id
         )
     ).filter(
         ForcedPhotometry.source_id == sourceid
