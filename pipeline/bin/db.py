@@ -1023,9 +1023,10 @@ class PipelineRegionFile(ZTFFile):
 
 
 # Thumbnanil
-models.Thumbnail.type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'dr8', 'dr8-model',
-                             'ps1', name='thumbnail_types',
-                             validate_strings=True))
+#models.Thumbnail.type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss',
+        # 'dr8', 'dr8-model',
+#                             'ps1', name='thumbnail_types',
+#                             validate_strings=True))
 
 models.Thumbnail.image_id = sa.Column(
     sa.Integer,
