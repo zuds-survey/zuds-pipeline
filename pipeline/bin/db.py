@@ -1290,8 +1290,8 @@ class CalibratableImage(FITSImage, ZTFFile):
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
-    thumbnails = relationship(Thumbnail,
-                              primaryjoin=Thumbnail.image_id == id)
+    thumbnails = relationship('Thumbnail',
+                              primaryjoin=models.Thumbnail.image_id == id)
 
     def cmap_limits(self):
         interval = ZScaleInterval()
@@ -2062,7 +2062,7 @@ class ForcedPhotometry(ObjectWithFlux):
     def magerr(self):
         return 1.08573620476 * self.fluxerr / self.flux
 
-models.Source.thumbnails = relationship(Thumbnail, cascade='all')
+models.Source.thumbnails = relationship('Thumbnail', cascade='all')
 
 def images(self, type=CalibratableImage):
 
