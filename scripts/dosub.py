@@ -28,7 +28,7 @@ for fn in imgs:
     tstart = time.time()
 
     sstart = time.time()
-    sci = db.ScienceImage.from_file(fn)
+    sci = db.ScienceCoadd.from_file(fn)
     sstop = time.time()
     print(
         f'sci: {sstop-sstart:.2f} sec to load  {sci.basename}',
@@ -59,20 +59,22 @@ for fn in imgs:
 
     basename = db.sub_name(sci.basename, ref.basename)
 
-    prev = db.SingleEpochSubtraction.get_by_basename(basename)
+    prev = db.MultiEpochSubtraction.get_by_basename(basename)
     #prev=None
 
-    if (prev is not None) and (prev.modified is not None) and \
-       (prev.modified > datetime.now() - timedelta(hours=4)):
-        db.DBSession().rollback()
-        continue
+    #if (prev is not None) and (prev.modified is not None) and \
+    #   (prev.modified > datetime.now() - timedelta(hours=24)):
+    #    db.DBSession().rollback()
+    #    continue
 
+    if prev is not None:
+        continue
 
     substart = time.time()
     try:
-        sub = db.SingleEpochSubtraction.from_images(sci, ref,
-                                                    data_product=False,
-                                                    tmpdir='tmp')
+        sub = db.MultiEpochSubtraction.from_images(sci, ref,
+                                                   data_product=False,
+                                                   tmpdir='tmp')
     except Exception as e:
         print(e, [sci.basename, ref.basename], flush=True)
         db.DBSession().rollback()
@@ -105,12 +107,19 @@ for fn in imgs:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
         continue
+
+    if len(detections) > 200:
+        db.DBSession().rollback()
+        print(f'{len(detections)} detections on "{sub.basename}", '
+              'something wrong with the image probably', flush=True)
+    
     dstop = time.time()
     print(
         f'det: {dstop-dstart:.2f} sec to make detections for {sub.basename}',
         flush=True
     )
 
+    """
     stampstart = time.time()
     try:
         remapped = sub.reference_image.aligned_to(sub)
@@ -131,13 +140,14 @@ for fn in imgs:
         f'stamp: {stampstop-stampstart:.2f} sec to make stamps for {sub.basename}',
         flush=True
     )
+    """
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
     #catcopy = db.HTTPArchiveCopy.from_product(cat)
     #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
     db.DBSession().add_all(detections)
-    db.DBSession().add_all(stamps)
+    #db.DBSession().add_all(stamps)
 
     #db.DBSession().add(mskcopy)
     #db.DBSession().add(catcopy)
@@ -145,15 +155,14 @@ for fn in imgs:
     #archive.archive(subcopy)
     #archive.archive(catcopy)
     #archive.archive(mskcopy)
-
-    archstop = time.time()
+    db.DBSession().commit()
+    archstop = time.time()    
     print(
         f'archive: {archstop-archstart:.2f} sec to archive stuff for '
         f'{sub.basename}',
         flush=True
     )
 
-    db.DBSession().commit()
 
     cleanstart = time.time()
     targets = []

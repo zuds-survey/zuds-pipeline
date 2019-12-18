@@ -18,9 +18,9 @@ __whatami__ = 'Make the references for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 # get the work
-sources = mpi.get_my_share_of_work(infile, reader=pd.read_csv)
+sources = mpi.get_my_share_of_work(infile)
 
-for _, source_id in sources.iterrows():
+for source_id in sources:
 
     tstart = time.time()
     sstart = time.time()
@@ -49,7 +49,7 @@ for _, source_id in sources.iterrows():
         stamps = []
         for i in [best_sub, best_new, remapped]:
             # make a stamp for the first detection
-            stamp = db.models.Thumbnail.from_detection(bestdet, i)
+            stamp = db.Thumbnail.from_detection(bestdet, i)
             stamps.append(stamp)
         source.add_linked_thumbnails()
     except Exception as e:

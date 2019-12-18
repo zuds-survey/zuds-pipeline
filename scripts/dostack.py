@@ -10,8 +10,8 @@ fmap = {1: 'zg',
         2: 'zr',
         3: 'zi'}
 
-db.init_db()
-db.DBSession().get_bind().echo = True
+#db.init_db()
+#db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
@@ -49,6 +49,9 @@ for _, job in jobs.iterrows():
     outname = os.path.join(os.path.dirname(images[0].local_path), basename)
     sstop = time.time()
 
+    if prev is not None:
+        continue
+
 
     print(
         f'load: {sstop-sstart:.2f} sec to load input images for {outname}',
@@ -60,7 +63,8 @@ for _, job in jobs.iterrows():
         stack = db.ScienceCoadd.from_images(
             images, outfile_name=outname,
             data_product=False,
-            tmpdir='tmp'
+            tmpdir='tmp',
+            nthreads=mpi.get_nthreads()
         )
     except Exception as e:
         print(e, [i.basename for i in images], flush=True)

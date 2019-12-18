@@ -1043,7 +1043,7 @@ def add_linked_thumbnails(self, commit=True):
         to_add.append(ps1_thumb)
 
     if 'dr8-model' not in thumbtypes:
-        ls_thumb = Thumbnail(public_url=self.get_decals_url(layer='model'),
+        ls_thumb = Thumbnail(public_url=self.get_decals_url(layer='dr8-model'),
                              type='dr8-model',
                              source=self)
         to_add.append(ls_thumb)
@@ -1051,7 +1051,7 @@ def add_linked_thumbnails(self, commit=True):
     if 'dr8' not in thumbtypes:
         ls_thumb_data = Thumbnail(public_url=self.get_decals_url(),
                                   type='dr8',
-                                  source='self')
+                                  source=self)
         to_add.append(ls_thumb_data)
 
     DBSession().add_all(to_add)
