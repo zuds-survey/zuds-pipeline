@@ -1139,7 +1139,6 @@ def add_linked_thumbnails(self, commit=False):
 models.Source.add_linked_thumbnails = add_linked_thumbnails
 
 
-
 class PipelineFITSCatalog(ZTFFile, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
 
