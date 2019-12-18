@@ -1038,10 +1038,6 @@ models.Thumbnail.image_id = sa.Column(
     nullable=True
 )
 
-models.Thumbnail.image = relationship('CalibratableImage',
-                     cascade='all',
-                     back_populates='thumbnails',
-                     foreign_keys=[models.Thumbnail.image_id])
 
 models.Thumbnail.source_id = sa.Column(
     sa.Text,
@@ -1051,13 +1047,6 @@ models.Thumbnail.source_id = sa.Column(
     ),
     index=True,
     nullable=False
-)
-
-models.Thumbnail.source = relationship(
-    'Source',
-    cascade='all',
-    back_populates='thumbnails',
-    foreign_keys=[models.Thumbnail.source_id]
 )
 
 
@@ -2406,6 +2395,20 @@ class DR8South(models.Base, DR8):
 init_db()
 
 from sqlalchemy import event
+
+models.Thumbnail.image = relationship('CalibratableImage',
+                     cascade='all',
+                     back_populates='thumbnails',
+                     foreign_keys=[models.Thumbnail.image_id])
+
+
+models.Thumbnail.source = relationship(
+    'Source',
+    cascade='all',
+    back_populates='thumbnails',
+    foreign_keys=[models.Thumbnail.source_id]
+)
+
 
 
 @event.listens_for(DBSession(), 'before_flush')
