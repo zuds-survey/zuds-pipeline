@@ -51,7 +51,7 @@ for source_id in sources:
             # make a stamp for the first detection
             stamp = db.Thumbnail.from_detection(bestdet, i)
             stamps.append(stamp)
-        source.add_linked_thumbnails()
+        source.add_linked_thumbnails(commit=False)
     except Exception as e:
         print(e, flush=True)
         db.DBSession().rollback()

@@ -1061,6 +1061,9 @@ def add_linked_thumbnails(self, commit=True):
 models.Source.add_linked_thumbnails = add_linked_thumbnails
 
 
+
+
+
 class Thumbnail(models.Base):
 
     # this can be filled optionally. if the jpeg is not written to data then
@@ -1154,6 +1157,7 @@ class Thumbnail(models.Base):
 
         return stamp
 
+models.Photometry.thumbnails = relationship(Thumbnail, cascade='all')
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
