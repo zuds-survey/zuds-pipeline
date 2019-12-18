@@ -1022,7 +1022,84 @@ class PipelineRegionFile(ZTFFile):
         return reg
 
 
-def add_linked_thumbnails(self, commit=True):
+# Thumbnanil
+models.Thumbnail.type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'dr8', 'dr8-model',
+                             'ps1', name='thumbnail_types',
+                             validate_strings=True))
+
+models.Thumbnail.image_id = sa.Column(
+    sa.Integer,
+    sa.ForeignKey(
+        'calibratableimages.id',
+        ondelete='CASCADE'
+    ),
+    index=True,
+    nullable=True
+)
+
+models.Thumbnail.image = relationship('CalibratableImage',
+                     cascade='all',
+                     back_populates='thumbnails',
+                     foreign_keys=[models.Thumbnail.image_id])
+
+models.Thumbnail.source_id = sa.Column(
+    sa.Text,
+    sa.ForeignKey(
+        'sources.id',
+        ondelete='CASCADE'
+    ),
+    index=True,
+    nullable=False
+)
+
+models.Thumbnail.source = relationship(
+    'Source',
+    cascade='all',
+    back_populates='thumbnails',
+    foreign_keys=[models.Thumbnail.source_id]
+)
+
+
+def from_detection(cls, detection, image):
+    source = detection.source
+
+    if os.getenv('NERSC_HOST') != 'cori':
+        raise ValueError('Cannot create stamp; must be on cori.')
+
+    if isinstance(image, models.Base):
+        linkimage = image
+    else:
+        linkimage = image.parent_image
+
+    stamp = DBSession().query(cls).filter(
+        cls.image_id == linkimage.id,
+        cls.source_id == source.id
+    ).first()
+    if stamp is None:
+        stamp = cls(source=source, image=linkimage)
+
+    outname = Path(NERSC_PREFIX) / f'{linkimage.field:06d}/' \
+                                   f'c{linkimage.ccdid:02d}/' \
+                                   f'q{linkimage.qid}/' \
+                                   f'{fid_map[linkimage.fid]}/' \
+                                   f'stamps'
+    outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
+    vmin, vmax = linkimage.cmap_limits()
+    stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
+
+    archive._mkdir_recursive(outname.parent)
+    publish.make_stamp(
+        outname, detection.ra, detection.dec, vmin,
+        vmax, image.data, image.wcs, save=True,
+        size=publish.CUTOUT_SIZE
+    )
+
+    return stamp
+
+models.Thumbnail.from_detection = classmethod(from_detection)
+
+
+def add_linked_thumbnails(self, commit=False):
 
     to_add = []
     thumbtypes = [t.type for t in self.thumbnails]
@@ -1031,25 +1108,26 @@ def add_linked_thumbnails(self, commit=True):
         return
 
     if 'sdss' not in thumbtypes:
-        sdss_thumb = Thumbnail(public_url=self.get_sdss_url(),
+        sdss_thumb = models.Thumbnail(public_url=self.get_sdss_url(),
                                type='sdss',
                                source=self)
         to_add.append(sdss_thumb)
 
     if 'ps1' not in thumbtypes:
-        ps1_thumb = Thumbnail(public_url=self.get_panstarrs_url(),
+        ps1_thumb = models.Thumbnail(public_url=self.get_panstarrs_url(),
                               type='ps1',
                               source=self)
         to_add.append(ps1_thumb)
 
     if 'dr8-model' not in thumbtypes:
-        ls_thumb = Thumbnail(public_url=self.get_decals_url(layer='dr8-model'),
+        ls_thumb = models.Thumbnail(public_url=self.get_decals_url(
+            layer='dr8-model'),
                              type='dr8-model',
                              source=self)
         to_add.append(ls_thumb)
 
     if 'dr8' not in thumbtypes:
-        ls_thumb_data = Thumbnail(public_url=self.get_decals_url(),
+        ls_thumb_data = models.Thumbnail(public_url=self.get_decals_url(),
                                   type='dr8',
                                   source=self)
         to_add.append(ls_thumb_data)
@@ -1060,99 +1138,6 @@ def add_linked_thumbnails(self, commit=True):
         DBSession().commit()
 models.Source.add_linked_thumbnails = add_linked_thumbnails
 
-
-class Thumbnail(models.Base):
-
-    # this can be filled optionally. if the jpeg is not written to data then
-    # use .copies to get the public url of the HTTP servable JPG
-
-    __table_args__ = {'extend_existing': True}
-
-    type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'dr8', 'dr8-model',
-                             'ps1', name='thumbnail_types',
-                             validate_strings=True))
-    public_url = sa.Column(sa.String(), nullable=True, index=False,
-                           unique=False)
-
-    image_id = sa.Column(
-        sa.Integer,
-        sa.ForeignKey(
-            'calibratableimages.id',
-            ondelete='CASCADE'
-        ),
-        index=True,
-        nullable=True
-    )
-    image = relationship('CalibratableImage',
-                         cascade='all',
-                         back_populates='thumbnails',
-                         foreign_keys=[image_id])
-
-    source_id = sa.Column(
-        sa.Text,
-        sa.ForeignKey(
-            'sources.id',
-            ondelete='CASCADE'
-        ),
-        index=True,
-        nullable=False
-    )
-
-    photometry_id = sa.Column(
-        sa.Integer,
-        sa.ForeignKey(
-            'photometry.id',
-            ondelete='SET NULL'
-        ),
-        index=False,
-        nullable=True
-    )
-
-    photometry = relationship('Photometry', back_populates='thumbnails', cascade='all')
-
-    source = relationship(
-        'Source',
-        cascade='all',
-        back_populates='thumbnails',
-        foreign_keys=[source_id]
-    )
-
-    @classmethod
-    def from_detection(cls, detection, image):
-        source = detection.source
-
-        if os.getenv('NERSC_HOST') != 'cori':
-            raise ValueError('Cannot create stamp; must be on cori.')
-
-        if isinstance(image, models.Base):
-            linkimage = image
-        else:
-            linkimage = image.parent_image
-
-        stamp = DBSession().query(cls).filter(
-            cls.image_id == linkimage.id,
-            cls.source_id == source.id
-        ).first()
-        if stamp is None:
-            stamp = cls(source=source, image=linkimage)
-
-        outname = Path(NERSC_PREFIX) / f'{linkimage.field:06d}/' \
-                                       f'c{linkimage.ccdid:02d}/' \
-                                       f'q{linkimage.qid}/' \
-                                       f'{fid_map[linkimage.fid]}/' \
-                                       f'stamps'
-        outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
-        vmin, vmax = linkimage.cmap_limits()
-        stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
-
-        archive._mkdir_recursive(outname.parent)
-        publish.make_stamp(
-            outname, detection.ra, detection.dec, vmin,
-            vmax, image.data, image.wcs, save=True,
-            size=publish.CUTOUT_SIZE
-        )
-
-        return stamp
 
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
