@@ -1108,6 +1108,8 @@ class Thumbnail(models.Base):
         nullable=True
     )
 
+    photometry = relationship('Photometry', back_populates='thumbnails', cascade='all')
+
     source = relationship(
         'Source',
         cascade='all',
