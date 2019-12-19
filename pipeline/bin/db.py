@@ -123,6 +123,20 @@ fid_map = {
 }
 
 
+def plot_triplet(tr):
+    fig = plt.figure(figsize=(8, 2), dpi=100)
+    ax = fig.add_subplot(131)
+    ax.axis('off')
+    ax.imshow(tr[:, :, 0], origin='upper', cmap=plt.cm.bone)
+    ax2 = fig.add_subplot(132)
+    ax2.axis('off')
+    ax2.imshow(tr[:, :, 1], origin='upper', cmap=plt.cm.bone)
+    ax3 = fig.add_subplot(133)
+    ax3.axis('off')
+    ax3.imshow(tr[:, :, 2], origin='upper', cmap=plt.cm.bone)
+    plt.show()
+
+
 def discrete_cmap(ncolors):
     """Create a ListedColorMap with `ncolors` randomly-generated colors
     that can be used to color an IntegerFITSImage.
@@ -1942,6 +1956,17 @@ class ObjectWithFlux(models.Base):
         return self.flux / self.fluxerr
 
 
+class RealBogus(models.Base):
+
+    rb_score = sa.Column(sa.Float)
+    rb_version = sa.Column(sa.Text)
+    detection_id = sa.Column(sa.Integer, sa.ForeignKey('detections.id',
+                                                       ondelete='CASCADE'),
+                             index=True)
+    detection = relationship('Detection', back_populates='rb', cascade='all')
+
+
+
 class Detection(ObjectWithFlux, SpatiallyIndexed):
     id = sa.Column(sa.Integer,
                    sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
@@ -1961,7 +1986,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     flags = sa.Column(sa.Integer)
     imaflags_iso = sa.Column(sa.Integer)
     goodcut = sa.Column(sa.Boolean)
-    rb = sa.Column(sa.Float)
+    rb = relationship('RealBogus', cascade='all')
 
     @classmethod
     def from_catalog(cls, cat, filter=True):
@@ -1986,8 +2011,13 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 flags=int(row['FLAGS']), imaflags_iso=int(row['IMAFLAGS_ISO']),
                 a_image=float(row['A_IMAGE']), b_image=float(row['B_IMAGE']),
                 fwhm_image=float(row['FWHM_IMAGE']),
-                x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE'])
+                x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE']),
             )
+
+            rb = RealBogus(rb_score=float(row['rb']), rb_version='d6_m7',
+                           detection=detection)
+
+            DBSession().add(rb)
 
             if filter:
                 detection.goodcut = True
@@ -1995,15 +2025,16 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             # query for nearby sources to determine if a new source needs to
             # be created
 
-            source = DBSession().query(models.Source).filter(
-                sa.func.q3c_radial_query(
-                    models.Source.ra,
-                    models.Source.dec,
-                    detection.ra,
-                    detection.dec,
-                    MATCH_RADIUS_DEG
-                )
-            ).first()
+            with DBSession().no_autoflush:
+                source = DBSession().query(models.Source).filter(
+                    sa.func.q3c_radial_query(
+                        models.Source.ra,
+                        models.Source.dec,
+                        detection.ra,
+                        detection.dec,
+                        MATCH_RADIUS_DEG
+                    )
+                ).first()
 
             if source is None:
 
@@ -2013,24 +2044,25 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 # get other detections nearby
 
 
-                prev_dets = DBSession().query(
-                    Detection,
-                    CalibratableImage.type
-                ).join(CalibratableImage).filter(
-                    sa.func.q3c_radial_query(
-                        Detection.ra,
-                        Detection.dec,
-                        detection.ra,
-                        detection.dec,
-                        MATCH_RADIUS_DEG
-                    )
-                ).all()
+                with DBSession().no_autoflush:
+                    prev_dets = DBSession().query(
+                        Detection,
+                        CalibratableImage.type
+                    ).join(CalibratableImage).filter(
+                        sa.func.q3c_radial_query(
+                            Detection.ra,
+                            Detection.dec,
+                            detection.ra,
+                            detection.dec,
+                            MATCH_RADIUS_DEG
+                        )
+                    ).all()
 
                 n_prev_single = sum([1 for _ in prev_dets if _[1] == 'sesub'])
                 n_prev_multi = sum([1 for _ in prev_dets if _[1] == 'mesub'])
 
-                single_criteria = n_prev_single > N_PREV_SINGLE
-                multi_criteria = n_prev_multi > N_PREV_MULTI
+                single_criteria = n_prev_single >= N_PREV_SINGLE
+                multi_criteria = n_prev_multi >= N_PREV_MULTI
                 create_new_source = single_criteria or multi_criteria
 
                 if create_new_source:
