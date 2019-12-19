@@ -20,6 +20,13 @@ __whatami__ = 'Make the subtractions for ZUDS.'
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 refvers = sys.argv[2]
 
+subclass = db.MultiEpochSubtraction
+sciclass = db.ScienceCoadd
+
+#subclass = db.SingleEpochSubtraction
+#sciclass = db.ScienceImage
+
+
 # get the work
 imgs = mpi.get_my_share_of_work(infile)
 
@@ -28,7 +35,7 @@ for fn in imgs:
     tstart = time.time()
 
     sstart = time.time()
-    sci = db.ScienceCoadd.from_file(fn)
+    sci = sciclass.from_file(fn)
     sstop = time.time()
     print(
         f'sci: {sstop-sstart:.2f} sec to load  {sci.basename}',
@@ -59,7 +66,7 @@ for fn in imgs:
 
     basename = db.sub_name(sci.basename, ref.basename)
 
-    prev = db.MultiEpochSubtraction.get_by_basename(basename)
+    prev = subclass.get_by_basename(basename)
     #prev=None
 
     #if (prev is not None) and (prev.modified is not None) and \
@@ -72,9 +79,9 @@ for fn in imgs:
 
     substart = time.time()
     try:
-        sub = db.MultiEpochSubtraction.from_images(sci, ref,
-                                                   data_product=False,
-                                                   tmpdir='tmp')
+        sub = subclass.from_images(sci, ref,
+                                   data_product=False,
+                                   tmpdir='tmp')
     except Exception as e:
         print(e, [sci.basename, ref.basename], flush=True)
         db.DBSession().rollback()
@@ -112,24 +119,31 @@ for fn in imgs:
         db.DBSession().rollback()
         print(f'{len(detections)} detections on "{sub.basename}", '
               'something wrong with the image probably', flush=True)
-    
+
     dstop = time.time()
     print(
         f'det: {dstop-dstart:.2f} sec to make detections for {sub.basename}',
         flush=True
     )
 
-    """
     stampstart = time.time()
     try:
-        remapped = sub.reference_image.aligned_to(sub)
+        if isinstance(sub, db.SingleEpochSubtraction):
+            sub_target = sub.aligned_to(sub.reference_image)
+        else:
+            sub_target = sub
+        if isinstance(sub.target_image, db.ScienceImage):
+            new_target = sub.target_image.aligned_to(sub.reference_image)
+        else:
+            new_target = sub.target_image
         stamps = []
-        for i in [sub, sub.target_image, remapped]:
-            for detection in detections:
-                if len(detection.source.detections) == 0:
+        for detection in detections:
+            if len(detection.source.thumbnails) == 0:
+                for i in [sub_target, new_target, sub.reference_image]:
                     # make a stamp for the first detection
                     stamp = db.Stamp.from_detection(detection, i)
                     stamps.append(stamp)
+                detection.source.add_linked_thumbnails(commit=False)
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
@@ -140,7 +154,7 @@ for fn in imgs:
         f'stamp: {stampstop-stampstart:.2f} sec to make stamps for {sub.basename}',
         flush=True
     )
-    """
+
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
@@ -156,7 +170,7 @@ for fn in imgs:
     #archive.archive(catcopy)
     #archive.archive(mskcopy)
     db.DBSession().commit()
-    archstop = time.time()    
+    archstop = time.time()
     print(
         f'archive: {archstop-archstart:.2f} sec to archive stuff for '
         f'{sub.basename}',

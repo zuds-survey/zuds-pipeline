@@ -5,18 +5,34 @@ from photutils import aperture_photometry
 from astropy.table import Table
 import time
 from seeing import estimate_seeing
+from tensorflow.keras.models import model_from_json, load_model
+import os
+from astropy.nddata.utils import Cutout2D
+from astropy.coordinates import SkyCoord
 
 import db
 
 from scipy.optimize import minimize
 
 CUTSIZE = 11 # pixels
+RB_CUT = 0.2
 
 
 # split an iterable over some processes recursively
 _split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
              _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
+
+def load_model_helper(path, model_base_name):
+    """
+        Build keras model using json-file with architecture and hdf5-file with weights
+    """
+    with open(os.path.join(path, f'{model_base_name}.architecture.json'), 'r') as json_file:
+        loaded_model_json = json_file.read()
+    m = model_from_json(loaded_model_json)
+    m.load_weights(os.path.join(path, f'{model_base_name}.weights.h5'))
+
+    return m
 
 def _read_clargs(val):
     if val[0].startswith('@'):
@@ -25,6 +41,19 @@ def _read_clargs(val):
         val = np.atleast_1d(val)
     return np.asarray(val)
 
+
+def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned):
+    # aligned images are db.CalibratableImages that have north up, east left
+
+    triplet = np.zeros((63, 63, 3))
+    coord = SkyCoord(ra, dec, unit='deg')
+    for i, img in enumerate([new_aligned, ref_aligned, sub_aligned]):
+        cutout = Cutout2D(
+            img.data, coord, size=63, mode='partial',
+            fill_value=0., wcs=img.wcs
+        )
+        triplet[:, :, i] = cutout.data / np.linalg.norm(cutout.data)
+    return triplet
 
 def filter_sexcat(cat):
     """Read in sextractor catalog `incat` and filter it using Peter's technique.
@@ -158,6 +187,51 @@ def filter_sexcat(cat):
 
     print('Number of candidates after negpix cut: ', np.sum(table['GOODCUT']))
     print(f'filter: {stop - start:.2f} sec to negpix cut for {cat.basename}')
+
+    # machine learning
+
+    start = time.time()
+    new_aligned = None
+    ref_aligned = image.reference_image
+    sub_aligned = None
+    ml_model = None
+
+    table['rb'] = -99.
+
+    for row in table:
+        if row['GOODCUT'] > 0:
+
+            # cache the images for stamp making
+            if new_aligned is None:
+                if isinstance(image.target_image, db.ScienceImage):
+                    new_aligned = image.target_image.aligned_to(
+                        image.reference_image)
+                else:
+                    new_aligned = image.target_image
+
+            if sub_aligned is None:
+                if isinstance(image, db.SingleEpochSubtraction):
+                    sub_aligned = image.aligned_to(image.reference_image)
+                else:
+                    sub_aligned = image
+
+            if ml_model is None:
+                ml_model = load_model_helper('../ml', 'd6_m7')
+
+            # put it through machine learning
+            triplet = make_triplet_for_braai(
+                row['X_WORLD'], row['Y_WORLD'], new_aligned,
+                ref_aligned, sub_aligned
+            )
+
+            rb = ml_model.predict(np.expand_dims(triplet, axis=0))
+            row['rb'] = rb[0, 0]
+            if row['rb'] < RB_CUT:
+                row['GOODCUT'] = 0
+
+    stop = time.time()
+    print('Number of candidates after ML cut: ', np.sum(table['GOODCUT']))
+    print(f'filter: {stop - start:.2f} sec to ML cut for {cat.basename}')
 
     start = time.time()
     cat.data = table.to_pandas().to_records(index=False)
