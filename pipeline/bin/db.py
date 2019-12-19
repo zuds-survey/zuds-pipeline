@@ -67,6 +67,7 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
 
 CMAP_RANDOM_SEED = 8675309
 DEFAULT_GROUP = 1
+DEFAULT_INSTRUMENT = 1
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
@@ -120,6 +121,20 @@ fid_map = {
     2: 'zr',
     3: 'zi'
 }
+
+
+def plot_triplet(tr):
+    fig = plt.figure(figsize=(8, 2), dpi=100)
+    ax = fig.add_subplot(131)
+    ax.axis('off')
+    ax.imshow(tr[:, :, 0], origin='upper', cmap=plt.cm.bone)
+    ax2 = fig.add_subplot(132)
+    ax2.axis('off')
+    ax2.imshow(tr[:, :, 1], origin='upper', cmap=plt.cm.bone)
+    ax3 = fig.add_subplot(133)
+    ax3.axis('off')
+    ax3.imshow(tr[:, :, 2], origin='upper', cmap=plt.cm.bone)
+    plt.show()
 
 
 def discrete_cmap(ncolors):
@@ -1052,10 +1067,9 @@ models.Thumbnail.source_id = sa.Column(
 )
 
 
-
-
 def from_detection(cls, detection, image):
     source = detection.source
+    dummy_phot = source.photometry[0]
 
     if os.getenv('NERSC_HOST') != 'cori':
         raise ValueError('Cannot create stamp; must be on cori.')
@@ -1070,6 +1084,7 @@ def from_detection(cls, detection, image):
         cls.source_id == source.id
     ).first()
 
+
     if stamp is None:
         stamp = cls(source=source, image=linkimage)
 
@@ -1081,6 +1096,7 @@ def from_detection(cls, detection, image):
     outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
     vmin, vmax = linkimage.cmap_limits()
     stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
+    stamp.photometry = dummy_phot
 
     archive._mkdir_recursive(outname.parent)
     publish.make_stamp(
@@ -1940,6 +1956,17 @@ class ObjectWithFlux(models.Base):
         return self.flux / self.fluxerr
 
 
+class RealBogus(models.Base):
+
+    rb_score = sa.Column(sa.Float)
+    rb_version = sa.Column(sa.Text)
+    detection_id = sa.Column(sa.Integer, sa.ForeignKey('detections.id',
+                                                       ondelete='CASCADE'),
+                             index=True)
+    detection = relationship('Detection', back_populates='rb', cascade='all')
+
+
+
 class Detection(ObjectWithFlux, SpatiallyIndexed):
     id = sa.Column(sa.Integer,
                    sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
@@ -1959,11 +1986,14 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     flags = sa.Column(sa.Integer)
     imaflags_iso = sa.Column(sa.Integer)
     goodcut = sa.Column(sa.Boolean)
-    rb = sa.Column(sa.Float)
+    rb = relationship('RealBogus', cascade='all')
 
     @classmethod
     def from_catalog(cls, cat, filter=True):
         result = []
+
+        # TODO: determine if prev dets that are updated should also be returned
+
         if filter:
             filter_sexcat(cat)
 
@@ -1981,8 +2011,13 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 flags=int(row['FLAGS']), imaflags_iso=int(row['IMAFLAGS_ISO']),
                 a_image=float(row['A_IMAGE']), b_image=float(row['B_IMAGE']),
                 fwhm_image=float(row['FWHM_IMAGE']),
-                x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE'])
+                x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE']),
             )
+
+            rb = RealBogus(rb_score=float(row['rb']), rb_version='d6_m7',
+                           detection=detection)
+
+            DBSession().add(rb)
 
             if filter:
                 detection.goodcut = True
@@ -1990,15 +2025,16 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             # query for nearby sources to determine if a new source needs to
             # be created
 
-            source = DBSession().query(models.Source).filter(
-                sa.func.q3c_radial_query(
-                    models.Source.ra,
-                    models.Source.dec,
-                    detection.ra,
-                    detection.dec,
-                    MATCH_RADIUS_DEG
-                )
-            ).first()
+            with DBSession().no_autoflush:
+                source = DBSession().query(models.Source).filter(
+                    sa.func.q3c_radial_query(
+                        models.Source.ra,
+                        models.Source.dec,
+                        detection.ra,
+                        detection.dec,
+                        MATCH_RADIUS_DEG
+                    )
+                ).first()
 
             if source is None:
 
@@ -2008,24 +2044,25 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 # get other detections nearby
 
 
-                prev_dets = DBSession().query(
-                    Detection,
-                    CalibratableImage.type
-                ).join(CalibratableImage).filter(
-                    sa.func.q3c_radial_query(
-                        Detection.ra,
-                        Detection.dec,
-                        detection.ra,
-                        detection.dec,
-                        MATCH_RADIUS_DEG
-                    )
-                ).all()
+                with DBSession().no_autoflush:
+                    prev_dets = DBSession().query(
+                        Detection,
+                        CalibratableImage.type
+                    ).join(CalibratableImage).filter(
+                        sa.func.q3c_radial_query(
+                            Detection.ra,
+                            Detection.dec,
+                            detection.ra,
+                            detection.dec,
+                            MATCH_RADIUS_DEG
+                        )
+                    ).all()
 
                 n_prev_single = sum([1 for _ in prev_dets if _[1] == 'sesub'])
                 n_prev_multi = sum([1 for _ in prev_dets if _[1] == 'mesub'])
 
-                single_criteria = n_prev_single > N_PREV_SINGLE
-                multi_criteria = n_prev_multi > N_PREV_MULTI
+                single_criteria = n_prev_single >= N_PREV_SINGLE
+                multi_criteria = n_prev_multi >= N_PREV_MULTI
                 create_new_source = single_criteria or multi_criteria
 
                 if create_new_source:
@@ -2033,6 +2070,10 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                     default_group = DBSession().query(
                         models.Group
                     ).get(DEFAULT_GROUP)
+
+                    default_instrument = DBSession().query(
+                        models.Instrument
+                    ).get(DEFAULT_INSTRUMENT)
 
                     # need to create a new source
                     name = publish.get_next_name()
@@ -2043,6 +2084,12 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                         groups=[default_group]
                     )
 
+                    # need this to make stamps.
+                    dummy_phot = models.Photometry(
+                        source=source,
+                        instrument=default_instrument
+                    )
+
                     for det in prev_dets:
                         det.source = source
 
@@ -2050,6 +2097,10 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
                     # dr8, sdss, ps1
                     source.add_linked_thumbnails()
+
+                    DBSession().add(dummy_phot)
+                    DBSession().add(source)
+
             else:
                 detection.source = source
 
@@ -2122,7 +2173,8 @@ models.Source.q3c = Index(
         models.Source.dec)
 )
 models.Source.detections = relationship('Detection', cascade='all')
-models.Source.photometry = relationship('ForcedPhotometry', cascade='all')
+models.Source.forced_photometry = relationship('ForcedPhotometry',
+                                               cascade='all')
 models.Source.best_detection = property(best_detection)
 
 
