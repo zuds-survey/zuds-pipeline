@@ -28,7 +28,7 @@ for fn in imgs:
 
     start = time.time()
     try:
-        phot = sub.force_photometry(sub.sources_contained)
+        phot = sub.force_photometry(sub.sources_contained.all())
     except Exception as e:
         print(e)
         continue
@@ -36,6 +36,7 @@ for fn in imgs:
     stop = time.time()
 
     db.DBSession().add_all(phot)
+    db.DBSession().commit()
     print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}')
 
 
