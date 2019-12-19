@@ -67,6 +67,7 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
 
 CMAP_RANDOM_SEED = 8675309
 DEFAULT_GROUP = 1
+DEFAULT_INSTRUMENT = 1
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
@@ -1052,10 +1053,9 @@ models.Thumbnail.source_id = sa.Column(
 )
 
 
-
-
 def from_detection(cls, detection, image):
     source = detection.source
+    dummy_phot = source.photometry[0]
 
     if os.getenv('NERSC_HOST') != 'cori':
         raise ValueError('Cannot create stamp; must be on cori.')
@@ -1070,6 +1070,7 @@ def from_detection(cls, detection, image):
         cls.source_id == source.id
     ).first()
 
+
     if stamp is None:
         stamp = cls(source=source, image=linkimage)
 
@@ -1081,6 +1082,7 @@ def from_detection(cls, detection, image):
     outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
     vmin, vmax = linkimage.cmap_limits()
     stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
+    stamp.photometry = dummy_phot
 
     archive._mkdir_recursive(outname.parent)
     publish.make_stamp(
@@ -1964,6 +1966,9 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     @classmethod
     def from_catalog(cls, cat, filter=True):
         result = []
+
+        # TODO: determine if prev dets that are updated should also be returned
+
         if filter:
             filter_sexcat(cat)
 
@@ -2034,6 +2039,10 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                         models.Group
                     ).get(DEFAULT_GROUP)
 
+                    default_instrument = DBSession().query(
+                        models.Instrument
+                    ).get(DEFAULT_INSTRUMENT)
+
                     # need to create a new source
                     name = publish.get_next_name()
                     source = models.Source(
@@ -2043,6 +2052,12 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                         groups=[default_group]
                     )
 
+                    # need this to make stamps.
+                    dummy_phot = models.Photometry(
+                        source=source,
+                        instrument=default_instrument
+                    )
+
                     for det in prev_dets:
                         det.source = source
 
@@ -2050,6 +2065,10 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
                     # dr8, sdss, ps1
                     source.add_linked_thumbnails()
+
+                    DBSession().add(dummy_phot)
+                    DBSession().add(source)
+
             else:
                 detection.source = source
 

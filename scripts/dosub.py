@@ -115,7 +115,7 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
-    if len(detections) > 200:
+    if len(detections) > 50:
         db.DBSession().rollback()
         print(f'{len(detections)} detections on "{sub.basename}", '
               'something wrong with the image probably', flush=True)
