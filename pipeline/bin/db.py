@@ -2095,9 +2095,6 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
                     detection.source = source
 
-                    # dr8, sdss, ps1
-                    source.add_linked_thumbnails()
-
                     DBSession().add(dummy_phot)
                     DBSession().add(source)
 

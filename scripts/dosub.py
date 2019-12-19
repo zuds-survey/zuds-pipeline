@@ -143,7 +143,8 @@ for fn in imgs:
                     # make a stamp for the first detection
                     stamp = db.Stamp.from_detection(detection, i)
                     stamps.append(stamp)
-                detection.source.add_linked_thumbnails(commit=False)
+                thumbs = detection.source.return_linked_thumbnails()
+                stamps.extend(thumbs)
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
