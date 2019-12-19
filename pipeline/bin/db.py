@@ -72,6 +72,8 @@ NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
+N_PREV_SINGLE = 1
+N_PREV_MULTI = 0
 
 MASK_BITS = {
     'BIT00': 0,
@@ -1050,6 +1052,8 @@ models.Thumbnail.source_id = sa.Column(
 )
 
 
+
+
 def from_detection(cls, detection, image):
     source = detection.source
 
@@ -1065,6 +1069,7 @@ def from_detection(cls, detection, image):
         cls.image_id == linkimage.id,
         cls.source_id == source.id
     ).first()
+
     if stamp is None:
         stamp = cls(source=source, image=linkimage)
 
@@ -1088,7 +1093,7 @@ def from_detection(cls, detection, image):
 
 models.Thumbnail.from_detection = classmethod(from_detection)
 
-
+"""
 def add_linked_thumbnails(self, commit=False):
 
     to_add = []
@@ -1127,7 +1132,7 @@ def add_linked_thumbnails(self, commit=False):
     if commit:
         DBSession().commit()
 models.Source.add_linked_thumbnails = add_linked_thumbnails
-
+"""
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
@@ -1997,23 +2002,56 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
             if source is None:
 
-                default_group = DBSession().query(
-                    models.Group
-                ).get(DEFAULT_GROUP)
+                # source creation logic. at least 2 single epoch detections,
+                # or at least 1 stack detection
 
-                # need to create a new source
-                name = publish.get_next_name()
-                source = models.Source(
-                    id=name,
-                    ra=detection.ra,
-                    dec=detection.dec,
-                    groups=[default_group]
-                )
+                # get other detections nearby
 
-                # dr8, sdss, ps1
-                source.add_linked_thumbnails(commit=False)
 
-            detection.source = source
+                prev_dets = DBSession().query(
+                    Detection,
+                    CalibratableImage.type
+                ).join(CalibratableImage).filter(
+                    sa.func.q3c_radial_query(
+                        Detection.ra,
+                        Detection.dec,
+                        detection.ra,
+                        detection.dec,
+                        MATCH_RADIUS_DEG
+                    )
+                ).all()
+
+                n_prev_single = sum([1 for _ in prev_dets if _[1] == 'sesub'])
+                n_prev_multi = sum([1 for _ in prev_dets if _[1] == 'mesub'])
+
+                single_criteria = n_prev_single > N_PREV_SINGLE
+                multi_criteria = n_prev_multi > N_PREV_MULTI
+                create_new_source = single_criteria or multi_criteria
+
+                if create_new_source:
+
+                    default_group = DBSession().query(
+                        models.Group
+                    ).get(DEFAULT_GROUP)
+
+                    # need to create a new source
+                    name = publish.get_next_name()
+                    source = models.Source(
+                        id=name,
+                        ra=detection.ra,
+                        dec=detection.dec,
+                        groups=[default_group]
+                    )
+
+                    for det in prev_dets:
+                        det.source = source
+
+                    detection.source = source
+
+                    # dr8, sdss, ps1
+                    source.add_linked_thumbnails()
+            else:
+                detection.source = source
 
             # update the source ra and dec
             #best = source.best_detection
