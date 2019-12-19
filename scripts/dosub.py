@@ -20,11 +20,11 @@ __whatami__ = 'Make the subtractions for ZUDS.'
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 refvers = sys.argv[2]
 
-subclass = db.MultiEpochSubtraction
-sciclass = db.ScienceCoadd
+#subclass = db.MultiEpochSubtraction
+#sciclass = db.ScienceCoadd
 
-#subclass = db.SingleEpochSubtraction
-#sciclass = db.ScienceImage
+subclass = db.SingleEpochSubtraction
+sciclass = db.ScienceImage
 
 
 # get the work
