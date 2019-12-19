@@ -216,7 +216,8 @@ def filter_sexcat(cat):
                     sub_aligned = image
 
             if ml_model is None:
-                ml_model = load_model_helper('../ml', 'd6_m7')
+                mydir = os.path.dirname(__file__)
+                ml_model = load_model_helper(f'{mydir}/../ml', 'd6_m7')
 
             # put it through machine learning
             triplet = make_triplet_for_braai(
