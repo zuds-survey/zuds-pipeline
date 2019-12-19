@@ -2141,7 +2141,8 @@ models.Source.q3c = Index(
         models.Source.dec)
 )
 models.Source.detections = relationship('Detection', cascade='all')
-models.Source.photometry = relationship('ForcedPhotometry', cascade='all')
+models.Source.forced_photometry = relationship('ForcedPhotometry',
+                                               cascade='all')
 models.Source.best_detection = property(best_detection)
 
 
