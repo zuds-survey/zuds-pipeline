@@ -138,12 +138,19 @@ for fn in imgs:
             new_target = sub.target_image
         stamps = []
         for detection in detections:
+
             if (detection.source is not None) and len(detection.source.thumbnails) == 0:
-                for i in [sub_target, new_target, sub.reference_image]:
+                for i, t in zip(
+                    [sub_target, new_target, sub.reference_image],
+                    ['sub', 'new', 'ref']
+                ):
                     # make a stamp for the first detection
                     stamp = db.models.Thumbnail.from_detection(detection, i)
+                    stamp.type = t
                     stamps.append(stamp)
                 thumbs = detection.source.return_linked_thumbnails()
+                for thumb in thumbs:
+                    thumb.source = detection.source
                 stamps.extend(thumbs)
     except Exception as e:
         print(e, [cat.basename], flush=True)
