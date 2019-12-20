@@ -1958,6 +1958,8 @@ class ObjectWithFlux(models.Base):
 
 class RealBogus(models.Base):
 
+    __tablename__ = 'realbogus'
+
     rb_score = sa.Column(sa.Float)
     rb_version = sa.Column(sa.Text)
     detection_id = sa.Column(sa.Integer, sa.ForeignKey('detections.id',
@@ -2061,19 +2063,26 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 n_prev_single = sum([1 for _ in prev_dets if _[1] == 'sesub'])
                 n_prev_multi = sum([1 for _ in prev_dets if _[1] == 'mesub'])
 
-                single_criteria = n_prev_single >= N_PREV_SINGLE
-                multi_criteria = n_prev_multi >= N_PREV_MULTI
+                incr_single = 1 if isinstance(detection.image,
+                                              SingleEpochSubtraction) else 0
+                incr_multi = 1 if isinstance(detection.image,
+                                             MultiEpochSubtraction) else 0
+
+                single_criteria = n_prev_single + incr_single > N_PREV_SINGLE
+                multi_criteria = n_prev_multi + incr_multi > N_PREV_MULTI
                 create_new_source = single_criteria or multi_criteria
 
                 if create_new_source:
 
-                    default_group = DBSession().query(
-                        models.Group
-                    ).get(DEFAULT_GROUP)
 
-                    default_instrument = DBSession().query(
-                        models.Instrument
-                    ).get(DEFAULT_INSTRUMENT)
+                    with DBSession().no_autoflush:
+                        default_group = DBSession().query(
+                            models.Group
+                        ).get(DEFAULT_GROUP)
+
+                        default_instrument = DBSession().query(
+                            models.Instrument
+                        ).get(DEFAULT_INSTRUMENT)
 
                     # need to create a new source
                     name = publish.get_next_name()
