@@ -138,7 +138,7 @@ for fn in imgs:
             new_target = sub.target_image
         stamps = []
         for detection in detections:
-            if len(detection.source.thumbnails) == 0:
+            if (detection.source is not None) and len(detection.source.thumbnails) == 0:
                 for i in [sub_target, new_target, sub.reference_image]:
                     # make a stamp for the first detection
                     stamp = db.models.Thumbnail.from_detection(detection, i)
