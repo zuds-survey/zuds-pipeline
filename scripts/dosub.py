@@ -138,7 +138,8 @@ for fn in imgs:
             new_target = sub.target_image
         stamps = []
         for detection in detections:
-            if len(detection.source.thumbnails) == 0:
+
+            if (detection.source is not None) and len(detection.source.thumbnails) == 0:
                 for i, t in zip(
                     [sub_target, new_target, sub.reference_image],
                     ['sub', 'new', 'ref']
