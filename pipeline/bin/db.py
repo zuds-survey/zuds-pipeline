@@ -2115,6 +2115,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
             result.append(detection)
 
+        DBSession().flush()
         return result
 
 

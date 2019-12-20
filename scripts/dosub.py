@@ -157,7 +157,7 @@ for fn in imgs:
     )
 
     # make the alerts
-    
+
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
