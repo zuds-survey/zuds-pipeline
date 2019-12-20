@@ -1088,7 +1088,7 @@ def from_detection(cls, detection, image):
                                    f'stamps'
     outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
     vmin, vmax = linkimage.cmap_limits()
-    stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
+    stamp.public_url = f'{outname}'.replace(STAMP_PREFIX, URL_PREFIX)
     stamp.photometry = dummy_phot
     stamp.file_uri = outname
 
