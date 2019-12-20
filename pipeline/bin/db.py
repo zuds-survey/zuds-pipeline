@@ -70,7 +70,7 @@ DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
-URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
+URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf'
 STAMP_PREFIX = '/global/project/projectdirs/ptf/www/ztf'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
