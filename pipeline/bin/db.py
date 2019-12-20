@@ -71,6 +71,7 @@ DEFAULT_INSTRUMENT = 1
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf/data'
+STAMP_PREFIX = '/global/project/projectdirs/ptf/www/ztf/stamps'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
 N_PREV_SINGLE = 1
@@ -1080,7 +1081,7 @@ def from_detection(cls, detection, image):
         linkimage = image.parent_image
 
     stamp = cls(source=source, image=linkimage)
-    outname = Path(NERSC_PREFIX) / f'{linkimage.field:06d}/' \
+    outname = Path(STAMP_PREFIX) / f'{linkimage.field:06d}/' \
                                    f'c{linkimage.ccdid:02d}/' \
                                    f'q{linkimage.qid}/' \
                                    f'{fid_map[linkimage.fid]}/' \
@@ -1089,6 +1090,7 @@ def from_detection(cls, detection, image):
     vmin, vmax = linkimage.cmap_limits()
     stamp.public_url = f'{outname}'.replace(NERSC_PREFIX, URL_PREFIX)
     stamp.photometry = dummy_phot
+    stamp.file_uri = outname
 
     archive._mkdir_recursive(outname.parent)
     publish.make_stamp(
@@ -1096,6 +1098,7 @@ def from_detection(cls, detection, image):
         vmax, image.data, image.wcs, save=True,
         size=publish.CUTOUT_SIZE
     )
+    os.chmod(outname, archive.perm)
 
     return stamp
 
