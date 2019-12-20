@@ -141,7 +141,7 @@ for fn in imgs:
             if len(detection.source.thumbnails) == 0:
                 for i in [sub_target, new_target, sub.reference_image]:
                     # make a stamp for the first detection
-                    stamp = db.Stamp.from_detection(detection, i)
+                    stamp = db.models.Thumbnail.from_detection(detection, i)
                     stamps.append(stamp)
                 thumbs = detection.source.return_linked_thumbnails()
                 stamps.extend(thumbs)
@@ -156,13 +156,15 @@ for fn in imgs:
         flush=True
     )
 
+    # make the alerts
+    
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
     #catcopy = db.HTTPArchiveCopy.from_product(cat)
     #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
     db.DBSession().add_all(detections)
-    #db.DBSession().add_all(stamps)
+    #db.DBSession().add_all(stamps)c
 
     #db.DBSession().add(mskcopy)
     #db.DBSession().add(catcopy)

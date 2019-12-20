@@ -1079,15 +1079,7 @@ def from_detection(cls, detection, image):
     else:
         linkimage = image.parent_image
 
-    stamp = DBSession().query(cls).filter(
-        cls.image_id == linkimage.id,
-        cls.source_id == source.id
-    ).first()
-
-
-    if stamp is None:
-        stamp = cls(source=source, image=linkimage)
-
+    stamp = cls(source=source, image=linkimage)
     outname = Path(NERSC_PREFIX) / f'{linkimage.field:06d}/' \
                                    f'c{linkimage.ccdid:02d}/' \
                                    f'q{linkimage.qid}/' \
@@ -2073,7 +2065,6 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 create_new_source = single_criteria or multi_criteria
 
                 if create_new_source:
-
 
                     with DBSession().no_autoflush:
                         default_group = DBSession().query(
