@@ -58,8 +58,6 @@ def prepare_sextractor(image, directory, checkimage_type=None,
     else:
         ctypestr = cnamestr = 'None'
 
-    hasweight = hasattr(image, '_rmsimg')
-
     syscall = f'sex -c {conf} {impath} ' \
               f'-CHECKIMAGE_TYPE {ctypestr} ' \
               f'-CHECKIMAGE_NAME {cnamestr} ' \
@@ -69,32 +67,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
               f'-PARAMETERS_NAME {PARAM_FILE} ' \
               f'-STARNNW_NAME {NNW_FILE} ' \
               f'-FILTER_NAME {CONV_FILE} ' \
-              f'-FLAG_IMAGE {image.mask_image.local_path} ' \
-
-    delnames = []
-    if hasweight:
-        image.weight_image.save()
-        syscall += f'-WEIGHT_IMAGE {image.weight_image.local_path} ' \
-                   f'-WEIGHT_TYPE MAP_WEIGHT'
-    else:
-        # we will use the (inverted) bad pixel mask as the initial weight map
-        #  if a weight map is not specified. this ensures that sextractor
-        # does not use masked pixels in its estimates of the background, etc.
-
-        # this means the weight map will have weight=0 for masked pixels and
-        # weight = 1 for unmasked pixels
-
-        bpmweight = db.FITSImage()
-        bpmweight.data = (~image.mask_image.boolean.data).astype('float32')
-        bpmweight.header = image.mask_image.header
-        bpmweight.header_comments= image.mask_image.header_comments
-        bpmweight.basename = image.basename.replace('.fits', '.bpmweight.fits')
-        bpmwpath = f'{(directory / bpmweight.basename).absolute()}'
-        bpmweight.map_to_local_file(bpmwpath)
-        bpmweight.save()
-
-        syscall += f'-WEIGHT_IMAGE {bpmweight.local_path} ' \
-                   f'-WEIGHT_TYPE MAP_WEIGHT'
+              f'-FLAG_IMAGE {image.mask_image.local_path} '
 
     outnames = [outname] + coutnames
 
