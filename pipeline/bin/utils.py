@@ -7,7 +7,7 @@ def initialize_directory(directory):
     directory.mkdir(parents=True, exist_ok=True)
 
 
-def quick_background_estimate(image, nsamp=10000, mask_image=None):
+def quick_background_estimate(image, nsamp=750000, mask_image=None):
     # only requires that image.data and image.mask_image be defined
     # we only need a quick estimate of the bkg.
     # so we mask out any pixels where the MASK value is non zero.
