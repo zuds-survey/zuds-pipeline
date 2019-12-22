@@ -1191,6 +1191,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         cat.image = image
         image.catalog = cat
 
+
         return cat
 
 
@@ -1804,6 +1805,13 @@ class Subtraction(HasWCS):
         submask = MaskImage.get_by_basename(os.path.basename(outmask))
         if submask is None:
             submask = MaskImage()
+
+        if submask.ismapped:
+            # may still be bound from a previous run,
+            # if so, remove its mapped attributes (_boolean, etc.)
+            submask.unmap()
+
+
         submask.basename = os.path.basename(outmask)
 
         submask.field = sci.field
