@@ -614,6 +614,9 @@ class FITSFile(File):
         if obj is None:
             obj = cls()
             obj.basename = f.name
+        else:
+            if obj.ismapped:
+                obj.unmap() #  force things to be reloaded from disk 
         obj.map_to_local_file(str(f.absolute()))
         obj.load_header()
 
