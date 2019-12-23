@@ -1175,7 +1175,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     _HEADER_HDU = 2
 
     @classmethod
-    def from_image(cls, image, tmpdir='/tmp'):
+    def from_image(cls, image, tmpdir='/tmp', kill_flagged=True):
         if not isinstance(image, CalibratableImage):
             raise ValueError('Image is not an instance of '
                              'CalibratableImage.')
@@ -1194,8 +1194,24 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         cat.image = image
         image.catalog = cat
 
+        if kill_flagged:
+            image.catalog.kill_flagged()
 
         return cat
+
+    def kill_flagged(self):
+        # overwrite the catalog, killing any detections with bad IMAFLAGS_ISO
+        self.load()
+        bad_bits = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 12, 16, 17])
+        bad_bits = int(np.sum(2 ** bad_bits))
+        oinds = []
+        for i, row in enumerate(self.data):
+            if row['IMAFLAGS_ISO'] & bad_bits == 0:
+                oinds.append(i)
+        out = self.data[oinds]
+        self.data = out
+        self.save()
+        self.load()
 
 
 class MaskImage(ZTFFile, FITSImage):
