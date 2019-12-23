@@ -1210,7 +1210,7 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         self.load()
         oinds = []
         for i, row in enumerate(self.data):
-            if row['IMAFLAGS_ISO'] & BAD_SUM == 0:
+            if row['IMAFLAGS_ISO'] & BAD_SUM == 0 and row['FLAGS_WEIGHT'] == 0:
                 oinds.append(i)
         out = self.data[oinds]
         self.data = out
