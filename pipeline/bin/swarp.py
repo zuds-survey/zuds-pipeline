@@ -242,7 +242,17 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
                                  nthreads=nthreads)
 
     # run swarp
-    subprocess.check_call(command.split())
+    while True:
+        try:
+            subprocess.check_call(command.split())
+        except OSError as e:
+            if e.errno == 14:
+                continue
+            else:
+                raise e
+        else:
+            break
+
 
     # load the result
     coadd = cls.from_file(outname)

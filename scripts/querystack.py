@@ -44,7 +44,7 @@ res = db.DBSession().query(db.ScienceImage.field,
                db.ScienceImage.id).join(daterange, jcond)
 ).filter(
     db.ScienceImage.seeing < 4.,
-    db.ScienceImage.maglimit > 19.
+    db.ScienceImage.maglimit > 19.2
 ).group_by(
     db.ScienceImage.field,
     db.ScienceImage.ccdid,
