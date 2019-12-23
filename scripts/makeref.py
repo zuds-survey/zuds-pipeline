@@ -52,7 +52,7 @@ for d in my_dirs:
     try:
         coadd = db.ReferenceImage.from_images(top, coaddname,
                                               data_product=True,
-                                              nthreads=4,
+                                              nthreads=mpi.get_nthreads(),
                                               tmpdir='./tmp')
         coadd.version = version
     except TypeError as e:
