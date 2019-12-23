@@ -24,7 +24,7 @@ checkimage_map = {
 
 
 def prepare_sextractor(image, directory, checkimage_type=None,
-                       catalog_type='FITS_LDAC'):
+                       catalog_type='FITS_LDAC', use_weightmap=True):
 
     """Set up the pipeline to do a run of source extractor."""
 
@@ -57,6 +57,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
     else:
         ctypestr = cnamestr = 'None'
 
+
     syscall = f'sex -c {conf} {impath} ' \
               f'-CHECKIMAGE_TYPE {ctypestr} ' \
               f'-CHECKIMAGE_NAME {cnamestr} ' \
@@ -68,13 +69,17 @@ def prepare_sextractor(image, directory, checkimage_type=None,
               f'-FILTER_NAME {CONV_FILE} ' \
               f'-FLAG_IMAGE {image.mask_image.local_path} '
 
+    if use_weightmap:
+        syscall += f'-WEIGHT_IMAGE {image.weight_image.local_path} ' \
+                   f'-WEIGHT_TYPE MAP_WEIGHT'
+
     outnames = [outname] + coutnames
 
     return syscall, outnames
 
 
 def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
-                   tmpdir='/tmp'):
+                   tmpdir='/tmp', use_weightmap=True):
     """Run SExtractor on an image and produce the requested checkimages and
     catalogs, returning the results as ZUDS objects (potentially DB-backed)."""
 
@@ -83,7 +88,7 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
 
     command, outnames = prepare_sextractor(
         image, directory, checkimage_type=checkimage_type,
-        catalog_type=catalog_type
+        catalog_type=catalog_type, use_weightmap=use_weightmap
     )
 
     # run it

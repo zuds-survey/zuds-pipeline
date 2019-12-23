@@ -1325,14 +1325,16 @@ class CalibratableImage(FITSImage, ZTFFile):
         interval = ZScaleInterval()
         return interval.get_limits(self.data[~self.mask_image.boolean.data])
 
-    def _call_source_extractor(self, checkimage_type=None, tmpdir='/tmp'):
+    def _call_source_extractor(self, checkimage_type=None, tmpdir='/tmp',
+                               use_weightmap=True):
 
         rs = sextractor.run_sextractor
         success = False
         for _ in range(3):
             try:
                 results = rs(
-                    self, checkimage_type=checkimage_type, tmpdir=tmpdir
+                    self, checkimage_type=checkimage_type, tmpdir=tmpdir,
+                    use_weightmap=use_weightmap
                 )
             except subprocess.CalledProcessError as e:
                 print(f'Caught CalledProcessError {e}, retrying... {_+1} / 3')
@@ -1398,7 +1400,36 @@ class CalibratableImage(FITSImage, ZTFFile):
         try:
             return self._rmsimg
         except AttributeError:
-            self._call_source_extractor(checkimage_type=['rms'])
+            if hasattr(self, '_weightimg'):
+                ind = self.mask_image.boolean.data
+                rms = np.empty_like(ind, dtype='<f4')
+                rms[~ind] = 1 / np.sqrt(self.weight_image.data[~ind])
+                rms[ind] = BIG_RMS
+
+                try:
+                    saturval = self.header['SATURATE']
+                except KeyError:
+                    pass
+                else:
+                    saturind = self.data >= 0.9 * saturval
+                    rms[saturind] = BIG_RMS
+
+                _rmsimg = FITSImage()
+                _rmsimg.basename = self.basename.replace('.fits', '.rms.fits')
+                _rmsimg.data = rms
+                _rmsimg.header = self.header
+                _rmsimg.header_comments = self.header_comments
+                if self.ismapped:
+                    dirname = os.path.dirname(self.local_path)
+                    bn = _rmsimg.basename
+                    join = os.path.join(dirname, bn)
+                    _rmsimg.map_to_local_file(join)
+                    _rmsimg.save()
+                self._rmsimg = _rmsimg
+                return self._rmsimg
+            else:
+                self._call_source_extractor(checkimage_type=['rms'],
+                                            use_weightmap=False)
         ind = self.mask_image.boolean.data
         self._rmsimg.data[ind] = BIG_RMS
         return self._rmsimg
