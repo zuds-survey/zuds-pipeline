@@ -259,6 +259,8 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     weightoutname = outname.replace('.fits', '.weight.fits')
 
     # we simply sum the weight maps together
+    if swarp_kws is None:
+        swarp_kws = {}
     swarp_kws['COMBINE_TYPE'] = 'SUM'
     command = prepare_swarp_sci(weightmaps, weightoutname, directory,
                                 reference=reference,
