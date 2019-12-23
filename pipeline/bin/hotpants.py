@@ -75,6 +75,9 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
                                                   mask_image=sci.mask_image)
     refbkg, refbkgstd = quick_background_estimate(ref)
 
+    # output the RMS image from hotpants
+    subrms = outname.replace('.fits', '.rms.fits')
+
     il = scibkg - 10 * scibkgstd
     tl = refbkg - 10 * refbkgstd
 
@@ -86,7 +89,8 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path} ' \
-              f'-nsx {nsx} -nsy {nsy}  -v 0'
+              f'-nsx {nsx} -nsy {nsy}  -v 0 -oni {subrms} ' \
+              f'-fin {db.BIG_RMS}'
 
     return syscall
 
