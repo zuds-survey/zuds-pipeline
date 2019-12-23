@@ -11,7 +11,6 @@ SEX_CONF = Path(__file__).parent.parent / 'astromatic/sextractor.conf'
 PARAM_FILE = Path(__file__).parent.parent / 'astromatic/sextractor.param'
 NNW_FILE = Path(__file__).parent.parent / 'astromatic/default.nnw'
 CONV_FILE = Path(__file__).parent.parent / 'astromatic/default.conv'
-BACKGROUND_BOXSIZE = db.BKG_BOX_SIZE  # pixels
 
 
 
@@ -63,7 +62,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
               f'-CHECKIMAGE_NAME {cnamestr} ' \
               f'-CATALOG_NAME {outname} ' \
               f'-CATALOG_TYPE {catalog_type} ' \
-              f'-BACK_SIZE {BACKGROUND_BOXSIZE} ' \
+              f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \
               f'-PARAMETERS_NAME {PARAM_FILE} ' \
               f'-STARNNW_NAME {NNW_FILE} ' \
               f'-FILTER_NAME {CONV_FILE} ' \
