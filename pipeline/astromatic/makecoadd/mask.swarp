@@ -22,7 +22,7 @@ WEIGHT_THRESH          1.0e-30               # Bad pixel weight-threshold
 #------------------------------- Co-addition ----------------------------------
 
 COMBINE                Y               # Combine resampled images (Y/N)?
-COMBINE_TYPE           OR              # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,CLIPPED
+COMBINE_TYPE           AND              # MEDIAN,AVERAGE,MIN,MAX,WEIGHTED,
                                        # CHI-OLD,CHI-MODE,CHI-MEAN,SUM,
                                        # WEIGHTED_WEIGHT,MEDIAN_WEIGHT,
                                        # AND,NAND,OR or NOR
