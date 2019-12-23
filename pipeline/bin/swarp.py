@@ -12,7 +12,7 @@ import tempfile
 from astropy.wcs import WCS
 
 
-from utils import initialize_directory
+from utils import initialize_directory, quick_background_estimate
 
 import db
 
@@ -210,7 +210,8 @@ def run_align(image, other, tmpdir='/tmp',
 
 
 def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
-              nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
+              nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None,
+              padnoise=True):
     """Run swarp on images `images`"""
 
     directory = Path(tmpdir) / uuid.uuid4().hex
@@ -273,6 +274,14 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
 
     if addbkg:
         coadd.data += BKG_VAL
+
+    if padnoise:
+        # pad the border regions with noise to keep weightmaps flat
+        coaddbkg, coaddstd = quick_background_estimate(coadd)
+        padscale = 1.5 * coaddstd
+        bdview = coadd.data[coaddweight.data == 0]
+        nbad = len(bdview)
+        bdview += np.random.normal(loc=0., scale=padscale, size=nbad)
 
     # save the coadd to disk
     coadd.save()
