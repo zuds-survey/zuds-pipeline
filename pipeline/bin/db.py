@@ -196,9 +196,9 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
             if catalog is not None:
                 filtered = 'GOODCUT' in catalog.data.dtype.names
                 my_xy = im.wcs.all_world2pix(list(zip(catalog.data[
-                                                          'X_IMAGE'],
+                                                          'X_WORLD'],
                                                       catalog.data[
-                                                          'Y_IMAGE'
+                                                          'Y_WORLD'
                                                       ])), 0)
                 for row, xy in zip(catalog.data, my_xy):
 

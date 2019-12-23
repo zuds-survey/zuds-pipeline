@@ -113,7 +113,7 @@ def filter_sexcat(cat):
 
     # the following bits are disqualifying:
     bad_bits = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 12, 16, 17])
-    bad_bits = int(np.sum(2**bad_bits))
+    bad_bits = int(np.sum(2 ** bad_bits))
 
     start = time.time()
 
