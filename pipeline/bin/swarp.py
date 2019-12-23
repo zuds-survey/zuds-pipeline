@@ -192,7 +192,7 @@ def run_align(image, other, tmpdir='/tmp',
     result.parent_image = image
     weightimage = db.FITSImage.from_file(outweight)
 
-    if isinstance(result, db.MaskImage):
+    if isinstance(image, db.MaskImage):
         result.update_from_weight_map(weightimage)
 
     # load everything into memory and unmap if the disk file is going to be
