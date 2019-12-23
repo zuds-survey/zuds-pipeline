@@ -97,6 +97,9 @@ MASK_BITS = {
     'BIT16': 16
 }
 
+BAD_BITS = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 16, 17])
+BAD_SUM = int(np.sum(2 ** BAD_BITS))
+
 MASK_COMMENTS = {
     'BIT00': 'AIRCRAFT/SATELLITE TRACK',
     'BIT01': 'CONTAINS SEXTRACTOR DETECTION',
@@ -1205,11 +1208,9 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     def kill_flagged(self):
         # overwrite the catalog, killing any detections with bad IMAFLAGS_ISO
         self.load()
-        bad_bits = np.asarray([0, 2, 3, 4, 5, 7, 8, 9, 10, 12, 16, 17])
-        bad_bits = int(np.sum(2 ** bad_bits))
         oinds = []
         for i, row in enumerate(self.data):
-            if row['IMAFLAGS_ISO'] & bad_bits == 0:
+            if row['IMAFLAGS_ISO'] & BAD_SUM == 0:
                 oinds.append(i)
         out = self.data[oinds]
         self.data = out
@@ -1275,7 +1276,7 @@ class MaskImage(ZTFFile, FITSImage):
             # masked, another of my custom bits)
             # So 6141 -> 71677 --> 202749
 
-            maskpix = (self.data & 202749) > 0
+            maskpix = (self.data & BAD_SUM) > 0
             _boolean = FITSImage()
             _boolean.data = maskpix
             _boolean.header = self.header
