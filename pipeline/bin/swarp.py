@@ -211,7 +211,7 @@ def run_align(image, other, tmpdir='/tmp',
 
 def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
               nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None,
-              padnoise=True):
+              padnoise=True, maskborder=True):
     """Run swarp on images `images`"""
 
     directory = Path(tmpdir) / uuid.uuid4().hex
@@ -282,9 +282,16 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
         bdview = coadd.data[coaddweight.data == 0]
         nbad = len(bdview)
         bdview += np.random.normal(loc=0., scale=padscale, size=nbad)
+        coadd.data[coaddweight.data == 0] = bdview
+
+    if maskborder:
+        # mask the tiny border region
+        borderval = 0. if not addbkg else BKG_VAL
+        coaddmask.data[coadd.data == borderval] = 2 ** 16
 
     # save the coadd to disk
     coadd.save()
+    coaddmask.save()
 
     # clean up
     for im in [coadd] + images.tolist():
