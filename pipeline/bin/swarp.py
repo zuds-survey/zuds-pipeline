@@ -254,31 +254,6 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
         else:
             break
 
-    # now swarp together the weight maps
-    weightmaps = [image.weight_image for image in images]
-    weightoutname = outname.replace('.fits', '.weight.fits')
-
-    # we simply sum the weight maps together
-    if swarp_kws is None:
-        swarp_kws = {}
-    swarp_kws['COMBINE_TYPE'] = 'SUM'
-    command = prepare_swarp_sci(weightmaps, weightoutname, directory,
-                                reference=reference,
-                                copy_inputs=copy_inputs,
-                                nthreads=nthreads,
-                                swarp_kws=swarp_kws)
-
-    # run swarp
-    while True:
-        try:
-            subprocess.check_call(command.split())
-        except OSError as e:
-            if e.errno == 14:
-                continue
-            else:
-                raise e
-        else:
-            break
 
     # load the result
     coadd = cls.from_file(outname)
