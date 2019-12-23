@@ -16,7 +16,7 @@ RESCALE_WEIGHTS        Y               # Rescale input weights/variances (Y/N)?
 WEIGHT_SUFFIX          .weight.fits    # Suffix to use for weight-maps
 WEIGHT_IMAGE                           # Weightmap filename if suffix not used
                                        # (all or for each weight-map)
-WEIGHT_THRESH                          # Bad pixel weight-threshold
+WEIGHT_THRESH         1.0e-30          # Bad pixel weight-threshold
 
 #------------------------------- Co-addition ----------------------------------
 
