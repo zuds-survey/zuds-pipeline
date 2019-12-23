@@ -17,15 +17,14 @@ from utils import initialize_directory, quick_background_estimate
 import db
 
 CONF_DIR = Path(__file__).parent.parent / 'astromatic/makecoadd'
-REF_CONF = CONF_DIR / 'template.swarp'
 SCI_CONF = CONF_DIR / 'default.swarp'
 MSK_CONF = CONF_DIR / 'mask.swarp'
 BKG_VAL = 150.  # counts
 
 
 def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
-                      reference=False, nthreads=1, swarp_kws=None):
-    conf = REF_CONF if reference else SCI_CONF
+                      nthreads=1, swarp_kws=None):
+    conf = SCI_CONF
     initialize_directory(directory)
 
     if copy_inputs:
@@ -209,7 +208,7 @@ def run_align(image, other, tmpdir='/tmp',
     return result
 
 
-def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
+def run_coadd(cls, images, outname, mskoutname, addbkg=True,
               nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
     """Run swarp on images `images`"""
 
@@ -217,7 +216,6 @@ def run_coadd(cls, images, outname, mskoutname, reference=False, addbkg=True,
     directory.mkdir(exist_ok=True, parents=True)
 
     command = prepare_swarp_sci(images, outname, directory,
-                                reference=reference,
                                 copy_inputs=copy_inputs,
                                 nthreads=nthreads,
                                 swarp_kws=swarp_kws)

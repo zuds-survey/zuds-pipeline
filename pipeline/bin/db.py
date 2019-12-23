@@ -1707,12 +1707,9 @@ class Coadd(CalibratableImage):
         # make sure all images have the same field, filter, ccdid, qid:
         ensure_images_have_the_same_properties(images, properties)
 
-        # is this a reference image?
-        isref = issubclass(cls, ReferenceImage)
-
         # call swarp
         coadd = run_coadd(cls, images, outfile_name, mskoutname,
-                          reference=isref, addbkg=True, nthreads=nthreads,
+                          addbkg=True, nthreads=nthreads,
                           tmpdir=tmpdir, copy_inputs=copy_inputs,
                           swarp_kws=swarp_kws)
         coaddmask = coadd.mask_image
