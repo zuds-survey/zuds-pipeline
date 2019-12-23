@@ -193,13 +193,16 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
 
         for i, (im, a) in enumerate(zip(imgs, ax.ravel())):
             im.show(a, align_to=align_target if reproject else None)
-
             if catalog is not None:
-
                 filtered = 'GOODCUT' in catalog.data.dtype.names
+                my_xy = im.wcs.all_world2pix(list(zip(catalog.data[
+                                                          'X_IMAGE'],
+                                                      catalog.data[
+                                                          'Y_IMAGE'
+                                                      ])), 0)
+                for row, xy in zip(catalog.data, my_xy):
 
-                for row in catalog.data:
-                    e = Ellipse(xy=(row['X_IMAGE'], row['Y_IMAGE']),
+                    e = Ellipse(xy=xy,
                                 width=6 * row['A_IMAGE'],
                                 height=6 * row['B_IMAGE'],
                                 angle=row['THETA_IMAGE'] * 180. / np.pi)
