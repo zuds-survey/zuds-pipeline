@@ -11,7 +11,7 @@ SEX_CONF = Path(__file__).parent.parent / 'astromatic/sextractor.conf'
 PARAM_FILE = Path(__file__).parent.parent / 'astromatic/sextractor.param'
 NNW_FILE = Path(__file__).parent.parent / 'astromatic/default.nnw'
 CONV_FILE = Path(__file__).parent.parent / 'astromatic/default.conv'
-BACKGROUND_BOXSIZE = 384  # pixels
+BACKGROUND_BOXSIZE = db.BKG_BOX_SIZE  # pixels
 
 
 
