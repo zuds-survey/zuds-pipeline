@@ -13,7 +13,7 @@ RUN apt-get update \
     flex pkg-config cmake \
     autoconf m4 libtool automake locales libopenblas-dev \
     && rm -fr /var/lib/apt/lists/*
-    
+
 # We install everything directly into /usr so that we do
 # not need to modify the default library and executable
 # search paths.  Shifter will manipulate LD_LIBRARY_PATH,
@@ -247,8 +247,8 @@ RUN conda install \
     ipython \
     jupyter \
     paramiko \
-    setuptools  \    
-    galsim -c conda-forge 
+    setuptools  \
+    galsim -c conda-forge
 
 # Install pip packages.
 
@@ -283,7 +283,8 @@ RUN pip install \
     awscli \
     -r requirements1.txt \
     -r requirements2.txt \
-    git+https://github.com/dmitryduev/kowalski.git
+    git+https://github.com/dmitryduev/kowalski.git \
+    tensorflow
 
 
 RUN python -c "import astropy"
