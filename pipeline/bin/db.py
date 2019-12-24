@@ -2583,3 +2583,9 @@ class CLU(models.Base):
     b2a = sa.Column(sa.Float)
     pa = sa.Column(sa.Float)
     type_ned = sa.Column(sa.Text)
+
+
+class Alert(models.Base):
+    mjd = sa.Column(sa.Float, index=True)
+    alert = sa.Column(psql.JSONB)
+
