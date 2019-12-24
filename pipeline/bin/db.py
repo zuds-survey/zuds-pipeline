@@ -2589,3 +2589,9 @@ class Alert(models.Base):
     mjd = sa.Column(sa.Float, index=True)
     alert = sa.Column(psql.JSONB)
 
+    @classmethod
+    def from_detection(cls, detection):
+        obj = cls()
+        obj.mjd = detection.image.mjd
+
+

@@ -28,7 +28,7 @@ lookup = dict(zip(range(0, 25), 'abcdefghijklmnopqrstuvwxyz'))
 def get_next_name():
     seqquery = "SELECT nextval('namenum')"
     num = db.DBSession().execute(seqquery).fetchone()[0]
-    name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
+    name = 'ZUDS' + str(date.today().year)[2:] + num_to_alpha(num)
     return name
 
 def num_to_alpha(num):
