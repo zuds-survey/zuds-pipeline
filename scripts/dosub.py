@@ -139,14 +139,14 @@ for fn in imgs:
         stamps = []
         for detection in detections:
             if detection.source is not None:
-                haswebstamps = len(detection.source.thumbnails) > 0
+                for_web = len(detection.source.thumbnails) == 0
                 for i in [sub_target, new_target, sub.reference_image]:
                     # make a stamp for the first detection
                     stamp = db.models.Thumbnail.from_detection(
-                        detection, i, for_web=~haswebstamps
+                        detection, i, for_web=for_web
                     )
                     stamps.append(stamp)
-                if ~haswebstamps:
+                if for_web:
                     thumbs = detection.source.return_linked_thumbnails()
                     for thumb in thumbs:
                         thumb.source = detection.source
@@ -163,6 +163,14 @@ for fn in imgs:
     )
 
 
+    # now make the alerts
+    alerts = []
+    for d in detections:
+        if d.source is not None:
+            alert = db.Alert.from_detection(d)
+
+    db.DBSession().add_all(alerts)
+    db.DBSession().commit()
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
@@ -185,11 +193,7 @@ for fn in imgs:
         flush=True
     )
 
-    # now make the alerts
-    alerts = []
-    for d in detections:
-        if d.source is not None:
-            alert = db.Alert.from_detection(d)
+
 
     cleanstart = time.time()
     targets = []
