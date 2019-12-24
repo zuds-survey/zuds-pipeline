@@ -1212,17 +1212,11 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         self.load()
 
 
-class MaskImage(ZTFFile, FITSImage):
+class MaskImageBase(FITSImage):
+
     __diskmapped_cached_properties__ = FITSImage.__diskmapped_cached_properties__ + [
         '_boolean']
 
-    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
-                                             ondelete='CASCADE'),
-                   primary_key=True)
-    __mapper_args__ = {
-        'polymorphic_identity': 'mask',
-        'inherit_condition': id == ZTFFile.id
-    }
 
     def refresh_bit_mask_entries_in_header(self):
         """Update the database record and the disk record with a constant
@@ -1279,6 +1273,17 @@ class MaskImage(ZTFFile, FITSImage):
             self._boolean = _boolean
         return self._boolean
 
+
+class MaskImage(ZTFFile, MaskImageBase):
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+    __mapper_args__ = {
+        'polymorphic_identity': 'mask',
+        'inherit_condition': id == ZTFFile.id
+    }
+
     parent_image_id = sa.Column(sa.Integer,
                                 sa.ForeignKey('calibratableimages.id',
                                               ondelete='CASCADE'))
@@ -1287,6 +1292,8 @@ class MaskImage(ZTFFile, FITSImage):
                                 foreign_keys=[parent_image_id])
 
     idx = Index('maskimages_parent_image_id_idx', parent_image_id)
+
+    pass
 
 
 class CalibratableImage(FITSImage, ZTFFile):
