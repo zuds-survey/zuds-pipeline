@@ -52,6 +52,8 @@ from astropy.visualization import ZScaleInterval
 from matplotlib.patches import Ellipse
 import publish
 
+from crossmatch import xmatch
+
 BIG_RMS = np.sqrt(50000.)
 BKG_BOX_SIZE = 128
 DETECT_NSIGMA = 1.5
@@ -64,6 +66,7 @@ TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
 SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
                           'Y_WORLD', 'FLUX_APER', 'FLUXERR_APER',
                           'THETA_WORLD', 'ELLIPTICITY', 'A_IMAGE', 'B_IMAGE']
+MJD_TO_JD = 2400000.5
 
 CMAP_RANDOM_SEED = 8675309
 DEFAULT_GROUP = 1
@@ -1049,12 +1052,6 @@ class PipelineRegionFile(ZTFFile):
         return reg
 
 
-# Thumbnanil
-#models.Thumbnail.type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss',
-        # 'dr8', 'dr8-model',
-#                             'ps1', name='thumbnail_types',
-#                             validate_strings=True))
-
 models.Thumbnail.image_id = sa.Column(
     sa.Integer,
     sa.ForeignKey(
@@ -1073,11 +1070,24 @@ models.Thumbnail.source_id = sa.Column(
         ondelete='CASCADE'
     ),
     index=True,
-    nullable=False
+    nullable=True
 )
 
+models.Thumbnail.detection_id = sa.Column(
+    sa.Integer,
+    sa.ForeignKey(
+        'detections.id',
+        ondelete='CASCADE'
+    ),
+    index=True,
+    nullable=True
+)
 
-def from_detection(cls, detection, image):
+import io
+import gzip
+
+
+def from_detection(cls, detection, image, for_web=False):
     source = detection.source
     dummy_phot = source.photometry[0]
 
@@ -1097,61 +1107,45 @@ def from_detection(cls, detection, image):
     outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
     vmin, vmax = linkimage.cmap_limits()
     stamp.public_url = f'{outname}'.replace(STAMP_PREFIX, URL_PREFIX)
-    stamp.photometry = dummy_phot
+
+    if for_web:
+        stamp.photometry = dummy_phot
+
     stamp.file_uri = f'{outname}'
 
+    if isinstance(image, Subtraction):
+        stamp.type = 'sub'
+    elif isinstance(image, ReferenceImage):
+        stamp.type = 'ref'
+    else:
+        stamp.type = 'new'
+
     archive._mkdir_recursive(outname.parent)
-    publish.make_stamp(
+    cutout = publish.make_stamp(
         outname, detection.ra, detection.dec, vmin,
         vmax, image.data, image.wcs, save=True,
         size=publish.CUTOUT_SIZE
     )
     os.chmod(outname, archive.perm)
 
+    # convert the cutout data to bytes
+    # and store that in the database
+
+    fitsbuf = io.BytesIO()
+    gzbuf = io.BytesIO()
+
+    fits.writeto(fitsbuf, cutout.data, header=cutout.wcs.to_header())
+    with gzip.open(gzbuf, 'wb') as fz:
+        fz.write(fitsbuf.getvalue())
+
+    stamp.bytes = gzbuf.getvalue()
+    stamp.detection = detection
+
     return stamp
 
 models.Thumbnail.from_detection = classmethod(from_detection)
+models.Thumbnail.bytes = sa.Column(psql.BYTEA)
 
-"""
-def add_linked_thumbnails(self, commit=False):
-
-    to_add = []
-    thumbtypes = [t.type for t in self.thumbnails]
-
-    if len(self.photometry) == 0:
-        return
-
-    if 'sdss' not in thumbtypes:
-        sdss_thumb = models.Thumbnail(public_url=self.get_sdss_url(),
-                               type='sdss',
-                               source=self)
-        to_add.append(sdss_thumb)
-
-    if 'ps1' not in thumbtypes:
-        ps1_thumb = models.Thumbnail(public_url=self.get_panstarrs_url(),
-                              type='ps1',
-                              source=self)
-        to_add.append(ps1_thumb)
-
-    if 'dr8-model' not in thumbtypes:
-        ls_thumb = models.Thumbnail(public_url=self.get_decals_url(
-            layer='dr8-model'),
-                             type='dr8-model',
-                             source=self)
-        to_add.append(ls_thumb)
-
-    if 'dr8' not in thumbtypes:
-        ls_thumb_data = models.Thumbnail(public_url=self.get_decals_url(),
-                                  type='dr8',
-                                  source=self)
-        to_add.append(ls_thumb_data)
-
-    DBSession().add_all(to_add)
-
-    if commit:
-        DBSession().commit()
-models.Source.add_linked_thumbnails = add_linked_thumbnails
-"""
 
 class PipelineFITSCatalog(ZTFFile, FITSFile):
     """Python object that maps a catalog stored on a fits file on disk."""
@@ -1430,8 +1424,6 @@ class CalibratableImage(FITSImage, ZTFFile):
             else:
                 self._call_source_extractor(checkimage_type=['rms'],
                                             use_weightmap=False)
-        ind = self.mask_image.boolean.data
-        self._rmsimg.data[ind] = BIG_RMS
         return self._rmsimg
 
     @property
@@ -2043,6 +2035,8 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     goodcut = sa.Column(sa.Boolean)
     rb = relationship('RealBogus', cascade='all')
 
+    thumbnails = relationship('Thumbnail', cascade='all')
+
     @classmethod
     def from_catalog(cls, cat, filter=True):
         result = []
@@ -2558,6 +2552,22 @@ models.Thumbnail.source = relationship(
     foreign_keys=[models.Thumbnail.source_id]
 )
 
+models.Thumbnail.detection = relationship(
+    'Detection',
+    cascade='all',
+    back_populates='thumbnails',
+    foreign_keys=[models.Thumbnail.detection_id]
+)
+
+
+def stamp_to_array(self):
+    if self.bytes is None:
+        raise ValueError('Cannot coerce array from empty bytes attribute')
+    fitsbuf = io.BytesIO(gzip.decompress(self.bytes))
+    array = np.flipud(fits.open(fitsbuf)[0].data)
+    return array
+
+models.Thumbnail.array = property(stamp_to_array)
 
 
 @event.listens_for(DBSession(), 'before_flush')
@@ -2585,3 +2595,133 @@ class CLU(models.Base):
     b2a = sa.Column(sa.Float)
     pa = sa.Column(sa.Float)
     type_ned = sa.Column(sa.Text)
+
+
+class Alert(models.Base):
+    mjd = sa.Column(sa.Float, index=True)
+    alert = sa.Column(psql.JSONB)
+    creation_index = sa.Index('created_at_index', 'created_at')
+    published = sa.Column(sa.Boolean, default=False)
+
+    @classmethod
+    def from_detection(cls, detection):
+        obj = cls()
+
+        if detection.source is None:
+            raise ValueError('Cannot issue an alert for a detection that is '
+                             f'not associated with a source ({detection.id})')
+
+        # prepare the JSONB
+        alert = dict()
+        alert['objectId'] = detection.source.id
+        alert['candid'] = detection.id
+        alert['schemavsn'] = None
+        alert['publisher'] = 'ZUDS/NERSC'
+
+        # do a bunch of cross matches to initially populate the candidate
+        # subschema
+        candidate = xmatch(detection.ra, detection.dec)
+        alert['candidate'] = candidate
+
+        # indicate whether this alert is generated based on a stack detection
+        #  or a single epoch detection
+        alert_type = 'single' if isinstance(
+            detection.image, SingleEpochSubtraction
+        ) else 'stack'
+        candidate['alert_type'] = alert_type
+
+        # add some basic info about the image this was found on and metadata
+        candidate['fid'] = detection.image.fid
+        candidate['pid'] = detection.image.id
+        candidate['programpi'] = 'Kulkarni'
+        candidate['programid'] = 2
+        candidate['pdiffimfilename'] = detection.image.basename
+        candidate['candid'] = detection.id
+        candidate['isdiffpos'] = 't'
+        candidate['field'] = detection.image.field
+        candidate['ra'] = detection.ra
+        candidate['dec'] = detection.dec
+        candidate['rcid'] = (detection.image.ccdid - 1) * 4 + (
+            detection.image.qid - 1)
+
+        # shape and position information
+        candidate['aimage'] = detection.a_image
+        candidate['bimage'] = detection.b_image
+        candidate['elong'] = detection.elongation
+        candidate['fwhm'] = detection.fwhm_image
+        candidate['aimagerat'] = detection.a_image / detection.fwhm_image
+        candidate['bimagerat'] = detection.b_image / detection.fwhm_image
+        candidate['xpos'] = detection.x_image
+        candidate['ypos'] = detection.y_image
+
+        # flux information
+        candidate['snr'] = detection.snr
+
+        # machine learning
+        candidate['drb'] = detection.rb[0].rb_score
+        candidate['drbversion'] = detection.rb[0].rb_version
+
+        #
+
+        # information about the reference images
+
+        refimgs = sorted(
+            detection.image.reference_image.input_images,
+            key=lambda i: i.mjd
+        )
+
+        if alert_type == 'single':
+            candidate['jd'] = detection.image.mjd + MJD_TO_JD
+            candidate['nid'] = detection.image.target_image.nid
+            candidate['diffmaglim'] = detection.image.target_image.maglimit
+            candidate['exptime'] = detection.image.target_image.exptime
+            mjdcut = detection.image.mjd
+        else:
+            stackimgs = sorted(
+                detection.image.target_image.input_images,
+                key=lambda i: i.mjd
+            )
+            candidate['jdstartstack'] = stackimgs[0].mjd + MJD_TO_JD
+            candidate['jdendstack'] = stackimgs[-1].mjd + MJD_TO_JD
+            candidate['jdmed'] = np.median([i.mjd + MJD_TO_JD for i in stackimgs])
+            candidate['nframesstack'] = len(stackimgs)
+            candidate['exptime'] = np.sum([i.exptime for i in stackimgs])
+            mjdcut = stackimgs[-1].mjd
+
+        # calculate the detection history
+        prevdets = list(filter(
+            lambda d: d is not detection,
+            sorted(
+                detection.source.detections,
+                key=lambda d: d.image.mjd,
+            )
+        ))
+
+        candidate['ndethist'] = len(prevdets)
+        candidate['jdstarthist'] = prevdets[0].mjd + MJD_TO_JD
+        candidate['jdendhist'] = prevdets[0].mjd + MJD_TO_JD
+
+
+        # make the light curve
+        lc = detection.source.light_curve
+        lc = lc[lc['time'] <= mjdcut]
+        alert['light_curve'] = lc.to_json()
+
+
+        # TODO implement 'light_curve' property
+
+        candidate['jdstartref'] = refimgs[0].mjd + MJD_TO_JD
+        candidate['jdendref'] = refimgs[-1].mjd + MJD_TO_JD
+        candidate['nframesref'] = len(refimgs)
+
+        # now do the cutouts
+        for stamp in detection.thumbnails:
+            if stamp.type == 'ref':
+                alert['cutoutTemplate'] = stamp.bytes
+            elif stamp.type == 'new':
+                alert['cutoutScience'] = stamp.bytes
+            elif stamp.type == 'sub':
+                alert['cutoutDifference'] = stamp.bytes
+
+        obj.alert = alert
+        return obj

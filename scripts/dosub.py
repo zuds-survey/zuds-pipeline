@@ -138,20 +138,19 @@ for fn in imgs:
             new_target = sub.target_image
         stamps = []
         for detection in detections:
-
-            if (detection.source is not None) and len(detection.source.thumbnails) == 0:
-                for i, t in zip(
-                    [sub_target, new_target, sub.reference_image],
-                    ['sub', 'new', 'ref']
-                ):
+            if detection.source is not None:
+                for_web = len(detection.source.thumbnails) == 0
+                for i in [sub_target, new_target, sub.reference_image]:
                     # make a stamp for the first detection
-                    stamp = db.models.Thumbnail.from_detection(detection, i)
-                    stamp.type = t
+                    stamp = db.models.Thumbnail.from_detection(
+                        detection, i, for_web=for_web
+                    )
                     stamps.append(stamp)
-                thumbs = detection.source.return_linked_thumbnails()
-                for thumb in thumbs:
-                    thumb.source = detection.source
-                stamps.extend(thumbs)
+                if for_web:
+                    thumbs = detection.source.return_linked_thumbnails()
+                    for thumb in thumbs:
+                        thumb.source = detection.source
+                    stamps.extend(thumbs)
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
@@ -163,8 +162,15 @@ for fn in imgs:
         flush=True
     )
 
-    # make the alerts
 
+    # now make the alerts
+    alerts = []
+    for d in detections:
+        if d.source is not None:
+            alert = db.Alert.from_detection(d)
+
+    db.DBSession().add_all(alerts)
+    db.DBSession().commit()
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
@@ -186,6 +192,7 @@ for fn in imgs:
         f'{sub.basename}',
         flush=True
     )
+
 
 
     cleanstart = time.time()

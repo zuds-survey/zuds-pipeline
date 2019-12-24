@@ -28,7 +28,7 @@ lookup = dict(zip(range(0, 25), 'abcdefghijklmnopqrstuvwxyz'))
 def get_next_name():
     seqquery = "SELECT nextval('namenum')"
     num = db.DBSession().execute(seqquery).fetchone()[0]
-    name = 'ZTFC' + str(date.today().year)[2:] + num_to_alpha(num)
+    name = 'ZUDS' + str(date.today().year)[2:] + num_to_alpha(num)
     return name
 
 def num_to_alpha(num):
@@ -50,8 +50,7 @@ def make_stamp(name, ra, dec, vmin, vmax, data, wcs, save=True,
         plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax,
                    cmap='gray')
         os.chmod(name, 0o774)
-    else:
-        return cutout
+    return cutout
 
 
 def annotate(source):
