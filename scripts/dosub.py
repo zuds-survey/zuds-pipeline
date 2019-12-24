@@ -138,20 +138,19 @@ for fn in imgs:
             new_target = sub.target_image
         stamps = []
         for detection in detections:
-
-            if (detection.source is not None) and len(detection.source.thumbnails) == 0:
-                for i, t in zip(
-                    [sub_target, new_target, sub.reference_image],
-                    ['sub', 'new', 'ref']
-                ):
+            if detection.source is not None:
+                haswebstamps = len(detection.source.thumbnails) > 0
+                for i in [sub_target, new_target, sub.reference_image]:
                     # make a stamp for the first detection
-                    stamp = db.models.Thumbnail.from_detection(detection, i)
-                    stamp.type = t
+                    stamp = db.models.Thumbnail.from_detection(
+                        detection, i, for_web=~haswebstamps
+                    )
                     stamps.append(stamp)
-                thumbs = detection.source.return_linked_thumbnails()
-                for thumb in thumbs:
-                    thumb.source = detection.source
-                stamps.extend(thumbs)
+                if ~haswebstamps:
+                    thumbs = detection.source.return_linked_thumbnails()
+                    for thumb in thumbs:
+                        thumb.source = detection.source
+                    stamps.extend(thumbs)
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
@@ -163,7 +162,6 @@ for fn in imgs:
         flush=True
     )
 
-    # make the alerts
 
 
     archstart = time.time()
@@ -187,6 +185,11 @@ for fn in imgs:
         flush=True
     )
 
+    # now make the alerts
+    alerts = []
+    for d in detections:
+        if d.source is not None:
+            alert = db.Alert.from_detection(d)
 
     cleanstart = time.time()
     targets = []
