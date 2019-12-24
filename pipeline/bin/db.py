@@ -1430,8 +1430,6 @@ class CalibratableImage(FITSImage, ZTFFile):
             else:
                 self._call_source_extractor(checkimage_type=['rms'],
                                             use_weightmap=False)
-        ind = self.mask_image.boolean.data
-        self._rmsimg.data[ind] = BIG_RMS
         return self._rmsimg
 
     @property
