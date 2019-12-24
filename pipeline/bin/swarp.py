@@ -188,7 +188,7 @@ def run_align(image, other, tmpdir='/tmp',
             break
 
     restype = db.MaskImageBase if isinstance(image, db.MaskImage) else db.FITSImage
-    
+
     result = restype.from_file(outname)
     result.parent_image = image
     weightimage = db.FITSImage.from_file(outweight)

@@ -1884,8 +1884,10 @@ class Subtraction(HasWCS):
                                    directory, copy_inputs=copy_inputs,
                                    tmpdir=tmpdir)
 
+
         subprocess.check_call(command.split())
         sub = cls.from_file(outname, use_existing_record=use_existing_record)
+
 
         # clear out any previous _data attributes that may be associated with
         #  this database object and force future accessors to load data
@@ -1931,8 +1933,8 @@ class Subtraction(HasWCS):
             archive.archive(sub.mask_image)
 
         # clean up
-        #if f'{directory}' in sub.mask_image.boolean.local_path:
-        #    del sub.mask_image._boolean
+        if f'{directory}' in sub.mask_image.boolean.local_path:
+            del sub.mask_image._boolean
 
         if f'{directory}' in sci.background_subtracted_image.local_path:
             del sci._bkgsubimg

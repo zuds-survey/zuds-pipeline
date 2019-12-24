@@ -92,6 +92,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
               f'-nsx {nsx} -nsy {nsy}  -v 0 -oni {subrms} ' \
               f'-fin {db.BIG_RMS}'
 
+
     return syscall
 
 
