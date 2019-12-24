@@ -50,8 +50,7 @@ def make_stamp(name, ra, dec, vmin, vmax, data, wcs, save=True,
         plt.imsave(name, np.flipud(cutout.data), vmin=vmin, vmax=vmax,
                    cmap='gray')
         os.chmod(name, 0o774)
-    else:
-        return cutout
+    return cutout
 
 
 def annotate(source):
