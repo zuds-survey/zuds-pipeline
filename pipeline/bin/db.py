@@ -2159,8 +2159,9 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                         instrument=default_instrument
                     )
 
-                    for det in prev_dets:
+                    for det, _ in prev_dets:
                         det.source = source
+                        DBSession().add(det)
 
                     detection.source = source
 
