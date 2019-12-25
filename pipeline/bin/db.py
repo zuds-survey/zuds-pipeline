@@ -1904,9 +1904,7 @@ class Subtraction(HasWCS):
         submask.boolean.save()
 
         command = prepare_hotpants(transact_sci, remapped_ref, outname,
-                                   submask.boolean,
-                                   directory, copy_inputs=copy_inputs,
-                                   tmpdir=tmpdir)
+                                   submask.boolean, directory, tmpdir=tmpdir)
 
         final_dir = os.path.dirname(sci)
         final_out = os.path.join(final_dir, os.path.basename(outname))
