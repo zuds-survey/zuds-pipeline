@@ -2,6 +2,7 @@ import numpy as np
 import math
 from astropy.io import fits
 import psycopg2
+import os
 from astropy.coordinates import SkyCoord
 from penquins import Kowalski
 from secrets import get_secret
@@ -59,11 +60,14 @@ def getsgtable(dec):
     """
     # Danny: add path to table here
 
-    if dec >= 0:
-        return("hlsp_ps1-psc_ps1_gpc1_%s_multi_v1_cat.fits" %math.floor(dec))
-    else:
-        return("hlsp_ps1-psc_ps1_gpc1_%s_multi_v1_cat.fits" %(math.floor(dec)+1))
 
+
+    if dec >= 0:
+        base = f"hlsp_ps1-psc_ps1_gpc1_{math.floor(dec):d}_multi_v1_cat.fits"
+    else:
+        base = f"hlsp_ps1-psc_ps1_gpc1_{math.floor(dec)+1:d}_multi_v1_cat.fits"
+
+    return os.path.join(get_secret('ps1_dir'), base)
 
 def ps1(s, ra, dec):
     """ Cross-match a position against PS1 DR1

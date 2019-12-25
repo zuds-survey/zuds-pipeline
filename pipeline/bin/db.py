@@ -2609,7 +2609,6 @@ class CLU(models.Base):
 class Alert(models.Base):
     alert = sa.Column(psql.JSONB)
     creation_index = sa.Index('created_at_index', 'created_at')
-    published = sa.Column(sa.Boolean, default=False)
 
     @classmethod
     def from_detection(cls, detection):
