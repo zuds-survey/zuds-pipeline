@@ -8,7 +8,8 @@ APERTURE_RADIUS = 3 * u.pixel
 APER_KEY = 'APCOR4'
 
 
-def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
+def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
+                        assume_background_subtracted=False):
 
     ra = np.atleast_1d(ra)
     dec = np.atleast_1d(dec)
@@ -16,7 +17,11 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False):
     apertures = photutils.SkyCircularAperture(coord, r=APERTURE_RADIUS)
 
     # something that is photometerable implements mask, background, and wcs
-    pixels_bkgsub = calibratable.data - calibratable.background_image.data
+    if not assume_background_subtracted:
+        pixels_bkgsub = calibratable.background_subtracted_image.data
+    else:
+        pixels_bkgsub = calibratable.data
+
     bkgrms = calibratable.rms_image.data
     mask = calibratable.mask_image.data
     wcs = calibratable.wcs

@@ -1502,7 +1502,7 @@ class CalibratedImage(CalibratableImage):
 
     forced_photometry = relationship('ForcedPhotometry', cascade='all')
 
-    def force_photometry(self, sources):
+    def force_photometry(self, sources, assume_background_subtracted=False):
         """Force aperture photometry at the locations of `sources`.
         Assumes that calibration has already been done.
 
@@ -1514,7 +1514,10 @@ class CalibratedImage(CalibratableImage):
         ra = [source.ra for source in sources]
         dec = [source.dec for source in sources]
 
-        result = aperture_photometry(self, ra, dec, apply_calibration=True)
+        result = aperture_photometry(
+            self, ra, dec, apply_calibration=True,
+            assume_background_subtracted=assume_background_subtracted
+        )
 
         photometry = []
         for row, source in zip(result, sources):
@@ -2241,6 +2244,10 @@ models.Source.best_detection = property(best_detection)
 
 
 def unphotometered_images(self):
+    subq = DBSession().query(ForcedPhotometry).filter(
+        ForcedPhotometry.source_id == self.id
+    ).subquery()
+
     q = DBSession().query(SingleEpochSubtraction.id).filter(
         func.q3c_radial_query(self.ra,
                               self.dec,
@@ -2249,17 +2256,24 @@ def unphotometered_images(self):
     ).filter(
         func.q3c_poly_query(self.ra, self.dec, SingleEpochSubtraction.poly)
     ).outerjoin(
-        ForcedPhotometry, ForcedPhotometry.image_id == SingleEpochSubtraction.id
+        subq, subq.c.image_id == SingleEpochSubtraction.id
     ).filter(
-        SingleEpochSubtraction.id
-    ).having(
-        ~self.id.in_(sa.func.array_agg(ForcedPhotometry.source_id))
+        subq.c.id == None
     )
 
+    return q
 
-def force_photometry(self):
-    pass
+def force_photometry(self, assume_background_subtracted=True):
+    out = []
+    for i in self.unphotometered_images:
+        fp = i.force_photometry(
+            self, assume_background_subtracted=assume_background_subtracted
+        )
+        out.extend(fp)
+    return out
 
+models.Source.unphotometered_images = property(unphotometered_images)
+models.Source.forced_photometry = force_photometry
 
 from astropy.table import Table
 def light_curve(sourceid):

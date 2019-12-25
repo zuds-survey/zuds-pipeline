@@ -156,6 +156,10 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
+    # run forced photometry
+    subfp = sub.force_photometry()
+
+
     stampstop = time.time()
     print(
         f'stamp: {stampstop-stampstart:.2f} sec to make stamps for {sub.basename}',
