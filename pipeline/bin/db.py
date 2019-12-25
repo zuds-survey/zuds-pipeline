@@ -2705,8 +2705,8 @@ class Alert(models.Base):
         ))
 
         candidate['ndethist'] = len(prevdets)
-        candidate['jdstarthist'] = prevdets[0].mjd + MJD_TO_JD
-        candidate['jdendhist'] = prevdets[0].mjd + MJD_TO_JD
+        candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
+        candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
 
 
         # make the light curve
