@@ -106,10 +106,11 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
                 name, use_existing_record=True
             )
 
-        product.field = image.field
-        product.ccdid = image.ccdid
-        product.qid = image.qid
-        product.fid = image.fid
+        if isinstance(image, db.ZTFFile):
+            product.field = image.field
+            product.ccdid = image.ccdid
+            product.qid = image.qid
+            product.fid = image.fid
         result.append(product)
 
     shutil.rmtree(directory)

@@ -1970,7 +1970,6 @@ class Subtraction(HasWCS):
         if hasattr(sub, '_data'):
             del sub._data
 
-
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
         sub.header['QID'] = sub.qid = sci.qid
