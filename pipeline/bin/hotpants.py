@@ -19,29 +19,17 @@ def chunk(iterable, chunksize):
         yield i, iterable[i * chunksize : (i + 1) * chunksize]
 
 
-def prepare_hotpants(sci, ref, outname, submask, directory,
-                     copy_inputs=False, tmpdir='/tmp'):
+def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
 
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image
-    sci.background_subtracted_image.load()
-    old = sci.background_subtracted_image.local_path
-    os.remove(old)
-    bn = sci.background_subtracted_image.basename
-    sci.background_subtracted_image.map_to_local_file(directory / bn)
     sci.background_subtracted_image.data += BKG_VAL
     sci.background_subtracted_image.save()
     scimbkg = sci.background_subtracted_image
 
 
     # if requested, copy the input images to a temporary working directory
-    if copy_inputs:
-        impaths = []
-        for image in [scimbkg, ref]:
-            shutil.copy(image.local_path, directory)
-            impaths.append(str(directory / image.basename))
-    else:
-        impaths = [im.local_path for im in [scimbkg, ref]]
+    impaths = [im.local_path for im in [scimbkg, ref]]
     scipath, refpath = impaths
 
     if 'SEEING' not in sci.header:
@@ -60,12 +48,12 @@ def prepare_hotpants(sci, ref, outname, submask, directory,
     refrms = ref.parent_image.rms_image.aligned_to(scirms, tmpdir=tmpdir)
 
     # save temporary copies of rms images if necessary
-    if not scirms.ismapped or copy_inputs:
+    if not scirms.ismapped:
         scirms_tmpnam = str((directory / scirms.basename).absolute())
         scirms.map_to_local_file(scirms_tmpnam)
         scirms.save()
 
-    if not refrms.ismapped or copy_inputs:
+    if not refrms.ismapped:
         refrms_tmpnam = str((directory / refrms.basename).absolute())
         refrms.map_to_local_file(refrms_tmpnam)
         refrms.save()

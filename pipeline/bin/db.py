@@ -624,6 +624,8 @@ class FITSFile(File):
             obj = cls()
             obj.basename = f.name
         else:
+            # this should never have to be called, as things are unmapped in
+            # get_by_basename
             if obj.ismapped:
                 obj.unmap() #  force things to be reloaded from disk
         obj.map_to_local_file(str(f.absolute()))
@@ -993,8 +995,8 @@ class ZTFFile(models.Base, File):
     @classmethod
     def get_by_basename(cls, basename):
         obj = DBSession().query(cls).filter(cls.basename == basename).first()
-        if obj.ismapped:
-            obj.unmap()
+        if obj is not None and (obj.ismapped or sa.inspect(obj).expired):
+            DBSession().refresh(obj)
         return obj
 
 
@@ -1831,20 +1833,42 @@ class Subtraction(HasWCS):
         return self.target_image.mjd
 
     @classmethod
-    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
-                    copy_inputs=False, use_existing_record=True):
+    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp'):
 
         directory = Path(tmpdir) / uuid.uuid4().hex
         directory.mkdir(exist_ok=True, parents=True)
 
-        outname = sub_name(sci.local_path, ref.local_path)
+        # we are gonna copy the inputs into the directory, then reload them
+        # off of disk to keep things transactionally isolated
+        shutil.copy(sci.local_path, directory)
+        shutil.copy(sci.mask_image.local_path, directory)
+
+        shutil.copy(ref.local_path, directory)
+        shutil.copy(ref.mask_image.local_path, directory)
+        shutil.copy(ref.weight_image.local_path, directory)
+
+        sciname = os.path.join(directory, sci.basename)
+        scimaskn = os.path.join(directory, sci.mask_image.basename)
+        refname = os.path.join(directory, ref.basename)
+        refmaskn = os.path.join(directory, ref.mask_image.basename)
+
+        transact_sci = FITSImage.from_file(sciname)
+        transact_scimask = MaskImageBase.from_file(scimaskn)
+        transact_ref = FITSImage.from_file(refname)
+        transact_refmask = MaskImageBase.from_file(refmaskn)
+
+        transact_sci.mask_image = transact_scimask
+        transact_ref.mask_image = transact_refmask
+
+        # output goes into the temporary directory to keep things transactional
+        outname = sub_name(transact_sci.local_path, transact_ref.local_path)
         outmask = outname.replace('.fits', '.mask.fits')
 
         # create the remapped ref, and remapped ref mask. the former will be
         # pixel-by-pixel subtracted from the science image. both will be written
         # to this subtraction's working directory (i.e., `directory`)
 
-        remapped_ref = ref.aligned_to(sci, tmpdir=tmpdir)
+        remapped_ref = transact_ref.aligned_to(sci, tmpdir=tmpdir)
         remapped_refmask = remapped_ref.mask_image
 
         remapped_refname = str(directory / remapped_ref.basename)
@@ -1855,21 +1879,15 @@ class Subtraction(HasWCS):
         remapped_refmask.map_to_local_file(remapped_refmaskname)
         remapped_ref.save()
         remapped_refmask.save()
-        remapped_ref.parent_image = ref
+        remapped_ref.parent_image = transact_ref
 
         # create the mask
-        submask = MaskImage.get_by_basename(os.path.basename(outmask))
-        if submask is None:
-            submask = MaskImage()
 
-        if submask.ismapped:
-            # may still be bound from a previous run,
-            # if so, remove its mapped attributes (_boolean, etc.)
-            submask.unmap()
-
+        # we truly want this to be a totally new copy of mask, with no
+        # uncommitted changes from previous runs
+        submask = MaskImageBase()
 
         submask.basename = os.path.basename(outmask)
-
         submask.field = sci.field
         submask.ccdid = sci.ccdid
         submask.qid = sci.qid
@@ -1885,28 +1903,32 @@ class Subtraction(HasWCS):
         submask.boolean.map_to_local_file(directory / submask.boolean.basename)
         submask.boolean.save()
 
-        command = prepare_hotpants(sci, remapped_ref, outname,
+        command = prepare_hotpants(transact_sci, remapped_ref, outname,
                                    submask.boolean,
                                    directory, copy_inputs=copy_inputs,
                                    tmpdir=tmpdir)
 
+        final_dir = os.path.dirname(sci)
+        final_out = os.path.join(final_dir, os.path.basename(outname))
+        product_map = {
+            outname: final_out,
+            outname.replace('.fits', '.rms.fits'): final_out.replace('.fits',
+                                                                     '.rms.fits'),
+            outname.replace('.fits', '.mask.fits'): final_out.replace(
+                '.fits', '.mask.fits')
+        }
 
+        # run HOTPANTS
         subprocess.check_call(command.split())
-        sub = cls.from_file(outname, use_existing_record=use_existing_record)
-
-
-        # clear out any previous _data attributes that may be associated with
-        #  this database object and force future accessors to load data
-        # directly from disk
-
-        if hasattr(sub, '_data'):
-            del sub._data
-
 
         # now modify the sub mask to include the stuff that's masked out from
         # hotpants
+
+        with fits.open(outname) as hdul:
+            sd = hdul[0].data
+
         hotbad = np.zeros_like(submask.data, dtype=int)
-        hotbad[sub.data == 1e-30] = 2**17
+        hotbad[sd == 1e-30] = 2**17
 
         # flip the bits
         submask.data |= hotbad
@@ -1914,12 +1936,27 @@ class Subtraction(HasWCS):
         submask.header_comments['BIT17'] = 'MASKED BY HOTPANTS (1e-30) / DG'
         submask.save()
 
+        # now copy the output files to the target directory, ending the
+        # transaction
+
+        for f in product_map:
+            shutil.copy(f, product_map[f])
+
+        sub = cls.from_file(final_out)
+        finalsubmask = MaskImage.from_file(final_out.replace('.fits',
+                                                             '.mask.fits'))
+
+        # this shouldn't be necessary but let's see
+        if hasattr(sub, '_data'):
+            del sub._data
+
+
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
         sub.header['QID'] = sub.qid = sci.qid
         sub.header['FID'] = sub.fid = sci.fid
 
-        sub.mask_image = submask
+        sub.mask_image = finalsubmask
         sub.reference_image = ref
         sub.target_image = sci
 
