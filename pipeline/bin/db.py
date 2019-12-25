@@ -1936,11 +1936,13 @@ class Subtraction(HasWCS):
             archive.archive(sub.mask_image)
 
         # clean up
-        if f'{directory}' in sub.mask_image.boolean.local_path:
-            del sub.mask_image._boolean
+        if sub.mask_image.boolean.ismapped:
+            if f'{directory}' in sub.mask_image.boolean.local_path:
+                del sub.mask_image._boolean
 
-        if f'{directory}' in sci.background_subtracted_image.local_path:
-            del sci._bkgsubimg
+        if sci.background_subtracted_image.ismapped:
+            if f'{directory}' in sci.background_subtracted_image.local_path:
+                del sci._bkgsubimg
 
         shutil.rmtree(directory)
 
