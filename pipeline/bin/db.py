@@ -1843,6 +1843,14 @@ class Subtraction(HasWCS):
         shutil.copy(sci.local_path, directory)
         shutil.copy(sci.mask_image.local_path, directory)
 
+        if hasattr(sci, '_rmsimg'):
+            shutil.copy(sci.rms_image.local_path, directory)
+        elif hasattr(sci, '_weightimg'):
+            shutil.copy(sci.weight_image.local_path, directory)
+        else:
+            raise ValueError('Science image must have a weight map or '
+                             'rms map defined prior to subtraction.')
+
         shutil.copy(ref.local_path, directory)
         shutil.copy(ref.mask_image.local_path, directory)
         shutil.copy(ref.weight_image.local_path, directory)

@@ -5,6 +5,7 @@ import shutil
 from utils import initialize_directory, quick_background_estimate
 from seeing import estimate_seeing
 from swarp import BKG_VAL
+from sextractor import run_sextractor
 
 
 # split an iterable over some processes recursively
@@ -23,10 +24,10 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
 
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image
-    sci.background_subtracted_image.data += BKG_VAL
-    sci.background_subtracted_image.save()
-    scimbkg = sci.background_subtracted_image
 
+    scimbkg = run_sextractor(sci, checkimage_type=['bkgsub'])[0]
+    scimbkg.data += BKG_VAL
+    scimbkg.save()
 
     # if requested, copy the input images to a temporary working directory
     impaths = [im.local_path for im in [scimbkg, ref]]
