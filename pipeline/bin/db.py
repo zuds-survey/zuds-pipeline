@@ -2605,6 +2605,7 @@ class CLU(models.Base):
     pa = sa.Column(sa.Float)
     type_ned = sa.Column(sa.Text)
 
+from copy import deepcopy
 
 class Alert(models.Base):
     alert = sa.Column(psql.JSONB)
@@ -2630,7 +2631,7 @@ class Alert(models.Base):
                                     foreign_keys=[cutoutdifference_id])
 
     def to_dict(self):
-        base = self.alert.copy()
+        base = deepcopy(self.alert)
         base['cutoutScience'] = self.cutoutscience.bytes
         base['cutoutTemplate'] = self.cutouttemplate.bytes
         base['cutoutDifference'] = self.cutoutdifference.bytes
