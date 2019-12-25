@@ -992,7 +992,10 @@ class ZTFFile(models.Base, File):
 
     @classmethod
     def get_by_basename(cls, basename):
-        return DBSession().query(cls).filter(cls.basename == basename).first()
+        obj = DBSession().query(cls).filter(cls.basename == basename).first()
+        if obj.ismapped:
+            obj.unmap()
+        return obj
 
 
 class PipelineRegionFile(ZTFFile):
