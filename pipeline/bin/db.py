@@ -995,8 +995,8 @@ class ZTFFile(models.Base, File):
     @classmethod
     def get_by_basename(cls, basename):
         obj = DBSession().query(cls).filter(cls.basename == basename).first()
-        if obj is not None and (obj.ismapped or sa.inspect(obj).expired):
-            DBSession().refresh(obj)
+        if obj is not None and obj.ismapped:
+            obj.unmap()  # get a fresh copy  
         return obj
 
 
