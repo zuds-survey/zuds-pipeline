@@ -162,6 +162,9 @@ for fn in imgs:
         flush=True
     )
 
+    # flush before making the alerts... but dont commit !
+    db.DBSession().flush()
+
 
     # now make the alerts
     alerts = []
