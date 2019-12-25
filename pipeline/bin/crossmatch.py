@@ -23,7 +23,7 @@ def private_logon():
     conn = psycopg2.connect(
             host=get_secret('hpss_dbhost'), user=get_secret('hpss_dbusername'),
             password=get_secret('hpss_dbpassword'),
-            database=get_secret('hpss_dbname'),
+            database=get_secret('olddb'),
             port=get_secret('hpss_dbport'))
     cur = conn.cursor()
     return cur
