@@ -164,6 +164,7 @@ for fn in imgs:
         if db.sa.inspect(d.source).pending:
             new_sources.append(d.source)
 
+    """
     # run forced photometry
     subfp = sub.force_photometry(sub.sources_contained)
     db.DBSession().add_all(subfp)
@@ -177,6 +178,7 @@ for fn in imgs:
         f'forcephot: {fpstop-fpstart:.2f} sec to force photometry for {sub.basename}',
         flush=True
     )
+    """
 
     stampstop = time.time()
     print(
