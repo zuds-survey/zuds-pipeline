@@ -174,7 +174,7 @@ for fn in imgs:
 
     fpstop = time.time()
     print(
-        f'forcephot: {fpstop-fpstart:.2f} sec to force photometry for {sub.basename}'
+        f'forcephot: {fpstop-fpstart:.2f} sec to force photometry for {sub.basename}',
         flush=True
     )
 
