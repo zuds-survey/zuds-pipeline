@@ -139,8 +139,8 @@ def ps1(s, ra, dec):
     for ii,match in enumerate(closest_matches):
         oid = matches[ii]['_id']
         out['objectidps%s' %(ii+1)] = oid
-        out['sgscore%s' %(ii+1)] = ps_score[objid==int(oid)][0]
-        out['distpsnr%s' %(ii+1)] = dist[order][ii]
+        out['sgscore%s' %(ii+1)] = float(ps_score[objid==int(oid)][0])
+        out['distpsnr%s' %(ii+1)] = float(dist[order][ii])
         try:
             out['psgmag%s' %(ii+1)] = matches[ii]['gMeanPSFMag']
         except:
