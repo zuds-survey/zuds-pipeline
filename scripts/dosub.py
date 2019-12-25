@@ -156,9 +156,27 @@ for fn in imgs:
         db.DBSession.rollback()
         continue
 
-    # run forced photometry
-    subfp = sub.force_photometry()
+    fpstart = time.time()
 
+    # new sources
+    new_sources = []
+    for d in detections:
+        if db.sa.inspect(d.source).pending:
+            new_sources.append(d.source)
+
+    # run forced photometry
+    subfp = sub.force_photometry(sub.sources_contained)
+    db.DBSession().add_all(subfp)
+
+    for source in new_sources:
+        fp = source.force_photometry()
+        db.DBSession().add_all(fp)
+
+    fpstop = time.time()
+    print(
+        f'forcephot: {fpstop-fpstart:.2f} sec to force photometry for {sub.basename}'
+        flush=True
+    )
 
     stampstop = time.time()
     print(

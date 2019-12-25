@@ -2266,7 +2266,10 @@ def unphotometered_images(self):
 def force_photometry(self, assume_background_subtracted=True):
     out = []
     for i in self.unphotometered_images:
-        fp = i.force_photometry(
+        r = type(i).from_file(f'/global/cscratch1/sd/dgold/zuds/{i.field:06d}/'
+                              f'c{i.ccdid:02d}/q{i.qid}/{fid_map[i.fid]}/'
+                              f'{i.basename}')
+        fp = r.force_photometry(
             self, assume_background_subtracted=assume_background_subtracted
         )
         out.extend(fp)
