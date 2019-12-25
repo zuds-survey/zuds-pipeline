@@ -1113,9 +1113,9 @@ def from_detection(cls, detection, image, for_web=False):
 
     stamp.file_uri = f'{outname}'
 
-    if isinstance(image, Subtraction):
+    if isinstance(linkimage, Subtraction):
         stamp.type = 'sub'
-    elif isinstance(image, ReferenceImage):
+    elif isinstance(linkimage, ReferenceImage):
         stamp.type = 'ref'
     else:
         stamp.type = 'new'
