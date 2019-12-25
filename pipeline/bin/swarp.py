@@ -146,7 +146,7 @@ def prepare_swarp_align(image, other, directory, nthreads=1,
         f'{extension}.weight.fits'
     )
 
-    combtype = 'OR' if isinstance(image, db.MaskImage) else 'CLIPPED'
+    combtype = 'OR' if isinstance(image, db.MaskImageBase) else 'CLIPPED'
 
     syscall = f'swarp -c {conf} {impath} ' \
               f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \

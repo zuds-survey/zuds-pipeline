@@ -1868,7 +1868,7 @@ class Subtraction(HasWCS):
         # pixel-by-pixel subtracted from the science image. both will be written
         # to this subtraction's working directory (i.e., `directory`)
 
-        remapped_ref = transact_ref.aligned_to(sci, tmpdir=tmpdir)
+        remapped_ref = transact_ref.aligned_to(transact_sci, tmpdir=tmpdir)
         remapped_refmask = remapped_ref.mask_image
 
         remapped_refname = str(directory / remapped_ref.basename)
@@ -1942,6 +1942,7 @@ class Subtraction(HasWCS):
         for f in product_map:
             shutil.copy(f, product_map[f])
 
+        # now read the final output products into database mapped records
         sub = cls.from_file(final_out)
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
