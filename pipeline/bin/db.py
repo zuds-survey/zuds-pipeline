@@ -1927,7 +1927,7 @@ class Subtraction(HasWCS):
         command = prepare_hotpants(transact_sci, remapped_ref, outname,
                                    submask.boolean, directory, tmpdir=tmpdir)
 
-        final_dir = os.path.dirname(sci)
+        final_dir = os.path.dirname(sci.local_path)
         final_out = os.path.join(final_dir, os.path.basename(outname))
         product_map = {
             outname: final_out,
