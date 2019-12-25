@@ -2610,6 +2610,32 @@ class Alert(models.Base):
     alert = sa.Column(psql.JSONB)
     creation_index = sa.Index('created_at_index', 'created_at')
 
+    cutoutscience_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'thumbnails.id', ondelete='SET NULL'
+    ))
+
+    cutouttemplate_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'thumbnails.id', ondelete='SET NULL'
+    ))
+
+    cutoutdifference_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'thumbnails.id', ondelete='SET NULL'
+    ))
+
+    cutoutscience = relationship('Thumbnail', cascade='all',
+                                 foreign_keys=[cutoutscience_id])
+    cutouttemplate = relationship('Thumbnail', cascade='all',
+                                  foreign_keys=[cutouttemplate_id])
+    cutoutdifference = relationship('Thumbnail', cascade='all',
+                                    foreign_keys=[cutoutdifference_id])
+
+    def to_dict(self):
+        base = self.alert.copy()
+        base['cutoutScience'] = self.cutoutscience.bytes
+        base['cutoutTemplate'] = self.cutouttemplate.bytes
+        base['cutoutDifference'] = self.cutoutdifference.bytes
+        return base
+
     @classmethod
     def from_detection(cls, detection):
         obj = cls()
@@ -2724,11 +2750,11 @@ class Alert(models.Base):
         # now do the cutouts
         for stamp in detection.thumbnails:
             if stamp.type == 'ref':
-                alert['cutoutTemplate'] = stamp.bytes
+                obj.cutouttemplate = stamp
             elif stamp.type == 'new':
-                alert['cutoutScience'] = stamp.bytes
+                obj.cutoutscience = stamp
             elif stamp.type == 'sub':
-                alert['cutoutDifference'] = stamp.bytes
+                obj.cutoutdifference = stamp
 
         obj.alert = alert
         return obj
