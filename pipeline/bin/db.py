@@ -2710,9 +2710,9 @@ class Alert(models.Base):
 
 
         # make the light curve
-        lc = detection.source.light_curve
-        lc = lc[lc['time'] <= mjdcut]
-        alert['light_curve'] = lc.to_json()
+        lc = detection.source.light_curve()
+        lc = lc[lc['mjd'] <= mjdcut]
+        alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
 
 
         # TODO implement 'light_curve' property
