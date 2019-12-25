@@ -1301,31 +1301,11 @@ class MaskImage(ZTFFile, MaskImageBase):
     pass
 
 
-class CalibratableImage(FITSImage, ZTFFile):
+class CalibratableImageBase(FITSImage):
     __diskmapped_cached_properties__ = ['_path', '_data', '_weightimg',
                                         '_bkgimg', '_filter_kernel', '_rmsimg',
                                         '_threshimg', '_segmimg',
                                         '_sourcelist', '_bkgsubimg']
-
-    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
-                                             ondelete='CASCADE'),
-                   primary_key=True)
-
-    __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
-                       'inherit_condition': id == ZTFFile.id}
-
-    detections = relationship('Detection', cascade='all')
-    objects = relationship('ObjectWithFlux', cascade='all')
-
-    mask_image = relationship('MaskImage',
-                              uselist=False,
-                              primaryjoin=MaskImage.parent_image_id == id)
-
-    catalog = relationship('PipelineFITSCatalog', uselist=False,
-                           primaryjoin=PipelineFITSCatalog.image_id == id)
-
-    thumbnails = relationship('Thumbnail',
-                              primaryjoin=models.Thumbnail.image_id == id)
 
     def cmap_limits(self):
         interval = ZScaleInterval()
@@ -1487,6 +1467,39 @@ class CalibratableImage(FITSImage, ZTFFile):
         for path, t in zip(paths, types):
             if path.exists():
                 setattr(obj, t, FITSImage.from_file(f'{path}'))
+
+        return obj
+
+
+class CalibratableImage(CalibratableImageBase, ZTFFile):
+
+    id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
+                                             ondelete='CASCADE'),
+                   primary_key=True)
+
+    __mapper_args__ = {'polymorphic_identity': 'calibratableimage',
+                       'inherit_condition': id == ZTFFile.id}
+
+    detections = relationship('Detection', cascade='all')
+    objects = relationship('ObjectWithFlux', cascade='all')
+
+    mask_image = relationship('MaskImage',
+                              uselist=False,
+                              primaryjoin=MaskImage.parent_image_id == id)
+
+    catalog = relationship('PipelineFITSCatalog', uselist=False,
+                           primaryjoin=PipelineFITSCatalog.image_id == id)
+
+    thumbnails = relationship('Thumbnail',
+                              primaryjoin=models.Thumbnail.image_id == id)
+
+
+    @classmethod
+    def from_file(cls, fname, use_existing_record=True):
+        obj = super().from_file(
+            fname, use_existing_record=use_existing_record
+        )
+        dir = Path(fname).parent
 
         if obj.mask_image is not None:
             mskpath = dir / obj.mask_image.basename
@@ -1860,9 +1873,9 @@ class Subtraction(HasWCS):
         refname = os.path.join(directory, ref.basename)
         refmaskn = os.path.join(directory, ref.mask_image.basename)
 
-        transact_sci = FITSImage.from_file(sciname)
+        transact_sci = CalibratableImageBase.from_file(sciname)
         transact_scimask = MaskImageBase.from_file(scimaskn)
-        transact_ref = FITSImage.from_file(refname)
+        transact_ref = CalibratableImageBase.from_file(refname)
         transact_refmask = MaskImageBase.from_file(refmaskn)
 
         transact_sci.mask_image = transact_scimask
