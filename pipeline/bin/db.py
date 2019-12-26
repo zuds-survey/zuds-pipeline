@@ -430,6 +430,9 @@ class File(object):
         if not self.ismapped:
             raise UnmappedFileError(f"Cannot unmap file '{self.basename}', "
                                     f"file is not mapped")
+        self.clear()
+
+    def clear(self):
         for attr in self.__diskmapped_cached_properties__:
             if hasattr(self, attr):
                 delattr(self, attr)
@@ -995,8 +998,8 @@ class ZTFFile(models.Base, File):
     @classmethod
     def get_by_basename(cls, basename):
         obj = DBSession().query(cls).filter(cls.basename == basename).first()
-        if obj is not None and obj.ismapped:
-            obj.unmap()  # get a fresh copy  
+        if obj is not None:
+            obj.clear()  # get a fresh copy
         return obj
 
 
