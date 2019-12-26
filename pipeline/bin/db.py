@@ -27,6 +27,7 @@ from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
 import archive
 from hotpants import prepare_hotpants
 from filterobjects import filter_sexcat
+from seeing import estimate_seeing
 
 import sextractor
 
@@ -1741,6 +1742,9 @@ class Coadd(CalibratableImage):
         coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
         coadd.header['QID'] = coadd.qid = images[0].qid
         coadd.header['FID'] = coadd.fid = images[0].fid
+
+        estimate_seeing(coadd)
+        coadd.save()
 
         if data_product:
             coadd_copy = HTTPArchiveCopy.from_product(coadd)
