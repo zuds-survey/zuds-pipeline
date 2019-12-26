@@ -19,6 +19,11 @@ def quick_background_estimate(image, nsamp=750000, mask_image=None):
     bkgpix = np.random.choice(bkgpix, size=nsamp)
 
     bkg = np.median(bkgpix)
-    bkgstd = np.std(bkgpix)
+
+    # use MAD as it is less sensitive to outliers (bright pixels)
+
+    # some bright pixels may not be masked and can totally throw off
+    # the bkgrms calculation if np.std is used
+    bkgstd = 1.4826 * np.median(np.abs(bkgpix - bkg))
 
     return bkg, bkgstd
