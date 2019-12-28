@@ -67,3 +67,4 @@ def estimate_seeing(image):
     seeing = np.nanmedian(seeings)
     image.header['SEEING'] = float(seeing)
     image.header_comments['SEEING'] = 'FWHM of seeing in pixels (Goldstein)'
+    image.save()
