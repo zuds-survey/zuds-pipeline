@@ -1510,6 +1510,11 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
             if mskpath.exists():
                 obj.mask_image = MaskImage.from_file(mskpath)
 
+        if obj.catalog is not None:
+            catpath = dir / obj.catalog.basename
+            if catpath.exists():
+                obj.catalog = PipelineFITSCatalog.from_file(catpath)
+
         return obj
 
 

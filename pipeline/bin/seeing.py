@@ -15,7 +15,7 @@ def estimate_seeing(image):
     kowalski = penquins.Kowalski(username=username, password=password)
     catalog = image.catalog
 
-    if catalog is None:
+    if catalog is None or not catalog.ismapped:
         catalog = db.PipelineFITSCatalog.from_image(image)
 
 
