@@ -1096,31 +1096,14 @@ import io
 import gzip
 
 
-def from_detection(cls, detection, image, for_web=False):
-    source = detection.source
-    dummy_phot = source.photometry[0]
-
-    if os.getenv('NERSC_HOST') != 'cori':
-        raise ValueError('Cannot create stamp; must be on cori.')
+def from_detection(cls, detection, image):
 
     if isinstance(image, models.Base):
         linkimage = image
     else:
         linkimage = image.parent_image
 
-    stamp = cls(source=source, image=linkimage)
-    outname = Path(STAMP_PREFIX) / f'stamps/{linkimage.field:06d}/' \
-                                   f'c{linkimage.ccdid:02d}/' \
-                                   f'q{linkimage.qid}/' \
-                                   f'{fid_map[linkimage.fid]}'
-    outname = outname / f'stamp.{source.id}.{linkimage.basename}.jpg'
-    vmin, vmax = linkimage.cmap_limits()
-    stamp.public_url = f'{outname}'.replace(STAMP_PREFIX, URL_PREFIX)
-
-    if for_web:
-        stamp.photometry = dummy_phot
-
-    stamp.file_uri = f'{outname}'
+    stamp = cls(image=linkimage, detection=detection)
 
     if isinstance(linkimage, Subtraction):
         stamp.type = 'sub'
@@ -1129,13 +1112,11 @@ def from_detection(cls, detection, image, for_web=False):
     else:
         stamp.type = 'new'
 
-    archive._mkdir_recursive(outname.parent)
     cutout = publish.make_stamp(
-        outname, detection.ra, detection.dec, vmin,
-        vmax, image.data, image.wcs, save=True,
+        None, detection.ra, detection.dec, None,
+        None, image.data, image.wcs, save=False,
         size=publish.CUTOUT_SIZE
     )
-    os.chmod(outname, archive.perm)
 
     # convert the cutout data to bytes
     # and store that in the database
