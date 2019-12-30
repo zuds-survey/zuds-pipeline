@@ -53,6 +53,14 @@ for d in my_dirs:
     top = sorted(ok, key=lambda i: i.maglimit, reverse=True)[:50]
     coaddname = os.path.join(d, f'ref.{ok[0].field:06d}_c{ok[0].ccdid:02d}'
                                 f'_q{ok[0].qid}_{fmap[ok[0].fid]}.{version}.fits')
+
+    if len(top) < 25:
+        print(f'Not enough images ({len(top)} < 25) to make reference '
+              f'{coaddname}. Skipping...')
+        db.DBSession().rollback()
+        continue
+
+
     try:
         coadd = db.ReferenceImage.from_images(top, coaddname,
                                               data_product=True,
