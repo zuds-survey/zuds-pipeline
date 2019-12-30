@@ -38,12 +38,10 @@ for d in my_dirs:
     # load the objects partway into memory
     ok = []
     for fn in sci_fns:
-        try:
-            sci = db.ScienceImage.from_file(fn)
-        except Exception as e:
-            print(f'bad: science image {fn} rasied exception {e}, skipping...',
-                  flush=True)
-            continue
+        sci = db.ScienceImage.get_by_basename(fn.name)
+        sci.map_to_local_file(f'{fn}')
+        maskname = f'{fn.parent / sci.mask_image.basename}'
+        mask = sci.mask_image.map_to_local_file(maskname)
 
         c1 = min_date <= sci.obsdate <= max_date
         c2 = 1.7 < sci.seeing < 2.5
