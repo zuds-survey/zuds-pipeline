@@ -224,16 +224,7 @@ for fn in imgs:
 
 
     cleanstart = time.time()
-    targets = []
-    if hasattr(sci, '_rmsimg'):
-        targets.append(sci.rms_image.local_path)
-    if hasattr(sci, '_weightimg'):
-        targets.append(sci.weight_image.local_path)
-
     sci.unmap()
-    for target in targets:
-        os.remove(target)
-
     cleanstop = time.time()
 
     tstop = time.time()
