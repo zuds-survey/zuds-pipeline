@@ -56,6 +56,7 @@ for fn in imgs:
 
     rstart = time.time()
     ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
+    db.DBSession().commit()
     rstop = time.time()
 
     print(
