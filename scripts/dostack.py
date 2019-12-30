@@ -52,6 +52,13 @@ for _, job in jobs.iterrows():
     if prev is not None:
         continue
 
+    if len(images) < 25:
+        print(f'Not enough images ({len(images)} < 25) to make reference '
+              f'{basename}. Skipping...')
+        db.DBSession().rollback()
+        continue
+
+
 
     print(
         f'load: {sstop-sstart:.2f} sec to load input images for {outname}',
