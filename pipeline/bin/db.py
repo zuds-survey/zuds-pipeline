@@ -70,8 +70,6 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
 MJD_TO_JD = 2400000.5
 
 CMAP_RANDOM_SEED = 8675309
-DEFAULT_GROUP = 1
-DEFAULT_INSTRUMENT = 1
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
 URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf'
@@ -528,7 +526,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
                                     f'{product.basename}'
 
         archive_path = f'{path.absolute()}'
-        url = f'{path.absolute()}'.replace(NERSC_PREFIX, URL_PREFIX)
+        url = f'{path.absolute()}'.replace(NERSC_PREFIX[:-5], URL_PREFIX)
 
         # check to see if a copy with this URL already exists.
         # if so return it
