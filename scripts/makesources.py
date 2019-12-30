@@ -37,7 +37,7 @@ unassigned = db.DBSession().query(
 ).join(
     db.CalibratableImage
 ).order_by(
-    db.CalibratableImage.mjd.asc()
+    db.CalibratableImage.basename.asc()
 )
 
 for detection in unassigned:
