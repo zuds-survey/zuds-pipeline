@@ -276,6 +276,7 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
 
     # save the coadd to disk
     coadd.save()
+    coaddmask.save()
 
     # clean up
     for im in [coadd] + images.tolist():
