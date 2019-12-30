@@ -43,6 +43,13 @@ for d in my_dirs:
         maskname = f'{fn.parent / sci.mask_image.basename}'
         mask = sci.mask_image.map_to_local_file(maskname)
 
+        try:
+            sci.load()
+        except Exception as e:
+            print(f'bad: File {sci.basename} is corrupted, skipping...',
+                  flush=True)
+            continue
+
         c1 = min_date <= sci.obsdate <= max_date
         c2 = 1.7 < sci.seeing < 2.5
         c3 = sci.maglimit > 19.5
