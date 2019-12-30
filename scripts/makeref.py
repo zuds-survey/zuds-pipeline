@@ -38,7 +38,13 @@ for d in my_dirs:
     # load the objects partway into memory
     ok = []
     for fn in sci_fns:
-        sci = db.ScienceImage.from_file(fn)
+        try:
+            sci = db.ScienceImage.from_file(fn)
+        except Exception as e:
+            print(f'bad: science image {fn} rasied exception {e}, skipping...',
+                  flush=True)
+            continue
+
         c1 = min_date <= sci.obsdate <= max_date
         c2 = 1.7 < sci.seeing < 2.5
         c3 = sci.maglimit > 19.5
@@ -66,7 +72,7 @@ for d in my_dirs:
         archive.archive(catcopy)
         db.DBSession().add(catcopy)
         db.DBSession().commit()
-        
+
     t_stop = time.time()
     print(f'it took {t_stop - t_start} sec to make {coaddname}.', flush=True)
 
