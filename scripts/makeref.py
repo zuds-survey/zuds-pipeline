@@ -41,7 +41,7 @@ for d in my_dirs:
         sci = db.ScienceImage.get_by_basename(fn.name)
         sci.map_to_local_file(f'{fn}')
         maskname = f'{fn.parent / sci.mask_image.basename}'
-        mask = sci.mask_image.map_to_local_file(maskname)
+        sci.mask_image.map_to_local_file(maskname)
 
         try:
             sci.load()
@@ -49,6 +49,18 @@ for d in my_dirs:
             print(f'bad: File {sci.basename} is corrupted, skipping...',
                   flush=True)
             continue
+        sci.clear()
+        sci.map_to_local_file(f'{fn}')
+
+        try:
+            sci.mask_image.load()
+        except Exception as e:
+            print(f'bad: File {sci.mask_image.basename} is corrupted, '
+                  f'skipping...',
+                  flush=True)
+            continue
+        sci.mask_image.clear()
+        sci.mask_image.map_to_local_file(maskname)
 
         c1 = min_date <= sci.obsdate <= max_date
         c2 = 1.7 < sci.seeing < 2.5
