@@ -35,7 +35,26 @@ for fn in imgs:
     tstart = time.time()
 
     sstart = time.time()
-    sci = sciclass.from_file(fn)
+    sci = sciclass.get_by_basename(os.path.basename(fn))
+    sci.map_to_local_file(fn)
+    maskname = os.path.join(os.path.dirname(fn), sci.mask_image.basename)
+    sci.mask_image.map_to_local_file(maskname)
+
+    weightname = fn.replace('.fits', '.weight.fits')
+    rmsname = fn.replace('.fits', '.rms.fits')
+    if os.path.exists(weightname):
+        sci._weightimg = db.FITSImage.from_file(weightname)
+    elif os.path.exists(rmsname):
+        sci._rmsimg = db.FITSImage.from_file(rmsname)
+    else:
+        if sciclass == db.ScienceImage:
+            # use sextractor to make the science image
+            _ = sci.rms_image
+        else:
+            raise RuntimeError(f'Cannot produce a subtraction for {fn},'
+                               f' the image has no weightmap or rms map.')
+
+
     sstop = time.time()
     print(
         f'sci: {sstop-sstart:.2f} sec to load  {sci.basename}',
@@ -55,8 +74,11 @@ for fn in imgs:
         continue
 
     rstart = time.time()
-    ref = db.ReferenceImage.from_file(refname, use_existing_record=True)
-    db.DBSession().commit()
+    ref = db.ReferenceImage.get_by_basename(os.path.basename(refname))
+    ref.map_to_local_file(refname)
+    ref.mask_image.map_to_local_file(refname.replace('.fits', '.mask.fits'))
+    ref._weightimg = db.FITSImage.from_file(refname.replace('.fits',
+                                                            '.weight.fits'))
     rstop = time.time()
 
     print(
