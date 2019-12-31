@@ -2135,6 +2135,8 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
             if filter:
                 detection.goodcut = True
 
+            result.append(detection)
+
         return result
 
 
