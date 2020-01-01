@@ -1137,7 +1137,7 @@ def persist(self):
     data = self.array
     self.source = self.detection.source
     vmin, vmax = ZScaleInterval().get_limits(data)
-    img = self.detection.image
+    img = self.image
     base = f'stamp.{self.source.id}.{img.basename}.jpg'
     relpath = f'stamps/{img.field:06d}/c{img.ccdid:02d}/' \
               f'q{img.qid}/{fid_map[img.fid]}/{base}'
@@ -1146,7 +1146,7 @@ def persist(self):
     self.file_uri = f'{Path(STAMP_PREFIX) / relpath}'
     archive._mkdir_recursive(Path(self.file_uri).parent)
 
-    plt.imsave(self.file_uri, np.flipud(data), vmin=vmin, vmax=vmax,
+    plt.imsave(self.file_uri, data, vmin=vmin, vmax=vmax,
                cmap='gray')
 
     os.chmod(self.file_uri, 0o774)
