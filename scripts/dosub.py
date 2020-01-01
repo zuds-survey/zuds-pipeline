@@ -220,21 +220,21 @@ for fn in imgs:
     db.DBSession().add_all(alerts)
     """
 
-    db.DBSession().commit()
-
     archstart = time.time()
-    #subcopy = db.HTTPArchiveCopy.from_product(sub)
-    #catcopy = db.HTTPArchiveCopy.from_product(cat)
-    #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
+    subcopy = db.HTTPArchiveCopy.from_product(sub)
+    catcopy = db.HTTPArchiveCopy.from_product(cat)
+    mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
+    db.DBSession().add(sub)
+    db.DBSession().add(cat)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 
-    #db.DBSession().add(mskcopy)
-    #db.DBSession().add(catcopy)
-    #db.DBSession().add(subcopy)
-    #archive.archive(subcopy)
-    #archive.archive(catcopy)
-    #archive.archive(mskcopy)
+    db.DBSession().add(mskcopy)
+    db.DBSession().add(catcopy)
+    db.DBSession().add(subcopy)
+    archive.archive(subcopy)
+    archive.archive(catcopy)
+    archive.archive(mskcopy)
     db.DBSession().commit()
     archstop = time.time()
     print(
