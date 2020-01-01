@@ -28,7 +28,8 @@ for fn in imgs:
 
     start = time.time()
     try:
-        phot = sub.force_photometry(sub.sources_contained.all())
+        phot = sub.force_photometry(sub.sources_contained.all(),
+                                    assume_background_subtracted=True)
     except Exception as e:
         print(e)
         continue

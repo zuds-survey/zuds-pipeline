@@ -149,8 +149,9 @@ for detection in unassigned:
 
     db.DBSession().flush()
 
-    lthumbs = source.return_linked_thumbnails()
-    db.DBSession().add_all(lthumbs)
+    if len(source.thumbnails) == len(source.photometry[0].thumbnails):
+        lthumbs = source.return_linked_thumbnails()
+        db.DBSession().add_all(lthumbs)
 
 db.DBSession().commit()
 

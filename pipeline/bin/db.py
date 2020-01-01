@@ -1133,6 +1133,8 @@ def from_detection(cls, detection, image):
 
 def persist(self):
 
+    if os.getenv('NERSC_HOST') != 'cori':
+        raise RuntimeError('Must be on cori to persist stamps.')
 
     data = self.array
     self.source = self.detection.source
