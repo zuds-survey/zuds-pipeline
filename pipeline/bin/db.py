@@ -77,7 +77,7 @@ STAMP_PREFIX = '/global/project/projectdirs/ptf/www/ztf'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
 N_PREV_SINGLE = 1
-N_PREV_MULTI = 0
+N_PREV_MULTI = 1
 
 MASK_BITS = {
     'BIT00': 0,
@@ -2229,7 +2229,8 @@ models.Source.best_detection = property(best_detection)
 
 
 def unphotometered_images(self):
-    subq = DBSession().query(ForcedPhotometry).filter(
+    subq = DBSession().query(ForcedPhotometry.id,
+                             ForcedPhotometry.image_id).filter(
         ForcedPhotometry.source_id == self.id
     ).subquery()
 
