@@ -1132,6 +1132,8 @@ def from_detection(cls, detection, image):
     return stamp
 
 def persist(self):
+
+
     data = self.array
     self.source = self.detection.source
     vmin, vmax = ZScaleInterval().get_limits(data)
@@ -1146,6 +1148,8 @@ def persist(self):
 
     plt.imsave(self.file_uri, np.flipud(data), vmin=vmin, vmax=vmax,
                cmap='gray')
+
+    os.chmod(self.file_uri, 0o774)
 
 
 models.Thumbnail.from_detection = classmethod(from_detection)
