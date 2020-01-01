@@ -114,8 +114,16 @@ for detection in unassigned:
                 instrument=default_instrument
             )
 
+            for t in detection.thumbnails:
+                t.photometry = dummy_phot
+                t.source = source
+                t.persist()
+                db.DBSession().add(t)
+
             for det, _ in prev_dets:
                 det.source = source
+                for thumbnail in det.thumbnails:
+                    thumbnail.source = source
                 db.DBSession().add(det)
 
             detection.source = source
@@ -140,6 +148,9 @@ for detection in unassigned:
     # source.dec = best.dec
 
     db.DBSession().flush()
+
+    lthumbs = source.return_linked_thumbnails()
+    db.DBSession().add_all(lthumbs)
 
 db.DBSession().commit()
 
