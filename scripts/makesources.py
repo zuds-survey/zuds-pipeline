@@ -71,8 +71,10 @@ for detection in unassigned:
                     detection.ra,
                     detection.dec,
                     ASSOC_RADIUS
-                )
+                ),
+                db.Detection.id != detection.id,
             ).all()
+
 
         n_prev_single = sum([1 for _ in prev_dets if _[1] == 'sesub'])
         n_prev_multi = sum([1 for _ in prev_dets if _[1] == 'mesub'])
