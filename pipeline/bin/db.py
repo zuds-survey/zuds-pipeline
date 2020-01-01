@@ -1966,6 +1966,11 @@ class Subtraction(HasWCS):
         sub.header['QID'] = sub.qid = sci.qid
         sub.header['FID'] = sub.fid = sci.fid
 
+        finalsubmask.header['FIELD'] = finalsubmask.field = sci.field
+        finalsubmask.header['CCDID'] = finalsubmask.ccdid = sci.ccdid
+        finalsubmask.header['QID'] = finalsubmask.qid = sci.qid
+        finalsubmask.header['FID'] = finalsubmask.fid = sci.fid
+
         sub.mask_image = finalsubmask
         sub.reference_image = ref
         sub.target_image = sci
@@ -1979,7 +1984,9 @@ class Subtraction(HasWCS):
             sub.header[APER_KEY] = sci.header[APER_KEY]
             sub.header_comments['MAGZP'] = sci.header_comments['MAGZP']
             sub.header_comments[APER_KEY] = sci.header_comments[APER_KEY]
+
         sub.save()
+        sub.mask_image.save()
 
         if data_product:
             archive.archive(sub)
@@ -2706,14 +2713,10 @@ class Alert(models.Base):
         candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
         candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
 
-
         # make the light curve
         lc = detection.source.light_curve()
         lc = lc[lc['mjd'] <= mjdcut]
         alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
-
-
-        # TODO implement 'light_curve' property
 
         candidate['jdstartref'] = refimgs[0].mjd + MJD_TO_JD
         candidate['jdendref'] = refimgs[-1].mjd + MJD_TO_JD
