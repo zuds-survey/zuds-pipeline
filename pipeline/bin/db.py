@@ -2731,8 +2731,15 @@ class Alert(models.Base):
         # add some basic info about the image this was found on and metadata
         candidate['fid'] = detection.image.fid
         candidate['pid'] = detection.image.id
-        candidate['programpi'] = 'Kulkarni'
-        candidate['programid'] = 2
+
+        if isinstance(detection.image, SingleEpochSubtraction):
+            candidate['programpi'] = detection.image.target_image.header['PROGRMPI']
+            candidate['programid'] = detection.image.target_image.header['PROGRMID']
+        else:
+            candidate['programpi'] = \
+                detection.image.target_image.input_images[0].header['PROGRMPI']
+            candidate['programid'] = \
+                detection.image.target_image.input_images[0].header['PROGRMID']
         candidate['pdiffimfilename'] = detection.image.basename
         candidate['candid'] = detection.id
         candidate['isdiffpos'] = 't'
