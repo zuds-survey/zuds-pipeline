@@ -64,8 +64,9 @@ for d in my_dirs:
 
         c1 = min_date <= sci.obsdate <= max_date
         c2 = 1.7 < sci.seeing < 2.5
-        c3 = sci.maglimit > 19.5
-        if c1 and c2 and c3:
+        c3 = 19.2 < sci.maglimit < 22.
+        c4 = sci.infobits == 0
+        if c1 and c2 and c3 and c4:
             ok.append(sci)
 
     # get the very best images
