@@ -2328,7 +2328,8 @@ def light_curve(sourceid):
         ForcedPhotometry.fluxerr,
         ForcedPhotometry.flags,
         ScienceImage.maglimit,
-        ScienceImage.apcor
+        ScienceImage.apcor,
+        ForcedPhotometry.id
     ).select_from(
         sa.join(
             ForcedPhotometry,
@@ -2351,7 +2352,8 @@ def light_curve(sourceid):
                  'flux': photpoint[3],
                  'fluxerr': photpoint[4],
                  'flags': photpoint[5],
-                 'lim_mag': photpoint[6]}
+                 'lim_mag': photpoint[6],
+                 'id': photpoint[8]}
         lc_raw.append(photd)
 
     return Table(lc_raw)
@@ -2792,6 +2794,13 @@ class Alert(models.Base):
 
         # make the light curve
         lc = detection.source.light_curve()
+
+        if len(lc) == 0:
+            raise RuntimeError('Cannot issue an alert for an object with no '
+                               'light curve, please rerun forced photometry '
+                               'to update the light curve of this object:' 
+                               f'"{detection.source.id}".')
+
         lc = lc[lc['mjd'] <= mjdcut]
         alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
 
