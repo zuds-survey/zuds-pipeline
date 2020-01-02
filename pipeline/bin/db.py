@@ -77,7 +77,7 @@ STAMP_PREFIX = '/global/project/projectdirs/ptf/www/ztf'
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
 N_PREV_SINGLE = 1
-N_PREV_MULTI = 0
+N_PREV_MULTI = 1
 
 MASK_BITS = {
     'BIT00': 0,
@@ -1589,6 +1589,30 @@ class CalibratedImage(CalibratableImage):
         except FileNotFoundError:
             pass
 
+    @property
+    def unphotometered_sources(self):
+        cls = type(self)
+        jcond = sa.func.q3c_poly_query(
+            models.Source.ra,
+            models.Source.dec,
+            self.poly
+        )
+
+        jcond2 = sa.and_(
+            ForcedPhotometry.image_id == self.id,
+            ForcedPhotometry.source_id == cls.id
+        )
+
+        query = DBSession().query(models.Source).join(
+            cls, jcond
+        ).outerjoin(
+            ForcedPhotometry, jcond2
+        ).filter(
+            ForcedPhotometry.id == None
+        )
+
+        return query.all()
+
 
 class ScienceImage(CalibratedImage):
     """IPAC record of a science image from their pipeline. Contains some
@@ -1703,11 +1727,39 @@ class Coadd(CalibratableImage):
         ).join(
             CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
         ).join(
-            type(self), type(self).id == CoaddImage.coadd_id
+            Coadd, Coadd.id == CoaddImage.coadd_id
         ).filter(
-            type(self).id == self.id
+            Coadd.id == self.id
         ).first()[0]
 
+    @property
+    def min_mjd(self):
+        return DBSession().query(
+            sa.func.min(
+                ScienceImage.obsjd - MJD_TO_JD
+            )
+        ).select_from(Coadd).join(
+            CoaddImage.coadd_id == Coadd.id
+        ).join(
+            ScienceImage, ScienceImage.id == CoaddImage.calibratableimage_id
+        ).filter(
+            Coadd.id == self.id
+        ).first()[0]
+
+
+    @property
+    def max_mjd(self):
+        return DBSession().query(
+            sa.func.max(
+                ScienceImage.obsjd - MJD_TO_JD
+            )
+        ).select_from(Coadd).join(
+            CoaddImage.coadd_id == Coadd.id
+        ).join(
+            ScienceImage, ScienceImage.id == CoaddImage.calibratableimage_id
+        ).filter(
+            Coadd.id == self.id
+        ).first()[0]
 
     @declared_attr
     def __table_args__(cls):
@@ -2229,13 +2281,14 @@ models.Source.best_detection = property(best_detection)
 
 
 def unphotometered_images(self):
-    subq = DBSession().query(ForcedPhotometry).filter(
+    subq = DBSession().query(ForcedPhotometry.id,
+                             ForcedPhotometry.image_id).filter(
         ForcedPhotometry.source_id == self.id
     ).subquery()
 
     q = DBSession().query(SingleEpochSubtraction.id).filter(
-        func.q3c_radial_query(self.ra,
-                              self.dec,
+        func.q3c_radial_query(SingleEpochSubtraction.ra,
+                              SingleEpochSubtraction.dec,
                               self.ra, self.dec,
                               0.64)
     ).filter(
@@ -2275,7 +2328,8 @@ def light_curve(sourceid):
         ForcedPhotometry.fluxerr,
         ForcedPhotometry.flags,
         ScienceImage.maglimit,
-        ScienceImage.apcor
+        ScienceImage.apcor,
+        ForcedPhotometry.id
     ).select_from(
         sa.join(
             ForcedPhotometry,
@@ -2298,7 +2352,8 @@ def light_curve(sourceid):
                  'flux': photpoint[3],
                  'fluxerr': photpoint[4],
                  'flags': photpoint[5],
-                 'lim_mag': photpoint[6]}
+                 'lim_mag': photpoint[6],
+                 'id': photpoint[8]}
         lc_raw.append(photd)
 
     return Table(lc_raw)
@@ -2625,12 +2680,19 @@ class Alert(models.Base):
         'thumbnails.id', ondelete='SET NULL'
     ))
 
+    detection_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'detections.id', ondelete='SET NULL'
+    ), index=True)
+
     cutoutscience = relationship('Thumbnail', cascade='all',
                                  foreign_keys=[cutoutscience_id])
     cutouttemplate = relationship('Thumbnail', cascade='all',
                                   foreign_keys=[cutouttemplate_id])
     cutoutdifference = relationship('Thumbnail', cascade='all',
                                     foreign_keys=[cutoutdifference_id])
+
+    detection = relationship('Detection', cascade='all',
+                             foreign_keys=[detection_id])
 
     def to_dict(self):
         base = deepcopy(self.alert)
@@ -2669,8 +2731,15 @@ class Alert(models.Base):
         # add some basic info about the image this was found on and metadata
         candidate['fid'] = detection.image.fid
         candidate['pid'] = detection.image.id
-        candidate['programpi'] = 'Kulkarni'
-        candidate['programid'] = 2
+
+        if isinstance(detection.image, SingleEpochSubtraction):
+            candidate['programpi'] = detection.image.target_image.header['PROGRMPI']
+            candidate['programid'] = detection.image.target_image.header['PROGRMID']
+        else:
+            candidate['programpi'] = \
+                detection.image.target_image.input_images[0].header['PROGRMPI']
+            candidate['programid'] = \
+                detection.image.target_image.input_images[0].header['PROGRMID']
         candidate['pdiffimfilename'] = detection.image.basename
         candidate['candid'] = detection.id
         candidate['isdiffpos'] = 't'
@@ -2696,8 +2765,6 @@ class Alert(models.Base):
         # machine learning
         candidate['drb'] = detection.rb[0].rb_score
         candidate['drbversion'] = detection.rb[0].rb_version
-
-        #
 
         # information about the reference images
 
@@ -2729,16 +2796,31 @@ class Alert(models.Base):
             lambda d: d is not detection,
             sorted(
                 detection.source.detections,
-                key=lambda d: d.image.mjd,
+                key=lambda d: d.image.mjd if not isinstance(
+                    d.image,
+                    MultiEpochSubtraction
+                ) else d.image.target_image.max_mjd
             )
         ))
 
         candidate['ndethist'] = len(prevdets)
-        candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
-        candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
+
+        if len(prevdets) > 0:
+            candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
+            candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
+        else:
+            candidate['jdstarthist'] = None
+            candidate['jdendhist'] = None
 
         # make the light curve
         lc = detection.source.light_curve()
+
+        if len(lc) == 0:
+            raise RuntimeError('Cannot issue an alert for an object with no '
+                               'light curve, please rerun forced photometry '
+                               'to update the light curve of this object:' 
+                               f'"{detection.source.id}".')
+
         lc = lc[lc['mjd'] <= mjdcut]
         alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
 
@@ -2756,4 +2838,5 @@ class Alert(models.Base):
                 obj.cutoutdifference = stamp
 
         obj.alert = alert
+        obj.detection = detection
         return obj

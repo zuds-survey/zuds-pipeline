@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime
 from ztfquery import query
-
+from astropy.time import Time
 
 QUERY_WINDOWSIZE = 30 # days
 WHERECLAUSE = ''
@@ -20,24 +20,21 @@ if __name__ == '__main__':
     start = datetime.now()
 
     # get the maximum nid
-    max_nid = db.DBSession().query(db.sa.func.max(db.ScienceImage.nid)).first()[0]
-    max_date = db.DBSession().query(db.sa.func.max(db.ScienceImage.obsdate)).first()[0]
-    today = datetime.utcnow()
-    todays_nid = max_nid + (today - max_date).days
+    max_jd = db.DBSession().query(db.sa.func.max(db.ScienceImage.jd)).first()[0]
+    current_jd = Time.now().jd
 
     metatables = []
-    nid_diff = todays_nid - max_nid
-    quotient = nid_diff // QUERY_WINDOWSIZE
-    mod = nid_diff % QUERY_WINDOWSIZE
-
-    n_chunks = quotient if mod == 0 else quotient + 1
-
+    jd_diff = current_jd - max_jd
+    n_chunks = jd_diff // QUERY_WINDOWSIZE + 1
     print('querying')
 
     for i in range(n_chunks):
+
+        jd_lo = max_jd + i * QUERY_WINDOWSIZE
+        jd_hi = max_jd + (i + 1) * QUERY_WINDOWSIZE
+
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
-                             f'NID BETWEEN {max_nid + QUERY_WINDOWSIZE * i} AND '
-                             f'{max_nid + QUERY_WINDOWSIZE * (i + 1)} AND IPAC_GID > 0',
+                             f'OBSJD BETWEEN {jd_lo} AND {jd_hi} AND IPAC_GID > 0',
                              auth=[get_secret('ipac_username'),
                                    get_secret('ipac_password')])
         metatable = zquery.metatable
