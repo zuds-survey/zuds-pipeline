@@ -2680,12 +2680,19 @@ class Alert(models.Base):
         'thumbnails.id', ondelete='SET NULL'
     ))
 
+    detection_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'detections.id', ondelete='SET NULL'
+    ), index=True)
+
     cutoutscience = relationship('Thumbnail', cascade='all',
                                  foreign_keys=[cutoutscience_id])
     cutouttemplate = relationship('Thumbnail', cascade='all',
                                   foreign_keys=[cutouttemplate_id])
     cutoutdifference = relationship('Thumbnail', cascade='all',
                                     foreign_keys=[cutoutdifference_id])
+
+    detection = relationship('Detection', cascade='all',
+                             foreign_keys=[detection_id])
 
     def to_dict(self):
         base = deepcopy(self.alert)
@@ -2752,8 +2759,6 @@ class Alert(models.Base):
         candidate['drb'] = detection.rb[0].rb_score
         candidate['drbversion'] = detection.rb[0].rb_version
 
-        #
-
         # information about the reference images
 
         refimgs = sorted(
@@ -2784,13 +2789,21 @@ class Alert(models.Base):
             lambda d: d is not detection,
             sorted(
                 detection.source.detections,
-                key=lambda d: d.image.mjd,
+                key=lambda d: d.image.mjd if not isinstance(
+                    d.image,
+                    MultiEpochSubtraction
+                ) else d.image.target_image.max_mjd
             )
         ))
 
         candidate['ndethist'] = len(prevdets)
-        candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
-        candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
+
+        if len(prevdets) > 0:
+            candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
+            candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
+        else:
+            candidate['jdstarthist'] = None
+            candidate['jdendhist'] = None
 
         # make the light curve
         lc = detection.source.light_curve()
@@ -2818,4 +2831,5 @@ class Alert(models.Base):
                 obj.cutoutdifference = stamp
 
         obj.alert = alert
+        obj.detection = detection
         return obj
