@@ -1589,6 +1589,30 @@ class CalibratedImage(CalibratableImage):
         except FileNotFoundError:
             pass
 
+    @property
+    def unphotometered_sources(self):
+        cls = type(self)
+        jcond = sa.func.q3c_poly_query(
+            models.Source.ra,
+            models.Source.dec,
+            self.poly
+        )
+
+        jcond2 = sa.and_(
+            ForcedPhotometry.image_id == self.id,
+            ForcedPhotometry.source_id == cls.id
+        )
+
+        query = DBSession().query(models.Source).join(
+            cls, jcond
+        ).outerjoin(
+            ForcedPhotometry, jcond2
+        ).filter(
+            ForcedPhotometry.id == None
+        )
+
+        return query.all()
+
 
 class ScienceImage(CalibratedImage):
     """IPAC record of a science image from their pipeline. Contains some
@@ -2263,8 +2287,8 @@ def unphotometered_images(self):
     ).subquery()
 
     q = DBSession().query(SingleEpochSubtraction.id).filter(
-        func.q3c_radial_query(self.ra,
-                              self.dec,
+        func.q3c_radial_query(SingleEpochSubtraction.ra,
+                              SingleEpochSubtraction.dec,
                               self.ra, self.dec,
                               0.64)
     ).filter(
