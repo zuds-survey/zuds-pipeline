@@ -19,7 +19,7 @@ db.init_db()
 
 # association radius 2 arcsec
 ASSOC_RADIUS = 2 * 0.0002777
-N_PREV_SINGLE = 1
+N_PREV_SINGLE = 0
 N_PREV_MULTI = 0
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
