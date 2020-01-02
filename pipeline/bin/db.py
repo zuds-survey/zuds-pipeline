@@ -1600,7 +1600,7 @@ class CalibratedImage(CalibratableImage):
 
         jcond2 = sa.and_(
             ForcedPhotometry.image_id == self.id,
-            ForcedPhotometry.source_id == cls.id
+            ForcedPhotometry.source_id == models.Source.id
         )
 
         query = DBSession().query(models.Source).join(
