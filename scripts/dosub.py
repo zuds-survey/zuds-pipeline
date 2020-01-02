@@ -12,7 +12,7 @@ fmap = {1: 'zg',
 
 db.init_db()
 #db.DBSession().autoflush = False
-#db.DBSession().get_bind().echo = True
+db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the subtractions for ZUDS.'
@@ -74,6 +74,7 @@ for fn in imgs:
         continue
 
     rstart = time.time()
+
     ref = db.ReferenceImage.get_by_basename(os.path.basename(refname))
     ref.map_to_local_file(refname)
     ref.mask_image.map_to_local_file(refname.replace('.fits', '.mask.fits'))
@@ -89,8 +90,8 @@ for fn in imgs:
 
     basename = db.sub_name(sci.basename, ref.basename)
 
-    prev = subclass.get_by_basename(basename)
-    #prev=None
+    #prev = subclass.get_by_basename(basename)
+    prev=None
 
     #if (prev is not None) and (prev.modified is not None) and \
     #   (prev.modified > datetime.now() - timedelta(hours=24)):
@@ -101,14 +102,9 @@ for fn in imgs:
         continue
 
     substart = time.time()
-    try:
-        sub = subclass.from_images(sci, ref,
-                                   data_product=False,
-                                   tmpdir='tmp')
-    except Exception as e:
-        print(e, [sci.basename, ref.basename], flush=True)
-        db.DBSession().rollback()
-        continue
+    sub = subclass.from_images(sci, ref,
+                               data_product=False,
+                               tmpdir='tmp')
 
     substop = time.time()
     print(
@@ -118,12 +114,8 @@ for fn in imgs:
 
 
     catstart = time.time()
-    try:
-        cat = db.PipelineFITSCatalog.from_image(sub)
-    except Exception as e:
-        print(e, [sub.basename], flush=True)
-        db.DBSession.rollback()
-        continue
+    cat = db.PipelineFITSCatalog.from_image(sub)
+
     catstop = time.time()
     print(
         f'cat: {catstop-catstart:.2f} sec to make catalog for {sub.basename}',
@@ -131,12 +123,7 @@ for fn in imgs:
     )
 
     dstart = time.time()
-    try:
-        detections = db.Detection.from_catalog(cat, filter=True)
-    except Exception as e:
-        print(e, [cat.basename], flush=True)
-        db.DBSession.rollback()
-        continue
+    detections = db.Detection.from_catalog(cat, filter=True)
 
     if len(detections) > 50:
         db.DBSession().rollback()

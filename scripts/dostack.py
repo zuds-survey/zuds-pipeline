@@ -49,8 +49,8 @@ for _, job in jobs.iterrows():
     outname = os.path.join(os.path.dirname(images[0].local_path), basename)
     sstop = time.time()
 
-    if prev is not None:
-        continue
+    #if prev is not None:
+    #    continue
 
 
     print(
