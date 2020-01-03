@@ -29,7 +29,7 @@ daterange = db.DBSession().query(lcol, rcol).subquery()
 
 target = db.sa.func.array_agg(db.ScienceImage.id).label('target')
 stacksize = db.sa.func.array_length(target, 1).label('stacksize')
-stackcond = stacksize >= 3
+stackcond = stacksize >= 2
 jcond = db.sa.and_(db.ScienceImage.obsdate > daterange.c.left,
                    db.ScienceImage.obsdate <= daterange.c.right)
 
@@ -41,10 +41,14 @@ res = db.DBSession().query(db.ScienceImage.field,
                            target).select_from(
     db.sa.join(db.SingleEpochSubtraction, db.ScienceImage.__table__,
                db.SingleEpochSubtraction.target_image_id ==
-               db.ScienceImage.id).join(daterange, jcond)
+               db.ScienceImage.id).join(
+        db.ReferenceImage, db.ReferenceImage.id ==
+                           db.SingleEpochSubtraction.reference_image_id
+    ).join(daterange, jcond)
 ).filter(
     db.ScienceImage.seeing < 4.,
-    db.ScienceImage.maglimit > 19.2
+    db.ScienceImage.maglimit > 19.2,
+    db.ReferenceImage.version == 'zuds4'
 ).group_by(
     db.ScienceImage.field,
     db.ScienceImage.ccdid,
