@@ -1591,24 +1591,24 @@ class CalibratedImage(CalibratableImage):
 
     @property
     def unphotometered_sources(self):
-        cls = type(self)
-        jcond = sa.func.q3c_poly_query(
-            models.Source.ra,
-            models.Source.dec,
-            self.poly
-        )
 
         jcond2 = sa.and_(
             ForcedPhotometry.image_id == self.id,
             ForcedPhotometry.source_id == models.Source.id
         )
 
-        query = DBSession().query(models.Source).join(
-            cls, jcond
+        query = DBSession().query(
+            models.Source
         ).outerjoin(
             ForcedPhotometry, jcond2
         ).filter(
             ForcedPhotometry.id == None
+        ).filter(
+            sa.func.q3c_poly_query(
+                models.Source.ra,
+                models.Source.dec,
+                self.poly
+            )
         )
 
         return query.all()
