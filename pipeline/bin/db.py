@@ -2019,9 +2019,13 @@ class Subtraction(HasWCS):
 
         # now read the final output products into database mapped records
         sub = cls.get_by_basename(os.path.basename(final_out))
+        if sub is None:
+            sub = cls()
+            sub.basename = os.path.basename(final_out)
         sub.map_to_local_file(final_out)
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
+        finalsubmask.clear()
 
         if sub.catalog is not None:
             sub.catalog.clear()
@@ -2059,15 +2063,6 @@ class Subtraction(HasWCS):
         if data_product:
             archive.archive(sub)
             archive.archive(sub.mask_image)
-
-        # clean up
-        if sub.mask_image.boolean.ismapped:
-            if f'{directory}' in sub.mask_image.boolean.local_path:
-                del sub.mask_image._boolean
-
-        if sci.background_subtracted_image.ismapped:
-            if f'{directory}' in sci.background_subtracted_image.local_path:
-                del sci._bkgsubimg
 
         shutil.rmtree(directory)
 
