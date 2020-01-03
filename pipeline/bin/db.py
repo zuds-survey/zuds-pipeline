@@ -1738,10 +1738,11 @@ class Coadd(CalibratableImage):
             sa.func.min(
                 ScienceImage.obsjd - MJD_TO_JD
             )
-        ).select_from(Coadd).join(
-            CoaddImage.coadd_id == Coadd.id
         ).join(
-            ScienceImage, ScienceImage.id == CoaddImage.calibratableimage_id
+            CoaddImage, ScienceImage.id == CoaddImage.calibratableimage_id
+        ).join(
+            Coadd,
+            CoaddImage.coadd_id == Coadd.id
         ).filter(
             Coadd.id == self.id
         ).first()[0]
@@ -1753,16 +1754,17 @@ class Coadd(CalibratableImage):
             sa.func.max(
                 ScienceImage.obsjd - MJD_TO_JD
             )
-        ).select_from(Coadd).join(
-            CoaddImage.coadd_id == Coadd.id
         ).join(
+            CoaddImage,
             ScienceImage, ScienceImage.id == CoaddImage.calibratableimage_id
+        ).join(
+            Coadd, CoaddImage.coadd_id == Coadd.id
         ).filter(
             Coadd.id == self.id
         ).first()[0]
 
     @declared_attr
-    def __table_args__(cls):
+    def __table_args__(cls):C
         return tuple()
 
     @classmethod
