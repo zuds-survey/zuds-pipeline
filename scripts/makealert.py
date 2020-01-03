@@ -20,7 +20,7 @@ unalerted = db.DBSession().query(
     db.Alert
 ).filter(
     db.Alert.id == None
-)
+).all()
 
 print(f'Need to make alerts for {len(unalerted)} detections')
 
