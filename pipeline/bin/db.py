@@ -1725,9 +1725,9 @@ class Coadd(CalibratableImage):
                 (ScienceImage.obsjd - 2400000.5).asc()
             )
         ).join(
-            CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
+            CoaddImage
         ).join(
-            Coadd, Coadd.id == CoaddImage.coadd_id
+            Coadd
         ).filter(
             Coadd.id == self.id
         ).first()[0]
@@ -1739,10 +1739,9 @@ class Coadd(CalibratableImage):
                 ScienceImage.obsjd - MJD_TO_JD
             )
         ).join(
-            CoaddImage, ScienceImage.id == CoaddImage.calibratableimage_id
+            CoaddImage
         ).join(
-            Coadd,
-            CoaddImage.coadd_id == Coadd.id
+            Coadd
         ).filter(
             Coadd.id == self.id
         ).first()[0]
@@ -1755,10 +1754,9 @@ class Coadd(CalibratableImage):
                 ScienceImage.obsjd - MJD_TO_JD
             )
         ).join(
-            CoaddImage,
-            ScienceImage, ScienceImage.id == CoaddImage.calibratableimage_id
+            CoaddImage
         ).join(
-            Coadd, CoaddImage.coadd_id == Coadd.id
+            Coadd
         ).filter(
             Coadd.id == self.id
         ).first()[0]
