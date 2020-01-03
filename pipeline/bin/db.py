@@ -1764,7 +1764,7 @@ class Coadd(CalibratableImage):
         ).first()[0]
 
     @declared_attr
-    def __table_args__(cls):C
+    def __table_args__(cls):
         return tuple()
 
     @classmethod
