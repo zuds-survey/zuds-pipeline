@@ -240,7 +240,7 @@ def filter_sexcat(cat):
     print(f'filter: {stop - start:.2f} sec to save {cat.basename} to disk')
 
     # make the region file
-    db.PipelineRegionFile.from_catalog(cat)
+    #db.PipelineRegionFile.from_catalog(cat)
 
 
 if __name__ == '__main__':
