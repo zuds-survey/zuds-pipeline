@@ -1725,41 +1725,23 @@ class Coadd(CalibratableImage):
                 (ScienceImage.obsjd - 2400000.5).asc()
             )
         ).join(
-            CoaddImage
+            CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
         ).join(
-            Coadd
+            type(self), type(self).id == CoaddImage.coadd_id
         ).filter(
-            Coadd.id == self.id
+            type(self).id == self.id
         ).first()[0]
 
     @property
     def min_mjd(self):
-        return DBSession().query(
-            sa.func.min(
-                ScienceImage.obsjd - MJD_TO_JD
-            )
-        ).join(
-            CoaddImage
-        ).join(
-            Coadd
-        ).filter(
-            Coadd.id == self.id
-        ).first()[0]
-
+        images = self.input_images
+        return min([image.mjd for image in images])
 
     @property
     def max_mjd(self):
-        return DBSession().query(
-            sa.func.max(
-                ScienceImage.obsjd - MJD_TO_JD
-            )
-        ).join(
-            CoaddImage
-        ).join(
-            Coadd
-        ).filter(
-            Coadd.id == self.id
-        ).first()[0]
+        images = self.input_images
+        return max([image.mjd for image in images])
+
 
     @declared_attr
     def __table_args__(cls):
