@@ -42,7 +42,7 @@ res = db.DBSession().query(db.ScienceImage.field,
     db.sa.join(db.SingleEpochSubtraction, db.ScienceImage.__table__,
                db.SingleEpochSubtraction.target_image_id ==
                db.ScienceImage.id).join(
-        db.ReferenceImage, db.ReferenceImage.id ==
+        db.ReferenceImage.__table__, db.ReferenceImage.__table__.c.id ==
                            db.SingleEpochSubtraction.reference_image_id
     ).join(daterange, jcond)
 ).filter(

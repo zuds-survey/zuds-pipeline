@@ -2713,7 +2713,7 @@ class Alert(models.Base):
         alert = dict()
         alert['objectId'] = detection.source.id
         alert['candid'] = detection.id
-        alert['schemavsn'] = None
+        alert['schemavsn'] = '0.1'
         alert['publisher'] = 'ZUDS/NERSC'
 
         # do a bunch of cross matches to initially populate the candidate
@@ -2792,16 +2792,18 @@ class Alert(models.Base):
             mjdcut = stackimgs[-1].mjd
 
         # calculate the detection history
-        prevdets = list(filter(
-            lambda d: d is not detection,
-            sorted(
-                detection.source.detections,
-                key=lambda d: d.image.mjd if not isinstance(
-                    d.image,
-                    MultiEpochSubtraction
-                ) else d.image.target_image.max_mjd
-            )
-        ))
+        prevdets = []
+        if alert_type == 'single':
+            mymjd = detection.image.mjd
+        else:
+            mymjd = detection.image.target_image.max_mjd
+        for d in detection.source.detections:
+            if isinstance(d.image, MultiEpochSubtraction):
+                dmjd = d.image.target_image.max_mjd
+            else:
+                dmjd = d.image.mjd
+            if dmjd < mymjd and d is not detection:
+                prevdets.append(d)
 
         candidate['ndethist'] = len(prevdets)
 
