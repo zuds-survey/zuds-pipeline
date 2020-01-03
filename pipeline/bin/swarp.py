@@ -255,10 +255,18 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
 
 
     # load the result
-    coadd = cls.from_file(outname)
+    coadd = cls.get_by_basename(os.path.basename(outname))
+    coadd.map_to_local_file(outname)
+
+    if coadd.catalog is not None:
+        coadd.catalog.clear()
+
+    coaddweightname = outname.replace('.fits', '.weight.fits')
+    coadd._weightimg = db.FITSImage.from_file(coaddweightname)
+
     coaddmask = db.MaskImage.from_file(mskoutname)
-    coaddweight = db.FITSImage.from_file(mskoutweightname)
-    coaddmask.update_from_weight_map(coaddweight)
+    coaddmaskweight = db.FITSImage.from_file(mskoutweightname)
+    coaddmask.update_from_weight_map(coaddmaskweight)
 
     # keep a record of the images that went into the coadd
     coadd.input_images = images.tolist()
