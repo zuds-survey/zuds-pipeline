@@ -2808,16 +2808,29 @@ class Alert(models.Base):
             )
         )
 
+        single_dets = [det for det in prevdets if isinstance(det.image, SingleEpochSubtraction)]
+        multi_dets = [det for det in prevdets if isinstance(det.image, MultiEpochSubtraction)]
 
+        candidate['ndethist_single'] = len(single_dets)
+        candidate['ndethist_stack'] = len(multi_dets)
 
-        candidate['ndethist'] = len(prevdets)
-
-        if len(prevdets) > 0:
-            candidate['jdstarthist'] = prevdets[0].image.mjd + MJD_TO_JD
-            candidate['jdendhist'] = prevdets[-1].image.mjd + MJD_TO_JD
+        if len(single_dets) > 0:
+            starthist = single_dets[0].image.mjd + MJD_TO_JD
+            endhist = single_dets[-1].image.mjd + MJD_TO_JD
+            candidate['jdstarthist_single'] = starthist
+            candidate['jdendhist_single'] = endhist
         else:
-            candidate['jdstarthist'] = None
-            candidate['jdendhist'] = None
+            candidate['jdstarthist_single'] = None
+            candidate['jdendhist_single'] = None
+
+        if len(multi_dets) > 0:
+            starthist = multi_dets[0].image.target_image.mjd_min + MJD_TO_JD
+            endhist = multi_dets[-1].image.target_image.mjd_max + MJD_TO_JD
+            candidate['jdstarthist_stack'] = starthist
+            candidate['jdendhist_stack'] = endhist
+        else:
+            candidate['jdstarthist_stack'] = None
+            candidate['jdendhist_stack'] = None
 
         # make the light curve
         lc = detection.source.light_curve()
