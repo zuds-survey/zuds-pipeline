@@ -2824,8 +2824,8 @@ class Alert(models.Base):
             candidate['jdendhist_single'] = None
 
         if len(multi_dets) > 0:
-            starthist = multi_dets[0].image.target_image.mjd_min + MJD_TO_JD
-            endhist = multi_dets[-1].image.target_image.mjd_max + MJD_TO_JD
+            starthist = multi_dets[0].image.target_image.min_mjd + MJD_TO_JD
+            endhist = multi_dets[-1].image.target_image.max_mjd + MJD_TO_JD
             candidate['jdstarthist_stack'] = starthist
             candidate['jdendhist_stack'] = endhist
         else:
