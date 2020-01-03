@@ -19,8 +19,8 @@ db.init_db()
 
 # association radius 2 arcsec
 ASSOC_RADIUS = 2 * 0.0002777
-N_PREV_SINGLE = 0
-N_PREV_MULTI = 0
+N_PREV_SINGLE = 1
+N_PREV_MULTI = 1
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
@@ -148,7 +148,7 @@ for detection in unassigned:
     # source.dec = best.dec
 
     db.DBSession().flush()
-    
+
     if len(source.thumbnails) == len(source.photometry[0].thumbnails):
         lthumbs = source.return_linked_thumbnails()
         db.DBSession().add_all(lthumbs)
