@@ -22,7 +22,13 @@ unalerted = db.DBSession().query(
     db.Alert.id == None
 )
 
+print(f'Need to make alerts for {len(unalerted)} detections')
+
 alerts = []
 for detection in unalerted:
+    tstart = time.time()
     alert = db.Alert.from_detection(detection)
     alerts.append(alert)
+    tstop = time.time()
+    print(f'took {tstop - tstart:.2f} sec to make alert '
+          f'for {detection.source_id}')
