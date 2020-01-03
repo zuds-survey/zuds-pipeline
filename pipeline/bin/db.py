@@ -423,6 +423,10 @@ class File(object):
         return hasattr(self, '_path')
 
     def map_to_local_file(self, path):
+        if  hasattr(self, 'basename'):
+            print(f'Mapping {self.basename} to {path}')
+        else:
+            print(f'Mapping {self} to {path}')
         self._path = str(Path(path).absolute())
 
     def unmap(self):
@@ -2014,13 +2018,16 @@ class Subtraction(HasWCS):
             shutil.copy(f, product_map[f])
 
         # now read the final output products into database mapped records
-        sub = cls.from_file(final_out)
+        sub = cls.get_by_basename(os.path.basename(final_out))
+        sub.map_to_local_file(final_out)
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
 
-        # this shouldn't be necessary but let's see
-        if hasattr(sub, '_data'):
-            del sub._data
+        if sub.catalog is not None:
+            sub.catalog.clear()
+
+        sub._rmsimg = FITSFile.from_file(final_out.replace('.fits',
+                                                           '.rms.fits'))
 
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
