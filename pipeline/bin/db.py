@@ -1473,6 +1473,7 @@ class CalibratableImageBase(FITSImage):
 
         for path, t in zip(paths, types):
             if path.exists():
+                print(f'Reading {obj.basename}.{t} from {path}')
                 setattr(obj, t, FITSImage.from_file(f'{path}'))
 
         return obj
@@ -1511,11 +1512,13 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
         if obj.mask_image is not None:
             mskpath = dir / obj.mask_image.basename
             if mskpath.exists():
+                print(f'Reading {obj.basename}.mask_image from {mskpath}')
                 obj.mask_image = MaskImage.from_file(mskpath)
 
         if obj.catalog is not None:
             catpath = dir / obj.catalog.basename
             if catpath.exists():
+                print(f'Reading {obj.basename}.catalog from {catpath}')
                 obj.catalog = PipelineFITSCatalog.from_file(catpath)
 
         return obj
