@@ -1003,6 +1003,15 @@ class ZTFFile(models.Base, File):
         obj = DBSession().query(cls).filter(cls.basename == basename).first()
         if obj is not None:
             obj.clear()  # get a fresh copy
+
+        if hasattr(obj, 'mask_image'):
+            if obj.mask_image is not None:
+                obj.mask_image.clear()
+
+        if hasattr(obj, 'catalog'):
+            if obj.catalog is not None:
+                obj.catalog.clear()
+
         return obj
 
 
@@ -2025,10 +2034,6 @@ class Subtraction(HasWCS):
         sub.map_to_local_file(final_out)
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
-        finalsubmask.clear()
-
-        if sub.catalog is not None:
-            sub.catalog.clear()
 
         sub._rmsimg = FITSFile.from_file(final_out.replace('.fits',
                                                            '.rms.fits'))
