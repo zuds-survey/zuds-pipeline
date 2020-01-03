@@ -2787,6 +2787,19 @@ class Alert(models.Base):
             if dmjd < mymjd and d is not detection:
                 prevdets.append(d)
 
+        sfunc = lambda d: d.image.mjd if isinstance(
+            d.image, SingleEpochSubtraction
+        ) else d.image.target_image.max_mjd
+
+        prevdets = list(
+            sorted(
+                prevdets,
+                key=sfunc
+            )
+        )
+
+
+
         candidate['ndethist'] = len(prevdets)
 
         if len(prevdets) > 0:
