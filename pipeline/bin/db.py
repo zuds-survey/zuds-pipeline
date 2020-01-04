@@ -1465,29 +1465,30 @@ class CalibratableImageBase(FITSImage):
 
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=True):
+    def from_file(cls, fname, use_existing_record=True, load_others=True):
         obj = super().from_file(
             fname, use_existing_record=use_existing_record,
         )
         dir = Path(fname).parent
 
-        weightpath = dir / obj.basename.replace('.fits', '.weight.fits')
-        rmspath = dir / obj.basename.replace('.fits', '.rms.fits')
-        bkgpath = dir / obj.basename.replace('.fits', '.bkg.fits')
-        threshpath = dir / obj.basename.replace('.fits', '.thresh.fits')
-        bkgsubpath = dir / obj.basename.replace('.fits', '.bkgsub.fits')
-        segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
+        if load_others:
+            weightpath = dir / obj.basename.replace('.fits', '.weight.fits')
+            rmspath = dir / obj.basename.replace('.fits', '.rms.fits')
+            bkgpath = dir / obj.basename.replace('.fits', '.bkg.fits')
+            threshpath = dir / obj.basename.replace('.fits', '.thresh.fits')
+            bkgsubpath = dir / obj.basename.replace('.fits', '.bkgsub.fits')
+            segmpath = dir / obj.basename.replace('.fits', '.segm.fits')
 
-        paths = [weightpath, rmspath, bkgpath, threshpath,
-                 bkgsubpath, segmpath]
+            paths = [weightpath, rmspath, bkgpath, threshpath,
+                     bkgsubpath, segmpath]
 
-        types = ['_weightimg', '_rmsimg', '_bkgimg', '_threshimg',
-                 '_bkgsubimg', '_segmimg']
+            types = ['_weightimg', '_rmsimg', '_bkgimg', '_threshimg',
+                     '_bkgsubimg', '_segmimg']
 
-        for path, t in zip(paths, types):
-            if path.exists():
-                print(f'Reading {obj.basename}.{t} from {path}')
-                setattr(obj, t, FITSImage.from_file(f'{path}'))
+            for path, t in zip(paths, types):
+                if path.exists():
+                    print(f'Reading {obj.basename}.{t} from {path}')
+                    setattr(obj, t, FITSImage.from_file(f'{path}'))
 
         return obj
 
@@ -1516,23 +1517,26 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
 
 
     @classmethod
-    def from_file(cls, fname, use_existing_record=True):
+    def from_file(cls, fname, use_existing_record=True, load_others=True):
         obj = super().from_file(
-            fname, use_existing_record=use_existing_record
+            fname, use_existing_record=use_existing_record,
+            load_others=load_others
         )
         dir = Path(fname).parent
 
-        if obj.mask_image is not None:
-            mskpath = dir / obj.mask_image.basename
-            if mskpath.exists():
-                print(f'Reading {obj.basename}.mask_image from {mskpath}')
-                obj.mask_image = MaskImage.from_file(mskpath)
+        if load_others:
 
-        if obj.catalog is not None:
-            catpath = dir / obj.catalog.basename
-            if catpath.exists():
-                print(f'Reading {obj.basename}.catalog from {catpath}')
-                obj.catalog = PipelineFITSCatalog.from_file(catpath)
+            if obj.mask_image is not None:
+                mskpath = dir / obj.mask_image.basename
+                if mskpath.exists():
+                    print(f'Reading {obj.basename}.mask_image from {mskpath}')
+                    obj.mask_image = MaskImage.from_file(mskpath)
+
+            if obj.catalog is not None:
+                catpath = dir / obj.catalog.basename
+                if catpath.exists():
+                    print(f'Reading {obj.basename}.catalog from {catpath}')
+                    obj.catalog = PipelineFITSCatalog.from_file(catpath)
 
         return obj
 
@@ -1657,9 +1661,10 @@ class ScienceImage(CalibratedImage):
                        'inherit_condition': id == CalibratedImage.id}
 
     @classmethod
-    def from_file(cls, f, use_existing_record=True):
+    def from_file(cls, f, use_existing_record=True, load_others=True):
         obj = super().from_file(
             f, use_existing_record=use_existing_record,
+            load_others=load_others
         )
         obj.field = obj.header['FIELDID']
         obj.ccdid = obj.header['CCDID']
@@ -2027,12 +2032,7 @@ class Subtraction(HasWCS):
             shutil.copy(f, product_map[f])
 
         # now read the final output products into database mapped records
-        sub = cls.get_by_basename(os.path.basename(final_out))
-        if sub is None:
-            sub = cls()
-            sub.basename = os.path.basename(final_out)
-        sub.map_to_local_file(final_out)
-        sub.load_header()
+        sub = cls.from_file(final_out, load_others=False)
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
 
