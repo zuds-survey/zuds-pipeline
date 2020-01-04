@@ -2032,6 +2032,7 @@ class Subtraction(HasWCS):
             sub = cls()
             sub.basename = os.path.basename(final_out)
         sub.map_to_local_file(final_out)
+        sub.load_header()
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
 

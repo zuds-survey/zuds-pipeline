@@ -256,7 +256,11 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
 
     # load the result
     coadd = cls.get_by_basename(os.path.basename(outname))
+    if coadd is None:
+        coadd = cls()
+        coadd.basename = os.path.basename(outname)
     coadd.map_to_local_file(outname)
+    coadd.load_header()
 
     if coadd.catalog is not None:
         coadd.catalog.clear()
