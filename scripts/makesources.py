@@ -28,16 +28,10 @@ DEFAULT_INSTRUMENT = 1
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Associate detections into sources for ZUDS.'
 
-
-# get distinct fields
-fields = db.DBSession().query(
-    db.CalibratableImage.field.distinct()
-).select_from(db.Detection).join(
-    db.CalibratableImage
-).all()
+field_file = sys.argv[1]
 
 # split the list up
-my_fields = mpi.get_my_share_of_work(fields, reader=lambda x: x)
+my_fields = mpi.get_my_share_of_work(field_file)
 
 # get unassigned detections
 
@@ -47,7 +41,7 @@ for field in my_fields:
         db.Detection
     ).filter(
         db.Detection.source_id == None,
-        db.CalibratableImage.field == field
+        db.CalibratableImage.field == int(field)
     ).join(
         db.CalibratableImage
     ).order_by(
@@ -87,7 +81,7 @@ for field in my_fields:
                         ASSOC_RADIUS
                     ),
                     db.Detection.id != detection.id,
-                    db.CalibratableImage.field == field
+                    db.CalibratableImage.field == int(field)
                 ).all()
 
 
