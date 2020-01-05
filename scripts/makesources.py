@@ -51,7 +51,7 @@ for field, chip in work:
     ).filter(
         db.Detection.source_id == None,
         db.CalibratableImage.field == int(field),
-        db.CalibratableImage.ccdid == int(ccdid)
+        db.CalibratableImage.ccdid == int(chip)
     ).join(
         db.CalibratableImage
     ).order_by(
@@ -92,7 +92,7 @@ for field, chip in work:
                     ),
                     db.Detection.id != detection.id,
                     db.CalibratableImage.field == int(field),
-                    db.CalibratableImage.ccdid == int(ccdid)
+                    db.CalibratableImage.ccdid == int(chip)
                 ).all()
 
 
