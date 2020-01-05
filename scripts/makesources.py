@@ -38,6 +38,8 @@ def reader(fname):
         for i in range(1, 17):
             result.append((f, i))
 
+    return result
+
 work = mpi.get_my_share_of_work(field_file, reader=reader)
 
 # get unassigned detections
