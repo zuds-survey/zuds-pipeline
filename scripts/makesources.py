@@ -31,17 +31,25 @@ __whatami__ = 'Associate detections into sources for ZUDS.'
 field_file = sys.argv[1]
 
 # split the list up
-my_fields = mpi.get_my_share_of_work(field_file)
+def reader(fname):
+    fields = np.genfromtxt(fname, dtype=None, encoding='ascii')
+    result = []
+    for f in fields:
+        for i in range(1, 17):
+            result.append((f, i))
+
+work = mpi.get_my_share_of_work(field_file, reader=reader)
 
 # get unassigned detections
 
-for field in my_fields:
+for field, chip in work:
 
     unassigned = db.DBSession().query(
         db.Detection
     ).filter(
         db.Detection.source_id == None,
-        db.CalibratableImage.field == int(field)
+        db.CalibratableImage.field == int(field),
+        db.CalibratableImage.ccdid == int(ccdid)
     ).join(
         db.CalibratableImage
     ).order_by(
@@ -81,7 +89,8 @@ for field in my_fields:
                         ASSOC_RADIUS
                     ),
                     db.Detection.id != detection.id,
-                    db.CalibratableImage.field == int(field)
+                    db.CalibratableImage.field == int(field),
+                    db.CalibratableImage.ccdid == int(ccdid)
                 ).all()
 
 
