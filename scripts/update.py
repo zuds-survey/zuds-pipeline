@@ -22,12 +22,12 @@ if __name__ == '__main__':
     # get the maximum nid
     max_jd = db.DBSession().query(db.sa.func.max(
         db.ScienceImage.obsjd
-    )).first()[0]
+    )).select_from(db.ScienceImage.__table__).first()[0]
     current_jd = Time.now().jd
 
     metatables = []
     jd_diff = current_jd - max_jd
-    n_chunks = jd_diff // QUERY_WINDOWSIZE + 1
+    n_chunks = int(jd_diff // QUERY_WINDOWSIZE) + 1
     print('querying')
 
     for i in range(n_chunks):
@@ -36,14 +36,16 @@ if __name__ == '__main__':
         jd_hi = max_jd + (i + 1) * QUERY_WINDOWSIZE
 
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
-                             f'OBSJD > {jd_lo} AND OBSJD <= {jd_hi} AND IPAC_GID > 0',
+                             f'OBSJD >= {jd_lo} AND OBSJD <= {jd_hi} AND IPAC_GID > 0',
                              auth=[get_secret('ipac_username'),
                                    get_secret('ipac_password')])
         metatable = zquery.metatable
         metatables.append(metatable)
 
     metatable = pd.concat(metatables)
-    current_paths = db.DBSession().query(db.ScienceImage.basename).all()
+    current_paths = db.DBSession().query(db.ScienceImage.basename).filter(
+        db.ScienceImage.obsjd == max_jd
+    )all()
     print(f'pulled {len(metatable)} images')
 
     # dont need this
@@ -62,22 +64,26 @@ if __name__ == '__main__':
 
     basenames = [i.ipac_path('sciimg.fits').split('/')[-1] for i in meta_images]
 
-    #indices = np.nonzero(~np.in1d(basenames, current_paths,
-    # assume_unique=True))[0]
+    indices = np.nonzero(~np.in1d(basenames, current_paths, assume_unique=True))[0]
 
     print(f'uploading images')
 
-    #for index in indices:
-    #    meta_images[index].basename = basenames[index]
-    #    meta_masks[index].basename = basenames[index].replace('sciimg',
-    #                                                          'mskimg')
+    for index in indices:
+        meta_images[index].basename = basenames[index]
+        meta_masks[index].basename = basenames[index].replace('sciimg',
+                                                              'mskimg')
 
-    for basename, img, mask in zip(basenames, meta_images, meta_masks):
-        img.basename = basename
-        mask.basename = basename
+        db.DBSession().add(meta_images[index])
+        db.DBSession().add(meta_masks[index])
+        
+    #for basename, img, mask in zip(basenames, meta_images, meta_masks):
+    #    img.basename = basename
+    #    mask.basename = basename.replace('sciimg', 'mskimg')
 
-    db.DBSession().add_all(meta_images)
-    db.DBSession().add_all(meta_masks)
+    
+
+    #db.DBSession().add_all(meta_images)
+    #db.DBSession().add_all(meta_masks)
     db.DBSession().commit()
 
     end = datetime.now()
