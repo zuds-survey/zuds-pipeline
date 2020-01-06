@@ -20,7 +20,9 @@ if __name__ == '__main__':
     start = datetime.now()
 
     # get the maximum nid
-    max_jd = db.DBSession().query(db.sa.func.max(db.ScienceImage.jd)).first()[0]
+    max_jd = db.DBSession().query(db.sa.func.max(
+        db.ScienceImage.obsjd
+    )).first()[0]
     current_jd = Time.now().jd
 
     metatables = []
@@ -34,7 +36,7 @@ if __name__ == '__main__':
         jd_hi = max_jd + (i + 1) * QUERY_WINDOWSIZE
 
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
-                             f'OBSJD BETWEEN {jd_lo} AND {jd_hi} AND IPAC_GID > 0',
+                             f'OBSJD > {jd_lo} AND OBSJD <= {jd_hi} AND IPAC_GID > 0',
                              auth=[get_secret('ipac_username'),
                                    get_secret('ipac_password')])
         metatable = zquery.metatable
@@ -60,16 +62,22 @@ if __name__ == '__main__':
 
     basenames = [i.ipac_path('sciimg.fits').split('/')[-1] for i in meta_images]
 
-    indices = np.nonzero(~np.in1d(basenames, current_paths, assume_unique=True))[0]
+    #indices = np.nonzero(~np.in1d(basenames, current_paths,
+    # assume_unique=True))[0]
 
     print(f'uploading images')
 
-    for index in indices:
-        meta_images[index].basename = basenames[index]
-        meta_masks[index].basename = basenames[index].replace('sciimg',
-                                                              'mskimg')
-        db.DBSession().add(meta_images[index])
-        db.DBSession().add(meta_masks[index])
+    #for index in indices:
+    #    meta_images[index].basename = basenames[index]
+    #    meta_masks[index].basename = basenames[index].replace('sciimg',
+    #                                                          'mskimg')
+
+    for basename, img, mask in zip(basenames, meta_images, meta_masks):
+        img.basename = basename
+        mask.basename = basename
+
+    db.DBSession().add_all(meta_images)
+    db.DBSession().add_all(meta_masks)
     db.DBSession().commit()
 
     end = datetime.now()
