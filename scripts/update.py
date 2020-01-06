@@ -45,7 +45,7 @@ if __name__ == '__main__':
     metatable = pd.concat(metatables)
     current_paths = db.DBSession().query(db.ScienceImage.basename).filter(
         db.ScienceImage.obsjd == max_jd
-    )all()
+    ).all()
     print(f'pulled {len(metatable)} images')
 
     # dont need this
