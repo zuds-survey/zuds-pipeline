@@ -12,7 +12,7 @@ fmap = {1: 'zg',
 
 db.init_db()
 #db.DBSession().autoflush = False
-db.DBSession().get_bind().echo = True
+#db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the subtractions for ZUDS.'
@@ -90,8 +90,8 @@ for fn in imgs:
 
     basename = db.sub_name(sci.basename, ref.basename)
 
-    #prev = subclass.get_by_basename(basename)
-    prev=None
+    prev = subclass.get_by_basename(basename)
+    #prev=None
 
     #if (prev is not None) and (prev.modified is not None) and \
     #   (prev.modified > datetime.now() - timedelta(hours=24)):
@@ -99,6 +99,7 @@ for fn in imgs:
     #    continue
 
     if prev is not None:
+        db.DBSession().rollback()
         continue
 
     substart = time.time()
