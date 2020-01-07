@@ -231,6 +231,8 @@ def do_one(fn, sciclass, subclass, refvers):
           flush=True)
     print(f'took {tstop - tstart} sec to make "{sub.basename}"', flush=True)
 
+    return detections, sub
+
 
 if __name__ == '__main__':
 
