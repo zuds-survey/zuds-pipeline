@@ -95,6 +95,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
             f'"{stdout.read()}", "{stderr.read()}".'
         )
 
+
     jobid = stdout.read().split()[-1]
 
     return jobid
@@ -125,16 +126,16 @@ if __name__ == '__main__':
                 ZUDS_FIELDS
             ),
             db.ScienceImage.ipac_gid == 2
-        ).with_for_update(
-            skip_locked=True, of=db.ScienceImage
-        ).limit(
-            JOB_SIZE
         ).options(
             db.sa.orm.joinedload(
                 db.ScienceImage.copies
             )
         ).order_by(
             db.ScienceImage.filefracday
+        ).with_for_update(
+            skip_locked=True, of=db.ScienceImage
+        ).limit(
+            JOB_SIZE
         )
 
         images = imq.all()
