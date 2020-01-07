@@ -20,11 +20,14 @@ if __name__ == '__main__':
     start = datetime.now()
 
     # get the maximum nid
-    max_jd, max_ffd = db.DBSession().query(db.sa.func.max(
-        db.ScienceImage.obsjd
-    ), db.sa.func.max(
-        db.ScienceImage.filefracday
-    )).select_from(db.ScienceImage.__table__).first()
+    sm = db.DBSession().query(db.ScienceImage).order_by(
+        db.ScienceImage.obsjd.desc()
+    ).first()
+
+    max_jd = sm.obsjd
+    max_ffd = sm.filefracday
+    max_nid = sm.nid
+
     current_jd = Time.now().jd
 
     metatables = []
@@ -34,11 +37,12 @@ if __name__ == '__main__':
 
     for i in range(n_chunks):
 
-        jd_lo = max_jd + i * QUERY_WINDOWSIZE
-        jd_hi = max_jd + (i + 1) * QUERY_WINDOWSIZE
+        nid_lo = max_nid + i * QUERY_WINDOWSIZE
+        nid_hi = max_nid + (i + 1) * QUERY_WINDOWSIZE
 
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
-                             f'OBSJD >= {jd_lo} AND OBSJD <= {jd_hi} AND IPAC_GID > 0',
+                             f'NID >= {nid_lo} AND NID <= {nid_hi} AND '
+                             f'IPAC_GID > 0',
                              auth=[get_secret('ipac_username'),
                                    get_secret('ipac_password')])
         metatable = zquery.metatable
@@ -46,7 +50,7 @@ if __name__ == '__main__':
 
     metatable = pd.concat(metatables)
     current_paths = db.DBSession().query(db.ScienceImage.basename).filter(
-        db.ScienceImage.filefracday == max_ffd
+        db.ScienceImage.nid == max_nid
     ).all()
     print(f'pulled {len(metatable)} images')
 
@@ -77,12 +81,12 @@ if __name__ == '__main__':
 
         db.DBSession().add(meta_images[index])
         db.DBSession().add(meta_masks[index])
-        
+
     #for basename, img, mask in zip(basenames, meta_images, meta_masks):
     #    img.basename = basename
     #    mask.basename = basename.replace('sciimg', 'mskimg')
 
-    
+
 
     #db.DBSession().add_all(meta_images)
     #db.DBSession().add_all(meta_masks)
