@@ -36,7 +36,8 @@ def reader(fname):
     result = []
     for f in fields:
         for i in range(1, 17):
-            result.append((f, i))
+            for j in range(1, 5):
+                result.append((f, i, j))
 
     return result
 
@@ -44,19 +45,21 @@ work = mpi.get_my_share_of_work(field_file, reader=reader)
 
 # get unassigned detections
 
-for field, chip in work:
+for field, chip, quad in work:
 
     unassigned = db.DBSession().query(
         db.Detection
     ).filter(
         db.Detection.source_id == None,
         db.CalibratableImage.field == int(field),
-        db.CalibratableImage.ccdid == int(chip)
+        db.CalibratableImage.ccdid == int(chip),
+        db.CalibratableImage.qid == int(quad)
     ).join(
         db.CalibratableImage
     ).order_by(
         db.CalibratableImage.basename.asc()
-    )
+    ).with_for_update()  # locks all the unassigned detections from this
+    # field/chip
 
     for detection in tqdm(unassigned.all()):
 
@@ -92,7 +95,8 @@ for field, chip in work:
                     ),
                     db.Detection.id != detection.id,
                     db.CalibratableImage.field == int(field),
-                    db.CalibratableImage.ccdid == int(chip)
+                    db.CalibratableImage.ccdid == int(chip),
+                    db.CalibratableImage.qid == int(quad)
                 ).all()
 
 
