@@ -43,7 +43,7 @@ def _update_source_coordinate(source_object, detections):
     source_object.dec = det.dec
 
 
-def associate(detection_id):
+def associate(detection_id, do_historical_phot=False):
 
     # put a lock on the detection
     detection = db.DBSession().query(db.Detection).filter(
@@ -157,6 +157,11 @@ def associate(detection_id):
                 db.DBSession().add(dummy_phot)
                 db.DBSession().add(source)
                 db.DBSession().flush()
+
+                # run forced photometry on the new source
+                if do_historical_phot:
+                    fp = source.force_photometry()
+                    db.DBSession().add_all(fp)
 
                 for t in detection.thumbnails:
                     t.photometry = dummy_phot
