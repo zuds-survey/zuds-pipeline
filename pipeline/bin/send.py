@@ -60,14 +60,17 @@ def send(topicname, records, schema):
 
 
 
-def send_alert(alert):
+def send_alert(alert_object):
     """
     Send an alert to IPAC. Figure out the alert type,
     and write to the relevant topic.
     """
     # Placeholder -- alert creation date UTC
     # Eventually this will come from the alert
-    alert_date = '20200106'
+
+    ac = alert_object.created_at
+    alert_date = f'{ac.year}{ac.month:02d}{ac.day:02d}'
+    alert = alert_object.to_dict()
 
     imtype = alert['candidate']['alert_type']
     if imtype == 'single':

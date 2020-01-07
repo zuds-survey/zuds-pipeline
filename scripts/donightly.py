@@ -2,6 +2,7 @@ import db
 import sys
 import mpi
 import dosub
+import send
 import makesources
 from argparse import ArgumentParser
 
@@ -35,3 +36,16 @@ if __name__ == '__main__':
         sub.force_photometry(sub.unphotometered_sources,
                              assume_background_subtracted=True)
         db.DBSession().commit()
+
+        # issue an alert for each detection
+
+        alerts = []
+        for d in detections:
+            if d.source is not None:
+                alert = db.Alert.from_detection(d)
+                db.DBSession().add(alert)
+                alerts.append(alert)
+
+        db.DBSession().commit()
+        for alert in alerts:
+            send.send_alert(alert)
