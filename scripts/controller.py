@@ -6,6 +6,7 @@ import sys
 import traceback
 import pandas as pd
 import datetime
+from pathlib import Path
 
 JOB_SIZE = 64 * 3
 
@@ -16,6 +17,7 @@ ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
                716,717,718,719,754,755,756,757,758,
                759,789,790,791,792,793,819,820,821,
                822,823,843,844,845,846,861,862,863]
+fid_map = {1: 'zg', 2:'zr', 3:'zi'}
 
 def get_job_statuses():
     if os.getenv('NERSC_HOST') != 'cori':
@@ -44,7 +46,15 @@ def get_job_statuses():
 def submit_job(images):
 
     ndt = datetime.datetime.utcnow()
-    datestring = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
+    nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
+
+    fnames = [
+        f'/global/cscratch1/sd/dgold/zuds/{s.field:06d}/'
+        f'c{s.ccdid:02d}/q{s.qid}/{fid_map[s.fid]}/{s.basename}'
+        for s in images
+    ]
+
+    final = '\n'.join(fnames)
 
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
@@ -58,9 +68,36 @@ def submit_job(images):
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py  zuds4
+filenames="{final}"
+
+HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py $filenames zuds4
 
 """
+
+    scriptname = Path(f'/global/cscratch1/sd/dgold/nightly/{nightdate}/{ndt}.sh')
+    scriptname.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(scriptname, 'w') as f:
+        f.write(jobscript)
+
+    cmd = f'sbatch {scriptname}'
+    process = subprocess.Popen(
+        cmd.split(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    stdout, stderr = process.communicate()
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f'Non-zero exit code from sbatch, output was '
+            f'"{stdout.read()}", "{stderr.read()}".'
+        )
+
+    jobid = stdout.read().split()[-1]
+
+    return jobid
 
 
 if __name__ == '__main__':
