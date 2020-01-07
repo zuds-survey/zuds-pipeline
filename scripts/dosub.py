@@ -17,21 +17,9 @@ db.init_db()
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the subtractions for ZUDS.'
 
-infile = sys.argv[1]  # file listing all the images to make subtractions of
-refvers = sys.argv[2]
-
-#subclass = db.MultiEpochSubtraction
-#sciclass = db.ScienceCoadd
-
-subclass = db.SingleEpochSubtraction
-sciclass = db.ScienceImage
-
-
-# get the work
-imgs = mpi.get_my_share_of_work(infile)
 
 # make a reference for each directory
-for fn in imgs:
+def do_one(fn, sciclass, subclass, refvers):
     tstart = time.time()
 
     sstart = time.time()
@@ -71,7 +59,7 @@ for fn in imgs:
     if not (db.ReferenceImage.get_by_basename(os.path.basename(refname))
             and os.path.exists(refname)):
         print(f'Ref {refname} does not exist. Skipping...')
-        continue
+        return
 
     rstart = time.time()
 
@@ -100,7 +88,7 @@ for fn in imgs:
 
     if prev is not None:
         db.DBSession().rollback()
-        continue
+        return
 
     substart = time.time()
     sub = subclass.from_images(sci, ref,
@@ -130,7 +118,7 @@ for fn in imgs:
         db.DBSession().rollback()
         print(f'Error: {len(detections)} detections on "{sub.basename}", '
               'something wrong with the image probably', flush=True)
-        continue
+        return
 
     dstop = time.time()
     print(
@@ -159,7 +147,7 @@ for fn in imgs:
     except Exception as e:
         print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
-        continue
+        return
 
     fpstart = time.time()
 
@@ -242,3 +230,20 @@ for fn in imgs:
           f'up after {sub.basename}"',
           flush=True)
     print(f'took {tstop - tstart} sec to make "{sub.basename}"', flush=True)
+
+
+if __name__ == '__main__':
+
+    infile = sys.argv[1]  # file listing all the images to make subtractions of
+    refvers = sys.argv[2]
+
+    # subclass = db.MultiEpochSubtraction
+    # sciclass = db.ScienceCoadd
+
+    subclass = db.SingleEpochSubtraction
+    sciclass = db.ScienceImage
+
+    # get the work
+    imgs = mpi.get_my_share_of_work(infile)
+    for fn in imgs:
+        do_one(fn, sciclass, subclass, refvers)
