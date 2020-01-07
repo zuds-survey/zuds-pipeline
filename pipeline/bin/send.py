@@ -1,5 +1,6 @@
 """ This code sends ZUDS alerts to IPAC topics """
 
+import os
 import pickle
 import json
 import confluent_kafka
@@ -28,6 +29,10 @@ def load_single_avsc(file_path, names):
     """Load a single avsc file.
     Taken from Eric's lsst-dm Github page
     """
+
+    curdir = os.path.dirname(__file__)
+    file_path = os.path.join(curdir, '..', 'alert_schemas', file_path)
+
     with open(file_path) as file_text:
         json_data = json.load(file_text)
     schema = avro.schema.SchemaFromJSONData(json_data, names)

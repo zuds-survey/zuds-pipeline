@@ -1,0 +1,20 @@
+{
+    "namespace": "zuds",
+    "type": "record",
+    "name": "alert",
+    "doc": "avro alert schema for stacks in ZTF ZUDS survey",
+    "version": "0.1",
+    "fields": [
+        {"name": "candid", "type": "long"},
+        {"name": "schemavsn", "type": "string", "doc": "schema version used"},
+        {"name": "cutoutScience", "type": "bytes"},
+        {"name": "candidate", "type": "ztf.alert.candidate"},
+        {"name": "publisher", "type": "string", "doc": "origin of alert packet"},
+        {"name": "objectId", "type": "string", "doc": "object identifier or name"},
+        {"name": "cutoutDifference", "type": "bytes"},
+        {"name": "cutoutTemplate", "type": "bytes"},
+		{"name": "light_curve", "type": [{
+				"type": "array",
+				"items": "ztf.alert.light_curve"}, "null" ], "default": null}
+	]
+}
