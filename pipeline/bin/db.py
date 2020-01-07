@@ -2279,7 +2279,7 @@ def unphotometered_images(self):
         ForcedPhotometry.source_id == self.id
     ).subquery()
 
-    q = DBSession().query(SingleEpochSubtraction.id).filter(
+    q = DBSession().query(SingleEpochSubtraction).filter(
         func.q3c_radial_query(SingleEpochSubtraction.ra,
                               SingleEpochSubtraction.dec,
                               self.ra, self.dec,
