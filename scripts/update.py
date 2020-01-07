@@ -20,9 +20,11 @@ if __name__ == '__main__':
     start = datetime.now()
 
     # get the maximum nid
-    max_jd = db.DBSession().query(db.sa.func.max(
+    max_jd, max_ffd = db.DBSession().query(db.sa.func.max(
         db.ScienceImage.obsjd
-    )).select_from(db.ScienceImage.__table__).first()[0]
+    ), db.sa.func.max(
+        db.ScienceImage.filefracday
+    )).select_from(db.ScienceImage.__table__).first()
     current_jd = Time.now().jd
 
     metatables = []
@@ -44,7 +46,7 @@ if __name__ == '__main__':
 
     metatable = pd.concat(metatables)
     current_paths = db.DBSession().query(db.ScienceImage.basename).filter(
-        db.ScienceImage.obsjd == max_jd
+        db.ScienceImage.filefracday == max_ffd
     ).all()
     print(f'pulled {len(metatable)} images')
 
