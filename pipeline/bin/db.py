@@ -2861,3 +2861,14 @@ class Alert(models.Base):
         obj.alert = alert
         obj.detection = detection
         return obj
+
+
+
+class Job(models.Base):
+    status = sa.Column(sa.Text, index=True, default='unsubmitted',
+                       nullable=False)
+    images = relationship('CalibratableImage', secondary='job_images')
+    slurm_id = sa.Column(sa.Text, index=True, nullable=False)
+
+JobImage = join_model('job_images', Job, CalibratableImage)
+
