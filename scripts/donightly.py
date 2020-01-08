@@ -45,4 +45,4 @@ if __name__ == '__main__':
         db.DBSession().commit()
         for alert in alerts:
             send.send_alert(alert)
-
+                

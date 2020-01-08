@@ -1575,6 +1575,8 @@ class CalibratedImage(CalibratableImage):
                                     fluxerr=row['fluxerr'],
                                     flags=int(row['flags']),
                                     image=self,
+                                    ra=source.ra,
+                                    dec=source.dec,
                                     source=source)
             photometry.append(phot)
 
@@ -2216,7 +2218,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
         return result
 
 
-class ForcedPhotometry(ObjectWithFlux):
+class ForcedPhotometry(ObjectWithFlux, SpatiallyIndexed):
     id = sa.Column(sa.Integer,
                    sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
                    primary_key=True)
