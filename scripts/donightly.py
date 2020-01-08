@@ -8,13 +8,8 @@ from argparse import ArgumentParser
 
 if __name__ == '__main__':
 
-    parser = ArgumentParser()
-    parser.add_argument('filenames', nargs='*', type=str)
-    parser.add_argument('refvers', type=str)
-    args = parser.parse_args()
-
-    filenames = args.filenames
-    refvers = args.refvers
+    infile = sys.argv[1]
+    refvers = sys.argv[2]
 
     # subclass = db.MultiEpochSubtraction
     # sciclass = db.ScienceCoadd
@@ -23,7 +18,7 @@ if __name__ == '__main__':
     sciclass = db.ScienceImage
 
     # get the work
-    imgs = mpi.get_my_share_of_work(filenames, reader=lambda x: x)
+    imgs = mpi.get_my_share_of_work(infile)
     for fn in imgs:
 
         # commits

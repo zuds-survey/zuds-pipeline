@@ -3,6 +3,7 @@ import os
 import subprocess
 import shlex
 import sys
+import shutil
 import traceback
 import pandas as pd
 import datetime
@@ -56,6 +57,23 @@ def submit_job(images):
 
     final = '\n'.join(fnames)
 
+    scriptname = Path(f'/global/cscratch1/sd/dgold/'
+                      f'nightly/{nightdate}/{ndt}.sh'.replace(' ', '_'))
+    scriptname.parent.mkdir(parents=True, exist_ok=True)
+
+    copies = [
+        list(filter(lambda x: isinstance(x, db.HTTPArchiveCopy),
+                    image.copies))[0].archive_path for image in images
+    ]
+
+    for source, dest in zip(copies, fnames):
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        shutil.copy(source, dest)
+
+    inname = f'{scriptname}'.replace('.sh', '.in')
+    with open(inname, 'w') as f:
+        f.write(final)
+
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
 #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
@@ -68,15 +86,10 @@ def submit_job(images):
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
 
-filenames="{final}"
-
-HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py $filenames zuds4
+HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds4
 
 """
 
-    scriptname = Path(f'/global/cscratch1/sd/dgold/'
-                      f'nightly/{nightdate}/{ndt}.sh'.replace(' ', '_'))
-    scriptname.parent.mkdir(parents=True, exist_ok=True)
 
     with open(scriptname, 'w') as f:
         f.write(jobscript)
