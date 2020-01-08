@@ -2689,6 +2689,8 @@ class Alert(models.Base):
     detection = relationship('Detection', cascade='all',
                              foreign_keys=[detection_id])
 
+    sent = sa.Column(sa.Boolean, default=False)
+
     def to_dict(self):
         base = deepcopy(self.alert)
         base['cutoutScience'] = self.cutoutscience.bytes
