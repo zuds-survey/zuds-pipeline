@@ -215,9 +215,12 @@ if __name__ == '__main__':
 
             if image.type == 'sci':
                 target = image.ipac_path('sciimg.fits')
+                http = (image.ipac_gid == 2 and image.field in ZUDS_FIELDS)
             else:
                 # it's a mask
                 target = image.parent_image.ipac_path('mskimg.fits')
+                http = (image.parent_image.ipac_gid == 2 and image.field in
+                        ZUDS_FIELDS)
 
 
             # ensure this has 12 components so that it can be used with
