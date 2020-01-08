@@ -22,8 +22,13 @@ if __name__ == '__main__':
     for fn in imgs:
 
         # commits
+        try:
+            detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
+        except Exception as e:
+            db.DBSession().rollback()
+            print(**sys.exc_info())
+            continue
 
-        detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
         db.DBSession().flush()
         for d in detections:
             # each call commits
@@ -33,6 +38,7 @@ if __name__ == '__main__':
         fp = sub.force_photometry(sub.unphotometered_sources,
                                   assume_background_subtracted=True)
         db.DBSession().add_all(fp)
+        db.DBSession().flush()
 
         # issue an alert for each detection
         alerts = []
@@ -45,4 +51,4 @@ if __name__ == '__main__':
         db.DBSession().commit()
         for alert in alerts:
             send.send_alert(alert)
-                
+
