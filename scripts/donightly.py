@@ -4,6 +4,7 @@ import mpi
 import dosub
 import send
 import makesources
+import traceback
 from argparse import ArgumentParser
 
 if __name__ == '__main__':
@@ -26,7 +27,7 @@ if __name__ == '__main__':
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
         except Exception as e:
             db.DBSession().rollback()
-            print(**sys.exc_info())
+            traceback.print_exc(*sys.exc_info())
             continue
 
         db.DBSession().flush()
