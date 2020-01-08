@@ -74,7 +74,8 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 """
 
-    scriptname = Path(f'/global/cscratch1/sd/dgold/nightly/{nightdate}/{ndt}.sh')
+    scriptname = Path(f'/global/cscratch1/sd/dgold/'
+                      f'nightly/{nightdate}/{ndt}.sh'.replace(' ', '_'))
     scriptname.parent.mkdir(parents=True, exist_ok=True)
 
     with open(scriptname, 'w') as f:
@@ -127,7 +128,7 @@ if __name__ == '__main__':
             ),
             db.ScienceImage.ipac_gid == 2
         ).order_by(
-            db.ScienceImage.filefracday
+            db.ScienceImage.filefracday.desc()
         ).with_for_update(
             skip_locked=True, of=db.ZTFFile
         ).limit(
