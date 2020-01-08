@@ -187,10 +187,7 @@ if __name__ == '__main__':
             db.HTTPArchiveCopy.product_id == None,
             db.TapeCopy.product_id == None
         ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
-            db.ZTFFile.field,
-            db.ZTFFile.ccdid,
-            db.ZTFFile.qid,
-            db.ZTFFile.fid
+            db.ZTFFile.id.desc()
         )
 
         idownload_q = idownload_base.filter(
