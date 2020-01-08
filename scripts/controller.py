@@ -108,7 +108,7 @@ if __name__ == '__main__':
             db.Job.id.label('jobid'), db.ScienceImage.id.label('imgid')
         ).select_from(db.Job).join(db.JobImage).join(
             db.ScienceImage,
-            db.JobImage.id == db.ScienceImage.id
+            db.JobImage.calibratableimage_id == db.ScienceImage.id
         ).filter(
             db.Job.status.in_(['processing', 'complete'])
         ).subquery()
@@ -126,14 +126,10 @@ if __name__ == '__main__':
                 ZUDS_FIELDS
             ),
             db.ScienceImage.ipac_gid == 2
-        ).options(
-            db.sa.orm.joinedload(
-                db.ScienceImage.copies
-            )
         ).order_by(
             db.ScienceImage.filefracday
         ).with_for_update(
-            skip_locked=True, of=db.ScienceImage
+            skip_locked=True, of=db.ZTFFile
         ).limit(
             JOB_SIZE
         )
