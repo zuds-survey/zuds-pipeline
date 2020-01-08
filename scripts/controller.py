@@ -57,7 +57,7 @@ def submit_job(images):
 
     final = '\n'.join(fnames)
 
-    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds'
+    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
                       f'nightly/{nightdate}/{ndt}.sh'.replace(' ', '_'))
     scriptname.parent.mkdir(parents=True, exist_ok=True)
 
