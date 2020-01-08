@@ -43,16 +43,13 @@ def _update_source_coordinate(source_object, detections):
     source_object.dec = det.dec
 
 
-def associate(detection_id, do_historical_phot=False):
+def associate(detection, do_historical_phot=False):
 
-    # put a lock on the detection
-    detection = db.DBSession().query(db.Detection).filter(
-        db.Detection.id == detection_id
-    ).with_for_update().first()
+    # assume `detection` is only visible to this transactionnn
 
     if detection.source is not None:
         # it was assigned in a previous iteration of this loop
-        print(f'detection {detection_id} is alread associated with '
+        print(f'detection {detection.id} is alread associated with '
               f'{detection.source_id}, skipping...')
         db.DBSession().rollback()
 

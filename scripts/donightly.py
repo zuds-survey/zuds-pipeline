@@ -24,9 +24,10 @@ if __name__ == '__main__':
         # commits
 
         detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
+        db.DBSession().flush()
         for d in detections:
             # each call commits
-            makesources.associate(d.id, do_historical_phot=True)
+            makesources.associate(d, do_historical_phot=True)
 
         # requires manual commit
         sub.force_photometry(sub.unphotometered_sources,
