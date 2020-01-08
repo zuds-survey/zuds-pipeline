@@ -161,7 +161,7 @@ if __name__ == '__main__':
             slurm_id = submit_job(images)
         except RuntimeError as e:
             exc_info = sys.exc_info()
-            traceback.print_exc(*exc_info)
+            traceback.print_exception(*exc_info)
             print(f'continuing...', flush=True)
             continue
 
@@ -182,7 +182,7 @@ if __name__ == '__main__':
             job_statuses = get_job_statuses()
         except RuntimeError as e:
             exc_info = sys.exc_info()
-            traceback.print_exc(*exc_info)
+            traceback.print_exception(*exc_info)
             print(f'continuing...', flush=True)
             continue
 
