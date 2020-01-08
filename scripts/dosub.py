@@ -58,8 +58,9 @@ def do_one(fn, sciclass, subclass, refvers):
 
     if not (db.ReferenceImage.get_by_basename(os.path.basename(refname))
             and os.path.exists(refname)):
-        print(f'Ref {refname} does not exist. Skipping...')
-        return
+        db.DBSession().rollback()
+        raise RuntimeError(f'Ref {refname} does not exist. Skipping...')
+
 
     rstart = time.time()
 
@@ -88,7 +89,7 @@ def do_one(fn, sciclass, subclass, refvers):
 
     if prev is not None:
         db.DBSession().rollback()
-        return
+        raise RuntimeError(f'{basename} already has a predecessor')
 
     substart = time.time()
     sub = subclass.from_images(sci, ref,
@@ -116,9 +117,8 @@ def do_one(fn, sciclass, subclass, refvers):
 
     if len(detections) > 50:
         db.DBSession().rollback()
-        print(f'Error: {len(detections)} detections on "{sub.basename}", '
-              'something wrong with the image probably', flush=True)
-        return
+        raise RuntimeError(f'Error: {len(detections)} detections on "{sub.basename}", '
+              'something wrong with the image probably')
 
     dstop = time.time()
     print(
@@ -145,73 +145,25 @@ def do_one(fn, sciclass, subclass, refvers):
                 )
                 stamps.append(stamp)
     except Exception as e:
-        print(e, [cat.basename], flush=True)
         db.DBSession.rollback()
-        return
-
-    fpstart = time.time()
-
-    """
-    # new sources
-    new_sources = []
-    for d in detections:
-        if d.source is not None and db.sa.inspect(d.source).pending:
-            new_sources.append(d.source)
-
-    for source in new_sources:
-        fp = source.force_photometry()
-        db.DBSession().add_all(fp)
-
-    # run forced photometry
-    other_sources = np.setdiff1d(
-        sub.sources_contained.all(),
-        new_sources
-    ).tolist()
-
-    subfp = sub.force_photometry(other_sources)
-    db.DBSession().add_all(subfp)
-
-    fpstop = time.time()
-    print(
-        f'forcephot: {fpstop-fpstart:.2f} sec to force photometry for {sub.basename}',
-        flush=True
-    )
-
-    stampstop = time.time()
-    print(
-        f'stamp: {stampstop-stampstart:.2f} sec to make stamps for {sub.basename}',
-        flush=True
-    )
-
-    # flush before making the alerts... but dont commit !
-    db.DBSession().flush()
-
-
-    # now make the alerts
-    alerts = []
-    for d in detections:
-        if d.source is not None:
-            alert = db.Alert.from_detection(d)
-
-    db.DBSession().add_all(alerts)
-    """
+        raise e
 
     archstart = time.time()
-    subcopy = db.HTTPArchiveCopy.from_product(sub)
-    catcopy = db.HTTPArchiveCopy.from_product(cat)
-    mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
+    #subcopy = db.HTTPArchiveCopy.from_product(sub)
+    #catcopy = db.HTTPArchiveCopy.from_product(cat)
+    #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
     db.DBSession().add(sub)
     db.DBSession().add(cat)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 
-    db.DBSession().add(mskcopy)
-    db.DBSession().add(catcopy)
-    db.DBSession().add(subcopy)
-    archive.archive(subcopy)
-    archive.archive(catcopy)
-    archive.archive(mskcopy)
-    db.DBSession().commit()
+    #db.DBSession().add(mskcopy)
+    #db.DBSession().add(catcopy)
+    #db.DBSession().add(subcopy)
+    #archive.archive(subcopy)
+    #archive.archive(catcopy)
+    #archive.archive(mskcopy)
+    #db.DBSession().commit()
     archstop = time.time()
     print(
         f'archive: {archstop-archstart:.2f} sec to archive stuff for '
@@ -248,4 +200,7 @@ if __name__ == '__main__':
     # get the work
     imgs = mpi.get_my_share_of_work(infile)
     for fn in imgs:
-        do_one(fn, sciclass, subclass, refvers)
+        try:
+            do_one(fn, sciclass, subclass, refvers)
+        except:
+            continue
