@@ -74,10 +74,6 @@ def associate(detection, do_historical_phot=False):
                 detection.ra,
                 detection.dec
             ).asc()
-        ).options(
-            db.sa.orm.joinedload(
-                db.models.Source.detections
-            )
         ).with_for_update(of=db.models.Source).first()
 
         if source is None:
