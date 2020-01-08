@@ -136,8 +136,12 @@ if __name__ == '__main__':
         ).outerjoin(
             disqualifying,
             disqualifying.c.imgid == db.ScienceImage.id
+        ).outerjoin(
+            db.SingleEpochSubtraction,
+            db.SingleEpochSubtraction.target_image_id == db.ScienceImage.id
         ).filter(
             disqualifying.c.jobid == None,
+            db.SingleEpochSubtraction.id == None,
             db.ScienceImage.field.in_(
                 ZUDS_FIELDS
             ),

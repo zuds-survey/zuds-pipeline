@@ -22,7 +22,7 @@ if __name__ == '__main__':
     for fn in imgs:
 
         # commits
-        
+
         detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
         for d in detections:
             # each call commits
