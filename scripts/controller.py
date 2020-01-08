@@ -113,7 +113,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 
     jobid = str(stdout).strip().split()[-1]
-    
+
     return jobid
 
 
@@ -141,7 +141,8 @@ if __name__ == '__main__':
             db.ScienceImage.field.in_(
                 ZUDS_FIELDS
             ),
-            db.ScienceImage.ipac_gid == 2
+            db.ScienceImage.ipac_gid == 2,
+            db.ScienceImage.basename > 'ztf_20200107'
         ).order_by(
             db.ScienceImage.filefracday.desc()
         ).with_for_update(
