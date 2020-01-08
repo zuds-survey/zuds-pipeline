@@ -9,7 +9,7 @@ import pandas as pd
 import datetime
 from pathlib import Path
 
-JOB_SIZE = 64 * 3
+JOB_SIZE = 64 * 5
 
 # query for the images to process
 
@@ -36,7 +36,7 @@ def get_job_statuses():
     if process.returncode != 0:
         raise RuntimeError(
             f'Non-zero exit code from squeue, output was '
-            f'"{stdout.read()}", "{stderr.read()}".'
+            f'"{str(stdout)}", "{str(stderr)}".'
         )
 
 
@@ -57,7 +57,7 @@ def submit_job(images):
 
     final = '\n'.join(fnames)
 
-    scriptname = Path(f'/global/cscratch1/sd/dgold/'
+    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds'
                       f'nightly/{nightdate}/{ndt}.sh'.replace(' ', '_'))
     scriptname.parent.mkdir(parents=True, exist_ok=True)
 
@@ -69,6 +69,8 @@ def submit_job(images):
     for source, dest in zip(copies, fnames):
         os.makedirs(os.path.dirname(dest), exist_ok=True)
         shutil.copy(source, dest)
+        shutil.copy(source.replace('sciimg', 'mskimg'),
+                    dest.replace('sciimg', 'mskimg'))
 
     inname = f'{scriptname}'.replace('.sh', '.in')
     with open(inname, 'w') as f:
@@ -106,12 +108,12 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     if process.returncode != 0:
         raise RuntimeError(
             f'Non-zero exit code from sbatch, output was '
-            f'"{stdout.read()}", "{stderr.read()}".'
+            f'"{str(stdout)}", "{str(stdout)}".'
         )
 
 
-    jobid = stdout.read().split()[-1]
-
+    jobid = str(stdout).strip().split()[-1]
+    
     return jobid
 
 
