@@ -30,12 +30,11 @@ if __name__ == '__main__':
             makesources.associate(d, do_historical_phot=True)
 
         # requires manual commit
-        sub.force_photometry(sub.unphotometered_sources,
-                             assume_background_subtracted=True)
-        db.DBSession().commit()
+        fp = sub.force_photometry(sub.unphotometered_sources,
+                                  assume_background_subtracted=True)
+        db.DBSession().add_all(fp)
 
         # issue an alert for each detection
-
         alerts = []
         for d in detections:
             if d.source is not None:
