@@ -88,7 +88,6 @@ def do_one(fn, sciclass, subclass, refvers):
     #    continue
 
     if prev is not None:
-        db.DBSession().rollback()
         raise RuntimeError(f'{basename} already has a predecessor')
 
     substart = time.time()
@@ -116,7 +115,6 @@ def do_one(fn, sciclass, subclass, refvers):
     detections = db.Detection.from_catalog(cat, filter=True)
 
     if len(detections) > 50:
-        db.DBSession().rollback()
         raise RuntimeError(f'Error: {len(detections)} detections on "{sub.basename}", '
               'something wrong with the image probably')
 
@@ -127,26 +125,23 @@ def do_one(fn, sciclass, subclass, refvers):
     )
 
     stampstart = time.time()
-    try:
-        if isinstance(sub, db.SingleEpochSubtraction):
-            sub_target = sub.aligned_to(sub.reference_image)
-        else:
-            sub_target = sub
-        if isinstance(sub.target_image, db.ScienceImage):
-            new_target = sub.target_image.aligned_to(sub.reference_image)
-        else:
-            new_target = sub.target_image
-        stamps = []
-        for detection in detections:
-            for i in [sub_target, new_target, sub.reference_image]:
-                # make a stamp for the first detection
-                stamp = db.models.Thumbnail.from_detection(
-                    detection, i
-                )
-                stamps.append(stamp)
-    except Exception as e:
-        db.DBSession.rollback()
-        raise e
+
+    if isinstance(sub, db.SingleEpochSubtraction):
+        sub_target = sub.aligned_to(sub.reference_image)
+    else:
+        sub_target = sub
+    if isinstance(sub.target_image, db.ScienceImage):
+        new_target = sub.target_image.aligned_to(sub.reference_image)
+    else:
+        new_target = sub.target_image
+    stamps = []
+    for detection in detections:
+        for i in [sub_target, new_target, sub.reference_image]:
+            # make a stamp for the first detection
+            stamp = db.models.Thumbnail.from_detection(
+                detection, i
+            )
+            stamps.append(stamp)
 
     archstart = time.time()
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
