@@ -27,7 +27,7 @@ if __name__ == '__main__':
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
         except Exception as e:
             db.DBSession().rollback()
-            traceback.print_exc(*sys.exc_info())
+            traceback.print_exception(*sys.exc_info())
             continue
 
         db.DBSession().flush()
@@ -52,4 +52,8 @@ if __name__ == '__main__':
         db.DBSession().commit()
         for alert in alerts:
             send.send_alert(alert)
+            alert.sent = True
+            db.DBSession().add(alert)
+            db.DBSession().commit()
+            
 
