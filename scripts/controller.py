@@ -127,6 +127,29 @@ shifter python $HOME/lensgrinder/scripts/finish_job.py $SLURM_JOB_ID
 if __name__ == '__main__':
     while True:
 
+        # look for failed jobs and mark them
+        currently_processing = db.DBSession().query(
+            db.Job
+        ).with_for_update(
+            skip_locked=True, of=db.Job
+        ).filter(db.Job.status == 'processing')
+
+        # get the slurm jobs and their statuses
+
+        try:
+            job_statuses = get_job_statuses()
+        except RuntimeError as e:
+            exc_info = sys.exc_info()
+            traceback.print_exception(*exc_info)
+            print(f'continuing...', flush=True)
+            continue
+
+        for job in currently_processing:
+            if job.slurm_id not in job_statuses['JOBID']:
+                job.status = 'failed'
+                db.DBSession().add(job)
+        db.DBSession().commit()
+
         disqualifying = db.DBSession().query(
             db.Job.id.label('jobid'), db.ScienceImage.id.label('imgid')
         ).select_from(db.Job).join(db.JobImage).join(
@@ -164,6 +187,9 @@ if __name__ == '__main__':
 
         images = imq.all()
 
+        if len(images) == 0:
+            continue
+
         try:
             slurm_id = submit_job(images)
         except RuntimeError as e:
@@ -176,25 +202,3 @@ if __name__ == '__main__':
         db.DBSession().add(job)
         db.DBSession().commit()
 
-        # look for failed jobs and mark them
-        currently_processing = db.DBSession().query(
-            db.Job
-        ).with_for_update(
-            skip_locked=True, of=db.Job
-        ).filter(db.Job.status == 'processing')
-
-        # get the slurm jobs and their statuses
-
-        try:
-            job_statuses = get_job_statuses()
-        except RuntimeError as e:
-            exc_info = sys.exc_info()
-            traceback.print_exception(*exc_info)
-            print(f'continuing...', flush=True)
-            continue
-
-        for job in currently_processing:
-            if job.slurm_id not in job_statuses['JOBID']:
-                job.status = 'failed'
-                db.DBSession().add(job)
-        db.DBSession().commit()
