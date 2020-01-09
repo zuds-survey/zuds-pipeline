@@ -2882,3 +2882,21 @@ class Job(models.Base):
 
 JobImage = join_model('job_images', Job, CalibratableImage)
 
+
+class FailedSubtraction(models.Base):
+
+    target_image_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'calibratableimages.id'
+    ), index=True)
+    reference_image_id = sa.Column(sa.Integer, sa.ForeignKey(
+        'referenceimages.id'
+    ), index=True)
+
+    target_image = relationship('CaliratableImage', cascade='all',
+                                foreign_keys=[target_image_id])
+    reference_image = relationship('ReferenceImage', cascade='all',
+                                   foreign_keys=[reference_image_id])
+
+    reason = sa.Column(sa.Text)
+
+

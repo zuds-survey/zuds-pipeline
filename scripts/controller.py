@@ -177,10 +177,14 @@ if __name__ == '__main__':
         ).outerjoin(
             db.SingleEpochSubtraction,
             db.SingleEpochSubtraction.target_image_id == db.ScienceImage.id
+        ).outerjoin(
+            db.FailedSubtraction,
+            db.FailedSubtraction.target_image_id == db.ScienceImage.id
         ).filter(
             disqualifying.c.jobid == None,
             db.SingleEpochSubtraction.id == None,
             db.ReferenceImage.version == 'zuds4',
+            db.FailedSubtraction.id == None,
             db.ScienceImage.field.in_(
                 ZUDS_FIELDS
             ),
@@ -197,6 +201,7 @@ if __name__ == '__main__':
         images = imq.all()
 
         if len(images) == 0:
+            print(f'{datetime.datetime.utcnow()}: Nothing to do, trying again...')
             continue
 
         try:
