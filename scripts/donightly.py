@@ -33,7 +33,7 @@ if __name__ == '__main__':
         db.DBSession().flush()
         for d in detections:
             # each call commits
-            makesources.associate(d, do_historical_phot=True)
+            makesources.associate(d, do_historical_phot=False)
 
         # requires manual commit
         fp = sub.force_photometry(sub.unphotometered_sources,
