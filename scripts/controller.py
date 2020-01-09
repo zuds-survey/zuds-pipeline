@@ -162,6 +162,15 @@ if __name__ == '__main__':
             db.ScienceImage,
         ).join(
             db.HTTPArchiveCopy
+        ).join(
+            # make sure it has a reference Image
+            db.ReferenceImage,
+            db.sa.and_(
+                db.ReferenceImage.field == db.ScienceImage.field,
+                db.ReferenceImage.ccdid == db.ScienceImage.ccdid,
+                db.ReferenceImage.qid == db.ScienceImage.qid,
+                db.ReferenceImage.fid == db.ScienceImage.fid
+            )
         ).outerjoin(
             disqualifying,
             disqualifying.c.imgid == db.ScienceImage.id
@@ -171,6 +180,7 @@ if __name__ == '__main__':
         ).filter(
             disqualifying.c.jobid == None,
             db.SingleEpochSubtraction.id == None,
+            db.ReferenceImage.version == 'zuds4',
             db.ScienceImage.field.in_(
                 ZUDS_FIELDS
             ),
