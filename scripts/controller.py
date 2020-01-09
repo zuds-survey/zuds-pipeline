@@ -144,7 +144,7 @@ if __name__ == '__main__':
             continue
 
         for job in currently_processing:
-            if job.slurm_id not in job_statuses['JOBID']:
+            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
                 job.status = 'failed'
                 db.DBSession().add(job)
         db.DBSession().commit()
