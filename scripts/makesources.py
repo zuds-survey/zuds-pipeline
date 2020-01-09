@@ -156,7 +156,7 @@ def associate(detection, do_historical_phot=False):
 
                 # run forced photometry on the new source
                 if do_historical_phot:
-                    fp = source.force_photometry()
+                    fp = source.forced_photometry()
                     db.DBSession().add_all(fp)
 
                 for t in detection.thumbnails:
