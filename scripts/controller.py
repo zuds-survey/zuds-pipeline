@@ -89,6 +89,8 @@ def submit_job(images):
 #SBATCH -A ***REMOVED***
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds4
+shifter python $HOME/lensgrinder/scripts/finish_job.py $SLURM_JOB_ID
+
 
 """
 
