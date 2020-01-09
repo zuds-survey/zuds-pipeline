@@ -41,7 +41,7 @@ if __name__ == '__main__':
         db.DBSession().add_all(fp)
         db.DBSession().flush()
 
-        # try to conserve memory? 
+        # try to conserve memory?
         sub.target_image.unmap()
         sub.reference_image.unmap()
         sub.unmap()
