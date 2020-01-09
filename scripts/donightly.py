@@ -1,4 +1,5 @@
 import db
+import os
 import sys
 import mpi
 import dosub
@@ -25,6 +26,27 @@ if __name__ == '__main__':
         # commits
         try:
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
+        except dosub.TooManyDetectionsError as e:
+            db.DBSession().rollback()
+            sci = db.ScienceImage.get_by_basename(os.path.basename(fn))
+            ref = db.DBSession().query(
+                db.ReferenceImage
+            ).filter(
+                db.ReferenceImage.field == sci.field,
+                db.ReferenceImage.ccdid == sci.ccdid,
+                db.ReferenceImage.qid == sci.qid,
+                db.ReferenceImage.fid == sci.fid,
+                db.ReferenceImage.version == refvers
+            ).first()
+            blocker = db.FailedSubtraction(
+                target_image=sci,
+                reference_image=ref,
+                reason=e.msg
+            )
+            db.DBSession().add(blocker)
+            db.DBSession().commit()
+            continue
+
         except Exception as e:
             db.DBSession().rollback()
             traceback.print_exception(*sys.exc_info())

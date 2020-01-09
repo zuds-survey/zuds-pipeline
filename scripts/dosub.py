@@ -17,6 +17,11 @@ db.init_db()
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the subtractions for ZUDS.'
 
+MAX_DETS = 50
+
+class TooManyDetectionsError(Exception):
+    pass
+
 
 # make a reference for each directory
 def do_one(fn, sciclass, subclass, refvers):
@@ -114,9 +119,11 @@ def do_one(fn, sciclass, subclass, refvers):
     dstart = time.time()
     detections = db.Detection.from_catalog(cat, filter=True)
 
-    if len(detections) > 50:
-        raise RuntimeError(f'Error: {len(detections)} detections on "{sub.basename}", '
-              'something wrong with the image probably')
+    if len(detections) > MAX_DETS:
+        raise TooManyDetectionsError(
+            f'Error: {len(detections)} detections (>{MAX_DETS}) '
+            f'on "{sub.basename}", something wrong with the image probably'
+        )
 
     dstop = time.time()
     print(
