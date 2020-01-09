@@ -42,10 +42,10 @@ if __name__ == '__main__':
         db.DBSession().flush()
 
         # try to conserve memory?
-        sub.target_image.unmap()
-        sub.reference_image.unmap()
-        sub.unmap()
-
+        sub.target_image.clear()
+        sub.reference_image.clear()
+        sub.clear()
+        
         # issue an alert for each detection
         alerts = []
         for d in detections:
