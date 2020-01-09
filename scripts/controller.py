@@ -155,7 +155,7 @@ if __name__ == '__main__':
             db.ScienceImage,
             db.JobImage.calibratableimage_id == db.ScienceImage.id
         ).filter(
-            db.Job.status.in_(['processing', 'complete'])
+            db.Job.status.in_(['processing'])
         ).subquery()
 
         imq = db.DBSession().query(
