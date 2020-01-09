@@ -45,7 +45,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
         phot_table = []
         maskpix = []
         for s in coord:
-            pixcoord = wcs.all_world2pix([[s.ra.deg.value, s.dec.deg.value]], 0)[0]
+            pixcoord = wcs.all_world2pix([[s.ra.deg, s.dec.deg]], 0)[0]
             pixx, pixy = pixcoord
 
             nx = calibratable.header['NAXIS1']
@@ -64,7 +64,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
             iymax = int(np.ceil(ymax))
 
             ap = photutils.CircularAperture([pixx - ixmin, pixy - iymin],
-                                            APERTURE_RADIUS)
+                                            APERTURE_RADIUS.value)
 
             # something that is photometerable implements mask, background, and wcs
             if not assume_background_subtracted:
@@ -86,8 +86,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
             with fits.open(calibratable.mask_image.local_path, memmap=True) as f:
                 mask = f[0].data[iymin:iymax, ixmin:ixmax]
 
-            pt = photutils.aperture_photometry(pixels_bkgsub, ap,
-                                                       error=bkgrms)
+            pt = photutils.aperture_photometry(pixels_bkgsub, ap, error=bkgrms)
 
             annulus_mask = ap.to_mask(method='center')
             mp = annulus_mask.cutout(mask.data)
