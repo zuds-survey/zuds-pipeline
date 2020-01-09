@@ -24,7 +24,7 @@ def get_job_statuses():
     if os.getenv('NERSC_HOST') != 'cori':
         raise RuntimeError('Can only check job statuses on cori.')
 
-    cmd = f'squeue -r -h  -u {os.getuid()}'
+    cmd = f'squeue -r -h  -u {os.getusername()}'
     process = subprocess.Popen(
         shlex.split(cmd),
         stdout=subprocess.PIPE,
