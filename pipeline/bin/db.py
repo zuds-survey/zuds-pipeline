@@ -2308,9 +2308,9 @@ def force_photometry(self, assume_background_subtracted=True):
             self, assume_background_subtracted=assume_background_subtracted,
             use_cutout=True
         )
-        r.rms_image.clear()
-        r.mask_image.clear()
-        r.clear()
+        #r.rms_image.clear()
+        #r.mask_image.clear()
+        #r.clear()
         out.extend(fp)
     return out
 
