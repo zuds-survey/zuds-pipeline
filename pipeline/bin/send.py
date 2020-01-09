@@ -73,6 +73,12 @@ def send_alert(alert_object):
     # Placeholder -- alert creation date UTC
     # Eventually this will come from the alert
 
+    if alert_object.sent:
+        raise RuntimeError(f'Refusing to send alert '
+                           f'{alert_object.alert["objectId"]},'
+                           f' alert has already been sent out.')
+            
+
     ac = alert_object.created_at
     alert_date = f'{ac.year}{ac.month:02d}{ac.day:02d}'
     alert = alert_object.to_dict()
