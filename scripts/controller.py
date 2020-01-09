@@ -110,6 +110,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     )
 
     stdout, stderr = process.communicate()
+    print(stdout)
 
     if process.returncode != 0:
         raise RuntimeError(
