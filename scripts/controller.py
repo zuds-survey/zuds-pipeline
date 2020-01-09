@@ -110,6 +110,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     )
 
     stdout, stderr = process.communicate()
+    print(stdout)
 
     if process.returncode != 0:
         raise RuntimeError(
@@ -154,7 +155,7 @@ if __name__ == '__main__':
             db.ScienceImage,
             db.JobImage.calibratableimage_id == db.ScienceImage.id
         ).filter(
-            db.Job.status.in_(['processing', 'complete'])
+            db.Job.status.in_(['processing'])
         ).subquery()
 
         imq = db.DBSession().query(
