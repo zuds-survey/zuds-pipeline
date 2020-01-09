@@ -45,7 +45,7 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
         phot_table = []
         maskpix = []
         for s in coord:
-            pixcoord = wcs.all_world2pix([[s.ra, s.dec]], 0)[0]
+            pixcoord = wcs.all_world2pix([[s.ra.deg.value, s.dec.deg.value]], 0)[0]
             pixx, pixy = pixcoord
 
             nx = calibratable.header['NAXIS1']
