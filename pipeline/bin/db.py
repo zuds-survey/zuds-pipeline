@@ -2892,7 +2892,7 @@ class FailedSubtraction(models.Base):
         'referenceimages.id'
     ), index=True)
 
-    target_image = relationship('CaliratableImage', cascade='all',
+    target_image = relationship('CalibratableImage', cascade='all',
                                 foreign_keys=[target_image_id])
     reference_image = relationship('ReferenceImage', cascade='all',
                                    foreign_keys=[reference_image_id])
