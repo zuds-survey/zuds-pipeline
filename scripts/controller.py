@@ -1,4 +1,5 @@
 import db
+import io
 import os
 import subprocess
 import shlex
@@ -39,8 +40,8 @@ def get_job_statuses():
             f'"{str(stdout)}", "{str(stderr)}".'
         )
 
-
-    df = pd.read_csv(stdout, header=True, delim_whitespace=True)
+    buf = io.BytesIO(stdout)
+    df = pd.read_csv(buf, delim_whitespace=True)
     return df
 
 
@@ -57,9 +58,13 @@ def submit_job(images):
 
     final = '\n'.join(fnames)
 
+    curdir = os.getcwd()
+
     scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
                       f'nightly/{nightdate}/{ndt}.sh'.replace(' ', '_'))
     scriptname.parent.mkdir(parents=True, exist_ok=True)
+
+    os.chdir(scriptname.parent)
 
     copies = [
         list(filter(lambda x: isinstance(x, db.HTTPArchiveCopy),
@@ -89,6 +94,8 @@ def submit_job(images):
 #SBATCH -A ***REMOVED***
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds4
+shifter python $HOME/lensgrinder/scripts/finish_job.py $SLURM_JOB_ID
+
 
 """
 
@@ -111,7 +118,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
             f'"{str(stdout)}", "{str(stdout)}".'
         )
 
-
+    os.chdir(curdir)
     jobid = str(stdout).strip().split()[-1]
 
     return jobid
