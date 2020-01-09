@@ -134,7 +134,9 @@ def associate(detection, do_historical_phot=False):
                     dec=detection.dec,
                     groups=[default_group]
                 )
-                _update_source_coordinate(source, match_dets + [detection])
+
+                udets = [m[0] for m in match_dets] + [detection]
+                _update_source_coordinate(source, udets)
 
                 # need this to make stamps.
                 dummy_phot = db.models.Photometry(
