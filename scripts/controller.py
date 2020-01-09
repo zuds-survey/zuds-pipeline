@@ -94,7 +94,6 @@ def submit_job(images):
 #SBATCH -A ***REMOVED***
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds4
-shifter python $HOME/lensgrinder/scripts/finish_job.py $SLURM_JOB_ID
 
 
 """
@@ -145,7 +144,7 @@ if __name__ == '__main__':
 
         for job in currently_processing:
             if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
-                job.status = 'failed'
+                job.status = 'done'
                 db.DBSession().add(job)
         db.DBSession().commit()
 
