@@ -5,16 +5,17 @@
     "doc": "avro alert schema for ZTF ZUDS survey",
     "version": "0.1",
     "fields": [
-        {"name": "candid", "type": "long"},
+        {"name": "candid", "type": "long", "doc": "unique candidate ID"},
         {"name": "schemavsn", "type": "string", "doc": "schema version used"},
-        {"name": "cutoutScience", "type": "bytes"},
-        {"name": "candidate", "type": "ztf.alert.candidate"},
+        {"name": "cutoutScience", "type": "bytes", "doc": "science cutout image"},
+        {"name": "candidate", "type": "ztf.alert.candidate", "doc": "candidate information"},
         {"name": "publisher", "type": "string", "doc": "origin of alert packet"},
         {"name": "objectId", "type": "string", "doc": "object identifier or name"},
-        {"name": "cutoutDifference", "type": "bytes"},
-        {"name": "cutoutTemplate", "type": "bytes"},
+        {"name": "cutoutDifference", "type": "bytes", "doc": "difference image cutout"},
+        {"name": "cutoutTemplate", "type": "bytes", "doc": "cutout of template image"},
 		{"name": "light_curve", "type": [{
 				"type": "array",
-				"items": "ztf.alert.light_curve"}, "null" ], "default": null}
+				"items": "ztf.alert.light_curve"}, "null" ], "default": null,
+                "doc": "light curve information"}
 	]
 }
