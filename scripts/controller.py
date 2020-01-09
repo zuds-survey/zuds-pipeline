@@ -25,7 +25,7 @@ def get_job_statuses():
     if os.getenv('NERSC_HOST') != 'cori':
         raise RuntimeError('Can only check job statuses on cori.')
 
-    cmd = f'squeue -r -h  -u {os.getusername()}'
+    cmd = f'squeue -r  -u {os.environ.get("USER")}'
     process = subprocess.Popen(
         shlex.split(cmd),
         stdout=subprocess.PIPE,
@@ -119,8 +119,7 @@ shifter python $HOME/lensgrinder/scripts/finish_job.py $SLURM_JOB_ID
         )
 
     os.chdir(curdir)
-    jobid = str(stdout).strip().split()[-1]
-
+    jobid = stdout.strip().split()[-1].decode('ascii')
     return jobid
 
 
@@ -194,7 +193,7 @@ if __name__ == '__main__':
             continue
 
         for job in currently_processing:
-            if job.slurm_id not in job_statuses['JOBID']:
+            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
                 job.status = 'failed'
                 db.DBSession().add(job)
         db.DBSession().commit()
