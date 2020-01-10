@@ -71,7 +71,7 @@ if __name__ == '__main__':
         db.DBSession().flush()
         for d in detections:
             # each call commits
-            makesources.associate(d, do_historical_phot=False)
+            makesources.associate(d, do_historical_phot=True)
         db.DBSession().commit()
 
         """
