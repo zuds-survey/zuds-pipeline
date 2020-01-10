@@ -190,8 +190,6 @@ if __name__ == '__main__':
             ),
             db.ScienceImage.ipac_gid == 2,
             db.ScienceImage.basename > 'ztf_20200107'
-        ).order_by(
-            db.ScienceImage.filefracday.desc()
         ).with_for_update(
             skip_locked=True, of=db.ZTFFile
         ).limit(
