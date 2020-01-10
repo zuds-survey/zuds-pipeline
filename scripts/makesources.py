@@ -86,7 +86,8 @@ def associate(detection, do_historical_phot=False):
                 source = db.DBSession().query(db.models.Source).filter(
                     db.models.Source.id == m.source.id
                 ).with_for_update(of=db.models.Source).first()
-                _update_source_coordinate(source, match_dets + [detection])
+                prev_dets = [m[0] for m in match_dets]
+                _update_source_coordinate(source, prev_dets + [detection])
                 detection.source = source
                 return
 
