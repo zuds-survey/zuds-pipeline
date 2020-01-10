@@ -1633,7 +1633,7 @@ class CalibratedImage(CalibratableImage):
                 models.Source.dec,
                 self.poly
             )
-        )
+        ).with_for_update(of=models.Source)
 
         return query.all()
 

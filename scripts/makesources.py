@@ -75,7 +75,7 @@ def associate(detection, do_historical_phot=False):
                 detection.ra,
                 detection.dec
             ).asc()
-        )
+        ).with_for_update(of=db.models.Source).first()
 
         if source is None:
 
@@ -101,7 +101,7 @@ def associate(detection, do_historical_phot=False):
                     ASSOC_RADIUS
                 ),
                 db.Detection.id != detection.id
-            )
+            ).with_for_update(of=db.Detection).all()
 
             n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
             n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
