@@ -55,7 +55,7 @@
         {"name": "psgmag1", "type": ["float", "null"], "default": null, "doc": "g-band PSF magnitude of closest source from PS1 catalog; if exists within 30 arcsec [mag]"},
         {"name": "lsdistnr2", "type": ["float", "null"], "default": null, "doc": "distance to the second closest source from LegacySurvey DR8 catalog; if exists within 30 arcsec [mag]"},
         {"name": "lsgaiap1", "type": ["float", "null"], "default": null, "doc": "Gaia parallax from closest source in LegacySurvey DR8 catalog; if exists [mag]"},
-        {"name": "jd", "type": "double", "doc": "Observation Julian date at start of exposure [days]"},
+        {"name": "jd", "type": "float", "doc": "Observation Julian date at start of exposure [days]"},
         {"name": "lszphotmed1", "type": ["float", "null"], "default": null, "doc": "(median) photometric redshift of the closest source in the LegacySurvey DR8 catalog"},
         {"name": "drbversion", "type": "string", "doc": "version of Deep-Learning-based classifier model used to assign RealBogus (drb) quality score"},
         {"name": "lszphotstd1", "type": ["float", "null"], "default": null, "doc": "standard deviation in photometric redshift of the closest source in the LegacySurvey DR8 catalog"},
