@@ -25,7 +25,7 @@ if __name__ == '__main__':
     # get the work
     imgs = mpi.get_my_share_of_work(infile)
 
-
+    all_detections = []
     for inpt in imgs:
 
         s = db.ScienceImage.get_by_basename(os.path.basename(inpt))
@@ -68,11 +68,12 @@ if __name__ == '__main__':
             traceback.print_exception(*sys.exc_info())
             continue
 
-        db.DBSession().flush()
-        for d in detections:
-            # each call commits
-            makesources.associate(d, do_historical_phot=True)
-        db.DBSession().commit()
+        all_detections.extend(detections)
+
+    for d in all_detections:
+        # each call commits
+        makesources.associate(d, do_historical_phot=False)
+    db.DBSession().commit()
 
         """
         # requires manual commit
