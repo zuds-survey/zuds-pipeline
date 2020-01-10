@@ -4,9 +4,12 @@ import sys
 import mpi
 import dosub
 import send
+import shutil
 import makesources
 import traceback
 from argparse import ArgumentParser
+
+fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 
 if __name__ == '__main__':
 
@@ -21,7 +24,19 @@ if __name__ == '__main__':
 
     # get the work
     imgs = mpi.get_my_share_of_work(infile)
-    for fn in imgs:
+
+
+    for inpt in imgs:
+
+        s = db.ScienceImage.get_by_basename(os.path.basename(inpt))
+        fn = f'/global/cscratch1/sd/dgold/zuds/{s.field:06d}' \
+             f'c{s.ccdid:02d}/q{s.qid}/{fid_map[s.fid]}/{s.basename}'
+
+        shutil.copy(inpt, fn)
+        shutil.copy(
+            inpt.replace('sciimg', 'mskimg'),
+            fn.replace('sciimg', 'mskimg')
+        )
 
         # commits
         try:

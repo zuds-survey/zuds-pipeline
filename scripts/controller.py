@@ -50,14 +50,6 @@ def submit_job(images):
     ndt = datetime.datetime.utcnow()
     nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
 
-    fnames = [
-        f'/global/cscratch1/sd/dgold/zuds/{s.field:06d}/'
-        f'c{s.ccdid:02d}/q{s.qid}/{fid_map[s.fid]}/{s.basename}'
-        for s in images
-    ]
-
-    final = '\n'.join(fnames)
-
     curdir = os.getcwd()
 
     scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
@@ -70,16 +62,9 @@ def submit_job(images):
         list(filter(lambda x: isinstance(x, db.HTTPArchiveCopy),
                     image.copies))[0].archive_path for image in images
     ]
-
-    for source, dest in zip(copies, fnames):
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        shutil.copy(source, dest)
-        shutil.copy(source.replace('sciimg', 'mskimg'),
-                    dest.replace('sciimg', 'mskimg'))
-
     inname = f'{scriptname}'.replace('.sh', '.in')
     with open(inname, 'w') as f:
-        f.write(final)
+        f.write('\n'.join(copies) + '\n')
 
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
