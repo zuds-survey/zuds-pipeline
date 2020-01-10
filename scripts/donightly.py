@@ -75,31 +75,31 @@ if __name__ == '__main__':
         makesources.associate(d, do_historical_phot=False)
     db.DBSession().commit()
 
-        """
-        # requires manual commit
-        fp = sub.force_photometry(sub.unphotometered_sources,
-                                  assume_background_subtracted=True)
-        db.DBSession().add_all(fp)
-        db.DBSession().flush()
+    """
+    # requires manual commit
+    fp = sub.force_photometry(sub.unphotometered_sources,
+                              assume_background_subtracted=True)
+    db.DBSession().add_all(fp)
+    db.DBSession().flush()
 
-        # try to conserve memory?
-        sub.target_image.clear()
-        sub.reference_image.clear()
-        sub.clear()
+    # try to conserve memory?
+    sub.target_image.clear()
+    sub.reference_image.clear()
+    sub.clear()
 
-        # issue an alert for each detection
-        alerts = []
-        for d in detections:
-            if d.source is not None:
-                alert = db.Alert.from_detection(d)
-                db.DBSession().add(alert)
-                alerts.append(alert)
-
-        db.DBSession().commit()
-        for alert in alerts:
-            send.send_alert(alert)
-            alert.sent = True
+    # issue an alert for each detection
+    alerts = []
+    for d in detections:
+        if d.source is not None:
+            alert = db.Alert.from_detection(d)
             db.DBSession().add(alert)
-            db.DBSession().commit()
-        """
+            alerts.append(alert)
+
+    db.DBSession().commit()
+    for alert in alerts:
+        send.send_alert(alert)
+        alert.sent = True
+        db.DBSession().add(alert)
+        db.DBSession().commit()
+    """
 
