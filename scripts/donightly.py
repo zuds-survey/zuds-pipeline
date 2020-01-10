@@ -57,7 +57,9 @@ if __name__ == '__main__':
         for d in detections:
             # each call commits
             makesources.associate(d, do_historical_phot=False)
+        db.DBSession().commit()
 
+        """
         # requires manual commit
         fp = sub.force_photometry(sub.unphotometered_sources,
                                   assume_background_subtracted=True)
@@ -83,5 +85,5 @@ if __name__ == '__main__':
             alert.sent = True
             db.DBSession().add(alert)
             db.DBSession().commit()
-
+        """
 
