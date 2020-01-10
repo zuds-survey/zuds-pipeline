@@ -81,7 +81,7 @@ def associate(detection, do_historical_phot=False):
             db.Detection.id != detection.id
         ).with_for_update(of=db.Detection.__table__).all()
 
-        for m in match_dets:
+        for m, _ in match_dets:
             if m.source is not None:
                 source = db.DBSession().query(db.models.Source).filter(
                     db.models.Source.id == m.source.id
@@ -153,24 +153,24 @@ def associate(detection, do_historical_phot=False):
                 t.persist()
                 db.DBSession().add(t)
 
-        # update the source ra and dec
-        # best = source.best_detection
+            # update the source ra and dec
+            # best = source.best_detection
 
-        # just doing this in case the new LC point
-        # isn't yet flushed to the DB
+            # just doing this in case the new LC point
+            # isn't yet flushed to the DB
 
-        # if detection.snr > best.snr:
-        #    best = detection
+            # if detection.snr > best.snr:
+            #    best = detection
 
-        # source.ra = best.ra
-        # source.dec = best.dec
+            # source.ra = best.ra
+            # source.dec = best.dec
 
-        db.DBSession().flush()
+            db.DBSession().flush()
 
-        if len(source.thumbnails) == len(source.photometry[0].thumbnails):
-            lthumbs = source.return_linked_thumbnails()
-            db.DBSession().add_all(lthumbs)
-        db.DBSession().add(detection)
+            if len(source.thumbnails) == len(source.photometry[0].thumbnails):
+                lthumbs = source.return_linked_thumbnails()
+                db.DBSession().add_all(lthumbs)
+            db.DBSession().add(detection)
 
 
 
