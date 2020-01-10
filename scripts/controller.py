@@ -10,7 +10,7 @@ import pandas as pd
 import datetime
 from pathlib import Path
 
-JOB_SIZE = 64 * 1
+JOB_SIZE = 64 * 5
 
 # query for the images to process
 
