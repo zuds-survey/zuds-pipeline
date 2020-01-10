@@ -56,122 +56,102 @@ def associate(detection, do_historical_phot=False):
 
     else:
 
-        source = db.DBSession().query(
-            db.models.Source
+
+        # source creation logic. at least 2 single epoch detections,
+        # or at least 1 stack detection
+
+        # get other detections nearby
+
+        # if source is none then the associatable detections are already in
+        # the `unassigned` list, so cross match against that
+
+        match_dets = db.DBSession().query(
+            db.Detection,
+            db.CalibratableImage.type
         ).join(
-            db.Detection
+            db.CalibratableImage
         ).filter(
             db.sa.func.q3c_radial_query(
-                db.models.Source.ra,
-                db.models.Source.dec,
+                db.Detection.ra,
+                db.Detection.dec,
                 detection.ra,
                 detection.dec,
                 ASSOC_RADIUS
-            )
-        ).order_by(
-            db.sa.func.q3c_dist(
-                db.models.Source.ra,
-                db.models.Source.dec,
-                detection.ra,
-                detection.dec
-            ).asc()
-        ).with_for_update(of=db.models.Source).first()
+            ),
+            db.Detection.id != detection.id
+        ).with_for_update(of=db.Detection.__table__).all()
 
-        if source is None:
-
-            # source creation logic. at least 2 single epoch detections,
-            # or at least 1 stack detection
-
-            # get other detections nearby
-
-            # if source is none then the associatable detections are already in
-            # the `unassigned` list, so cross match against that
-
-            match_dets = db.DBSession().query(
-                db.Detection,
-                db.CalibratableImage.type
-            ).join(
-                db.CalibratableImage
-            ).filter(
-                db.sa.func.q3c_radial_query(
-                    db.Detection.ra,
-                    db.Detection.dec,
-                    detection.ra,
-                    detection.dec,
-                    ASSOC_RADIUS
-                ),
-                db.Detection.id != detection.id
-            ).with_for_update(of=db.Detection.__table__).all()
-
-            n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
-            n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
-
-            incr_single = 1 if isinstance(detection.image,
-                                          db.SingleEpochSubtraction) else 0
-            incr_multi = 1 if isinstance(detection.image,
-                                         db.MultiEpochSubtraction) else 0
-
-            single_criteria = n_prev_single + incr_single > N_PREV_SINGLE
-            multi_criteria = n_prev_multi + incr_multi > N_PREV_MULTI
-            create_new_source = single_criteria or multi_criteria
-
-            if create_new_source:
-
-                with db.DBSession().no_autoflush:
-                    default_group = db.DBSession().query(
-                        db.models.Group
-                    ).get(DEFAULT_GROUP)
-
-                    default_instrument = db.DBSession().query(
-                        db.models.Instrument
-                    ).get(DEFAULT_INSTRUMENT)
-
-                # need to create a new source
-                name = publish.get_next_name()
-                source = db.models.Source(
-                    id=name,
-                    ra=detection.ra,
-                    dec=detection.dec,
-                    groups=[default_group]
-                )
-
-                udets = [m[0] for m in match_dets] + [detection]
-                _update_source_coordinate(source, udets)
-
-                # need this to make stamps.
-                dummy_phot = db.models.Photometry(
-                    source=source,
-                    instrument=default_instrument
-                )
-
-                for det, _ in match_dets:
-                    det.source = source
-                    db.DBSession().add(det)
-
+        for m in match_dets:
+            if m.source is not None:
+                source = db.DBSession().query(db.models.Source).filter(
+                    db.models.Source.id == m.source.id
+                ).with_for_update(of=db.models.Source).first()
+                _update_source_coordinate(source, match_dets + [detection])
                 detection.source = source
-
-                db.DBSession().add(dummy_phot)
-                db.DBSession().add(source)
-                db.DBSession().flush()
-
-                # run forced photometry on the new source
-                if do_historical_phot:
-                    fp = source.forced_photometry()
-                    db.DBSession().add_all(fp)
-
-                for t in detection.thumbnails:
-                    t.photometry = dummy_phot
-                    t.source = source
-                    t.persist()
-                    db.DBSession().add(t)
-
-            else:
-                # release the locks and move on
-                #db.DBSession().rollback()
                 return
-        else:
-            _update_source_coordinate(source, source.detections + [detection])
+
+
+        n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
+        n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
+
+        incr_single = 1 if isinstance(detection.image,
+                                      db.SingleEpochSubtraction) else 0
+        incr_multi = 1 if isinstance(detection.image,
+                                     db.MultiEpochSubtraction) else 0
+
+        single_criteria = n_prev_single + incr_single > N_PREV_SINGLE
+        multi_criteria = n_prev_multi + incr_multi > N_PREV_MULTI
+        create_new_source = single_criteria or multi_criteria
+
+        if create_new_source:
+
+            with db.DBSession().no_autoflush:
+                default_group = db.DBSession().query(
+                    db.models.Group
+                ).get(DEFAULT_GROUP)
+
+                default_instrument = db.DBSession().query(
+                    db.models.Instrument
+                ).get(DEFAULT_INSTRUMENT)
+
+            # need to create a new source
+            name = publish.get_next_name()
+            source = db.models.Source(
+                id=name,
+                ra=detection.ra,
+                dec=detection.dec,
+                groups=[default_group]
+            )
+
+            udets = [m[0] for m in match_dets] + [detection]
+            _update_source_coordinate(source, udets)
+
+            # need this to make stamps.
+            dummy_phot = db.models.Photometry(
+                source=source,
+                instrument=default_instrument
+            )
+
+            for det, _ in match_dets:
+                det.source = source
+                db.DBSession().add(det)
+
             detection.source = source
+
+            db.DBSession().add(dummy_phot)
+            db.DBSession().add(source)
+            db.DBSession().flush()
+
+            # run forced photometry on the new source
+            if do_historical_phot:
+                fp = source.forced_photometry()
+                db.DBSession().add_all(fp)
+
+            for t in detection.thumbnails:
+                t.photometry = dummy_phot
+                t.source = source
+                t.persist()
+                db.DBSession().add(t)
 
         # update the source ra and dec
         # best = source.best_detection
