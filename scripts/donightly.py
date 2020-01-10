@@ -28,6 +28,7 @@ if __name__ == '__main__':
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
         except dosub.TooManyDetectionsError as e:
             db.DBSession().rollback()
+            print(f'Error: too many detections on {fn} sub')
             sci = db.ScienceImage.get_by_basename(os.path.basename(fn))
             ref = db.DBSession().query(
                 db.ReferenceImage
@@ -41,7 +42,7 @@ if __name__ == '__main__':
             blocker = db.FailedSubtraction(
                 target_image=sci,
                 reference_image=ref,
-                reason=e.msg
+                reason=str(e)
             )
             db.DBSession().add(blocker)
             db.DBSession().commit()
