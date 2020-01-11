@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import mpi
+import numpy as np
 import dosub
 import send
 import shutil
@@ -43,7 +44,7 @@ if __name__ == '__main__':
         # commits
         try:
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
-        except dosub.TooManyDetectionsError as e:
+        except (dosub.TooManyDetectionsError, OSError) as e:
             db.DBSession().rollback()
             print(f'Error: too many detections on {fn} sub')
             sci = db.ScienceImage.get_by_basename(os.path.basename(fn))
@@ -86,6 +87,8 @@ if __name__ == '__main__':
             db.DBSession().rollback()
             traceback.print_exception(*sys.exc_info())
             continue
+
+
 
         else:
             subs.append(sub)
@@ -134,11 +137,19 @@ if __name__ == '__main__':
 
         subdir = os.path.dirname(sub.local_path)
         for h in historical:
+            db.DBSession().begin_nested()
             start = time.time()
             h.find_in_dir(subdir)
             rmsname = h.local_path.replace('.fits', '.rms.fits')
             h._rmsimg = db.FITSImage.from_file(rmsname)
-            fp = h.force_photometry(sources, assume_background_subtracted=True)
+
+            try:
+                fp = h.force_photometry(sources, assume_background_subtracted=True)
+            except np.AxisError as e:
+                # this image doesn't contain the coordinate
+                db.DBSession().rollback()
+                continue
+
             #h.mask_image.clear()
             #h.rms_image.clear()
             #h.clear()
