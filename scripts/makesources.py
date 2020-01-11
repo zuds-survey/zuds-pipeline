@@ -51,7 +51,7 @@ def associate(detection, do_historical_phot=False):
         # it was assigned in a previous iteration of this loop
         print(f'detection {detection.id} is alread associated with '
               f'{detection.source_id}, skipping...')
-        return
+        return False
         #db.DBSession().rollback()
 
     else:
@@ -89,7 +89,7 @@ def associate(detection, do_historical_phot=False):
                 prev_dets = [m[0] for m in match_dets]
                 _update_source_coordinate(source, prev_dets + [detection])
                 detection.source = source
-                return
+                return True
 
 
         n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
@@ -177,7 +177,10 @@ def associate(detection, do_historical_phot=False):
                 db.DBSession().add_all(lthumbs)
             db.DBSession().add(detection)
 
+            return True
 
+        else:
+            return False
 
 
 def associate_field_chip_quad(field, chip, quad):

@@ -1,6 +1,7 @@
 import db
 import os
 import sys
+import time
 import mpi
 import dosub
 import send
@@ -79,21 +80,24 @@ if __name__ == '__main__':
 
     db.DBSession().commit()
 
-    for d in all_detections:
-        # each call commits
-        makesources.associate(d, do_historical_phot=True)
+    issue_alert = {}
+    for sub in subs:
+        for d in sub.detections:
+            tstart = time.time()
+            needs_alert = makesources.associate(d, do_historical_phot=True)
+            tstop = time.time()
+
+            issue_alert[d] = needs_alert
     db.DBSession().commit()
-
-    # requires manual commit
-
 
     # issue an alert for each detection
     alerts = []
-    for d in all_detections:
-        if d.source is not None:
-            alert = db.Alert.from_detection(d)
-            db.DBSession().add(alert)
-            alerts.append(alert)
+    for sub in subs:
+        for d in sub.detections:
+            if issue_alert[d]:
+                alert = db.Alert.from_detection(d)
+                db.DBSession().add(alert)
+                alerts.append(alert)
 
     db.DBSession().commit()
     for alert in alerts:
