@@ -15,6 +15,8 @@ fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 
 if __name__ == '__main__':
 
+    send_alerts = False
+
     infile = sys.argv[1]
     refvers = sys.argv[2]
 
@@ -178,6 +180,7 @@ if __name__ == '__main__':
         db.DBSession().commit()
 
     # issue an alert for each detection
+
     alerts = []
     for sub in subs:
         for d in sub.detections:
@@ -187,14 +190,17 @@ if __name__ == '__main__':
                 alerts.append(alert)
                 print(f'made alert for {d.id} (source {d.source.id})', flush=True)
 
-    db.DBSession().commit()
-    for alert in alerts:
-        send.send_alert(alert)
-        print(f'sent alert for {alert.detection_id} '
-              f'(source {alert.detection.source.id})')
-        alert.sent = True
-        db.DBSession().add(alert)
+    if send_alerts:
         db.DBSession().commit()
-        print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
-              f'detection id {alert.detection.id}, '
-              f'source id {alert.detection.source_id}', flush=True)
+
+        if send_alerts:
+        for alert in alerts:
+            send.send_alert(alert)
+            print(f'sent alert for {alert.detection_id} '
+                  f'(source {alert.detection.source.id})')
+            alert.sent = True
+            db.DBSession().add(alert)
+            db.DBSession().commit()
+            print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
+                  f'detection id {alert.detection.id}, '
+                  f'source id {alert.detection.source_id}', flush=True)
