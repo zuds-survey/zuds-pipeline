@@ -132,8 +132,9 @@ if __name__ == '__main__':
             db.SingleEpochSubtraction.fid == sub.fid
         )
 
+        subdir = os.path.dirname(sub.local_path)
         for h in historical:
-            h.find_in_dir_of(sub)
+            h.find_in_dir(subdir)
             fp = h.force_photometry(sources, assume_background_subtracted=True)
             h.mask_image.clear()
             h.rms_image.clear()
