@@ -2183,7 +2183,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     triggers_phot = sa.Column(sa.Boolean)
     triggered_phot = sa.Column(sa.Boolean)
 
-    alert = relationship('Alert', cascade='all')
+    alert = relationship('Alert', cascade='all', uselist=False)
 
     thumbnails = relationship('Thumbnail', cascade='all')
 
