@@ -1553,7 +1553,7 @@ class CalibratedImage(CalibratableImage):
     forced_photometry = relationship('ForcedPhotometry', cascade='all')
 
     def force_photometry(self, sources, assume_background_subtracted=False,
-                         use_cutout=False):
+                         use_cutout=False, direct_load=None):
         """Force aperture photometry at the locations of `sources`.
         Assumes that calibration has already been done.
 
@@ -1568,7 +1568,7 @@ class CalibratedImage(CalibratableImage):
         result = aperture_photometry(
             self, ra, dec, apply_calibration=True,
             assume_background_subtracted=assume_background_subtracted,
-            use_cutout=use_cutout
+            use_cutout=use_cutout, direct_load=direct_load
         )
 
         photometry = []

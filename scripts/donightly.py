@@ -61,7 +61,6 @@ if __name__ == '__main__':
                 reason=str(e)
             )
             db.DBSession().add(blocker)
-            db.DBSession().commit()
             continue
 
         except Exception as e:
