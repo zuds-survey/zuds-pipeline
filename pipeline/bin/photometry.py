@@ -4,6 +4,7 @@ from astropy.coordinates import SkyCoord
 from astropy import units as u
 from astropy.io import fits
 from astropy.table import vstack
+from astropy.wcs import WCS
 
 
 APERTURE_RADIUS = 3 * u.pixel
@@ -18,9 +19,9 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
     dec = np.atleast_1d(dec)
     coord = SkyCoord(ra, dec, unit='deg')
 
-    wcs = calibratable.wcs
-
     if not use_cutout:
+
+        wcs = calibratable.wcs
 
         apertures = photutils.SkyCircularAperture(coord, r=APERTURE_RADIUS)
 
@@ -46,6 +47,31 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
         phot_table = []
         maskpix = []
         for s in coord:
+
+            if direct_load is not None and 'sci' in direct_load:
+                sci_path = direct_load['sci']
+            else:
+                if assume_background_subtracted:
+                    sci_path = calibratable.local_path
+                else:
+                    sci_path = calibratable.background_subtracted_image.local_path
+
+            if direct_load is not None and 'mask' in direct_load:
+                mask_path = direct_load['mask']
+            else:
+                mask_path = calibratable.mask_image.local_path
+
+            if direct_load is not None and 'rms' in direct_load:
+                rms_path = direct_load['rms']
+            else:
+                rms_path = calibratable.rms_image.local_path
+
+            with fits.open(
+                sci_path,
+                memmap=True
+            ) as f:
+                wcs = WCS(f[0].header)
+
             pixcoord = wcs.all_world2pix([[s.ra.deg, s.dec.deg]], 0)[0]
             pixx, pixy = pixcoord
 
@@ -67,23 +93,6 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
             ap = photutils.CircularAperture([pixx - ixmin, pixy - iymin],
                                             APERTURE_RADIUS.value)
 
-            if direct_load is not None and 'sci' in direct_load:
-                sci_path = direct_load['sci']
-            else:
-                if assume_background_subtracted:
-                    sci_path = calibratable.local_path
-                else:
-                    sci_path = calibratable.background_subtracted_image.local_path
-
-            if direct_load is not None and 'mask' in direct_load:
-                mask_path = direct_load['mask']
-            else:
-                mask_path = calibratable.mask_image.local_path
-
-            if direct_load is not None and 'rms' in direct_load:
-                rms_path = direct_load['rms']
-            else:
-                rms_path = calibratable.rms_image.local_path
 
             # something that is photometerable implements mask, background, and wcs
             with fits.open(
