@@ -75,7 +75,7 @@ if __name__ == '__main__':
         fp = sub.force_photometry(sub.unphotometered_sources,
                                   assume_background_subtracted=True)
         db.DBSession().add_all(fp)
-        db.DBSession().add_all(sub)
+        db.DBSession().add(sub)
         db.DBSession().add_all(detections)
 
     db.DBSession().commit()
