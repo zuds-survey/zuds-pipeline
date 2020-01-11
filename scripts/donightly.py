@@ -197,3 +197,6 @@ if __name__ == '__main__':
         alert.sent = True
         db.DBSession().add(alert)
         db.DBSession().commit()
+        print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
+              f'detection id {alert.detection.id}, '
+              f'source id {alert.detection.source_id}', flush=True)
