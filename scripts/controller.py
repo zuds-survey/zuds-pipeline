@@ -5,6 +5,7 @@ import subprocess
 import shlex
 import sys
 import shutil
+import numpy as np
 import traceback
 import pandas as pd
 import datetime
@@ -177,8 +178,6 @@ if __name__ == '__main__':
             db.ScienceImage.basename > 'ztf_20200107'
         ).with_for_update(
             skip_locked=True, of=db.ZTFFile
-        ).limit(
-            JOB_SIZE
         )
 
         images = imq.all()
@@ -187,15 +186,21 @@ if __name__ == '__main__':
             print(f'{datetime.datetime.utcnow()}: Nothing to do, trying again...')
             continue
 
-        try:
-            slurm_id = submit_job(images)
-        except RuntimeError as e:
-            exc_info = sys.exc_info()
-            traceback.print_exception(*exc_info)
-            print(f'continuing...', flush=True)
-            continue
 
-        job = db.Job(images=images, status='processing', slurm_id=slurm_id)
-        db.DBSession().add(job)
-        db.DBSession().commit()
+        nchunks = len(images) // JOB_SIZE
+        nchunks += 1 if len(images) % JOB_SIZE != 0 else 0
+
+        for group in np.array_split(images, nchunks):
+
+            try:
+                slurm_id = submit_job(group)
+            except RuntimeError as e:
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info)
+                print(f'continuing...', flush=True)
+                continue
+
+            job = db.Job(images=group, status='processing', slurm_id=slurm_id)
+            db.DBSession().add(job)
+            db.DBSession().commit()
 
