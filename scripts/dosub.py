@@ -22,6 +22,10 @@ MAX_DETS = 50
 class TooManyDetectionsError(Exception):
     pass
 
+class PredecessorError(Exception):
+    pass
+
+
 
 # make a reference for each directory
 def do_one(fn, sciclass, subclass, refvers):
@@ -93,7 +97,7 @@ def do_one(fn, sciclass, subclass, refvers):
     #    continue
 
     if prev is not None:
-        raise RuntimeError(f'{basename} already has a predecessor')
+        raise PredecessorError(f'{basename} already has a predecessor')
 
     substart = time.time()
     sub = subclass.from_images(sci, ref,
