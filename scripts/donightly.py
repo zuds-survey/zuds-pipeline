@@ -92,15 +92,6 @@ if __name__ == '__main__':
 
         else:
             subs.append(sub)
-            start = time.time()
-            fp = sub.force_photometry(sub.unphotometered_sources,
-                                      assume_background_subtracted=True)
-            stop = time.time()
-
-            print(f'took {stop-start:.2f} sec for single-epoch photometry on '
-                  f'{sub.basename}', flush=True)
-
-            db.DBSession().add_all(fp)
             db.DBSession().add(sub)
             db.DBSession().add_all(detections)
             db.DBSession().commit()
@@ -112,6 +103,18 @@ if __name__ == '__main__':
             db.DBSession().commit()
             tstop = time.time()
             print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
+
+    for sub in subs:
+        start = time.time()
+        fp = sub.force_photometry(sub.unphotometered_sources,
+                                  assume_background_subtracted=True)
+        stop = time.time()
+
+        print(f'took {stop-start:.2f} sec for single-epoch photometry on '
+              f'{sub.basename}', flush=True)
+
+        db.DBSession().add_all(fp)
+        db.DBSession().commit()
 
     # now do the forced photometry
     for sub in subs:
@@ -137,6 +140,8 @@ if __name__ == '__main__':
 
         subdir = os.path.dirname(sub.local_path)
         for h in historical:
+            if h.id == sub.id:
+                continue
             db.DBSession().begin_nested()
             start = time.time()
             h.find_in_dir(subdir)
