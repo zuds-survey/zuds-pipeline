@@ -133,6 +133,7 @@ if __name__ == '__main__':
         )
 
         for h in historical:
+            h.find_in_dir_of(sub)
             fp = h.force_photometry(sources, assume_background_subtracted=True)
             db.DBSession().add_all(fp)
         for detection in detections:
