@@ -135,6 +135,9 @@ if __name__ == '__main__':
         for h in historical:
             h.find_in_dir_of(sub)
             fp = h.force_photometry(sources, assume_background_subtracted=True)
+            h.mask_image.clear()
+            h.rms_image.clear()
+            h.clear()
             db.DBSession().add_all(fp)
         for detection in detections:
             detection.triggered_phot = True
