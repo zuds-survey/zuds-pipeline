@@ -115,6 +115,7 @@ if __name__ == '__main__':
     for sub in subs:
         for d in sub.detections:
             if issue_alert[d]:
+                print(f'made alert for {d.id} (source {d.source.id})', flush=True)
                 alert = db.Alert.from_detection(d)
                 db.DBSession().add(alert)
                 alerts.append(alert)
@@ -122,6 +123,8 @@ if __name__ == '__main__':
     db.DBSession().commit()
     for alert in alerts:
         send.send_alert(alert)
+        print(f'sent alert for {alert.detection_id} '
+              f'(source {alert.detection.source.id})')
         alert.sent = True
         db.DBSession().add(alert)
         db.DBSession().commit()
