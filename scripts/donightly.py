@@ -134,12 +134,17 @@ if __name__ == '__main__':
 
         subdir = os.path.dirname(sub.local_path)
         for h in historical:
+            start = time.time()
             h.find_in_dir(subdir)
+            rmsname = h.local_path.replace('.fits', '.rms.fits')
+            h._rmsimg = db.FITSImage.from_file(rmsname)
             fp = h.force_photometry(sources, assume_background_subtracted=True)
-            h.mask_image.clear()
-            h.rms_image.clear()
-            h.clear()
+            #h.mask_image.clear()
+            #h.rms_image.clear()
+            #h.clear()
             db.DBSession().add_all(fp)
+            stop = time.time()
+            print(f'took {stop-start:.2f} sec to do forcephot on {h.basename}')
         for detection in detections:
             detection.triggered_phot = True
             db.DBSession().add(detection)
