@@ -28,6 +28,7 @@ if __name__ == '__main__':
     imgs = mpi.get_my_share_of_work(infile)
 
     subs = []
+    dirs = []
     all_detections = []
     for inpt in imgs:
 
@@ -81,6 +82,7 @@ if __name__ == '__main__':
             subname = os.path.join(os.path.dirname(fn), basename)
             prev = subclass.from_file(subname)
             subs.append(prev)
+            dirs.append(os.path.dirname(fn))
             continue
 
         except Exception as e:
@@ -92,6 +94,7 @@ if __name__ == '__main__':
 
         else:
             subs.append(sub)
+            dirs.append(os.path.dirname(fn))
             db.DBSession().add(sub)
             db.DBSession().add_all(detections)
             db.DBSession().commit()
@@ -104,8 +107,17 @@ if __name__ == '__main__':
             tstop = time.time()
             print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
 
-    for sub in subs:
+    for sub, d in zip(subs, dirs):
         start = time.time()
+        # have to remap the sub
+        sub.find_in_dir(d)
+        sub.mask_image.find_in_dir(d)
+
+
+        sub._rmsimg = db.FITSImage.from_file(sub.local_path.replace(
+            '.fits', '.rms.fits'
+        ))
+
         fp = sub.force_photometry(sub.unphotometered_sources,
                                   assume_background_subtracted=True)
         stop = time.time()
@@ -135,7 +147,8 @@ if __name__ == '__main__':
             db.SingleEpochSubtraction.field == sub.field,
             db.SingleEpochSubtraction.ccdid == sub.ccdid,
             db.SingleEpochSubtraction.qid == sub.qid,
-            db.SingleEpochSubtraction.fid == sub.fid
+            db.SingleEpochSubtraction.fid == sub.fid,
+            db.SingleEpochSubtraction.id != sub.id
         )
 
         subdir = os.path.dirname(sub.local_path)
