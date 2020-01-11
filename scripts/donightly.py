@@ -40,8 +40,6 @@ if __name__ == '__main__':
             fn.replace('sciimg', 'mskimg')
         )
 
-        db.DBSession().begin_nested()
-
         # commits
         try:
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
@@ -79,7 +77,8 @@ if __name__ == '__main__':
                 db.ReferenceImage.version == refvers
             ).first()
             basename = db.sub_name(sci.basename, ref.basename)
-            prev = subclass.get_by_basename(basename)
+            subname = os.path.join(os.path.dirname(fn), basename)
+            prev = subclass.from_file(subname)
             subs.append(prev)
             continue
 
@@ -90,35 +89,66 @@ if __name__ == '__main__':
 
         else:
             subs.append(sub)
+            start = time.time()
             fp = sub.force_photometry(sub.unphotometered_sources,
                                       assume_background_subtracted=True)
+            stop = time.time()
+
+            print(f'took {stop-start:.2f} sec for single-epoch photometry on '
+                  f'{sub.basename}', flush=True)
+
             db.DBSession().add_all(fp)
             db.DBSession().add(sub)
             db.DBSession().add_all(detections)
+            db.DBSession().commit()
 
-    db.DBSession().commit()
-
-    issue_alert = {}
     for sub in subs:
         for d in sub.detections:
             tstart = time.time()
-            needs_alert = makesources.associate(d, do_historical_phot=True)
+            makesources.associate(d)
+            db.DBSession().commit()
             tstop = time.time()
-
             print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
 
-            issue_alert[d] = needs_alert
-    db.DBSession().commit()
+    # now do the forced photometry
+    for sub in subs:
+        sources = []
+        detections = []
+        for d in sub.detections:
+            if d.triggers_phot and not d.triggered_phot:
+                sources.append(d.source)
+                detections.append(d)
+
+        if len(sources) == 0:
+            db.DBSession().rollback()
+            continue
+
+        historical = db.DBSession().query(
+            db.SingleEpochSubtraction
+        ).filter(
+            db.SingleEpochSubtraction.field == sub.field,
+            db.SingleEpochSubtraction.ccdid == sub.ccdid,
+            db.SingleEpochSubtraction.qid == sub.qid,
+            db.SingleEpochSubtraction.fid == sub.fid
+        )
+
+        for h in historical:
+            fp = h.force_photometry(sources, assume_background_subtracted=True)
+            db.DBSession().add_all(fp)
+        for detection in detections:
+            detection.triggered_phot = True
+            db.DBSession().add(detection)
+        db.DBSession().commit()
 
     # issue an alert for each detection
     alerts = []
     for sub in subs:
         for d in sub.detections:
-            if issue_alert[d]:
-                print(f'made alert for {d.id} (source {d.source.id})', flush=True)
+            if d.triggers_alert and d.alert is None:
                 alert = db.Alert.from_detection(d)
                 db.DBSession().add(alert)
                 alerts.append(alert)
+                print(f'made alert for {d.id} (source {d.source.id})', flush=True)
 
     db.DBSession().commit()
     for alert in alerts:

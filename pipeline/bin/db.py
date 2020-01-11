@@ -1572,13 +1572,13 @@ class CalibratedImage(CalibratableImage):
         )
 
         photometry = []
-        for row, source in zip(result, sources):
+        for row, source, r, d in zip(result, sources, ra, dec):
             phot = ForcedPhotometry(flux=row['flux'],
                                     fluxerr=row['fluxerr'],
                                     flags=int(row['flags']),
                                     image=self,
-                                    ra=source.ra,
-                                    dec=source.dec,
+                                    ra=r,
+                                    dec=d,
                                     source=source)
             photometry.append(phot)
 
@@ -2178,6 +2178,12 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
     imaflags_iso = sa.Column(sa.Integer)
     goodcut = sa.Column(sa.Boolean)
     rb = relationship('RealBogus', cascade='all')
+
+    triggers_alert = sa.Column(sa.Boolean)
+    triggers_phot = sa.Column(sa.Boolean)
+    triggered_phot = sa.Column(sa.Boolean)
+
+    alert = relationship('Alert', cascade='all')
 
     thumbnails = relationship('Thumbnail', cascade='all')
 

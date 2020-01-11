@@ -43,7 +43,7 @@ def _update_source_coordinate(source_object, detections):
     source_object.dec = det.dec
 
 
-def associate(detection, do_historical_phot=False):
+def associate(detection):
 
     # assume `detection` is only visible to this transactionnn
 
@@ -51,11 +51,10 @@ def associate(detection, do_historical_phot=False):
         # it was assigned in a previous iteration of this loop
         print(f'detection {detection.id} is alread associated with '
               f'{detection.source_id}, skipping...')
-        return False
-        #db.DBSession().rollback()
+        # do nothing
+        return
 
     else:
-
 
         # source creation logic. at least 2 single epoch detections,
         # or at least 1 stack detection
@@ -89,8 +88,9 @@ def associate(detection, do_historical_phot=False):
                 prev_dets = [m[0] for m in match_dets]
                 _update_source_coordinate(source, prev_dets + [detection])
                 detection.source = source
-                return True
-
+                detection.triggers_phot = False
+                detection.triggers_alert = True
+                return
 
         n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
         n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
@@ -144,6 +144,10 @@ def associate(detection, do_historical_phot=False):
             db.DBSession().flush()
 
             # run forced photometry on the new source
+
+
+
+            """
             if do_historical_phot:
                 start = time.time()
                 fp = source.forced_photometry()
@@ -151,6 +155,7 @@ def associate(detection, do_historical_phot=False):
                 stop = time.time()
                 print(f'took {stop-start:.2f} sec to do historical phot'
                       f' for {source.id}', flush=True)
+            """
 
             for t in detection.thumbnails:
                 t.photometry = dummy_phot
@@ -177,10 +182,12 @@ def associate(detection, do_historical_phot=False):
                 db.DBSession().add_all(lthumbs)
             db.DBSession().add(detection)
 
-            return True
+            detection.triggers_alert = True
+            detection.triggers_phot = True
 
         else:
-            return False
+            detection.triggers_phot = False
+            detection.triggers_alert = False
 
 
 def associate_field_chip_quad(field, chip, quad):
