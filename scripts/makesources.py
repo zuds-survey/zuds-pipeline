@@ -150,7 +150,7 @@ def associate(detection, do_historical_phot=False):
                 db.DBSession().add_all(fp)
                 stop = time.time()
                 print(f'took {stop-start:.2f} sec to do historical phot'
-                      f' for {source.id}')
+                      f' for {source.id}', flush=True)
 
             for t in detection.thumbnails:
                 t.photometry = dummy_phot

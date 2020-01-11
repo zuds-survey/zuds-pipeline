@@ -87,6 +87,8 @@ if __name__ == '__main__':
             needs_alert = makesources.associate(d, do_historical_phot=True)
             tstop = time.time()
 
+            print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
+
             issue_alert[d] = needs_alert
     db.DBSession().commit()
 
