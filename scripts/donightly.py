@@ -193,7 +193,6 @@ if __name__ == '__main__':
     if send_alerts:
         db.DBSession().commit()
 
-        if send_alerts:
         for alert in alerts:
             send.send_alert(alert)
             print(f'sent alert for {alert.detection_id} '
