@@ -11,7 +11,8 @@ APER_KEY = 'APCOR4'
 
 
 def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
-                        assume_background_subtracted=False, use_cutout=False):
+                        assume_background_subtracted=False, use_cutout=False,
+                        direct_load=None):
 
     ra = np.atleast_1d(ra)
     dec = np.atleast_1d(dec)
@@ -66,24 +67,35 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
             ap = photutils.CircularAperture([pixx - ixmin, pixy - iymin],
                                             APERTURE_RADIUS.value)
 
-            # something that is photometerable implements mask, background, and wcs
-            if not assume_background_subtracted:
-                with fits.open(
-                    calibratable.background_subtracted_image.local_path,
-                    memmap=True
-                ) as f:
-                    pixels_bkgsub = f[0].data[iymin:iymax, ixmin:ixmax]
+            if direct_load is not None and 'sci' in direct_load:
+                sci_path = direct_load['sci']
             else:
-                with fits.open(
-                    calibratable.local_path,
-                    memmap=True
-                ) as f:
-                    pixels_bkgsub = f[0].data[iymin:iymax, ixmin:ixmax]
+                if assume_background_subtracted:
+                    sci_path = calibratable.local_path
+                else:
+                    sci_path = calibratable.background_subtracted_image.local_path
 
-            with fits.open(calibratable.rms_image.local_path, memmap=True) as f:
+            if direct_load is not None and 'mask' in direct_load:
+                mask_path = direct_load['mask']
+            else:
+                mask_path = calibratable.mask_image.local_path
+
+            if direct_load is not None and 'rms' in direct_load:
+                rms_path = direct_load['rms']
+            else:
+                rms_path = calibratable.rms_image.local_path
+
+            # something that is photometerable implements mask, background, and wcs
+            with fits.open(
+                sci_path,
+                memmap=True
+            ) as f:
+                pixels_bkgsub = f[0].data[iymin:iymax, ixmin:ixmax]
+
+            with fits.open(rms_path, memmap=True) as f:
                 bkgrms = f[0].data[iymin:iymax, ixmin:ixmax]
 
-            with fits.open(calibratable.mask_image.local_path, memmap=True) as f:
+            with fits.open(mask_path, memmap=True) as f:
                 mask = f[0].data[iymin:iymax, ixmin:ixmax]
 
             pt = photutils.aperture_photometry(pixels_bkgsub, ap, error=bkgrms)

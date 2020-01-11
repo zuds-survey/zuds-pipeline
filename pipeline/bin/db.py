@@ -2301,12 +2301,17 @@ def unphotometered_images(self):
 def force_photometry(self, assume_background_subtracted=True):
     out = []
     for i in self.unphotometered_images:
-        r = type(i).from_file(f'/global/cscratch1/sd/dgold/zuds/{i.field:06d}/'
-                              f'c{i.ccdid:02d}/q{i.qid}/{fid_map[i.fid]}/'
-                              f'{i.basename}')
-        fp = r.force_photometry(
+        sci_path = f'/global/cscratch1/sd/dgold/zuds/{i.field:06d}/' \
+                   f'c{i.ccdid:02d}/q{i.qid}/{fid_map[i.fid]}/' \
+                   f'{i.basename}'
+
+        mask_path = sci_path.replace('.fits', '.mask.fits')
+        rms_path = sci_path.replace('.fits', '.rms.fits')
+
+        fp = i.force_photometry(
             self, assume_background_subtracted=assume_background_subtracted,
-            use_cutout=True
+            use_cutout=True, direct_load={'mask': mask_path, 'sci': sci_path,
+                                          'rms': rms_path}
         )
         #r.rms_image.clear()
         #r.mask_image.clear()
