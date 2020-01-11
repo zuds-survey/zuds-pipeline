@@ -25,6 +25,7 @@ if __name__ == '__main__':
     # get the work
     imgs = mpi.get_my_share_of_work(infile)
 
+    subs = []
     all_detections = []
     for inpt in imgs:
 
@@ -69,27 +70,23 @@ if __name__ == '__main__':
             continue
 
         all_detections.extend(detections)
+        subs.append(sub)
 
     for d in all_detections:
         # each call commits
         makesources.associate(d, do_historical_phot=True)
     db.DBSession().commit()
 
-    """
     # requires manual commit
-    fp = sub.force_photometry(sub.unphotometered_sources,
-                              assume_background_subtracted=True)
-    db.DBSession().add_all(fp)
-    db.DBSession().flush()
 
-    # try to conserve memory?
-    sub.target_image.clear()
-    sub.reference_image.clear()
-    sub.clear()
+    for sub in subs:
+        fp = sub.force_photometry(sub.unphotometered_sources,
+                                  assume_background_subtracted=True)
+        db.DBSession().add_all(fp)
 
     # issue an alert for each detection
     alerts = []
-    for d in detections:
+    for d in all_detections:
         if d.source is not None:
             alert = db.Alert.from_detection(d)
             db.DBSession().add(alert)
@@ -101,5 +98,3 @@ if __name__ == '__main__':
         alert.sent = True
         db.DBSession().add(alert)
         db.DBSession().commit()
-    """
-
