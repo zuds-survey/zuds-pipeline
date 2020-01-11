@@ -155,7 +155,6 @@ if __name__ == '__main__':
         for h in historical:
             if h.id == sub.id:
                 continue
-            db.DBSession().begin_nested()
             start = time.time()
             h.find_in_dir(subdir)
             rmsname = h.local_path.replace('.fits', '.rms.fits')
@@ -165,7 +164,6 @@ if __name__ == '__main__':
                 fp = h.force_photometry(sources, assume_background_subtracted=True)
             except np.AxisError as e:
                 # this image doesn't contain the coordinate
-                db.DBSession().rollback()
                 continue
 
             #h.mask_image.clear()
