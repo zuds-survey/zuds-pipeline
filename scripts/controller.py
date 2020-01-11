@@ -193,14 +193,14 @@ if __name__ == '__main__':
         for group in np.array_split(images, nchunks):
 
             try:
-                slurm_id = submit_job(group)
+                slurm_id = submit_job(group.tolist())
             except RuntimeError as e:
                 exc_info = sys.exc_info()
                 traceback.print_exception(*exc_info)
                 print(f'continuing...', flush=True)
                 continue
 
-            job = db.Job(images=group, status='processing', slurm_id=slurm_id)
+            job = db.Job(images=group.tolist(), status='processing', slurm_id=slurm_id)
             db.DBSession().add(job)
             db.DBSession().commit()
 
