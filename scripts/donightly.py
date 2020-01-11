@@ -71,6 +71,14 @@ if __name__ == '__main__':
         all_detections.extend(detections)
         subs.append(sub)
 
+        fp = sub.force_photometry(sub.unphotometered_sources,
+                                  assume_background_subtracted=True)
+        db.DBSession().add_all(fp)
+        db.DBSession().add_all(sub)
+        db.DBSession().add_all(detections)
+
+    db.DBSession().commit()
+
     for d in all_detections:
         # each call commits
         makesources.associate(d, do_historical_phot=True)
@@ -78,10 +86,6 @@ if __name__ == '__main__':
 
     # requires manual commit
 
-    for sub in subs:
-        fp = sub.force_photometry(sub.unphotometered_sources,
-                                  assume_background_subtracted=True)
-        db.DBSession().add_all(fp)
 
     # issue an alert for each detection
     alerts = []

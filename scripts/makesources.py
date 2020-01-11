@@ -145,8 +145,12 @@ def associate(detection, do_historical_phot=False):
 
             # run forced photometry on the new source
             if do_historical_phot:
+                start = time.time()
                 fp = source.forced_photometry()
                 db.DBSession().add_all(fp)
+                stop = time.time()
+                print(f'took {stop-start:.2f} sec to do historical phot'
+                      f' for {source.id}')
 
             for t in detection.thumbnails:
                 t.photometry = dummy_phot
