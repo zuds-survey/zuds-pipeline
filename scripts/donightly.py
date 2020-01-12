@@ -193,7 +193,10 @@ if __name__ == '__main__':
                 db.DBSession().add(alert)
                 alerts.append(alert)
                 print(f'made alert for {d.id} (source {d.source.id})', flush=True)
-                assert alert.alert['candidate']['jd'] == max(a['mjd'] for a in alert.alert['light_curve'])
+                np.testing.assert_allclose(
+                    alert.alert['candidate']['jd'],
+                    max(a['mjd'] for a in alert.alert['light_curve'])
+                )
 
     if send_alerts:
         db.DBSession().commit()
