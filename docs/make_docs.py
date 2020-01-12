@@ -13,6 +13,7 @@ def write_file_contents(root, direc, filename, outputf):
         outputf.write('<font size="3" color="black">%s (%s): %s</font>'%(
             row['name'],row['type'],row['doc']))
         outputf.write('</br>')
+        outputf.write('</br>')
 
 
 def write_docs(alert_type):
