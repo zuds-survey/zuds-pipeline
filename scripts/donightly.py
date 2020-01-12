@@ -149,7 +149,9 @@ if __name__ == '__main__':
                     '.fits', '.mask.fits'
                 ))
                 rmsname = hitname.replace('.fits', '.rms.fits')
-                hit._rmsimg = db.FITSImage.from_file(rmsname)
+                hit._rmsimg = db.FITSImage()
+                hit.rms_image.map_to_local_file(rmsname)
+
 
             else:
                 tasks[hit].append(detection)
