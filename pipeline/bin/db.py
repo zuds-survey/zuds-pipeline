@@ -2884,7 +2884,7 @@ class Alert(models.Base):
                 obj.cutoutdifference = stamp
 
         obj.alert = alert
-        obj.detection = detection
+        obj.detection_id = detection.id
         return obj
 
 
