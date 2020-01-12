@@ -178,7 +178,7 @@ if __name__ == '__main__':
         #h.clear()
         db.DBSession().add_all(fp)
         stop = time.time()
-        print(f'took {stop-start:.2f} sec to do forcephot on {h.basename}')
+        print(f'took {stop-start:.2f} sec to do forcephot on {hit.basename}')
         db.DBSession().commit()
 
     # issue an alert for each detection
