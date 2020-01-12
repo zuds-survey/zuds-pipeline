@@ -141,17 +141,18 @@ if __name__ == '__main__':
         for hit in hits:
             if hit not in tasks:
                 tasks[hit] = [detection]
+                hitname = '/global/cscratch1/sd/dgold/zuds/' \
+                          f'{hit.field:06d}/c{hit.ccdid:02d}/' \
+                          f'q{hit.qid}/{fid_map[hit.fid]}/{hit.basename}'
+                hit.map_to_local_file(hitname)
+                hit.mask_image.map_to_local_file(hitname.replace(
+                    '.fits', '.mask.fits'
+                ))
+                rmsname = hitname.replace('.fits', '.rms.fits')
+                hit._rmsimg = db.FITSImage.from_file(rmsname)
+
             else:
                 tasks[hit].append(detection)
-            hitname = '/global/cscratch1/sd/dgold/zuds/' \
-                      f'{hit.field:06d}/c{hit.ccdid:02d}/' \
-                      f'q{hit.qid}/{fid_map[hit.fid]}/{hit.basename}'
-            hit.map_to_local_file(hitname)
-            hit.mask_image.map_to_local_file(hitname.replace(
-                '.fits', '.mask.fits'
-            ))
-            rmsname = hitname.replace('.fits', '.rms.fits')
-            hit._rmsimg = db.FITSImage.from_file(rmsname)
 
     for hit in tasks:
         sources = tasks[hit]
