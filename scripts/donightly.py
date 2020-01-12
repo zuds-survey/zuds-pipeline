@@ -121,7 +121,7 @@ if __name__ == '__main__':
             '.fits', '.rms.fits'
         ))
 
-        sources = sub.unphotometered_sources,
+        sources = sub.unphotometered_sources
         if len(sources) == 0:
             continue
 
@@ -170,7 +170,8 @@ if __name__ == '__main__':
 
         try:
             fp = hit.force_photometry(
-                sources, assume_background_subtracted=True
+                sources, assume_background_subtracted=True,
+                use_cutout=True
             )
         except np.AxisError as e:
             # this image doesn't contain the coordinate
