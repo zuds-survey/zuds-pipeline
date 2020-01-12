@@ -148,7 +148,7 @@ if __name__ == '__main__':
         hits = detection.source.unphotometered_images
         for hit in hits:
             if hit not in tasks:
-                tasks[hit] = [detection]
+                tasks[hit] = [detection.source]
                 hitname = '/global/cscratch1/sd/dgold/zuds/' \
                           f'{hit.field:06d}/c{hit.ccdid:02d}/' \
                           f'q{hit.qid}/{fid_map[hit.fid]}/{hit.basename}'
@@ -162,7 +162,7 @@ if __name__ == '__main__':
 
 
             else:
-                tasks[hit].append(detection)
+                tasks[hit].append(detection.source)
 
     for hit in tasks:
         sources = tasks[hit]
