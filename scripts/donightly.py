@@ -15,6 +15,8 @@ fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 
 if __name__ == '__main__':
 
+    send_alerts = False
+
     infile = sys.argv[1]
     refvers = sys.argv[2]
 
@@ -119,7 +121,7 @@ if __name__ == '__main__':
             '.fits', '.rms.fits'
         ))
 
-        sources = sub.unphotometered_sources,
+        sources = sub.unphotometered_sources
         if len(sources) == 0:
             continue
 
@@ -168,7 +170,8 @@ if __name__ == '__main__':
 
         try:
             fp = hit.force_photometry(
-                sources, assume_background_subtracted=True
+                sources, assume_background_subtracted=True,
+                use_cutout=True
             )
         except np.AxisError as e:
             # this image doesn't contain the coordinate
@@ -182,6 +185,7 @@ if __name__ == '__main__':
     db.DBSession().commit()
 
     # issue an alert for each detection
+
     alerts = []
     for sub in subs:
         for d in sub.detections:
@@ -195,14 +199,16 @@ if __name__ == '__main__':
                     max(a['mjd'] for a in alert.alert['light_curve'])
                 )
 
-    db.DBSession().commit()
-    for alert in alerts:
-        send.send_alert(alert)
-        print(f'sent alert for {alert.detection_id} '
-              f'(source {alert.detection.source.id})')
-        alert.sent = True
-        db.DBSession().add(alert)
+    if send_alerts:
         db.DBSession().commit()
-        print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
-              f'detection id {alert.detection.id}, '
-              f'source id {alert.detection.source_id}', flush=True)
+
+        for alert in alerts:
+            send.send_alert(alert)
+            print(f'sent alert for {alert.detection_id} '
+                  f'(source {alert.detection.source.id})')
+            alert.sent = True
+            db.DBSession().add(alert)
+            db.DBSession().commit()
+            print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
+                  f'detection id {alert.detection.id}, '
+                  f'source id {alert.detection.source_id}', flush=True)
