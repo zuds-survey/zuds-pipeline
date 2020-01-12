@@ -2181,7 +2181,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
 
     triggers_alert = sa.Column(sa.Boolean)
     triggers_phot = sa.Column(sa.Boolean)
-    triggered_phot = sa.Column(sa.Boolean)
+
 
     alert = relationship('Alert', cascade='all', uselist=False)
 
