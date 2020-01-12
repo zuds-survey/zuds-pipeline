@@ -112,14 +112,6 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 if __name__ == '__main__':
     while True:
 
-        # look for failed jobs and mark them
-        currently_processing = db.DBSession().query(
-            db.Job
-        ).with_for_update(
-            skip_locked=True, of=db.Job
-        ).filter(db.Job.status == 'processing')
-
-        # get the slurm jobs and their statuses
 
         try:
             job_statuses = get_job_statuses()
@@ -129,24 +121,9 @@ if __name__ == '__main__':
             print(f'continuing...', flush=True)
             continue
 
-        for job in currently_processing:
-            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
-                job.status = 'done'
-                db.DBSession().add(job)
-        db.DBSession().commit()
-
-        disqualifying = db.DBSession().query(
-            db.Job.id.label('jobid'), db.ScienceImage.id.label('imgid')
-        ).select_from(db.Job).join(db.JobImage).join(
-            db.ScienceImage,
-            db.JobImage.calibratableimage_id == db.ScienceImage.id
-        ).filter(
-            db.Job.status.in_(['processing'])
-        ).subquery()
-
         imq = db.DBSession().query(
-            db.ScienceImage,
-        ).join(
+            db.HTTPArchiveCopy.archive_path,
+        ).select_from(db.ScienceImage).join(
             db.HTTPArchiveCopy
         ).join(
             # make sure it has a reference Image
@@ -158,26 +135,20 @@ if __name__ == '__main__':
                 db.ReferenceImage.fid == db.ScienceImage.fid
             )
         ).outerjoin(
-            disqualifying,
-            disqualifying.c.imgid == db.ScienceImage.id
-        ).outerjoin(
             db.SingleEpochSubtraction,
             db.SingleEpochSubtraction.target_image_id == db.ScienceImage.id
         ).outerjoin(
             db.FailedSubtraction,
             db.FailedSubtraction.target_image_id == db.ScienceImage.id
         ).filter(
-            disqualifying.c.jobid == None,
             db.SingleEpochSubtraction.id == None,
             db.ReferenceImage.version == 'zuds4',
             db.FailedSubtraction.id == None,
             db.ScienceImage.field.in_(
                 ZUDS_FIELDS
             ),
-            db.ScienceImage.ipac_gid == 2,
-            db.ScienceImage.basename > 'ztf_20200107'
         ).with_for_update(
-            skip_locked=True, of=db.ZTFFile
+            skip_locked=True, of=db.ScienceImage.__table__
         )
 
         images = imq.all()
