@@ -2863,7 +2863,8 @@ class Alert(models.Base):
                                'to update the light curve of this object:' 
                                f'"{detection.source.id}".')
 
-        lc = lc[lc['mjd'] <= mjdcut]
+        index = (lc['mjd'] <= mjdcut) | np.isclose(lc['mjd'], mjdcut)
+        lc = lc[index]
         alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
 
         candidate['jdstartref'] = refimgs[0].mjd + MJD_TO_JD
