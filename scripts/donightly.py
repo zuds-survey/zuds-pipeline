@@ -191,7 +191,7 @@ if __name__ == '__main__':
                 alerts.append(alert)
                 print(f'made alert for {d.id} (source {d.source.id})', flush=True)
                 np.testing.assert_allclose(
-                    alert.alert['candidate']['jd'],
+                    alert.alert['candidate']['jd'] - db.MJD_TO_JD,
                     max(a['mjd'] for a in alert.alert['light_curve'])
                 )
 
