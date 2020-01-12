@@ -168,8 +168,8 @@ if __name__ == '__main__':
 
         results = []
         for field in ZUDS_FIELDS:
-            db.DBSession().execute(imq % field)
-            results.extend(db.DBSession().fetchall())
+            r = db.DBSession().execute(imq % field)
+            results.extend(r.fetchall())
 
         if len(results) == 0:
             print(f'{datetime.datetime.utcnow()}: Nothing to do, trying again...')
