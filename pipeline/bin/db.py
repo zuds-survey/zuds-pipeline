@@ -2805,6 +2805,10 @@ class Alert(models.Base):
             candidate['exptime'] = np.sum([i.exptime for i in stackimgs])
             mjdcut = stackimgs[-1].mjd
 
+        # add half a second to mjdcut to ensure expected behavior in
+        # floating point comparisons
+        mjdcut += 0.5 / 3600. / 24.
+
         # calculate the detection history
         prevdets = []
         if alert_type == 'single':
@@ -2863,8 +2867,7 @@ class Alert(models.Base):
                                'to update the light curve of this object:' 
                                f'"{detection.source.id}".')
 
-        index = (lc['mjd'] <= mjdcut) | np.isclose(lc['mjd'], mjdcut)
-        lc = lc[index]
+        lc = lc[lc['mjd'] <= mjdcut]
         alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
 
         candidate['jdstartref'] = refimgs[0].mjd + MJD_TO_JD
