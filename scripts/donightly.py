@@ -119,8 +119,13 @@ if __name__ == '__main__':
             '.fits', '.rms.fits'
         ))
 
-        fp = sub.force_photometry(sub.unphotometered_sources,
-                                  assume_background_subtracted=True)
+        sources = sub.unphotometered_sources,
+        if len(sources) == 0:
+            continue
+
+        fp = sub.force_photometry(sources,
+                                  assume_background_subtracted=True,
+                                  use_cutout=True)
         stop = time.time()
 
         print(f'took {stop-start:.2f} sec for single-epoch photometry on '
