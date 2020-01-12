@@ -131,51 +131,47 @@ if __name__ == '__main__':
         db.DBSession().commit()
 
     # now do the forced photometry
+    detections = []
     for sub in subs:
-        sources = []
-        detections = []
         for d in sub.detections:
-            if d.triggers_phot and not d.triggered_phot:
-                sources.append(d.source)
+            if d.triggers_phot:
                 detections.append(d)
 
-        if len(sources) == 0:
-            db.DBSession().rollback()
+    tasks = {}
+    for detection in detections:
+        hits = detection.source.unphotometered_images
+        for hit in hits:
+            if hit not in tasks:
+                tasks[hit] = [detection]
+            else:
+                tasks[hit].append(detection)
+            hitname = '/global/cscratch1/sd/dgold/zuds/' \
+                      f'{hit.field:06d}/c{hit.ccdid:02d}/' \
+                      f'q{hit.qid}/{fid_map[hit.fid]}/{hit.basename}'
+            hit.map_to_local_file(hitname)
+            hit.mask_image.map_to_local_file(hitname.replace(
+                '.fits', '.mask.fits'
+            ))
+            rmsname = hitname.replace('.fits', '.rms.fits')
+            hit._rmsimg = db.FITSImage.from_file(rmsname)
+
+    for hit in tasks:
+        sources = tasks[hit]
+        start = time.time()
+
+        try:
+            fp = hit.force_photometry(
+                sources, assume_background_subtracted=True
+            )
+        except np.AxisError as e:
+            # this image doesn't contain the coordinate
             continue
-
-        historical = db.DBSession().query(
-            db.SingleEpochSubtraction
-        ).filter(
-            db.SingleEpochSubtraction.field == sub.field,
-            db.SingleEpochSubtraction.ccdid == sub.ccdid,
-            db.SingleEpochSubtraction.qid == sub.qid,
-            db.SingleEpochSubtraction.id != sub.id
-        )
-
-        subdir = os.path.dirname(sub.local_path)
-        for h in historical:
-            if h.id == sub.id:
-                continue
-            start = time.time()
-            h.find_in_dir(subdir)
-            rmsname = h.local_path.replace('.fits', '.rms.fits')
-            h._rmsimg = db.FITSImage.from_file(rmsname)
-
-            try:
-                fp = h.force_photometry(sources, assume_background_subtracted=True)
-            except np.AxisError as e:
-                # this image doesn't contain the coordinate
-                continue
-
-            #h.mask_image.clear()
-            #h.rms_image.clear()
-            #h.clear()
-            db.DBSession().add_all(fp)
-            stop = time.time()
-            print(f'took {stop-start:.2f} sec to do forcephot on {h.basename}')
-        for detection in detections:
-            detection.triggered_phot = True
-            db.DBSession().add(detection)
+        #h.mask_image.clear()
+        #h.rms_image.clear()
+        #h.clear()
+        db.DBSession().add_all(fp)
+        stop = time.time()
+        print(f'took {stop-start:.2f} sec to do forcephot on {h.basename}')
         db.DBSession().commit()
 
     # issue an alert for each detection
