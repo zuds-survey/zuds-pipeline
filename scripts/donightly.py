@@ -149,7 +149,6 @@ if __name__ == '__main__':
             db.SingleEpochSubtraction.field == sub.field,
             db.SingleEpochSubtraction.ccdid == sub.ccdid,
             db.SingleEpochSubtraction.qid == sub.qid,
-            db.SingleEpochSubtraction.fid == sub.fid,
             db.SingleEpochSubtraction.id != sub.id
         )
 
@@ -189,6 +188,7 @@ if __name__ == '__main__':
                 db.DBSession().add(alert)
                 alerts.append(alert)
                 print(f'made alert for {d.id} (source {d.source.id})', flush=True)
+                assert alert.alert['candidate']['jd'] == max(a['mjd'] for a in alert.alert['light_curve'])
 
     if send_alerts:
         db.DBSession().commit()
