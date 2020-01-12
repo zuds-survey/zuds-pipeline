@@ -2884,6 +2884,10 @@ class Alert(models.Base):
                 obj.cutoutdifference = stamp
 
         obj.alert = alert
+
+        # this is to prevent detections from being re-inserted, triggering
+        # a unique key violation
+
         obj.detection_id = detection.id
         return obj
 
