@@ -114,7 +114,8 @@ if __name__ == '__main__':
         sub.mask_image.find_in_dir(d)
 
 
-        sub._rmsimg = db.FITSImage.from_file(sub.local_path.replace(
+        sub._rmsimg = db.FITSImage()
+        sub.rms_image.map_to_local_file(sub.local_path.replace(
             '.fits', '.rms.fits'
         ))
 
