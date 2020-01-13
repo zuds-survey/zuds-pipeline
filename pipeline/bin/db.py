@@ -26,7 +26,7 @@ from photometry import aperture_photometry, APER_KEY
 from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
 import archive
 from hotpants import prepare_hotpants
-from filterobjects import filter_sexcat
+from filterobjects import filter_sexcat, BRAAI_VERSION
 from seeing import estimate_seeing
 
 import sextractor
@@ -68,7 +68,6 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
                           'Y_WORLD', 'FLUX_APER', 'FLUXERR_APER',
                           'THETA_WORLD', 'ELLIPTICITY', 'A_IMAGE', 'B_IMAGE']
 MJD_TO_JD = 2400000.5
-
 CMAP_RANDOM_SEED = 8675309
 
 NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
@@ -2213,7 +2212,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE']),
             )
 
-            rb = RealBogus(rb_score=float(row['rb']), rb_version='d6_m7',
+            rb = RealBogus(rb_score=float(row['rb']), rb_version=BRAAI_VERSION,
                            detection=detection)
 
             DBSession().add(rb)
