@@ -27,8 +27,12 @@ for fn in imgs:
     sub = db.SingleEpochSubtraction.from_file(fn)
 
     start = time.time()
+    sources = sub.unphotometered_sources
+    if len(sources) == 0:
+        continue
+
     try:
-        phot = sub.force_photometry(sub.unphotometered_sources,
+        phot = sub.force_photometry(sources,
                                     assume_background_subtracted=True)
     except Exception as e:
         print(e)
