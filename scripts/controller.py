@@ -153,6 +153,7 @@ if __name__ == '__main__':
                        and s.ipac_gid = 2
                        and s.seeing < 4
                        and s.maglimit > 19
+                       and zf.basename > 'ztf_20200107'
                      ) dummy
                      left outer join failedsubtractions f
                      on f.target_image_id = dummy.sid
