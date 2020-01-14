@@ -26,7 +26,7 @@ from photometry import aperture_photometry, APER_KEY
 from swarp import ensure_images_have_the_same_properties, run_coadd, run_align
 import archive
 from hotpants import prepare_hotpants
-from filterobjects import filter_sexcat, BRAAI_VERSION
+from filterobjects import filter_sexcat, BRAAI_MODEL
 from seeing import estimate_seeing
 
 import sextractor
@@ -2217,7 +2217,7 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
                 x_image=float(row['X_IMAGE']), y_image=float(row['Y_IMAGE']),
             )
 
-            rb = RealBogus(rb_score=float(row['rb']), rb_version=BRAAI_VERSION,
+            rb = RealBogus(rb_score=float(row['rb']), rb_version=BRAAI_MODEL,
                            detection=detection)
 
             DBSession().add(rb)
