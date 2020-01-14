@@ -223,9 +223,40 @@ def associate_field_chip_quad(field, chip, quad):
         db.CalibratableImage.basename.asc()
     )
 
-    for detection in tqdm(unassigned):
-        associate(detection.id)
+    for d in tqdm(unassigned):
+        associate(d)
+        db.DBSession().add(d)
+        db.DBSession().commit()
+        if d.triggers_phot:
+            # it's a new source -- update thumbnails post commit.
+            # doing this post commit (with the triggers_phot flag)
+            # avoids database deadlocks
 
+            for t in d.thumbnails:
+                t.photometry = d.source.photometry[0]
+                t.source = d.source
+                t.persist()
+                db.DBSession().add(t)
+
+            # update the source ra and dec
+            # best = source.best_detection
+
+            # just doing this in case the new LC point
+            # isn't yet flushed to the DB
+
+            # if detection.snr > best.snr:
+            #    best = detection
+
+            # source.ra = best.ra
+            # source.dec = best.dec
+
+            db.DBSession().flush()
+
+            if len(d.source.thumbnails) == len(d.source.photometry[0].thumbnails):
+                lthumbs = d.source.return_linked_thumbnails()
+                db.DBSession().add_all(lthumbs)
+            db.DBSession().add(d)
+            db.DBSession().commit()
 
 if __name__ == '__main__':
     field_file = sys.argv[1]
