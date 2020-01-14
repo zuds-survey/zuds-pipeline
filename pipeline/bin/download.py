@@ -18,8 +18,8 @@ os.umask(0o007)
 # write images and masks to tape
 # write difference images to disk
 
-CHUNK_SIZE = 512
-TAR_SIZE = 2048
+CHUNK_SIZE = 256
+TAR_SIZE = 1024
 
 # this script does not use shifter
 # it is meant to be run on the data transfer nodes
@@ -175,23 +175,19 @@ if __name__ == '__main__':
             tstart = time.time()
             icookie = ipac_authenticate()
 
-        idownload_base = db.DBSession().query(db.ZTFFile).outerjoin(
+        idownload_base = db.DBSession().query(db.ScienceImage).outerjoin(
             db.TapeCopy, db.ZTFFile.id == db.TapeCopy.product_id
         ).outerjoin(
             db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
         ).filter(
-            db.sa.or_(
-                db.ZTFFile.basename.ilike('ztf%sciimg.fits'),
-                db.ZTFFile.basename.ilike('ztf%mskimg.fits'),
-            ),
             db.HTTPArchiveCopy.product_id == None,
             db.TapeCopy.product_id == None
         ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
-            db.ZTFFile.id.desc()
+            db.ScienceImage.id.desc()
         )
 
         idownload_q = idownload_base.filter(
-            db.ZTFFile.field.in_(ZUDS_FIELDS)
+            db.ScienceImage.field.in_(ZUDS_FIELDS)
         ).limit(CHUNK_SIZE)
 
         to_download = idownload_q.all()
@@ -208,63 +204,66 @@ if __name__ == '__main__':
             continue
 
 
-        for image in to_download:
+        for sci in to_download:
+            for t in ['sci', 'mask']:
 
-            if image.type == 'sci':
-                target = image.ipac_path('sciimg.fits')
-                http = (image.ipac_gid == 2 and image.field in ZUDS_FIELDS)
-            else:
-                # it's a mask
-                target = image.parent_image.ipac_path('mskimg.fits')
-                http = (image.parent_image.ipac_gid == 2 and image.field in
-                        ZUDS_FIELDS)
+                if t == 'sci':
+                    image = sci
+                    target = image.ipac_path('sciimg.fits')
+                    http = (image.ipac_gid == 2 and image.field in ZUDS_FIELDS)
+                else:
+                    # it's a mask
+                    image = sci.mask_image
+                    target = image.parent_image.ipac_path('mskimg.fits')
+                    http = (image.parent_image.ipac_gid == 2 and image.field in
+                            ZUDS_FIELDS)
 
 
-            # ensure this has 12 components so that it can be used with
-            # retrieve
-            destination_base = Path(
-                f'/global/cscratch1/sd/dgold/zuds/data/xfer/{hostname}/'
-                f'{image.field:06d}/'
-                f'c{image.ccdid:02d}/'
-                f'q{image.qid}/'
-                f'{fmap[image.fid]}'
-            )
+                # ensure this has 12 components so that it can be used with
+                # retrieve
+                destination_base = Path(
+                    f'/global/cscratch1/sd/dgold/zuds/data/xfer/{hostname}/'
+                    f'{image.field:06d}/'
+                    f'c{image.ccdid:02d}/'
+                    f'q{image.qid}/'
+                    f'{fmap[image.fid]}'
+                )
 
-            destination = f'{destination_base / image.basename}'
-            safe_download(target, destination, icookie, logger)
-            image.map_to_local_file(destination)
+                destination = f'{destination_base / image.basename}'
+                safe_download(target, destination, icookie, logger)
+                image.map_to_local_file(destination)
 
-            # ensure the image header is written to the DB
-            image.load_header()
+                # ensure the image header is written to the DB
+                image.load_header()
 
-            # associate it with the tape archive
-            tcopy = db.TapeCopy(
-                member_name=destination,
-                archive=archive,
-                product=image
-            )
-            current_tarball.append(tcopy)
+                # associate it with the tape archive
+                tcopy = db.TapeCopy(
+                    member_name=destination,
+                    archive=archive,
+                    product=image
+                )
+                current_tarball.append(tcopy)
 
-            # and archive the file to disk
+                # and archive the file to disk
 
-            if http:
-                acopy = db.HTTPArchiveCopy.from_product(image)
-                acopy.put()
-                db.DBSession().add(acopy)
+                if http:
+                    acopy = db.HTTPArchiveCopy.from_product(image)
+                    acopy.put()
+                    db.DBSession().add(acopy)
 
-            if len(current_tarball) >= TAR_SIZE:
-                # write the archive to the database
-                db.DBSession().add(archive)
+                if len(current_tarball) >= TAR_SIZE:
+                    # write the archive to the database
+                    db.DBSession().add(archive)
 
-                size = 0
-                for copy in archive.contents:
-                    size += os.path.getsize(copy.member_name)
+                    size = 0
+                    for copy in archive.contents:
+                        size += os.path.getsize(copy.member_name)
 
-                archive.size = size
+                    archive.size = size
 
-                # submit it to tape
-                submit_to_tape(archive)
-                current_tarball, archive = reset_tarball()
+                    # submit it to tape
+                    submit_to_tape(archive)
+                    current_tarball, archive = reset_tarball()
 
         db.DBSession().add_all(to_download)
         db.DBSession().commit()
