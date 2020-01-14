@@ -28,7 +28,7 @@ DEFAULT_INSTRUMENT = 1
 
 if mpi.has_mpi():
     from mpi4py import MPI
-    rank = MPI.COMM_WORLD.get_rank()
+    rank = MPI.COMM_WORLD.Get_rank()
     FORMAT = f'%(asctime)-15s {rank} %(message)s'
 else:
     FORMAT = f'%(asctime)-15s %(message)s'
