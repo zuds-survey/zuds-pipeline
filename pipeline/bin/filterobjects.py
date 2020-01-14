@@ -9,6 +9,7 @@ from tensorflow.keras.models import model_from_json, load_model
 import os
 from astropy.nddata.utils import Cutout2D
 from astropy.coordinates import SkyCoord
+from tensorflow.keras.utils import normalize as tf_norm
 
 import db
 
@@ -16,6 +17,8 @@ from scipy.optimize import minimize
 
 CUTSIZE = 11 # pixels
 RB_CUT = 0.2
+BRAAI_MODEL = 'braai_d6_m9'
+old_norm = int(BRAAI_MODEL.split('d6_m')[1]) <= 7
 
 
 # split an iterable over some processes recursively
@@ -42,7 +45,8 @@ def _read_clargs(val):
     return np.asarray(val)
 
 
-def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned):
+def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned,
+                           old_norm=False):
     # aligned images are db.CalibratableImages that have north up, east left
 
     triplet = np.zeros((63, 63, 3))
@@ -52,7 +56,10 @@ def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned):
             img.data, coord, size=63, mode='partial',
             fill_value=0., wcs=img.wcs
         )
-        triplet[:, :, i] = cutout.data / np.linalg.norm(cutout.data)
+        if old_norm:
+            triplet[:, :, i] = tf_norm(cutout.data)
+        else:
+            triplet[:, :, i] = cutout.data / np.linalg.norm(cutout.data)
     return triplet
 
 def filter_sexcat(cat):
@@ -216,12 +223,12 @@ def filter_sexcat(cat):
 
             if ml_model is None:
                 mydir = os.path.dirname(__file__)
-                ml_model = load_model_helper(f'{mydir}/../ml', 'd6_m7')
+                ml_model = load_model_helper(f'{mydir}/../ml', BRAAI_MODEL)
 
             # put it through machine learning
             triplet = make_triplet_for_braai(
                 row['X_WORLD'], row['Y_WORLD'], new_aligned,
-                ref_aligned, sub_aligned
+                ref_aligned, sub_aligned, old_norm=old_norm
             )
 
             rb = ml_model.predict(np.expand_dims(triplet, axis=0))
