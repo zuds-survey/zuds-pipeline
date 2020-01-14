@@ -2732,7 +2732,7 @@ class Alert(models.Base):
         alert = dict()
         alert['objectId'] = detection.source.id
         alert['candid'] = detection.id
-        alert['schemavsn'] = '0.1'
+        alert['schemavsn'] = '0.2'
         alert['publisher'] = 'ZUDS/NERSC'
 
         # do a bunch of cross matches to initially populate the candidate
@@ -2827,7 +2827,7 @@ class Alert(models.Base):
                 dmjd = d.image.mjd
             if dmjd < mymjd and d is not detection:
                 for r in d.rb:
-                    if r.rb_version == BRAAI_MODEL and r.rb_score > RB_ASSOC_MIN:
+                    if r.rb_score > RB_ASSOC_MIN:
                         prevdets.append(d)
                         break
 
