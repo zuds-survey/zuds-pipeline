@@ -5,7 +5,7 @@
     "doc": "avro alert schema for ZTF ZUDS survey",
     "version": "0.2",
     "fields": [
-        {"name": "candid", "type": "long", "doc": "unique candidate ID"},
+        {"name": "candid", "type": "long", "doc": "ID number of the detection that generated this alert"},
         {"name": "schemavsn", "type": "string", "doc": "schema version used"},
         {"name": "cutoutScience", "type": "bytes", "doc": "science cutout image"},
         {"name": "candidate", "type": "ztf.alert.candidate", "doc": "candidate information"},
