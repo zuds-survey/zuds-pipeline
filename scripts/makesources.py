@@ -26,6 +26,7 @@ DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
 
+
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Associate detections into sources for ZUDS.'
 
@@ -68,7 +69,9 @@ def associate(detection):
             db.Detection,
             db.CalibratableImage.type
         ).join(
-            db.CalibratableImage
+            db.CalibratableImage,
+        ).join(
+            db.RealBogus
         ).filter(
             db.sa.func.q3c_radial_query(
                 db.Detection.ra,
@@ -77,7 +80,9 @@ def associate(detection):
                 detection.dec,
                 ASSOC_RADIUS
             ),
-            db.Detection.id != detection.id
+            db.Detection.id != detection.id,
+            db.RealBogus.rb_version == db.BRAAI_MODEL,
+            db.RealBogus.rb_score > db.RB_ASSOC_MIN
         ).with_for_update(of=db.Detection.__table__).all()
 
         for m, _ in match_dets:

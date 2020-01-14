@@ -82,6 +82,7 @@ GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
 N_PREV_SINGLE = 1
 N_PREV_MULTI = 1
+RB_ASSOC_MIN = 0.2
 
 MASK_BITS = {
     'BIT00': 0,
@@ -2825,7 +2826,10 @@ class Alert(models.Base):
             else:
                 dmjd = d.image.mjd
             if dmjd < mymjd and d is not detection:
-                prevdets.append(d)
+                for r in d.rb:
+                    if r.rb_version == BRAAI_MODEL and r.rb_score > RB_ASSOC_MIN:
+                        prevdets.append(d)
+                        break
 
         sfunc = lambda d: d.image.mjd if isinstance(
             d.image, SingleEpochSubtraction
