@@ -20,6 +20,14 @@ def get_nthreads():
             return slurm_count
 
 
+def has_mpi():
+    try:
+        from mpi4py import MPI
+        return True
+    except ImportError:
+        return False
+
+
 def get_my_share_of_work(fname, reader=default_reader):
 
     try:

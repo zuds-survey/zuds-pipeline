@@ -8,6 +8,7 @@ import numpy as np
 from sqlalchemy.orm import aliased
 import publish
 from tqdm import tqdm
+import logging
 from astropy.coordinates import SkyCoord
 
 fmap = {1: 'zg',
@@ -25,6 +26,13 @@ N_PREV_MULTI = 1
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
+if mpi.has_mpi():
+    from mpi4py import MPI
+    rank = MPI.COMM_WORLD.get_rank()
+    FORMAT = f'%(asctime)-15s {rank} %(message)s'
+else:
+    FORMAT = f'%(asctime)-15s %(message)s'
+logging.basicConfig(format=FORMAT, level=logging.DEBUG)
 
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
@@ -65,6 +73,11 @@ def associate(detection):
         # if source is none then the associatable detections are already in
         # the `unassigned` list, so cross match against that
 
+        logging.debug(f'querying for detections within 2 arcsec of {detection.id}',
+                      flush=True)
+
+        start = time.time()
+
         match_dets = db.DBSession().query(
             db.Detection,
             db.CalibratableImage.type
@@ -81,21 +94,43 @@ def associate(detection):
                 ASSOC_RADIUS
             ),
             db.Detection.id != detection.id,
-            db.RealBogus.rb_version == db.BRAAI_MODEL,
             db.RealBogus.rb_score > db.RB_ASSOC_MIN
-        ).with_for_update(of=db.Detection.__table__).all()
+        ).with_for_update(of=[db.Detection.__table__,
+                              db.ObjectWithFlux.__table__]).all()
+        stop = time.time()
+
+        logging.debug(f'found {len(match_dets)} with rb > 0.2 in 2arcsec of {detection.id}, '
+                      f'locking detections and objectswithflux rows: '
+                      f'{[d[0].id for d in match_dets]}, took {stop-start:.2f} sec '
+                      f'to execute the query')
 
         for m, _ in match_dets:
             if m.source is not None:
+                logging.debug(f'one of the locked detections within 2arcsec of {detection.id} '
+                              f'is associated with a source: {m.source.id}. now locking'
+                              f'that source...')
+                start = time.time()
                 source = db.DBSession().query(db.models.Source).filter(
                     db.models.Source.id == m.source.id
-                ).with_for_update(of=db.models.Source).first()
+                ).with_for_update().first()
+                stop = time.time()
+                logging.debug(f'took {stop-start:.2f} sec to lock source {m.source.id}'
+                              f' for {detection.id}. now associating detection with '
+                              f'source and updating ra/dec...')
                 prev_dets = [m[0] for m in match_dets]
                 _update_source_coordinate(source, prev_dets + [detection])
                 detection.source = source
                 detection.triggers_phot = False
                 detection.triggers_alert = True
+                logging.debug(f'done associating detection {detection.id} with'
+                              f'source {m.source.id} and done updating source location',
+                              flush=True)
                 return
+
+        logging.debug('did not find any sources associated with detections within'
+                      f' 2 arcsec of {detection.id}. '
+                      'determining if a new source should be created...',
+                      flush=True)
 
         n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
         n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
@@ -107,9 +142,16 @@ def associate(detection):
 
         single_criteria = n_prev_single + incr_single > N_PREV_SINGLE
         multi_criteria = n_prev_multi + incr_multi > N_PREV_MULTI
+
         create_new_source = single_criteria or multi_criteria
 
         if create_new_source:
+
+            logging.debug(f'Source creation criteria met for detection {detection.id}. '
+                          f'Detection {detection.id} has {n_prev_single} previous'
+                          f'single detections and {n_prev_multi} previous multi'
+                          f'epoch detections. '
+                          f'Making a new source now...')
 
             with db.DBSession().no_autoflush:
                 default_group = db.DBSession().query(
@@ -129,6 +171,9 @@ def associate(detection):
                 groups=[default_group]
             )
 
+            logging.debug(f'Locally created an unpersisted source called {name}. '
+                          f'for detection {detection.id}')
+
             udets = [m[0] for m in match_dets] + [detection]
             _update_source_coordinate(source, udets)
 
@@ -139,30 +184,26 @@ def associate(detection):
             )
 
             for det, _ in match_dets:
+                logging.debug(f'As part of association of detection {detection.id},'
+                              f'associating detection {det.id}.source = {source.id} ')
                 det.source = source
                 db.DBSession().add(det)
 
+            logging.debug(f'As part of association of detection {detection.id},'
+                          f'associating detection {detection.id}.source = {source.id} ')
             detection.source = source
 
             db.DBSession().add(dummy_phot)
             db.DBSession().add(source)
+
+            logging.debug(f'Flushing new source {source.id} to database as '
+                          f'part of the association of {detection.id}')
             db.DBSession().flush()
 
-            # run forced photometry on the new source
-
-
-
-            """
-            if do_historical_phot:
-                start = time.time()
-                fp = source.forced_photometry()
-                db.DBSession().add_all(fp)
-                stop = time.time()
-                print(f'took {stop-start:.2f} sec to do historical phot'
-                      f' for {source.id}', flush=True)
-            """
-
             for t in detection.thumbnails:
+                logging.debug(f'updating thumbnail {t.id} setting photometry = {dummy_phot.id}'
+                              f' source = {source.id}, and persisting as part of'
+                              f'association of {detection.id} ')
                 t.photometry = dummy_phot
                 t.source = source
                 t.persist()
@@ -179,6 +220,10 @@ def associate(detection):
 
             # source.ra = best.ra
             # source.dec = best.dec
+
+
+            logging.debug(f'flushing thumbnails to database as part of the '
+                          f'association of {detection.id} ')
 
             db.DBSession().flush()
 
