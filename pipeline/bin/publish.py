@@ -14,7 +14,7 @@ from astropy.visualization import ZScaleInterval
 __all__ = ['load_catalog']
 
 
-CUTOUT_SIZE = 61  # pix
+CUTOUT_SIZE = 63  # pix
 SEARCH_RADIUS = 2. / 3600.  # 2 arcsec
 #DB_FTP_DIR = os.getenv('DB_FTP_DIR')
 DB_FTP_DIR = '/skyportal/static/thumbnails'
