@@ -73,8 +73,7 @@ def associate(detection):
         # if source is none then the associatable detections are already in
         # the `unassigned` list, so cross match against that
 
-        logging.debug(f'querying for detections within 2 arcsec of {detection.id}',
-                      flush=True)
+        logging.debug(f'querying for detections within 2 arcsec of {detection.id}')
 
         start = time.time()
 
@@ -123,14 +122,13 @@ def associate(detection):
                 detection.triggers_phot = False
                 detection.triggers_alert = True
                 logging.debug(f'done associating detection {detection.id} with'
-                              f'source {m.source.id} and done updating source location',
-                              flush=True)
+                              f'source {m.source.id} and done updating source location')
                 return
 
         logging.debug('did not find any sources associated with detections within'
                       f' 2 arcsec of {detection.id}. '
-                      'determining if a new source should be created...',
-                      flush=True)
+                      'determining if a new source should be created...')
+
 
         n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
         n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
