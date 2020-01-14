@@ -74,9 +74,9 @@ CMAP_RANDOM_SEED = 8675309
 #URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf'
 #STAMP_PREFIX = '/global/project/projectdirs/ptf/www/ztf'
 
-NERSC_PREFIX = '/global/projecta/projectdirs/tmp_astro250/www/data'
-URL_PREFIX = 'https://portal.nersc.gov/project/tmp_astro250'
-STAMP_PREFIX = '/global/projecta/projectdirs/tmp_astro250/www'
+NERSC_PREFIX = '/global/projecta/projectdirs/tmp_astro250/data'
+URL_PREFIX = 'https://portal.nersc.gov/project/astro250/ro_workaround'
+STAMP_PREFIX = '/global/projecta/projectdirs/tmp_astro250'
 
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
