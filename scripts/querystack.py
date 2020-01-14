@@ -14,7 +14,7 @@ STACK_INTERVAL = timedelta(days=STACK_WINDOW)
 # create the date table
 gs = db.sa.func.generate_series
 timetype = db.sa.DateTime(timezone=False)
-mindate = db.sa.cast('2017-01-01', timetype)
+mindate = db.sa.cast('2017-01-03', timetype)
 maxdate = db.sa.cast(db.sa.func.now(), timetype)
 
 lcol = gs(mindate,
@@ -48,7 +48,8 @@ res = db.DBSession().query(db.ScienceImage.field,
 ).filter(
     db.ScienceImage.seeing < 4.,
     db.ScienceImage.maglimit > 19.2,
-    db.ReferenceImage.version == 'zuds4'
+    db.ReferenceImage.version == 'zuds4',
+    db.ScienceImage.filefracday > 20200107000000
 ).group_by(
     db.ScienceImage.field,
     db.ScienceImage.ccdid,
