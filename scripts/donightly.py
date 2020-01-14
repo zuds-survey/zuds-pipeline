@@ -109,6 +109,37 @@ if __name__ == '__main__':
             tstop = time.time()
             print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
 
+            if d.triggers_alert and d.triggers_phot:
+                # it's a new source -- update thumbnails post commit.
+                # doing this post commit (with the triggers_phot flag)
+                # avoids database deadlocks
+
+                for t in d.thumbnails:
+                    t.photometry = d.source.photometry[0]
+                    t.source = d.source
+                    t.persist()
+                    db.DBSession().add(t)
+
+                # update the source ra and dec
+                # best = source.best_detection
+
+                # just doing this in case the new LC point
+                # isn't yet flushed to the DB
+
+                # if detection.snr > best.snr:
+                #    best = detection
+
+                # source.ra = best.ra
+                # source.dec = best.dec
+
+                db.DBSession().flush()
+
+                if len(d.source.thumbnails) == len(d.source.photometry[0].thumbnails):
+                    lthumbs = d.source.return_linked_thumbnails()
+                    db.DBSession().add_all(lthumbs)
+                db.DBSession().add(d)
+                db.DBSession().commit()
+
     for sub, d in zip(subs, dirs):
         start = time.time()
         # have to remap the sub

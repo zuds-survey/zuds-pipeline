@@ -58,8 +58,8 @@ def associate(detection):
 
     if detection.source is not None:
         # it was assigned in a previous iteration of this loop
-        print(f'detection {detection.id} is alread associated with '
-              f'{detection.source_id}, skipping...')
+        logging.debug(f'detection {detection.id} is alread associated with '
+                      f'{detection.source_id}, skipping...')
         # do nothing
         return
 
@@ -194,46 +194,13 @@ def associate(detection):
             db.DBSession().add(dummy_phot)
             db.DBSession().add(source)
 
-            logging.debug(f'Flushing new source {source.id} to database as '
-                          f'part of the association of {detection.id}')
-            db.DBSession().flush()
-
-            for t in detection.thumbnails:
-                logging.debug(f'updating thumbnail {t.id} setting photometry = {dummy_phot.id}'
-                              f' source = {source.id}, and persisting as part of'
-                              f'association of {detection.id} ')
-                t.photometry = dummy_phot
-                t.source = source
-                t.persist()
-                db.DBSession().add(t)
-
-            # update the source ra and dec
-            # best = source.best_detection
-
-            # just doing this in case the new LC point
-            # isn't yet flushed to the DB
-
-            # if detection.snr > best.snr:
-            #    best = detection
-
-            # source.ra = best.ra
-            # source.dec = best.dec
-
-
-            logging.debug(f'flushing thumbnails to database as part of the '
-                          f'association of {detection.id} ')
-
-            db.DBSession().flush()
-
-            if len(source.thumbnails) == len(source.photometry[0].thumbnails):
-                lthumbs = source.return_linked_thumbnails()
-                db.DBSession().add_all(lthumbs)
-            db.DBSession().add(detection)
+            logging.debug(f'Finished associating detection {detection.id}')
 
             detection.triggers_alert = True
             detection.triggers_phot = True
 
         else:
+            logging.debug(f'No new source to be created for deteection {detection.id}')
             detection.triggers_phot = False
             detection.triggers_alert = False
 
