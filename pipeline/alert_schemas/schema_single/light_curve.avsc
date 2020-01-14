@@ -11,7 +11,7 @@
         {"name": "flags", "type": ["int"], "doc": "any flags on quality of subtraction, default 0"},
         {"name": "fluxerr", "type": ["float", "null"], "default": null, "doc": "uncertainty on the flux [DN]"},
         {"name": "mjd", "type": ["float", "null"], "doc": "MJD of exposure"},
-        {"name": "id", "type": ["int"], "doc": "unique integer for image"},
+        {"name": "id", "type": ["int"], "doc": "unique integer ID of photometry point"},
         {"name": "filter", "type": ["string"], "doc": "'ztfg', 'ztfr', or 'ztfi'"},
         {"name": "lim_mag", "type": ["float"], "doc": "limiting mag of image [mag]"}
             ]

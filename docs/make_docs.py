@@ -32,7 +32,7 @@ def write_docs(alert_type):
     outputf.write('</head>\n')
     outputf.write('<body>\n')
 
-    outputf.write('<font size="5" color="blue"><b>ZUDS Avro Schema for Single Alerts</font></b>\n')
+    outputf.write(f'<font size="5" color="blue"><b>ZUDS Avro Schema for {alert_type.capitalize()} Alerts</font></b>\n')
     outputf.write('</br>\n')
     outputf.write('</br>\n')
 
