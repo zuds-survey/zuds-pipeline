@@ -15,7 +15,7 @@ fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 
 if __name__ == '__main__':
 
-    send_alerts = False
+    send_alerts = True
 
     infile = sys.argv[1]
     refvers = sys.argv[2]

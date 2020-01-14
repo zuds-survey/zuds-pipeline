@@ -3,6 +3,7 @@ import io
 import os
 import subprocess
 import shlex
+import time
 import sys
 import shutil
 import numpy as np
@@ -173,6 +174,7 @@ if __name__ == '__main__':
 
         if len(results) == 0:
             print(f'{datetime.datetime.utcnow()}: Nothing to do, trying again...')
+            time.sleep(1800.)
             continue
 
 
