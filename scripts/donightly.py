@@ -109,7 +109,7 @@ if __name__ == '__main__':
             tstop = time.time()
             print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
 
-            if d.triggers_alert and d.triggers_phot:
+            if d.triggers_phot:
                 # it's a new source -- update thumbnails post commit.
                 # doing this post commit (with the triggers_phot flag)
                 # avoids database deadlocks
