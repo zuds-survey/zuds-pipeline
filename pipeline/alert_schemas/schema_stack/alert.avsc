@@ -16,6 +16,6 @@
 		{"name": "light_curve", "type": [{
 				"type": "array",
 				"items": "ztf.alert.light_curve"}, "null" ], "default": null,
-                "doc": "light curve information"}
+                "doc": "forced photometry at the location of the source on every *single-epoch* subtraction  containing the source processed through the ZUDS pipeline  going back to January 2019"}
 	]
 }
