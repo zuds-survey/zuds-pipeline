@@ -85,7 +85,7 @@ def associate(detection):
 
         match_dets = db.DBSession().query(
             db.Detection,
-            db.Source,
+            db.models.Source,
             db.CalibratableImage.type
         ).join(
             db.CalibratableImage,
