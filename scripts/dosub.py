@@ -2,6 +2,7 @@ import db
 import sys
 import mpi
 import os
+import traceback
 import time
 import archive
 import numpy as np
@@ -208,5 +209,6 @@ if __name__ == '__main__':
     for fn in imgs:
         try:
             do_one(fn, sciclass, subclass, refvers)
-        except:
+        except Exception as e:
+            traceback.print_exception(*sys.exc_info())
             continue
