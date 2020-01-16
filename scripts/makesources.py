@@ -92,7 +92,7 @@ def associate(detection):
         ).join(
             db.RealBogus
         ).outerjoin(
-            db.models.Source, db.Detection.source_id == db.Source.id
+            db.models.Source, db.Detection.source_id == db.models.Source.id
         ).filter(
             db.sa.func.q3c_radial_query(
                 db.Detection.ra,
