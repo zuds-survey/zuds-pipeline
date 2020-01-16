@@ -54,6 +54,7 @@ def _update_source_coordinate(source_object, detections):
 
 def associate(detection):
 
+
     # assume `detection` is only visible to this transactionnn
 
     if detection.source is not None:
@@ -61,6 +62,11 @@ def associate(detection):
         logging.debug(f'detection {detection.id} is alread associated with '
                       f'{detection.source_id}, skipping...')
         # do nothing
+        return
+
+    if all([r.rb_score < db.RB_ASSOC_MIN for r in detection.rb]):
+        logging.debug(f'detection {detection.id} does not have a high enough '
+                      f'rb score to be associated')
         return
 
     else:
@@ -79,11 +85,14 @@ def associate(detection):
 
         match_dets = db.DBSession().query(
             db.Detection,
+            db.Source,
             db.CalibratableImage.type
         ).join(
             db.CalibratableImage,
         ).join(
             db.RealBogus
+        ).outerjoin(
+            db.models.Source, db.Detection.source_id == db.Source.id
         ).filter(
             db.sa.func.q3c_radial_query(
                 db.Detection.ra,
@@ -92,33 +101,35 @@ def associate(detection):
                 detection.dec,
                 ASSOC_RADIUS
             ),
-            db.Detection.id != detection.id,
             db.RealBogus.rb_score > db.RB_ASSOC_MIN
         ).with_for_update(of=[db.Detection.__table__,
-                              db.ObjectWithFlux.__table__]).all()
+                              db.ObjectWithFlux.__table__,
+                              db.models.Source.__table__]).all()
         stop = time.time()
+
+        # remove myself from the match detections
+        for i, dd in enumerate(match_dets):
+            if dd[0] == detection:
+                match_dets.remove(dd)
 
         logging.debug(f'found {len(match_dets)} with rb > 0.2 in 2arcsec of {detection.id}, '
                       f'locking detections and objectswithflux rows: '
                       f'{[d[0].id for d in match_dets]}, took {stop-start:.2f} sec '
                       f'to execute the query')
 
-        for m, _ in match_dets:
-            if m.source is not None:
+        for _, s, __ in match_dets:
+            if s is not None:
                 logging.debug(f'one of the locked detections within 2arcsec of {detection.id} '
                               f'is associated with a source: {m.source.id}. now locking'
                               f'that source...')
                 start = time.time()
-                source = db.DBSession().query(db.models.Source).filter(
-                    db.models.Source.id == m.source.id
-                ).with_for_update().first()
                 stop = time.time()
                 logging.debug(f'took {stop-start:.2f} sec to lock source {m.source.id}'
                               f' for {detection.id}. now associating detection with '
                               f'source and updating ra/dec...')
                 prev_dets = [m[0] for m in match_dets]
-                _update_source_coordinate(source, prev_dets + [detection])
-                detection.source = source
+                _update_source_coordinate(s, prev_dets + [detection])
+                detection.source = s
                 detection.triggers_phot = False
                 detection.triggers_alert = True
                 logging.debug(f'done associating detection {detection.id} with'
@@ -130,8 +141,8 @@ def associate(detection):
                       'determining if a new source should be created...')
 
 
-        n_prev_single = sum([1 for _ in match_dets if _[1] == 'sesub'])
-        n_prev_multi = sum([1 for _ in match_dets if _[1] == 'mesub'])
+        n_prev_single = sum([1 for _ in match_dets if _[2] == 'sesub'])
+        n_prev_multi = sum([1 for _ in match_dets if _[2] == 'mesub'])
 
         incr_single = 1 if isinstance(detection.image,
                                       db.SingleEpochSubtraction) else 0
