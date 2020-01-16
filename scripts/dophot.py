@@ -24,7 +24,12 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 imgs = mpi.get_my_share_of_work(infile)
 
 for fn in imgs:
-    sub = db.SingleEpochSubtraction.from_file(fn)
+
+    sub = db.SingleEpochSubtraction.get_by_basename(os.path.basename(fn))
+    sub.map_to_local_file(fn)
+    sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'))
+    sub._rmsimg = db.FITSImage()
+    sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'))
 
     start = time.time()
     sources = sub.unphotometered_sources
