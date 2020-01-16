@@ -2826,10 +2826,8 @@ class Alert(models.Base):
             else:
                 dmjd = d.image.mjd
             if dmjd < mymjd and d is not detection:
-                for r in d.rb:
-                    if r.rb_score > RB_ASSOC_MIN:
-                        prevdets.append(d)
-                        break
+                prevdets.append(d)
+                break
 
         sfunc = lambda d: d.image.mjd if isinstance(
             d.image, SingleEpochSubtraction
