@@ -27,10 +27,10 @@ for fn in imgs:
 
     start = time.time()
     sub = db.SingleEpochSubtraction.get_by_basename(os.path.basename(fn))
-    sub.map_to_local_file(fn)
-    sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'))
+    sub.map_to_local_file(fn, quiet=True)
+    sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'), quiet=True)
     sub._rmsimg = db.FITSImage()
-    sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'))
+    sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'), quiet=True)
 
     sources = sub.unphotometered_sources
     if len(sources) == 0:
