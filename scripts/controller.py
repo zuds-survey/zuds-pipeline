@@ -151,8 +151,8 @@ def submit_forcephot_chain():
             q = g[-1]
             c = g[-3]
             b = g[-4]
-            f = g[-5]
-            outnames.append(f'/global/cscratch1/sd/d/gold/zuds/{f}/{c}/'
+            field = g[-5]
+            outnames.append(f'/global/cscratch1/sd/dgold/zuds/{field}/{c}/'
                             f'{q}/{b}/{name}')
 
         f.write('\n'.join(outnames) + '\n')
@@ -474,6 +474,10 @@ if __name__ == '__main__':
             f'''update detections set triggers_alert = 't'
             where detections.id in {tuple(detection_ids)}'''
         )
+
+        # need to commit so that sources will be there for forced photometry
+        # jobs running via slurm
+        db.DBSession().commit()
 
         # see if a forcephot chain should be launched
         current_forcephot_jobs = db.DBSession().query(db.ForcePhotJob).filter(
