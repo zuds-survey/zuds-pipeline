@@ -101,6 +101,8 @@ if __name__ == '__main__':
             db.DBSession().add_all(detections)
             db.DBSession().commit()
 
+"""            
+
     for sub in subs:
         for d in sub.detections:
             tstart = time.time()
@@ -243,3 +245,4 @@ if __name__ == '__main__':
             print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
                   f'detection id {alert.detection.id}, '
                   f'source id {alert.detection.source_id}', flush=True)
+"""

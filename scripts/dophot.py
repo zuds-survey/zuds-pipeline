@@ -28,10 +28,10 @@ for fn in imgs:
 
     start = time.time()
     sub = db.SingleEpochSubtraction.get_by_basename(os.path.basename(fn))
-    sub.map_to_local_file(fn)
-    sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'))
+    sub.map_to_local_file(fn, quiet=True)
+    sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'), quiet=True)
     sub._rmsimg = db.FITSImage()
-    sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'))
+    sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'), quiet=True)
 
     sources = sub.unphotometered_sources
     if len(sources) == 0:
@@ -41,8 +41,8 @@ for fn in imgs:
 
     try:
         phot = sub.force_photometry(sources,
-                                    assume_background_subtracted=True,
-                                    use_cutout=True)
+                                    assume_background_subtracted=True
+                                    )
     except Exception as e:
         print(e)
         continue
@@ -50,6 +50,6 @@ for fn in imgs:
     db.DBSession().add_all(phot)
     db.DBSession().commit()
     stop = time.time()
-    print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}')
+    print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}', flush=True)
 
 
