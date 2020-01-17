@@ -85,7 +85,6 @@ def associate(detection):
 
         match_dets = db.DBSession().query(
             db.Detection,
-            db.models.Source,
             db.CalibratableImage.type
         ).join(
             db.CalibratableImage,
@@ -103,14 +102,14 @@ def associate(detection):
             ),
             db.RealBogus.rb_score > db.RB_ASSOC_MIN
         ).with_for_update(of=[db.Detection.__table__,
-                              db.ObjectWithFlux.__table__,
-                              db.models.Source.__table__]).all()
+                              db.ObjectWithFlux.__table__]).all()
         stop = time.time()
 
         # remove myself from the match detections
-        for i, dd in enumerate(match_dets):
+        for dd in match_dets:
             if dd[0] == detection:
-                match_dets.remove(dd)
+                remove = dd
+        match_dets.remove(remove)
 
         logging.debug(f'found {len(match_dets)} with rb > 0.2 in 2arcsec of {detection.id}, '
                       f'locking detections and objectswithflux rows: '
@@ -265,7 +264,7 @@ def associate_field_chip_quad(field, chip, quad):
 
             if len(d.source.thumbnails) == len(d.source.photometry[0].thumbnails):
                 lthumbs = d.source.return_linked_thumbnails()
-                db.DBSession().add_all(lthumbs)
+            db.DBSession().add_all(lthumbs)
             db.DBSession().add(d)
             db.DBSession().commit()
 
