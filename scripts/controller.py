@@ -456,7 +456,7 @@ if __name__ == '__main__':
         db.DBSession().flush()
         db.DBSession().execute('''
         update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
-        from (select g.id, g.ra, g.dec from j
+        from (select g.id, g.ra, g.dec from 
         (select s.id, d.ra, d.dec, rank() over 
         (partition by o.source_id order by o.flux / o.fluxerr desc) 
         from sources s join objectswithflux o on o.source_id = s.id 
