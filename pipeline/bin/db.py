@@ -427,11 +427,12 @@ class File(object):
     def ismapped(self):
         return hasattr(self, '_path')
 
-    def map_to_local_file(self, path):
-        if  hasattr(self, 'basename'):
-            print(f'Mapping {self.basename} to {path}')
-        else:
-            print(f'Mapping {self} to {path}')
+    def map_to_local_file(self, path, quiet=False):
+        if not quiet:
+            if  hasattr(self, 'basename'):
+                print(f'Mapping {self.basename} to {path}')
+            else:
+                print(f'Mapping {self} to {path}')
         self._path = str(Path(path).absolute())
 
     def unmap(self):
