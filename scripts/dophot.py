@@ -34,11 +34,14 @@ for fn in imgs:
 
     sources = sub.unphotometered_sources
     if len(sources) == 0:
+        stop = time.time()
+        print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}')
         continue
 
     try:
         phot = sub.force_photometry(sources,
-                                    assume_background_subtracted=True)
+                                    assume_background_subtracted=True,
+                                    use_cutout=True)
     except Exception as e:
         print(e)
         continue
