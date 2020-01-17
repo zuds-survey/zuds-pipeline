@@ -28,6 +28,8 @@ ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
                822,823,843,844,845,846,861,862,863]
 fid_map = {1: 'zg', 2:'zr', 3:'zi'}
 
+FORCEPHOT_IMAGE_LIMIT = 150000
+
 
 def _update_source_coordinate(source_object, detections):
     # assumes source_object and detections are locked
@@ -139,9 +141,14 @@ def submit_forcephot_chain():
     image_names = db.DBSession().query(db.SingleEpochSubtraction.basename).join(
         db.ReferenceImage,
         db.SingleEpochSubtraction.reference_image_id == db.ReferenceImage.id
+    ).join(
+        db.ScienceImage,
+        db.SingleEpochSubtraction.target_image_id == db.ScienceImage.id
     ).filter(
-        db.ReferenceImage.version == 'zuds4'
-    ).all()
+        db.ReferenceImage.version == 'zuds4',
+    ).order_by(
+        db.ScienceImage.obsjd.desc()
+    ).limit(FORCEPHOT_IMAGE_LIMIT).all()
 
     imginname = f'{scriptname}'.replace('.sh', '.in')
     outnames = []
@@ -161,7 +168,7 @@ def submit_forcephot_chain():
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
 #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-#SBATCH -N 18
+#SBATCH -N 17
 #SBATCH -C haswell
 #SBATCH -q realtime
 #SBATCH --exclusive
@@ -170,7 +177,7 @@ def submit_forcephot_chain():
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 1152 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds4
+HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds4
 
 """
 
@@ -220,7 +227,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1152 -c1 --cpu_bind=cores shifter python $HO
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
 #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-#SBATCH -N 18
+#SBATCH -N 1
 #SBATCH -C haswell
 #SBATCH -q realtime
 #SBATCH --exclusive
@@ -228,7 +235,8 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1152 -c1 --cpu_bind=cores shifter python $HO
 #SBATCH -t 00:60:00
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
-#SBATCH --dependency=afterok:{jobid}
+#SBATCH --dependency=afterany:{jobid}
+#SBATCH --array=0-17
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
 

@@ -22,6 +22,7 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 
 # get the work
 imgs = mpi.get_my_share_of_work(infile)
+imgs = sorted(imgs, key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
 
 for fn in imgs:
 
