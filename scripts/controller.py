@@ -266,6 +266,10 @@ if __name__ == '__main__':
             db.Job
         ).filter(db.Job.status == 'processing')
 
+        also_processing = db.DBSession().query(
+            db.ForcePhotJob
+        ).filter(db.ForcePhotJob.status == 'processing')
+
         # get the slurm jobs and their statuses
 
         try:
@@ -280,6 +284,12 @@ if __name__ == '__main__':
             if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
                 job.status = 'done'
                 db.DBSession().add(job)
+
+        for job in also_processing:
+            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
+                job.status = 'done'
+                db.DBSession().add(job)
+
         db.DBSession().commit()
 
         imq = '''select final.ap, final.sid from
@@ -443,7 +453,7 @@ if __name__ == '__main__':
                 lthumbs = d.source.return_linked_thumbnails()
                 db.DBSession().add_all(lthumbs)
 
-
+        db.DBSession().flush()
         db.DBSession().execute('''
         update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
         from (select g.id, g.ra, g.dec from j
@@ -461,11 +471,27 @@ if __name__ == '__main__':
             detection_ids.append(row['id1'])
 
         db.DBSession().execute(
-            '''update detections set triggers_alert = 't'
+            f'''update detections set triggers_alert = 't'
             where detections.id in {tuple(detection_ids)}'''
         )
 
-        submit_forcephot_chain()
+        # see if a forcephot chain should be launched
+        current_forcephot_jobs = db.DBSession().query(db.ForcePhotJob).filter(
+            db.ForcePhotJob.status == 'processing'
+        ).all()
+
+        if len(current_forcephot_jobs) == 0:
+
+            try:
+                slurm_id = submit_forcephot_chain()
+            except RuntimeError as e:
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info)
+                print(f'continuing...', flush=True)
+                continue
+
+            job = db.ForcePhotJob(status='processing', slurm_id=slurm_id)
+            db.DBSession().add(job)
 
         db.DBSession().commit()
         #submit_Jobs()

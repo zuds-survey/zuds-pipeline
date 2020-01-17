@@ -2908,6 +2908,11 @@ class Job(models.Base):
 JobImage = join_model('job_images', Job, CalibratableImage)
 
 
+class ForcePhotJob(models.Base):
+    status = sa.Column(sa.Text, index=True, default='unsubmitted',
+                       nullable=False)
+    slurm_id = sa.Column(sa.Text, index=True, nullable=False)
+
 class FailedSubtraction(models.Base):
 
     target_image_id = sa.Column(sa.Integer, sa.ForeignKey(
