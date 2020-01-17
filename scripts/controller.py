@@ -170,7 +170,7 @@ def submit_forcephot_chain():
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds4
+HDF5_USE_FILE_LOCKING=FALSE srun -n 1152 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds4
 
 """
 
