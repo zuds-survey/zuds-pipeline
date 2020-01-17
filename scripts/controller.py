@@ -16,7 +16,8 @@ from pathlib import Path
 
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
-JOB_SIZE = 64 * 5
+JOB_SIZE = 64 * 15
+
 
 # query for the images to process
 
@@ -335,33 +336,31 @@ if __name__ == '__main__':
             results.extend(r.fetchall())
 
         if len(results) == 0:
-            print(f'{datetime.datetime.utcnow()}: Nothing to do, trying again...')
-            time.sleep(1800.)
-            continue
+            print(f'{datetime.datetime.utcnow()}: No images to process, moving to forced photometry...')
+        else:
 
+            nchunks = len(results) // JOB_SIZE
+            nchunks += 1 if len(results) % JOB_SIZE != 0 else 0
 
-        nchunks = len(results) // JOB_SIZE
-        nchunks += 1 if len(results) % JOB_SIZE != 0 else 0
+            for group in np.array_split(results, nchunks):
 
-        for group in np.array_split(results, nchunks):
+                try:
+                    slurm_id = submit_job(group.tolist())
+                except RuntimeError as e:
+                    exc_info = sys.exc_info()
+                    traceback.print_exception(*exc_info)
+                    print(f'continuing...', flush=True)
+                    continue
 
-            try:
-                slurm_id = submit_job(group.tolist())
-            except RuntimeError as e:
-                exc_info = sys.exc_info()
-                traceback.print_exception(*exc_info)
-                print(f'continuing...', flush=True)
-                continue
+                job = db.Job(status='processing', slurm_id=slurm_id)
+                db.DBSession().add(job)
+                db.DBSession().flush()
 
-            job = db.Job(status='processing', slurm_id=slurm_id)
-            db.DBSession().add(job)
-            db.DBSession().flush()
+                for row in group:
+                    ji = db.JobImage(calibratableimage_id=row[1], job_id=job.id)
+                    db.DBSession().add(ji)
 
-            for row in group:
-                ji = db.JobImage(calibratableimage_id=row[1], job_id=job.id)
-                db.DBSession().add(ji)
-
-            db.DBSession().commit()
+                db.DBSession().commit()
 
         r = db.DBSession().execute(
             'update objectswithflux set source_id = s.id, '
@@ -373,7 +372,7 @@ if __name__ == '__main__':
             "z.created_at > now() - interval '24 hours' and "
             'objectswithflux.id = d.id returning d.id, s.id')
 
-
+        print(f'associated {len(list(r))} detections with existing sources')
 
         db.DBSession().execute('''
         update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
@@ -400,7 +399,7 @@ if __name__ == '__main__':
 
         df = pd.read_sql(q, db.DBSession().get_bind())
         df = df[pd.isna(df['source_id'])]
-        df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
+        df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first').iloc[:10]
 
         sources = {}
         for i, row in tqdm(df.iterrows()):
@@ -470,6 +469,7 @@ if __name__ == '__main__':
         for i, row in df.iterrows():
             detection_ids.append(row['id1'])
 
+        print(f'triggering alerts and forced photometry for {len(detection_ids)} detections')
         db.DBSession().execute(
             f'''update detections set triggers_alert = 't'
             where detections.id in {tuple(detection_ids)}'''
