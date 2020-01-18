@@ -408,6 +408,24 @@ if __name__ == '__main__':
         df = df[pd.isna(df['source_id'])]
         df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
 
+        with db.DBSession().no_autoflush:
+            default_group = db.DBSession().query(
+                db.models.Group
+            ).get(DEFAULT_GROUP)
+
+            default_instrument = db.DBSession().query(
+                db.models.Instrument
+            ).get(DEFAULT_INSTRUMENT)
+
+        # cache d1 and d2
+        _ = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
+            int(i) for i in df['id1']
+        ]))
+
+        _ = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
+            int(i) for i in df['id2']
+        ]))
+
         sources = {}
         for i, row in tqdm(df.iterrows()):
             print(i)
@@ -418,14 +436,6 @@ if __name__ == '__main__':
             else:
 
                 d2 = db.DBSession().query(db.Detection).get(row['id2'])
-                with db.DBSession().no_autoflush:
-                    default_group = db.DBSession().query(
-                        db.models.Group
-                    ).get(DEFAULT_GROUP)
-
-                    default_instrument = db.DBSession().query(
-                        db.models.Instrument
-                    ).get(DEFAULT_INSTRUMENT)
 
                 # need to create a new source
                 name = publish.get_next_name()
@@ -453,7 +463,7 @@ if __name__ == '__main__':
                 for t in d.thumbnails:
                     t.photometry = dummy_phot
                     t.source = d.source
-                    t.persist()
+                    #t.persist()
                     db.DBSession().add(t)
 
                 lthumbs = d.source.return_linked_thumbnails()
