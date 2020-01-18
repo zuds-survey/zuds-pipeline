@@ -207,7 +207,6 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
 
     os.chdir(scriptname.parent)
 
-
     # get the alerts
     detids = db.DBSession().query(db.Detection.id).outerjoin(
         db.Alert, db.Alert.detection_id == db.Detection.id
@@ -222,24 +221,80 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
     with open(detinname, 'w') as f:
         f.write('\n'.join([str(i) for i in detids]) + '\n')
 
+    jobscript = f"""#!/bin/bash
+    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+    #SBATCH -N 1
+    #SBATCH -C haswell
+    #SBATCH -q realtime
+    #SBATCH --exclusive
+    #SBATCH -J zuds
+    #SBATCH -t 00:60:00
+    #SBATCH -L SCRATCH
+    #SBATCH -A ***REMOVED***
+    #SBATCH --dependency=afterany:{jobid}
+    #SBATCH --array=0-17
+
+    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
+
+    """
+
+    with open(scriptname, 'w') as f:
+        f.write(jobscript)
+
+    cmd = f'sbatch {scriptname}'
+    process = subprocess.Popen(
+        cmd.split(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    stdout, stderr = process.communicate()
+    print(stdout)
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f'Non-zero exit code from sbatch, output was '
+            f'"{str(stdout)}", "{str(stdout)}".'
+        )
+
+    os.chdir(curdir)
+    jobid = stdout.strip().split()[-1].decode('ascii')
+
+    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
+                      f'nightly/{nightdate}/{ndt}.thumb.sh'.replace(' ', '_'))
+    scriptname.parent.mkdir(parents=True, exist_ok=True)
+
+    os.chdir(scriptname.parent)
+
+    # get the alerts
+    thumbids = db.DBSession().query(db.Thumbnails.id).join(
+        db.Photometry
+    ).filter(
+        db.Thumbnails.public_url == None
+    ).all()
+
+    thumbids = [t[0] for t in thumbids]
+
+    thumbinname = f'{scriptname}'.replace('.sh', '.in')
+    with open(thumbinname, 'w') as f:
+        f.write('\n'.join([str(t) for t in thumbids]) + '\n')
 
     jobscript = f"""#!/bin/bash
-#SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
-#SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-#SBATCH -N 1
-#SBATCH -C haswell
-#SBATCH -q realtime
-#SBATCH --exclusive
-#SBATCH -J zuds
-#SBATCH -t 00:60:00
-#SBATCH -L SCRATCH
-#SBATCH -A ***REMOVED***
-#SBATCH --dependency=afterany:{jobid}
-#SBATCH --array=0-17
+    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+    #SBATCH -N 1
+    #SBATCH -C haswell
+    #SBATCH -q realtime
+    #SBATCH --exclusive
+    #SBATCH -J zuds
+    #SBATCH -t 00:60:00
+    #SBATCH -L SCRATCH
+    #SBATCH -A ***REMOVED***
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
+    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dothumb.py {thumbinname}
 
-"""
+    """
 
     with open(scriptname, 'w') as f:
         f.write(jobscript)
