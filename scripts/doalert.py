@@ -12,8 +12,8 @@ fmap = {1: 'zg',
         3: 'zi'}
 
 db.init_db()
-#db.DBSession().autoflush = False
-#db.DBSession().get_bind().echo = True
+# db.DBSession().autoflush = False
+# db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the subtractions for ZUDS.'
@@ -28,13 +28,15 @@ for detid in my_work:
     d = db.DBSession().query(db.Detection).get(int(detid))
     alert = db.Alert.from_detection(d)
     stop = time.time()
-    print(f'made alert for {detid} ({d.source.id}) in {stop-start:.2f} sec', flush=True)
-    
+    print(f'made alert for {detid} ({d.source.id}) in {stop-start:.2f} sec',
+          flush=True)
+
 for alert in alerts:
     db.DBSession().add(alert)
     db.DBSession().commit()
     send.send_alert(alert)
     alert.sent = True
-    print(f'sent alert for {alert.detection.id} ({alert.detection.source.id})', flush=True)
+    print(f'sent alert for {alert.detection.id} ({alert.detection.source.id})',
+          flush=True)
     db.DBSession().add(alert)
     db.DBSession().commit()

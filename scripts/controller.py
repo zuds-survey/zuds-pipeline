@@ -268,10 +268,12 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
     os.chdir(scriptname.parent)
 
     # get the alerts
-    thumbids = db.DBSession().query(db.Thumbnails.id).join(
-        db.Photometry
+    thumbids = db.DBSession().query(db.models.Thumbnail.id).join(
+        db.models.Photometry
     ).filter(
-        db.Thumbnails.public_url == None
+        db.models.Thumbnail.public_url == None,
+        db.models.Thumbnail.type.in_(['sub', 'new', 'ref']),
+        db.models.Thumbnail.bytes != None
     ).all()
 
     thumbids = [t[0] for t in thumbids]
