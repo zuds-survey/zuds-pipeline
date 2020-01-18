@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 
 import sqlalchemy as sa
+import time
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy import Index
 from sqlalchemy import func
@@ -2681,6 +2682,8 @@ class CLU(models.Base):
     type_ned = sa.Column(sa.Text)
 
 from copy import deepcopy
+def print_time(start, stop, detection, step):
+    print(f'took {stop-start:.2f} sec to do {step} for {detection.id}', flush=True)
 
 class Alert(models.Base):
     alert = sa.Column(psql.JSONB)
@@ -2738,17 +2741,26 @@ class Alert(models.Base):
 
         # do a bunch of cross matches to initially populate the candidate
         # subschema
+        start = time.time()
         candidate = xmatch(detection.ra, detection.dec)
         alert['candidate'] = candidate
+        stop = time.time()
+        print_time(start, stop, detection, 'xmatch')
+        
 
         # indicate whether this alert is generated based on a stack detection
         #  or a single epoch detection
+        start = time.time()
         alert_type = 'single' if isinstance(
             detection.image, SingleEpochSubtraction
         ) else 'stack'
         candidate['alert_type'] = alert_type
+        stop = time.time()
+        print_time(start, stop, detection , 'alert_type')
+        
 
         # add some basic info about the image this was found on and metadata
+        start = time.time()
         candidate['fid'] = detection.image.fid
         candidate['pid'] = detection.image.id
 
@@ -2785,13 +2797,20 @@ class Alert(models.Base):
         # machine learning
         candidate['drb'] = detection.rb[0].rb_score
         candidate['drbversion'] = detection.rb[0].rb_version
-
+        stop = time.time()
+        print_time(start, stop, detection, 'basic')
+        
         # information about the reference images
-
+        
+        start = time.time()
         refimgs = sorted(
             detection.image.reference_image.input_images,
             key=lambda i: i.mjd
         )
+        stop = time.time()
+        print_time(start, stop, detection, 'get refimgs')
+
+        start = time.time()
 
         if alert_type == 'single':
             candidate['jd'] = detection.image.mjd + MJD_TO_JD
@@ -2815,6 +2834,11 @@ class Alert(models.Base):
         # floating point comparisons
         mjdcut += 0.5 / 3600. / 24.
 
+        stop = time.time()
+        print_time(start, stop, detection, 'histstats')
+
+        start = time.time()
+        
         # calculate the detection history
         prevdets = []
         if alert_type == 'single':
@@ -2847,6 +2871,11 @@ class Alert(models.Base):
         candidate['ndethist_single'] = len(single_dets)
         candidate['ndethist_stack'] = len(multi_dets)
 
+        stop = time.time()
+        print_time(start, stop, detection, 'prevdets')
+
+        start = time.time()
+
         if len(single_dets) > 0:
             starthist = single_dets[0].image.mjd + MJD_TO_JD
             endhist = single_dets[-1].image.mjd + MJD_TO_JD
@@ -2865,8 +2894,14 @@ class Alert(models.Base):
             candidate['jdstarthist_stack'] = None
             candidate['jdendhist_stack'] = None
 
+        stop = time.time()
+        print_time(start, stop, detection, 'jdstarthist')
+
+        start = time.time()
         # make the light curve
         lc = detection.source.light_curve()
+        stop = time.time()
+        print_time(start, stop, detection, 'light_curve')
 
         if len(lc) == 0:
             raise RuntimeError('Cannot issue an alert for an object with no '
@@ -2881,6 +2916,7 @@ class Alert(models.Base):
         candidate['jdendref'] = refimgs[-1].mjd + MJD_TO_JD
         candidate['nframesref'] = len(refimgs)
 
+        start = time.time()
         # now do the cutouts
         for stamp in detection.thumbnails:
             if stamp.type == 'ref':
@@ -2890,6 +2926,9 @@ class Alert(models.Base):
             elif stamp.type == 'sub':
                 obj.cutoutdifference = stamp
 
+        stop = time.time()
+        print_time(start, stop, detection, 'cutouts')
+        
         obj.alert = alert
 
         # this is to prevent detections from being re-inserted, triggering
