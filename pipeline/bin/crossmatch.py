@@ -1,4 +1,6 @@
+import sys
 import numpy as np
+import traceback
 import math
 from astropy.io import fits
 import psycopg2
@@ -12,9 +14,18 @@ def logon():
     """ Log onto Kowalski """
     username = get_secret('kowalski_username')
     password = get_secret('kowalski_password')
-    s = Kowalski(
-        protocol='https', host='kowalski.caltech.edu', port=443,
-        verbose=False, username=username, password=password)
+    for i in range(3):
+        try:
+            s = Kowalski(
+                protocol='https', host='kowalski.caltech.edu', port=443,
+                verbose=False, username=username, password=password)
+        except Exception as e:
+            traceback.print_exception(*sys.exc_info())
+            print('continuing..')
+            continue
+        else:
+            break
+        
     return s
 
 
