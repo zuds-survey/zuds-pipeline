@@ -70,7 +70,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
     il = scibkg - 10 * scibkgstd
     tl = refbkg - 10 * refbkgstd
 
-    satlev = 5e4  # not perfect, but close enough.
+    satlev = 5e4  # not perfect, but close enough.    
 
     syscall = f'hotpants -inim {scipath} -hki -n i -c t ' \
               f'-tmplim {ref.local_path} -outim {outname} ' \
@@ -79,7 +79,10 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path} ' \
               f'-nsx {nsx / 3} -nsy {nsy / 3}  -v 0 -oni {subrms} ' \
-              f'-fin {db.BIG_RMS} -nrx 3 -nry 3'
+              f'-fin {db.BIG_RMS} -nrx 3 -nry 3 '
+
+    if isinstance(sci, db.ScienceCoadd):
+        syscall += '-ko 3 -bgo 2'
 
 
     return syscall
