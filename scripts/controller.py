@@ -418,30 +418,40 @@ if __name__ == '__main__':
             ).get(DEFAULT_INSTRUMENT)
 
         # cache d1 and d2
-        _ = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
-            int(i) for i in df['id1']
-        ]))
+        from sqlalchemy.orm import joinedload
 
-        _ = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
+        d1 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
+            int(i) for i in df['id1']
+        ])).options(joinedload(db.Detection.thumbnails)).all()
+
+        detcache = {d.id: d for d in d1}
+
+        d2 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
             int(i) for i in df['id2']
-        ]))
+        ])).options(joinedload(db.Detection.thumbnails)).all()
+
+        for d in d2:
+            detcache[d.id] = d
 
         sources = {}
         for i, row in tqdm(df.iterrows()):
-            print(i)
-            d = db.DBSession().query(db.Detection).get(row['id1'])
+            d = detcache[row['id1']]
             if row['id2'] in sources:
                 sources[row['id1']] = sources[row['id2']]
                 d.source = sources[row['id2']]
             else:
 
-                d2 = db.DBSession().query(db.Detection).get(row['id2'])
+                d2 = detcache[row['id2']]
+                #d2 = db.DBSession().query(db.Detection).get(row['id2'])
 
+                bestdet = d if d.flux / d.fluxerr > d2.flux / d2.fluxerr else d2
                 # need to create a new source
                 name = publish.get_next_name()
                 source = db.models.Source(
                     id=name,
-                    groups=[default_group]
+                    groups=[default_group],
+                    ra=bestdet.ra,
+                    dec=bestdet.dec
                 )
 
                 # need this to make stamps.
@@ -466,8 +476,13 @@ if __name__ == '__main__':
                     #t.persist()
                     db.DBSession().add(t)
 
-                lthumbs = d.source.return_linked_thumbnails()
-                db.DBSession().add_all(lthumbs)
+                sdss_thumb = db.models.Thumbnail(photometry=dummy_phot,
+                                          public_url=source.sdss_url,
+                                          type='sdss')
+                dr8_thumb = db.models.Thumbnail(photometry=dummy_phot,
+                                         public_url=source.desi_dr8_url,
+                                         type='dr8')
+                db.DBSession().add_all([sdss_thumb, dr8_thumb])
 
         db.DBSession().flush()
         db.DBSession().execute('''
