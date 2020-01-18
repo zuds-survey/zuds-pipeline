@@ -141,20 +141,18 @@ def submit_forcephot_chain():
     image_names = db.DBSession().query(db.SingleEpochSubtraction.basename).join(
         db.ReferenceImage,
         db.SingleEpochSubtraction.reference_image_id == db.ReferenceImage.id
-    ).join(
-        db.ScienceImage,
-        db.SingleEpochSubtraction.target_image_id == db.ScienceImage.id
     ).filter(
         db.ReferenceImage.version == 'zuds4',
-    ).order_by(
-        db.ScienceImage.obsjd.desc()
-    ).limit(FORCEPHOT_IMAGE_LIMIT).all()
+    ).all()
+
+    image_names = sorted([i[0] for i in image_names], key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
+    image_names = image_names[:FORCEPHOT_IMAGE_LIMIT]
 
     imginname = f'{scriptname}'.replace('.sh', '.in')
     outnames = []
     with open(imginname, 'w') as f:
         for name in image_names:
-            name = name[0]
+            #name = name[0]
             g = name.split('_sciimg')[0].split('_')
             q = g[-1]
             c = g[-3]
@@ -211,17 +209,18 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
 
 
     # get the alerts
-    detids = db.DBSession().query(db.Detection).outerjoin(
+    detids = db.DBSession().query(db.Detection.id).outerjoin(
         db.Alert, db.Alert.detection_id == db.Detection.id
     ).filter(
         db.Detection.triggers_alert == True,
         db.Alert.id == None
     ).all()
 
+    detids = [d[0] for d in detids]
 
     detinname = f'{scriptname}'.replace('.sh', '.in')
     with open(detinname, 'w') as f:
-        f.write('\n'.join([str(i) for i in detection_ids]) + '\n')
+        f.write('\n'.join([str(i) for i in detids]) + '\n')
 
 
     jobscript = f"""#!/bin/bash
@@ -377,7 +376,7 @@ if __name__ == '__main__':
             'z.id = o.image_id join sources s on '
             'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.000277*2) '
             'where  o.source_id is NULL  and '
-            "z.created_at > now() - interval '24 hours' and "
+            "z.created_at > now() - interval '48 hours' and "
             'objectswithflux.id = d.id returning d.id, s.id')
 
         print(f'associated {len(list(r))} detections with existing sources')
@@ -402,12 +401,12 @@ if __name__ == '__main__':
         join objectswithflux oo on oo.id = dd.id join 
         realbogus rr on rr.detection_id = dd.id 
         where o.source_id is NULL  and 
-        z.created_at > now() - interval '24 hours'  
+        z.created_at > now() - interval '48 hours'  
         and d.id != dd.id and rr.rb_score > 0.2 and rb.rb_score > 0.2'''
 
         df = pd.read_sql(q, db.DBSession().get_bind())
         df = df[pd.isna(df['source_id'])]
-        df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first').iloc[:10]
+        df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
 
         sources = {}
         for i, row in tqdm(df.iterrows()):
