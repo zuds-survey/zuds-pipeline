@@ -6,6 +6,9 @@ from numpy.lib import recfunctions
 from pathlib import Path
 import shutil
 
+from sqlalchemy.orm import deferred
+
+
 import sqlalchemy as sa
 import time
 from sqlalchemy.dialects import postgresql as psql
@@ -1175,7 +1178,7 @@ def persist(self):
 
 
 models.Thumbnail.from_detection = classmethod(from_detection)
-models.Thumbnail.bytes = sa.Column(psql.BYTEA)
+models.Thumbnail.bytes = deferred(sa.Column(psql.BYTEA))
 models.Thumbnail.persist = persist
 
 
@@ -2746,7 +2749,7 @@ class Alert(models.Base):
         alert['candidate'] = candidate
         stop = time.time()
         print_time(start, stop, detection, 'xmatch')
-        
+
 
         # indicate whether this alert is generated based on a stack detection
         #  or a single epoch detection
@@ -2757,7 +2760,7 @@ class Alert(models.Base):
         candidate['alert_type'] = alert_type
         stop = time.time()
         print_time(start, stop, detection , 'alert_type')
-        
+
 
         # add some basic info about the image this was found on and metadata
         start = time.time()
@@ -2799,9 +2802,9 @@ class Alert(models.Base):
         candidate['drbversion'] = detection.rb[0].rb_version
         stop = time.time()
         print_time(start, stop, detection, 'basic')
-        
+
         # information about the reference images
-        
+
         start = time.time()
         refimgs = sorted(
             detection.image.reference_image.input_images,
@@ -2838,7 +2841,7 @@ class Alert(models.Base):
         print_time(start, stop, detection, 'histstats')
 
         start = time.time()
-        
+
         # calculate the detection history
         prevdets = []
         if alert_type == 'single':
@@ -2928,7 +2931,7 @@ class Alert(models.Base):
 
         stop = time.time()
         print_time(start, stop, detection, 'cutouts')
-        
+
         obj.alert = alert
 
         # this is to prevent detections from being re-inserted, triggering
