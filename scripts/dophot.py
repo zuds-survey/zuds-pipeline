@@ -33,13 +33,18 @@ for fn in imgs:
     sub._rmsimg = db.FITSImage()
     sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'), quiet=True)
 
+    sstart = time.time()
     sources = sub.unphotometered_sources
+    sstop = time.time()
+    db.print_time(sstart, sstop, sub, 'unphotometered sources')
+    
     if len(sources) == 0:
         stop = time.time()
         print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}')
         continue
 
     try:
+        pstart = time.time()
         phot = sub.force_photometry(sources,
                                     assume_background_subtracted=True,
                                     use_cutout=True,
@@ -47,6 +52,8 @@ for fn in imgs:
                                                  'mask': fn.replace('.fits', '.mask.fits'),
                                                  'rms': fn.replace('.fits', '.rms.fits')}
                                     )
+        pstop = time.time()
+        db.print_time(pstart, pstop, sub, 'actual force photometry')
     except Exception as e:
         print(e)
         continue
