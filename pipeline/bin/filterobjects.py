@@ -16,7 +16,7 @@ import db
 from scipy.optimize import minimize
 
 CUTSIZE = 11 # pixels
-RB_CUT = 0.0
+RB_CUT = 0.3
 BRAAI_MODEL = 'braai_d6_m9'
 old_norm = int(BRAAI_MODEL.split('d6_m')[1]) <= 7
 
