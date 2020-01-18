@@ -41,15 +41,22 @@ for fn in imgs:
 
     try:
         phot = sub.force_photometry(sources,
-                                    assume_background_subtracted=True
+                                    assume_background_subtracted=True,
+                                    use_cutout=True,
+                                    direct_load={'sci': fn,
+                                                 'mask': fn.replace('.fits', '.mask.fits'),
+                                                 'rms': fn.replace('.fits', '.rms.fits')}
                                     )
     except Exception as e:
         print(e)
         continue
 
     db.DBSession().add_all(phot)
-    db.DBSession().commit()
+    db.DBSession().commit()    
     stop = time.time()
     print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}', flush=True)
+    
+
+
 
 
