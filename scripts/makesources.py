@@ -1,23 +1,26 @@
 import db
-import sys
-import mpi
+import io
 import os
+import subprocess
+import shlex
 import time
-import archive
-import numpy as np
-from sqlalchemy.orm import aliased
-import publish
 from tqdm import tqdm
-import logging
-from astropy.coordinates import SkyCoord
+import sys
+import shutil
+import publish
+import numpy as np
+import traceback
+import pandas as pd
+import datetime
+from pathlib import Path
+
+
+ASSOC_RB_MIN = 0.4
 
 fmap = {1: 'zg',
         2: 'zr',
         3: 'zi'}
 
-db.init_db()
-#db.DBSession().autoflush = False
-#db.DBSession().get_bind().echo = True
 
 # association radius 2 arcsec
 ASSOC_RADIUS = 2 * 0.0002777
@@ -26,164 +29,146 @@ N_PREV_MULTI = 1
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
-if mpi.has_mpi():
-    from mpi4py import MPI
-    rank = MPI.COMM_WORLD.Get_rank()
-    FORMAT = f'%(asctime)-15s {rank} %(message)s'
-else:
-    FORMAT = f'%(asctime)-15s %(message)s'
-logging.basicConfig(format=FORMAT, level=logging.DEBUG)
+def submit_thumbs(thumbids):
 
+    ndt = datetime.datetime.utcnow()
+    nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
+    curdir = os.getcwd()
 
-__author__ = 'Danny Goldstein <danny@caltech.edu>'
-__whatami__ = 'Associate detections into sources for ZUDS.'
+    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
+                      f'nightly/{nightdate}/{ndt}.thumb.sh'.replace(' ', '_'))
+    scriptname.parent.mkdir(parents=True, exist_ok=True)
 
+    os.chdir(scriptname.parent)
 
-# associate detection_id with a source or create one and associate
-# the other detections with it
+    thumbinname = f'{scriptname}'.replace('.sh', '.in')
+    with open(thumbinname, 'w') as f:
+        f.write('\n'.join([str(t) for t in thumbids]) + '\n')
 
-def _update_source_coordinate(source_object, detections):
-    # assumes source_object and detections are locked
+    jobscript = f"""#!/bin/bash
+    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+    #SBATCH -N 1
+    #SBATCH -C haswell
+    #SBATCH -q realtime
+    #SBATCH --exclusive
+    #SBATCH -J zuds
+    #SBATCH -t 00:60:00
+    #SBATCH -L SCRATCH
+    #SBATCH -A ***REMOVED***
 
-    snrs = [d.flux / d.fluxerr for d in detections]
-    top = np.argmax(snrs)
-    det = detections[top]
-    source_object.ra = det.ra
-    source_object.dec = det.dec
+    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dothumb.py {thumbinname}
 
+    """
 
-def associate(detection):
+    with open(scriptname, 'w') as f:
+        f.write(jobscript)
 
+    cmd = f'sbatch {scriptname}'
+    process = subprocess.Popen(
+        cmd.split(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
 
-    # assume `detection` is only visible to this transactionnn
+    stdout, stderr = process.communicate()
+    print(stdout)
 
-    if detection.source is not None:
-        # it was assigned in a previous iteration of this loop
-        logging.debug(f'detection {detection.id} is alread associated with '
-                      f'{detection.source_id}, skipping...')
-        # do nothing
-        return
+    if process.returncode != 0:
+        raise RuntimeError(
+            f'Non-zero exit code from sbatch, output was '
+            f'"{str(stdout)}", "{str(stdout)}".'
+        )
 
-    if all([r.rb_score < db.RB_ASSOC_MIN for r in detection.rb]):
-        logging.debug(f'detection {detection.id} does not have a high enough '
-                      f'rb score to be associated')
-        return
+    os.chdir(curdir)
+    _ = stdout.strip().split()[-1].decode('ascii')
 
-    else:
+def associate():
 
-        # source creation logic. at least 2 single epoch detections,
-        # or at least 1 stack detection
+    r = db.DBSession().execute(
+        'update objectswithflux set source_id = s.id, '
+        'modified = now() from  detections d join objectswithflux o '
+        'on d.id = o.id  join ztffiles z on '
+        'z.id = o.image_id join sources s on '
+        'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.000277*2) '
+        'where  o.source_id is NULL  and '
+        "z.created_at > now() - interval '48 hours' and "
+        'objectswithflux.id = d.id returning d.id, s.id')
 
-        # get other detections nearby
+    print(f'associated {len(list(r))} detections with existing sources')
 
-        # if source is none then the associatable detections are already in
-        # the `unassigned` list, so cross match against that
+    db.DBSession().execute('''
+    update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
+    from (select g.id, g.ra, g.dec from 
+    (select s.id, d.ra, d.dec, rank() over 
+    (partition by o.source_id order by o.flux / o.fluxerr desc) 
+    from sources s join objectswithflux o on o.source_id = s.id 
+    join detections d on o.id = d.id ) g where rank = 1) 
+    dummy where sources.id = dummy.id;
+    ''')
 
-        logging.debug(f'querying for detections within 2 arcsec of {detection.id}')
+    q = '''select d.id as id1,  dd.id as id2, oo.source_id, 
+    q3c_dist(d.ra, d.dec, dd.ra, dd.dec) * 3600  sep 
+    from detections d join objectswithflux o on d.id=o.id 
+    join realbogus rb on rb.detection_id = d.id 
+    join ztffiles z on z.id = o.image_id  
+    join detections dd on 
+    q3c_join(d.ra, d.dec, dd.ra, dd.dec, 0.0002777 * 2) 
+    join objectswithflux oo on oo.id = dd.id join 
+    realbogus rr on rr.detection_id = dd.id 
+    where o.source_id is NULL  and 
+    z.created_at > now() - interval '48 hours'  
+    and d.id != dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
 
-        start = time.time()
+    df = pd.read_sql(q, db.DBSession().get_bind())
+    df = df[pd.isna(df['source_id'])]
+    df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
 
-        match_dets = db.DBSession().query(
-            db.Detection,
-            db.CalibratableImage.type
-        ).join(
-            db.CalibratableImage,
-        ).join(
-            db.RealBogus
-        ).outerjoin(
-            db.models.Source, db.Detection.source_id == db.models.Source.id
-        ).filter(
-            db.sa.func.q3c_radial_query(
-                db.Detection.ra,
-                db.Detection.dec,
-                detection.ra,
-                detection.dec,
-                ASSOC_RADIUS
-            ),
-            db.RealBogus.rb_score > db.RB_ASSOC_MIN
-        ).with_for_update(of=[db.Detection.__table__,
-                              db.ObjectWithFlux.__table__]).all()
-        stop = time.time()
+    with db.DBSession().no_autoflush:
+        default_group = db.DBSession().query(
+            db.models.Group
+        ).get(DEFAULT_GROUP)
 
-        # remove myself from the match detections
-        for dd in match_dets:
-            if dd[0] == detection:
-                remove = dd
-        match_dets.remove(remove)
+        default_instrument = db.DBSession().query(
+            db.models.Instrument
+        ).get(DEFAULT_INSTRUMENT)
 
-        logging.debug(f'found {len(match_dets)} with rb > 0.2 in 2arcsec of {detection.id}, '
-                      f'locking detections and objectswithflux rows: '
-                      f'{[d[0].id for d in match_dets]}, took {stop-start:.2f} sec '
-                      f'to execute the query')
+    # cache d1 and d2
+    from sqlalchemy.orm import joinedload
 
-        for _, s, __ in match_dets:
-            if s is not None:
-                logging.debug(f'one of the locked detections within 2arcsec of {detection.id} '
-                              f'is associated with a source: {m.source.id}. now locking'
-                              f'that source...')
-                start = time.time()
-                stop = time.time()
-                logging.debug(f'took {stop-start:.2f} sec to lock source {m.source.id}'
-                              f' for {detection.id}. now associating detection with '
-                              f'source and updating ra/dec...')
-                prev_dets = [m[0] for m in match_dets]
-                _update_source_coordinate(s, prev_dets + [detection])
-                detection.source = s
-                detection.triggers_phot = False
-                detection.triggers_alert = True
-                logging.debug(f'done associating detection {detection.id} with'
-                              f'source {m.source.id} and done updating source location')
-                return
+    d1 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
+        int(i) for i in df['id1']
+    ])).options(joinedload(db.Detection.thumbnails)).all()
 
-        logging.debug('did not find any sources associated with detections within'
-                      f' 2 arcsec of {detection.id}. '
-                      'determining if a new source should be created...')
+    detcache = {d.id: d for d in d1}
 
+    d2 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
+        int(i) for i in df['id2']
+    ])).options(joinedload(db.Detection.thumbnails)).all()
 
-        n_prev_single = sum([1 for _ in match_dets if _[2] == 'sesub'])
-        n_prev_multi = sum([1 for _ in match_dets if _[2] == 'mesub'])
+    for d in d2:
+        detcache[d.id] = d
 
-        incr_single = 1 if isinstance(detection.image,
-                                      db.SingleEpochSubtraction) else 0
-        incr_multi = 1 if isinstance(detection.image,
-                                     db.MultiEpochSubtraction) else 0
+    sources = {}
+    for i, row in tqdm(df.iterrows()):
+        d = detcache[row['id1']]
+        if row['id2'] in sources:
+            sources[row['id1']] = sources[row['id2']]
+            d.source = sources[row['id2']]
+        else:
 
-        single_criteria = n_prev_single + incr_single > N_PREV_SINGLE
-        multi_criteria = n_prev_multi + incr_multi > N_PREV_MULTI
+            d2 = detcache[row['id2']]
+            #d2 = db.DBSession().query(db.Detection).get(row['id2'])
 
-        create_new_source = single_criteria or multi_criteria
-
-        if create_new_source:
-
-            logging.debug(f'Source creation criteria met for detection {detection.id}. '
-                          f'Detection {detection.id} has {n_prev_single} previous'
-                          f'single detections and {n_prev_multi} previous multi'
-                          f'epoch detections. '
-                          f'Making a new source now...')
-
-            with db.DBSession().no_autoflush:
-                default_group = db.DBSession().query(
-                    db.models.Group
-                ).get(DEFAULT_GROUP)
-
-                default_instrument = db.DBSession().query(
-                    db.models.Instrument
-                ).get(DEFAULT_INSTRUMENT)
-
+            bestdet = d if d.flux / d.fluxerr > d2.flux / d2.fluxerr else d2
             # need to create a new source
             name = publish.get_next_name()
             source = db.models.Source(
                 id=name,
-                ra=detection.ra,
-                dec=detection.dec,
-                groups=[default_group]
+                groups=[default_group],
+                ra=bestdet.ra,
+                dec=bestdet.dec
             )
-
-            logging.debug(f'Locally created an unpersisted source called {name}. '
-                          f'for detection {detection.id}')
-
-            udets = [m[0] for m in match_dets] + [detection]
-            _update_source_coordinate(source, udets)
 
             # need this to make stamps.
             dummy_phot = db.models.Photometry(
@@ -191,98 +176,64 @@ def associate(detection):
                 instrument=default_instrument
             )
 
-            for det, _ in match_dets:
-                logging.debug(f'As part of association of detection {detection.id},'
-                              f'associating detection {det.id}.source = {source.id} ')
-                det.source = source
-                db.DBSession().add(det)
-
-            logging.debug(f'As part of association of detection {detection.id},'
-                          f'associating detection {detection.id}.source = {source.id} ')
-            detection.source = source
-
-            db.DBSession().add(dummy_phot)
+            d.source = source
+            d2.source = source
+            db.DBSession().add(d)
+            db.DBSession().add(d2)
             db.DBSession().add(source)
+            db.DBSession().add(dummy_phot)
 
-            logging.debug(f'Finished associating detection {detection.id}')
-
-            detection.triggers_alert = True
-            detection.triggers_phot = True
-
-        else:
-            logging.debug(f'No new source to be created for deteection {detection.id}')
-            detection.triggers_phot = False
-            detection.triggers_alert = False
-
-
-def associate_field_chip_quad(field, chip, quad):
-
-    # to avoid race conditions, get an exclusive lock to  all the unassigned
-    # detections from this field/chip
-
-    unassigned = db.DBSession().query(
-        db.Detection,
-    ).filter(
-        db.Detection.source_id == None,
-        db.CalibratableImage.field == int(field),
-        db.CalibratableImage.ccdid == int(chip),
-        db.CalibratableImage.qid == int(quad)
-    ).join(
-        db.CalibratableImage
-    ).order_by(
-        db.CalibratableImage.basename.asc()
-    )
-
-    for d in tqdm(unassigned):
-        associate(d)
-        db.DBSession().add(d)
-        db.DBSession().commit()
-        if d.triggers_phot:
-            # it's a new source -- update thumbnails post commit.
-            # doing this post commit (with the triggers_phot flag)
-            # avoids database deadlocks
+            sources[row['id1']] = source
+            sources[row['id2']] = source
 
             for t in d.thumbnails:
-                t.photometry = d.source.photometry[0]
+                t.photometry = dummy_phot
                 t.source = d.source
-                t.persist()
+                #t.persist()
                 db.DBSession().add(t)
 
-            # update the source ra and dec
-            # best = source.best_detection
+            sdss_thumb = db.models.Thumbnail(photometry=dummy_phot,
+                                      public_url=source.sdss_url,
+                                      type='sdss')
+            dr8_thumb = db.models.Thumbnail(photometry=dummy_phot,
+                                     public_url=source.desi_dr8_url,
+                                     type='dr8')
+            db.DBSession().add_all([sdss_thumb, dr8_thumb])
 
-            # just doing this in case the new LC point
-            # isn't yet flushed to the DB
+    db.DBSession().flush()
+    db.DBSession().execute('''
+    update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
+    from (select g.id, g.ra, g.dec from 
+    (select s.id, d.ra, d.dec, rank() over 
+    (partition by o.source_id order by o.flux / o.fluxerr desc) 
+    from sources s join objectswithflux o on o.source_id = s.id 
+    join detections d on o.id = d.id ) g where rank = 1) 
+    dummy where sources.id = dummy.id;
+    ''')
 
-            # if detection.snr > best.snr:
-            #    best = detection
+    detection_ids = []
+    for row in r:
+        detection_ids.append(row[0])
+    for i, row in df.iterrows():
+        detection_ids.append(row['id1'])
 
-            # source.ra = best.ra
-            # source.dec = best.dec
+    thumbids = []
+    for d in detcache:
+        for t in d.thumbnails:
+            thumbids.append(t.id)
 
-            db.DBSession().flush()
+    if os.getenv('NERSC_HOST') == 'cori':
+        submit_thumbs(thumbids)
 
-            if len(d.source.thumbnails) == len(d.source.photometry[0].thumbnails):
-                lthumbs = d.source.return_linked_thumbnails()
-            db.DBSession().add_all(lthumbs)
-            db.DBSession().add(d)
-            db.DBSession().commit()
+    print(f'triggering alerts and forced photometry for {len(detection_ids)} detections')
+    db.DBSession().execute(
+        f'''update detections set triggers_alert = 't'
+        where detections.id in {tuple(detection_ids)}'''
+    )
+
+    # need to commit so that sources will be there for forced photometry
+    # jobs running via slurm
+    db.DBSession().commit()
 
 if __name__ == '__main__':
-    field_file = sys.argv[1]
-
-    # split the list up
-    def reader(fname):
-        fields = np.genfromtxt(fname, dtype=None, encoding='ascii')
-        result = []
-        for f in fields:
-            for i in range(1, 17):
-                for j in range(1, 5):
-                    result.append((f, i, j))
-
-        return result
-
-
-    work = mpi.get_my_share_of_work(field_file, reader=reader)
-    for field, chip, quad in work:
-        associate_field_chip_quad(field, chip, quad)
+    associate()
