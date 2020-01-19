@@ -68,6 +68,7 @@ TABLE_COLUMNS = ['id', 'xcentroid', 'ycentroid', 'sky_centroid',
                  'orientation', 'eccentricity', 'semimajor_axis_sigma',
                  'semiminor_axis_sigma']
 
+
 SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
                           'Y_WORLD', 'FLUX_APER', 'FLUXERR_APER',
                           'THETA_WORLD', 'ELLIPTICITY', 'A_IMAGE', 'B_IMAGE']
@@ -2806,10 +2807,16 @@ class Alert(models.Base):
         # information about the reference images
 
         start = time.time()
-        refimgs = sorted(
-            detection.image.reference_image.input_images,
-            key=lambda i: i.mjd
-        )
+
+        refmin, refmax, refcount = DBSession().query(
+            sa.func.min(ScienceImage.obsjd) - MJD_TO_JD,
+            sa.func.max(ScienceImage.obsjd) - MJD_TO_JD,
+            sa.func.count(ScienceImage.id)
+        ).select_from(ScienceImage.__table__).join(
+            CoaddImage, ScienceImage.id == CoaddImage.calibratableimage_id
+        ).filter(
+            CoaddImage.coadd_id == detection.image.reference_image_id
+        ).first()
         stop = time.time()
         print_time(start, stop, detection, 'get refimgs')
 
@@ -2915,9 +2922,9 @@ class Alert(models.Base):
         lc = lc[lc['mjd'] <= mjdcut]
         alert['light_curve'] = lc.to_pandas().to_dict(orient='records')
 
-        candidate['jdstartref'] = refimgs[0].mjd + MJD_TO_JD
-        candidate['jdendref'] = refimgs[-1].mjd + MJD_TO_JD
-        candidate['nframesref'] = len(refimgs)
+        candidate['jdstartref'] = refmin
+        candidate['jdendref'] = refmax
+        candidate['nframesref'] = refcount
 
         start = time.time()
         # now do the cutouts
