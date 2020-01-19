@@ -75,13 +75,13 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
 MJD_TO_JD = 2400000.5
 CMAP_RANDOM_SEED = 8675309
 
-#NERSC_PREFIX = '/global/project/projectdirs/ptf/www/ztf/data'
-#URL_PREFIX = 'https://portal.nersc.gov/project/ptf/ztf'
-#STAMP_PREFIX = '/global/project/projectdirs/ptf/www/ztf'
+NERSC_PREFIX = '/global/cfs/projectdirs/ptf/www/ztf/data'
+URL_PREFIX = 'https://portal.nersc.gov/cfs/ptf/ztf'
+STAMP_PREFIX = '/global/cfs/projectdirs/ptf/www/ztf'
 
-NERSC_PREFIX = '/global/projecta/projectdirs/tmp_astro250/data'
-URL_PREFIX = 'https://portal.nersc.gov/project/astro250/ro_workaround'
-STAMP_PREFIX = '/global/projecta/projectdirs/tmp_astro250'
+#NERSC_PREFIX = '/global/projecta/projectdirs/tmp_astro250/data'
+#URL_PREFIX = 'https://portal.nersc.gov/project/astro250/ro_workaround'
+#STAMP_PREFIX = '/global/projecta/projectdirs/tmp_astro250'
 
 GROUP_PROPERTIES = ['field', 'ccdid', 'qid', 'fid']
 MATCH_RADIUS_DEG = 0.0002777 * 2.0
@@ -1164,9 +1164,9 @@ def persist(self):
     self.source = self.detection.source
     vmin, vmax = ZScaleInterval().get_limits(data)
     img = self.image
-    base = f'stamp.{self.id}.jpg'
     relpath = f'stamps/{img.field:06d}/c{img.ccdid:02d}/' \
               f'q{img.qid}/{fid_map[img.fid]}/{base}'
+    base = f'stamp.{self.id}.jpg'
     name = Path(URL_PREFIX) / relpath
     self.public_url = f'{name}'
     self.file_uri = f'{Path(STAMP_PREFIX) / relpath}'
