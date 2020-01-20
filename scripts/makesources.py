@@ -254,4 +254,5 @@ def associate(debug=False):
     db.DBSession().commit()
 
 if __name__ == '__main__':
+    db.DBSession().get_bind().echo=True
     associate()
