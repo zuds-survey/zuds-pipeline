@@ -1164,9 +1164,9 @@ def persist(self):
     self.source = self.detection.source
     vmin, vmax = ZScaleInterval().get_limits(data)
     img = self.image
+    base = f'stamp.{self.id}.jpg'
     relpath = f'stamps/{img.field:06d}/c{img.ccdid:02d}/' \
               f'q{img.qid}/{fid_map[img.fid]}/{base}'
-    base = f'stamp.{self.id}.jpg'
     name = Path(URL_PREFIX) / relpath
     self.public_url = f'{name}'
     self.file_uri = f'{Path(STAMP_PREFIX) / relpath}'
