@@ -46,20 +46,20 @@ def submit_thumbs(thumbids):
         f.write('\n'.join([str(t) for t in thumbids]) + '\n')
 
     jobscript = f"""#!/bin/bash
-    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
-    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-    #SBATCH -N 1
-    #SBATCH -C haswell
-    #SBATCH -q realtime
-    #SBATCH --exclusive
-    #SBATCH -J zuds
-    #SBATCH -t 00:60:00
-    #SBATCH -L SCRATCH
-    #SBATCH -A ***REMOVED***
+#SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+#SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+#SBATCH -N 1
+#SBATCH -C haswell
+#SBATCH -q realtime
+#SBATCH --exclusive
+#SBATCH -J zuds
+#SBATCH -t 00:60:00
+#SBATCH -L SCRATCH
+#SBATCH -A ***REMOVED***
 
-    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dothumb.py {thumbinname}
+HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dothumb.py {thumbinname}
 
-    """
+"""
 
     with open(scriptname, 'w') as f:
         f.write(jobscript)
@@ -83,7 +83,7 @@ def submit_thumbs(thumbids):
     os.chdir(curdir)
     _ = stdout.strip().split()[-1].decode('ascii')
 
-def associate():
+def associate(debug=False):
 
     r = db.DBSession().execute(
         'update objectswithflux set source_id = s.id, '
@@ -94,8 +94,9 @@ def associate():
         'where  o.source_id is NULL  and '
         "z.created_at > now() - interval '48 hours' and "
         'objectswithflux.id = d.id returning d.id, s.id')
+    r = list(r)
 
-    print(f'associated {len(list(r))} detections with existing sources')
+    print(f'associated {len(r)} detections with existing sources')
 
     db.DBSession().execute('''
     update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
@@ -120,9 +121,12 @@ def associate():
     z.created_at > now() - interval '48 hours'  
     and d.id != dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
 
-    df = pd.read_sql(q, db.DBSession().get_bind())
+    df = pd.read_sql(q, db.DBSession().get_bind())    
     df = df[pd.isna(df['source_id'])]
     df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
+
+    if debug:
+        df = df.iloc[:10]
 
     with db.DBSession().no_autoflush:
         default_group = db.DBSession().query(
@@ -218,7 +222,7 @@ def associate():
         detection_ids.append(row['id1'])
 
     thumbids = []
-    for d in detcache:
+    for d in detcache.values():
         for t in d.thumbnails:
             thumbids.append(t.id)
 
