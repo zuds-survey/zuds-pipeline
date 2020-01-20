@@ -226,20 +226,20 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
         f.write('\n'.join([str(i) for i in detids]) + '\n')
 
     jobscript = f"""#!/bin/bash
-    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
-    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-    #SBATCH -N 1
-    #SBATCH -C haswell
-    #SBATCH -q realtime
-    #SBATCH --exclusive
-    #SBATCH -J zuds
-    #SBATCH -t 00:60:00
-    #SBATCH -L SCRATCH
-    #SBATCH -A ***REMOVED***
-    #SBATCH --dependency=afterany:{jobid}
-    #SBATCH --array=0-17
+#SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+#SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+#SBATCH -N 1
+#SBATCH -C haswell
+#SBATCH -q realtime
+#SBATCH --exclusive
+#SBATCH -J zuds
+#SBATCH -t 00:60:00
+#SBATCH -L SCRATCH
+#SBATCH -A ***REMOVED***
+#SBATCH --dependency=afterany:{jobid}
+#SBATCH --array=0-17
 
-    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
+HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
 
     """
 
