@@ -236,7 +236,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
 #SBATCH -t 00:60:00
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
-#SBATCH --dependency=afterok:{jobid}
+#SBATCH --dependency=afterany:{jobid}
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
 
