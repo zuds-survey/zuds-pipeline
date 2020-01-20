@@ -121,7 +121,7 @@ def associate(debug=False):
     z.created_at > now() - interval '48 hours'  
     and d.id != dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
 
-    df = pd.read_sql(q, db.DBSession().get_bind())    
+    df = pd.read_sql(q, db.DBSession().get_bind())
     df = df[pd.isna(df['source_id'])]
     df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
 
@@ -205,6 +205,20 @@ def associate(debug=False):
             db.DBSession().add_all([sdss_thumb, dr8_thumb])
 
     db.DBSession().flush()
+
+    # now that new sources have been flushed to the database,
+    # associate any nearby detections with them
+
+    db.DBSession().execute(
+        'update objectswithflux set source_id = s.id, '
+        'modified = now() from  detections d join objectswithflux o '
+        'on d.id = o.id  join ztffiles z on '
+        'z.id = o.image_id join sources s on '
+        'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.000277*2) '
+        'where  o.source_id is NULL  and '
+        "z.created_at > now() - interval '48 hours' and "
+        'objectswithflux.id = d.id returning d.id, s.id')
+
     db.DBSession().execute('''
     update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
     from (select g.id, g.ra, g.dec from 
