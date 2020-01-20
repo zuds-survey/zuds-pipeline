@@ -2,7 +2,7 @@
     "namespace": "ztf.alert",
     "name": "candidate",
     "doc": "avro alert schema",
-    "version": "0.2",
+    "version": "0.3",
     "type": "record",
     "fields": [
         {"name": "lszphotu682", "type": ["float", "null"], "default": null, "doc": "upper bound on 68 percentile uncertainty for redshift of the second closest source in the LegacySurvey DR8 catalog"},
