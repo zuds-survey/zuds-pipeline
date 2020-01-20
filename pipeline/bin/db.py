@@ -1649,6 +1649,7 @@ class CalibratedImage(CalibratableImage):
         return query.all()
 
 
+
 class ScienceImage(CalibratedImage):
     """IPAC record of a science image from their pipeline. Contains some
     metadata that IPAC makes available through its irsa metadata query
@@ -2862,7 +2863,6 @@ class Alert(models.Base):
                 dmjd = d.image.mjd
             if dmjd < mymjd and d is not detection:
                 prevdets.append(d)
-                break
 
         sfunc = lambda d: d.image.mjd if isinstance(
             d.image, SingleEpochSubtraction
