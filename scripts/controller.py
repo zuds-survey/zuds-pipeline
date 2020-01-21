@@ -131,6 +131,20 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 def submit_forcephot_chain():
 
+    # get the what needs alerts
+    detids = db.DBSession().query(db.Detection.id).outerjoin(
+        db.Alert, db.Alert.detection_id == db.Detection.id
+    ).filter(
+        db.Detection.triggers_alert == True,
+        db.Alert.id == None
+    ).all()
+
+    detids = [d[0] for d in detids]
+
+    if len(detids) == 0:
+        raise RuntimeError('No detections to run make alerts for, abandoning '
+                           'forced photometry and alerting ')
+
     ndt = datetime.datetime.utcnow()
     nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
 
@@ -211,16 +225,6 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
 
     os.chdir(scriptname.parent)
 
-    # get the alerts
-    detids = db.DBSession().query(db.Detection.id).outerjoin(
-        db.Alert, db.Alert.detection_id == db.Detection.id
-    ).filter(
-        db.Detection.triggers_alert == True,
-        db.Alert.id == None
-    ).all()
-
-    detids = [d[0] for d in detids]
-
     detinname = f'{scriptname}'.replace('.sh', '.in')
     with open(detinname, 'w') as f:
         f.write('\n'.join([str(i) for i in detids]) + '\n')
@@ -269,6 +273,8 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 if __name__ == '__main__':
     while True:
+
+        db.DBSession().rollback()
 
         # look for failed jobs and mark them
         currently_processing = db.DBSession().query(
@@ -376,7 +382,6 @@ if __name__ == '__main__':
         ).all()
 
         if len(current_forcephot_jobs) == 0:
-
             try:
                 slurm_id = submit_forcephot_chain()
             except RuntimeError as e:
