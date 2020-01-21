@@ -79,6 +79,13 @@ def prepare_sextractor(image, directory, checkimage_type=None,
         weightname = directory / imgbase.replace('.fits', '.false.weight.fits')
         falseweight = np.ones_like(image.mask_image.data)
         falseweight[(image.mask_image.data & db.BAD_SUM) > 0] = 0
+
+        if image.basename.endswith('sciimg.fits'):
+            falseweight[:5] = 0
+            falseweight[-5:] = 0
+            falseweight[:, :5] = 0
+            falseweight[:, -5:] = 0
+
         fits.writeto(weightname, data=falseweight.astype('<f4'))
         syscall += f'-WEIGHT_IMAGE {weightname} -WEIGHT_TYPE MAP_WEIGHT'
 
