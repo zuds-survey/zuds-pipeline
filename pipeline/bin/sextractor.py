@@ -4,6 +4,8 @@ from pathlib import Path
 import shutil
 import uuid
 import db
+import os
+from astropy.io import fits
 
 from utils import initialize_directory
 
@@ -69,7 +71,18 @@ def prepare_sextractor(image, directory, checkimage_type=None,
               f'-FILTER_NAME {CONV_FILE} ' \
               f'-FLAG_IMAGE {image.mask_image.local_path} '
 
-    if use_weightmap:
+    if not use_weightmap:
+        # make a false weightmap so that masked pixels are excluded from
+        # background statistics
+
+        imgbase = os.path.basename(impath)
+        weightname = directory / imgbase.replace('.fits', '.false.weight.fits')
+        falseweight = np.ones_like(image.mask_image.data)
+        falseweight[(image.mask_image.data & db.BAD_SUM) > 0] = 0
+        fits.writeto(weightname, data=falseweight.astype('<f4'))
+        syscall += f'-WEIGHT_IMAGE {weightname} -WEIGHT_TYPE MAP_WEIGHT'
+
+    else:
         syscall += f'-WEIGHT_IMAGE {image.weight_image.local_path} ' \
                    f'-WEIGHT_TYPE MAP_WEIGHT'
 
