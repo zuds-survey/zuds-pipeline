@@ -23,43 +23,13 @@ def estimate_seeing(image):
     # connect to kowalski to query gaia
 
     catalog = image.catalog
-    cursor = private_logon()
 
     if catalog is None or not catalog.ismapped:
         catalog = db.PipelineFITSCatalog.from_image(image)
 
-    q = f'''SELECT "RA", "DEC" FROM dr8_north WHERE
-    q3c_radial_query("RA", "DEC", {image.ra}, {image.dec}, 1.2) AND 
-    "PARALLAX" > 0 AND "GAIA_PHOT_G_MEAN_MAG" > 16. 
-    '''
-
-    cursor.execute(q)
-    result = cursor.fetchall()
-
-    if len(result) == 0:
-        q = f'''SELECT "RA", "DEC" FROM dr8_south WHERE
-        q3c_radial_query("RA", "DEC", {image.ra}, {image.dec}, 1.2) AND 
-        "PARALLAX" > 0 AND "GAIA_PHOT_G_MEAN_MAG" > 16. 
-        '''
-
-        cursor.execute(q)
-        result = cursor.fetchall()
-
-    matchra = []
-    matchdec = []
-    for d in result:
-        matchra.append(d[0])
-        matchdec.append(d[1])
-
-    matchcoord = SkyCoord(matchra, matchdec, unit='deg')
-    catcoord = SkyCoord(catalog.data['X_WORLD'], catalog.data['Y_WORLD'], unit='deg')
-
-    idx, d2d, _ = catcoord.match_to_catalog_sky(matchcoord)
-    ind = d2d < 1 * u.arcsec
-    catok = catalog.data[ind]
-
+    data = catalog.data
     seeings = []
-    for row in catok:
+    for row in data:
         fwhm = row['FWHM_IMAGE']
         seeings.append(fwhm)
 
