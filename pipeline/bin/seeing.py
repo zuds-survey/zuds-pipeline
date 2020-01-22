@@ -36,6 +36,15 @@ def estimate_seeing(image):
     cursor.execute(q)
     result = cursor.fetchall()
 
+    if len(result) == 0:
+        q = f'''SELECT "RA", "DEC" FROM dr8_south WHERE
+        q3c_radial_query("RA", "DEC", {image.ra}, {image.dec}, 1.2) AND 
+        "PARALLAX" > 0 AND "GAIA_PHOT_G_MEAN_MAG" > 16. 
+        '''
+
+        cursor.execute(q)
+        result = cursor.fetchall()
+
     matchra = []
     matchdec = []
     for d in result:
