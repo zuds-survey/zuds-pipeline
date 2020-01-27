@@ -75,9 +75,9 @@ SEXTRACTOR_EQUIVALENTS = ['NUMBER', 'XWIN_IMAGE', 'YWIN_IMAGE', 'X_WORLD',
 MJD_TO_JD = 2400000.5
 CMAP_RANDOM_SEED = 8675309
 
-NERSC_PREFIX = '/global/cfs/projectdirs/ptf/www/ztf/data'
-URL_PREFIX = 'https://portal.nersc.gov/cfs/ptf/ztf'
-STAMP_PREFIX = '/global/cfs/projectdirs/ptf/www/ztf'
+NERSC_PREFIX = '/global/cfs/cdirs/m937/www/data'
+URL_PREFIX = 'https://portal.nersc.gov/cfs/m937'
+STAMP_PREFIX = '/global/cfs/cdirs/m937/www'
 
 #NERSC_PREFIX = '/global/projecta/projectdirs/tmp_astro250/data'
 #URL_PREFIX = 'https://portal.nersc.gov/project/astro250/ro_workaround'
