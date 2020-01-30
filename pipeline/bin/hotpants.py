@@ -78,7 +78,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path} ' \
-              f'-nsx {nsx / 3} -nsy {nsy / 3}  -v 0 -oni {subrms} ' \
+              f'-nsx {nsx} -nsy {nsy}  -v 0 -oni {subrms} ' \
               f'-fin {db.BIG_RMS}'
 
     return syscall
