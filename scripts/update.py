@@ -10,6 +10,7 @@ from astropy.time import Time
 QUERY_WINDOWSIZE = 30 # days
 WHERECLAUSE = ''
 
+
 # this script should be run as a cron job to update metadata table of ZTF images
 
 if __name__ == '__main__':
@@ -24,9 +25,15 @@ if __name__ == '__main__':
         db.ScienceImage.obsjd.desc()
     ).first()
 
-    max_jd = sm.obsjd
-    max_ffd = sm.filefracday
-    max_nid = sm.nid
+    if sm is None:
+        max_jd = 2458165.6030208
+        max_nid = 411
+        max_ffd = 20180216102002
+
+    else:
+        max_jd = sm.obsjd
+        max_ffd = sm.filefracday
+        max_nid = sm.nid
 
     current_jd = Time.now().jd
 
