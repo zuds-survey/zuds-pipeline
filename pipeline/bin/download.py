@@ -4,6 +4,7 @@ import time
 import stat
 import requests
 import logging
+import datetime
 import sys
 from uuid import uuid4
 import subprocess
@@ -113,7 +114,7 @@ def download_file(target, destination, cookie):
     if r.content.startswith(b'<!DOCTYPE'):
         raise requests.RequestException(f'Could not retrieve "{target}": {r.content}')
     else:
-        print(f'Retrieved "{target}" in {dstop - dstart:.2f} seconds')
+        print(f'{datetime.datetime.utcnow()}: Retrieved "{target}" in {dstop - dstart:.2f} seconds')
 
     while True:
         try:
