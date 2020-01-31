@@ -99,6 +99,7 @@ def download_file(target, destination, cookie):
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
 
+    dstart = time.time()
     while True:
         try:
             r = requests.get(target, cookies=cookie)
@@ -107,11 +108,12 @@ def download_file(target, destination, cookie):
             time.sleep(1.)
         else:
             break
+    dstop = time.time()
 
     if r.content.startswith(b'<!DOCTYPE'):
         raise requests.RequestException(f'Could not retrieve "{target}": {r.content}')
     else:
-        print(f'Retrieved "{target}"')
+        print(f'Retrieved "{target}" in {dstop - dstart:.2f} seconds')
 
     while True:
         try:
