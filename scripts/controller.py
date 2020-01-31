@@ -98,6 +98,7 @@ def submit_job(images):
 #SBATCH -t 00:60:00
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
+#SBATCH -o {scriptname.replace('.sh', '.out')}
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds4
 
@@ -192,6 +193,7 @@ def submit_forcephot_chain():
 #SBATCH -t 00:60:00
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
+#SBATCH -o {scriptname.replace('.sh', '.out')}
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds4
 
@@ -241,6 +243,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
 #SBATCH -L SCRATCH
 #SBATCH -A ***REMOVED***
 #SBATCH --dependency=afterany:{jobid}
+#SBATCH -o {scriptname.replace('.sh', '.out')}
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
 
