@@ -222,7 +222,7 @@ if __name__ == '__main__':
                 # ensure this has 12 components so that it can be used with
                 # retrieve
                 destination_base = Path(
-                    f'/global/cscratch1/sd/dgold/zuds/data/xfer/{hostname}/'
+                    f'/global/cfs/cdirs/m937/zuds/data/xfer/{hostname}/'
                     f'{image.field:06d}/'
                     f'c{image.ccdid:02d}/'
                     f'q{image.qid}/'
