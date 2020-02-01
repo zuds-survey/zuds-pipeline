@@ -215,7 +215,7 @@ def associate(debug=False):
         'modified = now() from  detections d join objectswithflux o '
         'on d.id = o.id  join ztffiles z on '
         'z.id = o.image_id join sources s on '
-        'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.000277*2) '
+        'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.0002777*2) '
         'where  o.source_id is NULL  and '
         "z.created_at > now() - interval '48 hours' and "
         'objectswithflux.id = d.id returning d.id, s.id')
