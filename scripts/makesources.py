@@ -85,6 +85,10 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 def associate(debug=False):
 
+    db.DBSession().execute('LOCK TABLE objectswithflux; '
+                           'LOCK TABLE detections;'
+                           'LOCK TABLE sources;')
+
     r = db.DBSession().execute(
         'update objectswithflux set source_id = s.id, '
         'modified = now() from  detections d join objectswithflux o '
