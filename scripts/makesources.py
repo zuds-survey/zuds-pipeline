@@ -99,6 +99,8 @@ def associate(debug=False):
     )
     r = list(r)
 
+    db.DBSession().flush()
+
     print(f'associated {len(r)} detections with existing sources')
 
     db.DBSession().execute('''
