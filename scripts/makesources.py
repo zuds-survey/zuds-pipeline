@@ -99,8 +99,6 @@ def associate(debug=False):
     )
     r = list(r)
 
-    db.DBSession().flush()
-
     print(f'associated {len(r)} detections with existing sources')
 
     db.DBSession().execute('''
@@ -126,7 +124,10 @@ def associate(debug=False):
     z.created_at > now() - interval '48 hours'  
     and d.id != dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
 
-    df = pd.read_sql(q, db.DBSession().get_bind())
+    df = pd.DataFrame(
+        list(db.DBSession().execute(q)),
+        columns=['id1', 'id2', 'source_id', 'sep']
+    )
     df = df[pd.isna(df['source_id'])]
     df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
 
