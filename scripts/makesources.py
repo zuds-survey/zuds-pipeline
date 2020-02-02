@@ -122,7 +122,7 @@ def associate(debug=False):
     realbogus rr on rr.detection_id = dd.id 
     where o.source_id is NULL  and 
     z.created_at > now() - interval '48 hours'  
-    and d.id != dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
+    and d.id > dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
 
     df = pd.DataFrame(
         list(db.DBSession().execute(q)),
