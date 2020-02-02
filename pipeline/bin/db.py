@@ -1029,6 +1029,20 @@ class ZTFFile(models.Base, File):
 
         return obj
 
+    @hybrid_property
+    def relname(self):
+        return sa.func.FORMAT('%06d', self.field) + '/' + \
+               sa.func.FORMAT('c%02d', self.ccdid) + '/' + \
+               sa.func.FORMAT('q%d', self.qid) + '/' + \
+               sa.case([
+                   (self.fid == 1, 'zg'),
+                   (self.fid == 2, 'zr'),
+                   (self.fid == 3, 'zi')
+               ])
+
+
+
+
 
 class PipelineRegionFile(ZTFFile):
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
