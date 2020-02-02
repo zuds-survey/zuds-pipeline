@@ -1032,7 +1032,7 @@ class ZTFFile(models.Base, File):
     @property
     def relname(self):
         return f'{self.field:06d}/' \
-               f'c{self.ccdid}/' \
+               f'c{self.ccdid:02d}/' \
                f'q{self.qid}/' \
                f'{fid_map[self.fid]}/' \
                f'{self.basename}'
