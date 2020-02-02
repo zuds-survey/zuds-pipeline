@@ -2350,7 +2350,7 @@ def force_photometry(self, assume_background_subtracted=True):
     return out
 
 models.Source.unphotometered_images = property(unphotometered_images)
-models.Source.forced_photometry = force_photometry
+models.Source.force_photometry = force_photometry
 
 from astropy.table import Table
 def light_curve(sourceid):
