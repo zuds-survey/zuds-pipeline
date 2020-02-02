@@ -1029,19 +1029,13 @@ class ZTFFile(models.Base, File):
 
         return obj
 
-    @hybrid_property
+    @property
     def relname(self):
-        return sa.func.FORMAT('%06d', self.field) + '/' + \
-               sa.func.FORMAT('c%02d', self.ccdid) + '/' + \
-               sa.func.FORMAT('q%d', self.qid) + '/' + \
-               sa.case([
-                   (self.fid == 1, 'zg'),
-                   (self.fid == 2, 'zr'),
-                   (self.fid == 3, 'zi')
-               ])
-
-
-
+        return f'{self.field:06d}/' \
+               f'c{self.ccdid}/' \
+               f'q{self.qid}/' \
+               f'{fid_map[self.fid]}/' \
+               f'{self.basename}'
 
 
 class PipelineRegionFile(ZTFFile):
