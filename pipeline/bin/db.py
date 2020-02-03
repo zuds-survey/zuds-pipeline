@@ -2389,7 +2389,7 @@ def light_curve(sourceid):
                  'flux': photpoint[3],
                  'fluxerr': photpoint[4],
                  'flags': photpoint[5],
-                 'lim_mag': photpoint[6],
+                 'lim_mag': -2.5 * np.log10(5 * photpoint[4]) + photpoint[2] + photpoint[7],
                  'id': photpoint[8]}
         lc_raw.append(photd)
 
