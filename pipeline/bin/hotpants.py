@@ -81,7 +81,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
               f'-imi {submask.local_path}  -v 0 -oni {subrms} ' \
               f'-fin {db.BIG_RMS} '
     if not refined:
-        syscall += f'-nsx {nsx / 3} -nsy {nsy / 3}'
+        syscall += f'-nsx {nsx} -nsy {nsy}'
     else:
         syscall += f'-nsx {nsx / 3} -nsy {nsy / 3} ' \
                    f' -ko 3 -bgo 0 -nrx 3 -nry 3'
