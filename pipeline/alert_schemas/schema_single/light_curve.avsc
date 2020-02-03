@@ -2,7 +2,7 @@
     "namespace": "ztf.alert",
     "name": "light_curve",
     "doc": "avro alert schema",
-    "version": "0.2",
+    "version": "0.4",
     "type": "record",
     "fields": [
         {"name": "zpsys", "type": ["string", "null"], "default": null, "doc": "mag system, default ab"},

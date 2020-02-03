@@ -2023,7 +2023,8 @@ class Subtraction(HasWCS):
         submask.boolean.save()
 
         command = prepare_hotpants(transact_sci, remapped_ref, outname,
-                                   submask.boolean, directory, tmpdir=tmpdir)
+                                   submask.boolean, directory, tmpdir=tmpdir,
+                                   refined=isinstance(sci, Coadd))
 
         final_dir = os.path.dirname(sci.local_path)
         final_out = os.path.join(final_dir, os.path.basename(outname))
@@ -2363,7 +2364,6 @@ def light_curve(sourceid):
         ForcedPhotometry.flux,
         ForcedPhotometry.fluxerr,
         ForcedPhotometry.flags,
-        ScienceImage.maglimit,
         ScienceImage.apcor,
         ForcedPhotometry.id
     ).select_from(
@@ -2388,7 +2388,7 @@ def light_curve(sourceid):
                  'flux': photpoint[3],
                  'fluxerr': photpoint[4],
                  'flags': photpoint[5],
-                 'lim_mag': photpoint[6],
+                 'lim_mag': -2.5 * np.log10(5 * photpoint[4]) + photpoint[2] + photpoint[7],
                  'id': photpoint[8]}
         lc_raw.append(photd)
 

@@ -100,7 +100,7 @@ def submit_job(images):
 #SBATCH -A ***REMOVED***
 #SBATCH -o {str(scriptname).replace('.sh', '.out')}
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds4
+HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds5
 
 
 """
@@ -161,7 +161,7 @@ def submit_forcephot_chain():
         db.ReferenceImage,
         db.SingleEpochSubtraction.reference_image_id == db.ReferenceImage.id
     ).filter(
-        db.ReferenceImage.version == 'zuds4',
+        db.ReferenceImage.version == 'zuds5',
     ).all()
 
     image_names = sorted([i[0] for i in image_names], key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
@@ -195,7 +195,7 @@ def submit_forcephot_chain():
 #SBATCH -A ***REMOVED***
 #SBATCH -o {str(scriptname).replace('.sh', '.out')}
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds4
+HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds5
 
 """
 
@@ -327,7 +327,7 @@ if __name__ == '__main__':
                           and z1.ccdid=zf.ccdid
                           and z1.qid=zf.qid
                           and z1.fid=zf.fid
-                       ) where r.version = 'zuds4'
+                       ) where r.version = 'zuds5'
                        and zf.field  = %d
                        and s.ipac_gid = 2
                        and s.seeing < 4

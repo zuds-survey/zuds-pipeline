@@ -111,7 +111,7 @@ def associate(debug=False):
     dummy where sources.id = dummy.id;
     ''')
 
-    q = '''select d.id as id1,  dd.id as id2, oo.source_id, 
+    q = f'''select d.id as id1,  dd.id as id2, oo.source_id, 
     q3c_dist(d.ra, d.dec, dd.ra, dd.dec) * 3600  sep 
     from detections d join objectswithflux o on d.id=o.id 
     join realbogus rb on rb.detection_id = d.id 
@@ -122,7 +122,8 @@ def associate(debug=False):
     realbogus rr on rr.detection_id = dd.id 
     where o.source_id is NULL  and 
     z.created_at > now() - interval '48 hours'  
-    and d.id != dd.id and rr.rb_score > 0.4 and rb.rb_score > 0.4'''
+    and d.id != dd.id and rr.rb_score >= {ASSOC_RB_MIN} 
+    and rb.rb_score >= {ASSOC_RB_MIN}'''
 
     df = pd.DataFrame(
         list(db.DBSession().execute(q)),

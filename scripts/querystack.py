@@ -48,7 +48,7 @@ res = db.DBSession().query(db.ScienceImage.field,
 ).filter(
     db.ScienceImage.seeing < 4.,
     db.ScienceImage.maglimit > 19.2,
-    db.ReferenceImage.version == 'zuds4',
+    db.ReferenceImage.version == 'zuds5',
     db.ScienceImage.filefracday > 20200107000000
 ).group_by(
     db.ScienceImage.field,
