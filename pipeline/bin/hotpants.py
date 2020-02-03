@@ -20,7 +20,8 @@ def chunk(iterable, chunksize):
         yield i, iterable[i * chunksize : (i + 1) * chunksize]
 
 
-def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
+def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
+                     refined=False):
 
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image
@@ -77,11 +78,12 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
               f'-tu {satlev} -iu {satlev}  -tl {tl} -il {il} -r {r} ' \
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
-              f'-imi {submask.local_path} ' \
-              f'-nsx {nsx / 3} -nsy {nsy / 3}  -v 0 -oni {subrms} ' \
-              f'-fin {db.BIG_RMS} -ko 3 -bgo 0 -nrx 3 -nry 3'
-
-
+              f'-imi {submask.local_path}  -v 0 '
+    if not refined:
+        syscall += f'-nsx {nsx / 3} -nsy {nsy / 3}'
+    else:
+        syscall += f'-nsx {nsx / 3} -nsy {nsy / 3} -oni {subrms} ' \
+                   f'-fin {db.BIG_RMS} -ko 3 -bgo 0 -nrx 3 -nry 3'
 
     return syscall
 
