@@ -2364,7 +2364,6 @@ def light_curve(sourceid):
         ForcedPhotometry.flux,
         ForcedPhotometry.fluxerr,
         ForcedPhotometry.flags,
-        ScienceImage.maglimit,
         ScienceImage.apcor,
         ForcedPhotometry.id
     ).select_from(
