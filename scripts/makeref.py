@@ -13,7 +13,7 @@ fmap = {1: 'zg',
         3: 'zi'}
 
 db.init_db()
-db.DBSession().get_bind().echo = True
+#db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
@@ -71,6 +71,13 @@ for d in my_dirs:
 
     # get the very best images
     top = sorted(ok, key=lambda i: i.maglimit, reverse=True)[:50]
+    if len(top) == 0:
+        print(f'Not enough images ({len(top)} < 14) to make reference '
+              f'{coaddname}. Skipping...')
+        db.DBSession().rollback()
+        continue
+
+    
     coaddname = os.path.join(d, f'ref.{ok[0].field:06d}_c{ok[0].ccdid:02d}'
                                 f'_q{ok[0].qid}_{fmap[ok[0].fid]}.{version}.fits')
 
