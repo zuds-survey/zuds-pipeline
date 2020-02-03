@@ -72,14 +72,14 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp'):
 
     satlev = 5e4  # not perfect, but close enough.
 
-    syscall = f'hotpants -inim {scipath} -hki -n i -c t ' \
+    syscall = f'hotpants -inim {scipath} -hki -n i -c t' \
               f'-tmplim {ref.local_path} -outim {outname} ' \
               f'-tu {satlev} -iu {satlev}  -tl {tl} -il {il} -r {r} ' \
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path} ' \
-              f'-nsx {nsx} -nsy {nsy}  -v 0 -oni {subrms} ' \
-              f'-fin {db.BIG_RMS}'
+              f'-nsx {nsx / 3} -nsy {nsy / 3}  -v 0 -oni {subrms} ' \
+              f'-fin {db.BIG_RMS} -ko 3 -bgo 0 -nrx 3 -nry 3'
 
     return syscall
 
