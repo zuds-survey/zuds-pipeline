@@ -2064,8 +2064,8 @@ class Subtraction(HasWCS):
         finalsubmask = MaskImage.from_file(final_out.replace('.fits',
                                                              '.mask.fits'))
 
-        sub._rmsimg = FITSFile.from_file(final_out.replace('.fits',
-                                                           '.rms.fits'))
+        sub._rmsimg = FITSImage.from_file(final_out.replace('.fits',
+                                                            '.rms.fits'))
 
         sub.header['FIELD'] = sub.field = sci.field
         sub.header['CCDID'] = sub.ccdid = sci.ccdid
