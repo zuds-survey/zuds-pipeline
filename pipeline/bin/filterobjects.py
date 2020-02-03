@@ -16,7 +16,10 @@ import db
 from scipy.optimize import minimize
 
 CUTSIZE = 11 # pixels
-RB_CUT = 0.3
+RB_CUT = {1 : 0.3,
+          2 : 0.3,
+          3 : 0.6
+          }
 BRAAI_MODEL = 'braai_d6_m9'
 old_norm = int(BRAAI_MODEL.split('d6_m')[1]) <= 7
 
@@ -233,7 +236,7 @@ def filter_sexcat(cat):
 
             rb = ml_model.predict(np.expand_dims(triplet, axis=0))
             row['rb'] = rb[0, 0]
-            if row['rb'] < RB_CUT:
+            if row['rb'] < RB_CUT[image.fid]:
                 row['GOODCUT'] = 0
 
     stop = time.time()
