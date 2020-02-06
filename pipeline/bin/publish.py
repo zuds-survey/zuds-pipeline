@@ -25,9 +25,10 @@ DB_FTP_PORT = 222
 
 lookup = dict(zip(range(0, 25), 'abcdefghijklmnopqrstuvwxyz'))
 
-def get_next_name():
-    seqquery = "SELECT nextval('namenum')"
-    num = db.DBSession().execute(seqquery).fetchone()[0]
+def get_next_name(num=None):
+    if num is None:
+        seqquery = "SELECT nextval('namenum')"
+        num = db.DBSession().execute(seqquery).fetchone()[0]
     name = 'ZUDS' + str(date.today().year)[2:] + num_to_alpha(num)
     return name
 

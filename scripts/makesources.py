@@ -14,6 +14,8 @@ import pandas as pd
 import datetime
 from pathlib import Path
 
+from astropy import units as u
+from astropy.coordinates import SkyCoord, match_coordinates_sky
 
 ASSOC_RB_MIN = 0.4
 
@@ -83,18 +85,55 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     os.chdir(curdir)
     _ = stdout.strip().split()[-1].decode('ascii')
 
+
+def source_coords_from_solution(grouped, inverted, df):
+    source_coords = {}
+    for source in grouped:
+        dets = grouped[source]
+        snrs = df.loc[dets]['snr']
+        best = snrs.idxmax()
+        source_coords[source] = tuple(df.loc[best][['ra', 'dec']].tolist())
+    return source_coords
+
+    
+def iterate_sources(grouped, inverted, df):
+
+    source_coords = source_coords_from_solution(grouped, inverted, df)
+    
+    sources = np.asarray([s for s in source_coords])
+    coords = SkyCoord([source_coords[s][0] for s in sources],
+                      [source_coords[s][1] for s in sources],
+                      unit='deg')
+
+    idx, d2d, d3d = match_coordinates_sky(coords, coords, nthneighbor=2)
+
+    ok = sources[d2d < 2 * u.arcsec]
+    match = sources[idx[d2d < 2 * u.arcsec]]
+
+    if len(match) == 0:
+        return False
+
+    for s1, s2 in zip(ok, match):
+        s2dets = grouped[s2]
+        grouped[s1].extend(s2dets)
+        del grouped[s2]
+        for d in s2dets:
+            inverted[d] = s1
+
+    return True
+
 def associate(debug=False):
 
+    """
     db.DBSession().execute('LOCK TABLE ONLY objectswithflux IN EXCLUSIVE MODE;')
 
     r = db.DBSession().execute(
         'update objectswithflux set source_id = s.id, '
         'modified = now() from  detections d join objectswithflux o '
-        'on d.id = o.id  join ztffiles z on '
-        'z.id = o.image_id join sources s on '
+        'on d.id = o.id join sources s on '
         'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.0002777*2) '
         'where  o.source_id is NULL  and '
-        "z.created_at > now() - interval '48 hours' and "
+        "o.created_at > now() - interval '48 hours' and "
         'objectswithflux.id = d.id returning d.id, s.id'
     )
     r = list(r)
@@ -111,26 +150,77 @@ def associate(debug=False):
     dummy where sources.id = dummy.id;
     ''')
 
+    
+
     q = f'''select d.id as id1,  dd.id as id2, oo.source_id, 
     q3c_dist(d.ra, d.dec, dd.ra, dd.dec) * 3600  sep 
     from detections d join objectswithflux o on d.id=o.id 
     join realbogus rb on rb.detection_id = d.id 
-    join ztffiles z on z.id = o.image_id  
     join detections dd on 
     q3c_join(d.ra, d.dec, dd.ra, dd.dec, 0.0002777 * 2) 
     join objectswithflux oo on oo.id = dd.id join 
     realbogus rr on rr.detection_id = dd.id 
     where o.source_id is NULL  and 
-    z.created_at > now() - interval '48 hours'  
+    o.created_at > now() - interval '48 hours'  
     and d.id != dd.id and rr.rb_score >= {ASSOC_RB_MIN} 
     and rb.rb_score >= {ASSOC_RB_MIN}'''
+    """
+
+    q = f'''select d.id, d.ra, d.dec, o.flux / o.fluxerr as snr 
+    from detections d join objectswithflux o on d.id = o.id join realbogus
+    rb on rb.detection_id = d.id where o.source_id is NULL 
+    and rb.rb_score > {ASSOC_RB_MIN} order by o.created_at asc LIMIT 10000'''
 
     df = pd.DataFrame(
         list(db.DBSession().execute(q)),
-        columns=['id1', 'id2', 'source_id', 'sep']
+        columns=['id', 'ra', 'dec', 'snr']
     )
-    df = df[pd.isna(df['source_id'])]
-    df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
+
+    
+    df = df.set_index('id')
+    df['id'] = df.index.tolist()
+    
+    #df = df[pd.isna(df['source_id'])]
+    #df = df.sort_values('sep').drop_duplicates(subset='id1', keep='first')
+    #df = df[df['id1'] > df['id2']]
+    
+    coord = SkyCoord(df['ra'], df['dec'], unit='deg')
+    idx, d2d, d3d = match_coordinates_sky(coord, coord, nthneighbor=2)
+    
+    ok = df['id'][d2d < 2 * u.arcsec]
+    match = df.iloc[idx[d2d < 2 * u.arcsec]]['id']
+
+    grouped = {}
+    inverted = {}
+    scounter = 0
+    scoords = {}
+    
+    for d1, d2 in zip(ok, match):
+        if d1 in inverted and not d2 in inverted:
+            s1 = inverted[d1]
+            inverted[d2] = s1
+            grouped[s1].append(d2)
+        if d2 in inverted and not d1 in inverted:
+            s2 = inverted[d2]
+            inverted[d1] = s2
+            grouped[s2].append(d1)
+        if d1 in inverted and d2 in inverted:
+            s1 = inverted[d1]
+            s2 = inverted[d2]
+            if s1 != s2:
+                s2dets = grouped[s2]
+                grouped[s1].extend(s2dets)
+                del grouped[s2]
+                for d in s2dets:
+                    inverted[d] = s1
+        else:
+            inverted[d1] = scounter
+            inverted[d2] = scounter
+            grouped[scounter] = [d1, d2]
+            scounter += 1
+
+    while iterate_sources(grouped, inverted, df):
+        continue
 
     if debug:
         df = df.iloc[:10]
@@ -146,7 +236,6 @@ def associate(debug=False):
 
     # cache d1 and d2
     from sqlalchemy.orm import joinedload
-
     d1 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_([
         int(i) for i in df['id1']
     ])).options(joinedload(db.Detection.thumbnails)).all()
@@ -161,19 +250,29 @@ def associate(debug=False):
         detcache[d.id] = d
 
     sources = {}
+    curval = db.DBSession().execute("select nextval('namenum')")
     for i, row in tqdm(df.iterrows()):
         d = detcache[row['id1']]
-        if row['id2'] in sources:
+        d2 = detcache[row['id2']]
+        
+        if row['id1'] in sources and not row['id2'] in sources:
+            sources[row['id2']] = sources[row['id1']]
+            d2.source = sources[row['id1']]
+            db.DBSession().add(d2)
+        
+        if row['id2'] in sources and not row['id1'] in sources:
             sources[row['id1']] = sources[row['id2']]
             d.source = sources[row['id2']]
+            
         else:
 
-            d2 = detcache[row['id2']]
+
             #d2 = db.DBSession().query(db.Detection).get(row['id2'])
 
             bestdet = d if d.flux / d.fluxerr > d2.flux / d2.fluxerr else d2
             # need to create a new source
-            name = publish.get_next_name()
+            name = publish.get_next_name(num=curval)
+            curval += 1
             source = db.models.Source(
                 id=name,
                 groups=[default_group],
@@ -211,20 +310,24 @@ def associate(debug=False):
                                      type='dr8')
             db.DBSession().add_all([sdss_thumb, dr8_thumb])
 
+    db.DBSession().execute(f"select setval('namenum', {curval})")
     db.DBSession().flush()
 
     # now that new sources have been flushed to the database,
     # associate any nearby detections with them
 
-    db.DBSession().execute(
+    r = db.DBSession().execute(
         'update objectswithflux set source_id = s.id, '
         'modified = now() from  detections d join objectswithflux o '
-        'on d.id = o.id  join ztffiles z on '
-        'z.id = o.image_id join sources s on '
+        'on d.id = o.id join sources s on '
         'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.0002777*2) '
         'where  o.source_id is NULL  and '
-        "z.created_at > now() - interval '48 hours' and "
-        'objectswithflux.id = d.id returning d.id, s.id')
+        "o.created_at > now() - interval '48 hours' and "
+        'objectswithflux.id = d.id returning d.id, s.id'
+    )
+    r = list(r)
+
+    print(f'associated {len(r)} detections with existing sources')
 
     db.DBSession().execute('''
     update sources set ra=dummy.ra, dec=dummy.dec, modified=now() 
