@@ -109,7 +109,6 @@ def associate(debug=False):
         'on d.id = o.id join sources s on '
         'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.0002777*2) '
         'where  o.source_id is NULL  and '
-        "o.created_at > now() - interval '48 hours' and "
         'objectswithflux.id = d.id returning d.id, s.id'
     )
     r = list(r)
@@ -141,8 +140,14 @@ def associate(debug=False):
         columns=['id', 'ra', 'dec', 'snr']
     )
 
+    df = df.set_index('id')
+
     coord = SkyCoord(df['ra'], df['dec'], unit='deg')
     idx1, idx2, sep, _ = search_around_sky(coord, coord, ASSOC_RADIUS_ARCSEC * u.arcsec)
+    dropdupes = idx1 != idx2
+    idx1 = idx1[dropdupes]
+    idx2 = idx2[dropdupes]
+    sep = sep[dropdupes]
 
     # cluster the detections into sources using DBSCAN
     clustering = DBSCAN(
@@ -175,13 +180,13 @@ def associate(debug=False):
     # get thumbnail pics
     from sqlalchemy.orm import joinedload
     d1 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_(
-        list(bestdets.values())
+        [int(v) for v in bestdets.values()]
     )).options(joinedload(db.Detection.thumbnails)).all()
 
     detcache = {d.id: d for d in d1}
     sourceid_map = {}
 
-    curval = db.DBSession().execute("select nextval('namenum')")
+    curval = db.DBSession().execute("select nextval('namenum')").first()[0]
     for sourceid in tqdm(bestdets):
         bestdet = detcache[bestdets[sourceid]]
 
@@ -224,23 +229,15 @@ def associate(debug=False):
     db.DBSession().execute(f"select setval('namenum', {curval})")
     db.DBSession().flush()
 
-    for sourceid, group in df.groupby('sourceid'):
+    for sourceid, group in df.groupby('source'):
         realid = sourceid_map[sourceid].id
-        dets = group['id'].tolist()
+        dets = group.index.tolist()
         db.DBSession().execute(
             f'''
-            update objectswithflux set source_id = {realid} 
-            where o.id in {tuple(dets)}
+            update objectswithflux set source_id = '{realid}'
+            where objectswithflux.id in {tuple(dets)}
             '''
         )
-
-    thumbids = []
-    for d in detcache.values():
-        for t in d.thumbnails:
-            thumbids.append(t.id)
-
-    if os.getenv('NERSC_HOST') == 'cori':
-        submit_thumbs(thumbids)
 
     print(f'triggering alerts and forced photometry for {len(detection_ids)} detections')
     db.DBSession().execute(
@@ -252,6 +249,15 @@ def associate(debug=False):
     # jobs running via slurm
     db.DBSession().commit()
 
+    thumbids = []
+    for d in detcache.values():
+        for t in d.thumbnails:
+            thumbids.append(t.id)
+
+    if os.getenv('NERSC_HOST') == 'cori':
+        submit_thumbs(thumbids)
+    
+
 if __name__ == '__main__':
     db.DBSession().get_bind().echo=True
-    associate()
+    associate(debug=True)
