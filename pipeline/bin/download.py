@@ -130,11 +130,13 @@ def download_file(target, destination, cookie):
             break
 
 
-def safe_download(target, destination, cookie, logger):
+def safe_download(target, destination, cookie, logger, raise_exc=False):
     try:
         download_file(target, destination, cookie)
     except requests.RequestException as e:
         logger.warning(f'File "{target}" does not exist. Continuing...')
+        if raise_exc:
+            raise e
 
 
 ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
@@ -170,6 +172,8 @@ if __name__ == '__main__':
     _gid_priorities = {2: 1, 3: 2, 1: 3}
     sort_order = case(value=db.ScienceImage.ipac_gid, whens=_gid_priorities)
 
+    bad = []
+
     while True:
 
         # check if the cookies need to be reset
@@ -184,7 +188,8 @@ if __name__ == '__main__':
             db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
         ).filter(
             db.HTTPArchiveCopy.product_id == None,
-            db.TapeCopy.product_id == None
+            db.TapeCopy.product_id == None,
+            ~db.ZTFFile.id.in_(bad)
         ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
             db.ScienceImage.id.desc()
         )
@@ -233,7 +238,12 @@ if __name__ == '__main__':
                 )
 
                 destination = f'{destination_base / image.basename}'
-                safe_download(target, destination, icookie, logger)
+                try:
+                    safe_download(target, destination, icookie, logger, raise_exc=True)
+                except requests.exceptions.RequestException as e:
+                    bad.append(image.id)
+                    continue
+
                 image.map_to_local_file(destination)
 
                 # ensure the image header is written to the DB
