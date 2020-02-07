@@ -239,11 +239,13 @@ def associate(debug=False):
             '''
         )
 
-    print(f'triggering alerts and forced photometry for {len(detection_ids)} detections')
+    """
+    print(f'triggering alerts and forced photometry for {len(triggers_alert)} detections')
     db.DBSession().execute(
         f'''update detections set triggers_alert = 't'
         where detections.id in {tuple(triggers_alert)}'''
     )
+    """
 
     # need to commit so that sources will be there for forced photometry
     # jobs running via slurm
@@ -260,4 +262,4 @@ def associate(debug=False):
 
 if __name__ == '__main__':
     db.DBSession().get_bind().echo=True
-    associate(debug=True)
+    associate()
