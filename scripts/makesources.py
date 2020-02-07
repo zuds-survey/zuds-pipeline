@@ -187,6 +187,9 @@ def associate(debug=False):
     sourceid_map = {}
 
     curval = db.DBSession().execute("select nextval('namenum')").first()[0]
+    stups = []
+    gtups = []
+    sources = []
     for sourceid in tqdm(bestdets):
         bestdet = detcache[bestdets[sourceid]]
 
@@ -199,60 +202,64 @@ def associate(debug=False):
             dec=bestdet.dec
         )
 
-        db.DBSession().execute('INSERT INTO sources (id, ra, dec, created_at, modified) VALUES '
-                               f'({name}, {bestdet.ra}, {bestdet.dec}, now(), now())')
-        db.DBSession().execute('INSERT INTO group_sources (source_id, group_id, created_at, modified) '
-                               f'VALUES ({name}, 1, now(), now())')
-
-
         sourceid_map[sourceid] = source
+        sources.append(source)
 
-        # need this to make stamps.
-        dummy_phot = db.models.Photometry(
-            source=source,
-            instrument=default_instrument
-        )
+        stups.append(f"('{name}', {bestdet.ra}, {bestdet.dec}, now(), now())")
+        gtups.append(f"('{name}', 1, now(), now())")
 
-        pid = db.DBSession().exeucte('INSERT INTO photometry (source_id, instrument_id, created_at, modified) '
-                                     f'VALUES ({name}, 1, now(), now())) RETURNING ID')[0][0]
+    db.DBSession().execute('INSERT INTO sources (id, ra, dec, created_at, modified) VALUES '
+                           f'{",".join(stups)}')
+    db.DBSession().execute('INSERT INTO group_sources (source_id, group_id, created_at, modified) '
+                           f'VALUES {",".join(gtups)}')
+
+    pid = [row[0] for row in db.DBSession().exeucte(
+        'INSERT INTO photometry (source_id, instrument_id, created_at, modified) '
+        f'VALUES {",".join(gtups)} RETURNING ID'
+    )]
+
+    stups = [f"(now(), now(), {p}, '{source.sdss_url}', 'sdss')" for p, source in zip(
+        pid, sources
+    )]
+
+    dtups = [f"(now(), now(), {p}, '{source.desi_dr8_url}', 'dr8')" for p, source in zip(
+        pid, sources
+    )]
+
+    db.DBSession().execute(
+        'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
+        f"VALUES  {','.join(stups)}")
+    db.DBSession().execute(
+        'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
+        f"VALUES {','.join(dtups)}")
 
 
-
-        db.DBSession().execute(f'UPDATE thumbnails SET modified=now(), photometry_id={pid}, '
-                               f'source_id={name} where detection_id={bestdet.id}')
-
-
-        """
-        bestdet.source = source
-        db.DBSession().add(bestdet)
-        db.DBSession().add(source)
-        db.DBSession().add(dummy_phot)
+    """
+    bestdet.source = source
+    db.DBSession().add(bestdet)
+    db.DBSession().add(source)
+    db.DBSession().add(dummy_phot)
 
 
-        for t in bestdet.thumbnails:
-            t.photometry = dummy_phot
-            t.source = bestdet.source
-            #t.persist()
-            db.DBSession().add(t)
-            
-        """
-        db.DBSession().execute(
-            'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
-            f"VALUES (now(), now(), pid, {source.sdss_url}, 'sdss')")
-        db.DBSession().execute(
-            'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
-            f"VALUES (now(), now(), pid, {source.desi_dr8_url}, 'dr8')")
+    for t in bestdet.thumbnails:
+        t.photometry = dummy_phot
+        t.source = bestdet.source
+        #t.persist()
+        db.DBSession().add(t)
+        
+    """
 
-        """
 
-        sdss_thumb = db.models.Thumbnail(photometry=dummy_phot,
-                                  public_url=source.sdss_url,
-                                  type='sdss')
-        dr8_thumb = db.models.Thumbnail(photometry=dummy_phot,
-                                 public_url=source.desi_dr8_url,
-                                 type='dr8')
-        db.DBSession().add_all([sdss_thumb, dr8_thumb])
-        """
+    """
+
+    sdss_thumb = db.models.Thumbnail(photometry=dummy_phot,
+                              public_url=source.sdss_url,
+                              type='sdss')
+    dr8_thumb = db.models.Thumbnail(photometry=dummy_phot,
+                             public_url=source.desi_dr8_url,
+                             type='dr8')
+    db.DBSession().add_all([sdss_thumb, dr8_thumb])
+    """
 
     db.DBSession().execute(f"select setval('namenum', {curval})")
     db.DBSession().flush()
@@ -267,13 +274,16 @@ def associate(debug=False):
             '''
         )
 
-    """
-    print(f'triggering alerts and forced photometry for {len(triggers_alert)} detections')
+
+    db.DBSession().execute(f'UPDATE thumbnails SET modified=now(), photometry_id={pid}, '
+                           f'source_id={name} where detection_id={bestdet.id}')
+
+
+    print(f'triggering alerts and forced photometry for {len(detection_ids)} detections')
     db.DBSession().execute(
         f'''update detections set triggers_alert = 't'
         where detections.id in {tuple(triggers_alert)}'''
     )
-    """
 
     # need to commit so that sources will be there for forced photometry
     # jobs running via slurm
@@ -290,4 +300,4 @@ def associate(debug=False):
 
 if __name__ == '__main__':
     db.DBSession().get_bind().echo=True
-    associate()
+    associate(debug=True)
