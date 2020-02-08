@@ -73,7 +73,7 @@ for d in my_dirs:
     top = sorted(ok, key=lambda i: i.maglimit, reverse=True)[:50]
     if len(top) == 0:
         print(f'Not enough images ({len(top)} < 14) to make reference '
-              f'{coaddname}. Skipping...')
+              f'for {d}. Skipping...')
         db.DBSession().rollback()
         continue
 
