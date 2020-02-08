@@ -30,15 +30,15 @@ def batch(iterable, n=1):
 
 for thumbids in batch(my_work, n=BATCH_SIZE):
     start = time.time()
-    thumbs = db.DBSession().query(db.models.Thumbnail).filter(db.models.Thumbnail.id.in_(thumbids))
+    thumbs = db.DBSession().query(db.models.Thumbnail).filter(db.models.Thumbnail.id.in_(thumbids.tolist()))
     for t in thumbs:
         t.persist()
     stop = time.time()
-    db.print_time(start, stop, thumbids, 'get and persist')
+    db.print_time(start, stop, t, 'get and persist')
 
     start = time.time()
     db.DBSession().commit()
     stop = time.time()
-    db.print_time(start, stop, thumbids, 'commit')
+    db.print_time(start, stop, t, 'commit')
 
 
