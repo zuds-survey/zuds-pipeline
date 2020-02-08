@@ -20,18 +20,25 @@ __whatami__ = 'Make the subtractions for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the subs to do photometry on
 
+BATCH_SIZE = 50
 my_work = mpi.get_my_share_of_work(infile)
 
-for thumbid in my_work:
+def batch(iterable, n=1):
+    l = len(iterable)
+    for ndx in range(0, l, n):
+        yield iterable[ndx:min(ndx + n, l)]
+
+for thumbids in batch(my_work, n=BATCH_SIZE):
     start = time.time()
-    t = db.DBSession().query(db.models.Thumbnail).get(int(thumbid))
-    t.persist()
+    thumbs = db.DBSession().query(db.models.Thumbnail).filter(db.models.Thumbnail.id.in_(thumbids))
+    for t in thumbs:
+        t.persist()
     stop = time.time()
-    db.print_time(start, stop, t, 'get and persist')
+    db.print_time(start, stop, thumbids, 'get and persist')
 
     start = time.time()
     db.DBSession().commit()
     stop = time.time()
-    db.print_time(start, stop, t, 'commit')
+    db.print_time(start, stop, thumbids, 'commit')
 
 
