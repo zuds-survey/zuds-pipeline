@@ -37,7 +37,14 @@ N_PREV_MULTI = 1
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
-def submit_thumbs(thumbids):
+def submit_thumbs():
+
+    thumbids = db.DBSession().query(db.models.Thumbnail.id).filter(
+        db.models.Thumbnail.source_id != None,
+        db.models.Thumbnail.public_url == None
+    )
+    thumbids = [t[0] for t in thumbids]
+    
 
     ndt = datetime.datetime.utcnow()
     nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
@@ -273,14 +280,8 @@ def associate(debug=False):
         # jobs running via slurm
         db.DBSession().commit()
 
-        thumbids = db.DBSession().query(db.models.Thumbnail.id).filter(
-            db.models.Thumbnail.source_id != None,
-            db.models.Thumbnail.public_url == None
-        )
-        thumbids = [t[0] for t in thumbids]
-
         if os.getenv('NERSC_HOST') == 'cori':
-            submit_thumbs(thumbids)
+            submit_thumbs()
     else:
         print('nothing to do')
         db.DBSession().commit()
