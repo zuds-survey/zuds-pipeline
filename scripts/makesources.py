@@ -99,6 +99,70 @@ def source_bestdet_from_solution(df):
     return source_bestdet
 
 
+def xmatch(source_ids):
+
+    # update dr8_join
+    insert = f'''
+    insert into dr8_join (select s.id as sid, d.*, rank() over (partition by
+    s.id  order by q3c_dist(s.ra, s.dec, d."RA", d."DEC") asc) 
+    from sources s join dr8_north d 
+    on q3c_join(s.ra, s.dec, d."RA", d."DEC", 30./3600.) where s.id in 
+    {tuple(source_ids)})
+    '''
+
+    # this should take about 40 minutes
+    db.DBSession().execute(insert)
+
+
+    queries = '''
+    update sources set score = -1, 
+    altdata = ('{"rejected": "matched to GAIA dr8 ID ' || d.id::text || '"}')::jsonb 
+    from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 and d."PARALLAX" > 0 ;
+    
+    update sources set score = -1, 
+    altdata = ('{"rejected": "matched to dr8 masked source ID ' || d.id::text || '"}')::jsonb 
+    from dr8_join_neighbors d where d.sid = sources.id 
+    and d.rank = 1 and 
+    (d."FRACMASKED_G" > 0.2 OR d."FRACMASKED_R" > 0.2 OR d."FRACMASKED_Z" > 0.2)  ;
+        
+    update sources set score = -1, 
+    altdata = ('{"rejected": "matched to hits  ID ' || h.id::text || '"}')::jsonb 
+    from dr8_join_neighbors d join hits h on 
+    q3c_join(d."RA", d."DEC", h.ra, h.dec, 0.0002777 * 1.5) 
+    where d.sid = sources.id and d.rank = 1 ;
+    
+    update sources set score = -1, 
+    altdata = ('{"rejected": "matched to MQ  ID ' || m.id::text || '"}')::jsonb 
+    from dr8_join_neighbors d join milliquas_v6 m 
+    on q3c_join(d."RA", d."DEC", m.ra, m.dec, 0.0002777 * 1.5) 
+    where d.sid = sources.id and d.rank = 1 ;
+    
+    create temp table rbacc as (select o.source_id, sum(rb.rb_score)  as sumrb from 
+    detections d join objectswithflux o on d.id = o.id join realbogus 
+    rb on rb.detection_id = d.id group by o.source_id);  
+    
+    update sources set score = dummy.sumrb from (select o.source_id, sum(rb.rb_score)  
+    as sumrb from detections d join objectswithflux o on d.id = o.id 
+    join realbogus rb on rb.detection_id = d.id group by o.source_id) dummy 
+    where dummy.source_id = sources.id and sources.score = 0;     
+    
+    update sources set redshift = (case when d.z_spec = -99 then d.z_phot_median else d.z_spec end) 
+    from dr8_join_neighbors d where d.rank = 1 and d.sid = sources.id;
+    
+    update sources set score = -1, 
+    altdata = ('{"rejected": "rejected for having z_dr8 < 0.0001"}')::jsonb  
+    where sources.redshift <= 0.0001;
+    
+    update sources set score = -1, 
+    altdata = ('{"rejected": "right on top of (< 1 arcsec) DR8 PSF  ' || d.id::text || '"}')::jsonb 
+    from dr8_join_neighbors d where d.sid = sources.id and 
+    d.rank = 1 and (d."TYPE" = 'PSF') and 
+    q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600;    
+    '''
+
+    db.DBSession().execute(queries)
+
+
 def associate(debug=False):
 
     db.DBSession().execute('LOCK TABLE ONLY objectswithflux IN EXCLUSIVE MODE;')
@@ -233,34 +297,6 @@ def associate(debug=False):
         'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
         f"VALUES {','.join(dtups)}")
 
-
-    """
-    bestdet.source = source
-    db.DBSession().add(bestdet)
-    db.DBSession().add(source)
-    db.DBSession().add(dummy_phot)
-
-
-    for t in bestdet.thumbnails:
-        t.photometry = dummy_phot
-        t.source = bestdet.source
-        #t.persist()
-        db.DBSession().add(t)
-        
-    """
-
-
-    """
-
-    sdss_thumb = db.models.Thumbnail(photometry=dummy_phot,
-                              public_url=source.sdss_url,
-                              type='sdss')
-    dr8_thumb = db.models.Thumbnail(photometry=dummy_phot,
-                             public_url=source.desi_dr8_url,
-                             type='dr8')
-    db.DBSession().add_all([sdss_thumb, dr8_thumb])
-    """
-
     db.DBSession().execute(f"select setval('namenum', {curval})")
     db.DBSession().flush()
 
@@ -284,6 +320,8 @@ def associate(debug=False):
         f'''update detections set triggers_alert = 't'
         where detections.id in {tuple(triggers_alert)}'''
     )
+
+    xmatch([s.id for s in sources])
 
     # need to commit so that sources will be there for forced photometry
     # jobs running via slurm
