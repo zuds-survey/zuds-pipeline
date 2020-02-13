@@ -103,7 +103,7 @@ def xmatch(source_ids):
 
     # update dr8_join
     insert = f'''
-    insert into dr8_join (select s.id as sid, d.*, rank() over (partition by
+    insert into dr8_join_neighbors (select s.id as sid, d.*, rank() over (partition by
     s.id  order by q3c_dist(s.ra, s.dec, d."RA", d."DEC") asc) 
     from sources s join dr8_north d 
     on q3c_join(s.ra, s.dec, d."RA", d."DEC", 30./3600.) where s.id in 
@@ -114,53 +114,104 @@ def xmatch(source_ids):
     db.DBSession().execute(insert)
 
 
-    queries = '''
+    q = '''
     update sources set score = -1, 
     altdata = ('{"rejected": "matched to GAIA dr8 ID ' || d.id::text || '"}')::jsonb 
     from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 and d."PARALLAX" > 0 ;
-    
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
     update sources set score = -1, 
     altdata = ('{"rejected": "matched to dr8 masked source ID ' || d.id::text || '"}')::jsonb 
     from dr8_join_neighbors d where d.sid = sources.id 
     and d.rank = 1 and 
     (d."FRACMASKED_G" > 0.2 OR d."FRACMASKED_R" > 0.2 OR d."FRACMASKED_Z" > 0.2)  ;
-        
-    update sources set score = -1, 
-    altdata = ('{"rejected": "matched to hits  ID ' || h.id::text || '"}')::jsonb 
-    from dr8_join_neighbors d join hits h on 
-    q3c_join(d."RA", d."DEC", h.ra, h.dec, 0.0002777 * 1.5) 
-    where d.sid = sources.id and d.rank = 1 ;
-    
-    update sources set score = -1, 
-    altdata = ('{"rejected": "matched to MQ  ID ' || m.id::text || '"}')::jsonb 
-    from dr8_join_neighbors d join milliquas_v6 m 
-    on q3c_join(d."RA", d."DEC", m.ra, m.dec, 0.0002777 * 1.5) 
-    where d.sid = sources.id and d.rank = 1 ;
-    
-    create temp table rbacc as (select o.source_id, sum(rb.rb_score)  as sumrb from 
-    detections d join objectswithflux o on d.id = o.id join realbogus 
-    rb on rb.detection_id = d.id group by o.source_id);  
-    
-    update sources set score = dummy.sumrb from (select o.source_id, sum(rb.rb_score)  
-    as sumrb from detections d join objectswithflux o on d.id = o.id 
-    join realbogus rb on rb.detection_id = d.id group by o.source_id) dummy 
-    where dummy.source_id = sources.id and sources.score = 0;     
-    
-    update sources set redshift = (case when d.z_spec = -99 then d.z_phot_median else d.z_spec end) 
-    from dr8_join_neighbors d where d.rank = 1 and d.sid = sources.id;
-    
-    update sources set score = -1, 
-    altdata = ('{"rejected": "rejected for having z_dr8 < 0.0001"}')::jsonb  
-    where sources.redshift <= 0.0001;
-    
-    update sources set score = -1, 
-    altdata = ('{"rejected": "right on top of (< 1 arcsec) DR8 PSF  ' || d.id::text || '"}')::jsonb 
-    from dr8_join_neighbors d where d.sid = sources.id and 
-    d.rank = 1 and (d."TYPE" = 'PSF') and 
-    q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600;    
     '''
 
-    db.DBSession().execute(queries)
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set score = -1,
+    altdata = ('{"rejected": "matched to hits  ID ' || h.id::text || '"}')::jsonb
+    from dr8_join_neighbors d join hits h on
+    q3c_join(d."RA", d."DEC", h.ra, h.dec, 0.0002777 * 1.5)
+    where d.sid = sources.id and d.rank = 1 ;
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+
+    update sources set score = -1,
+    altdata = ('{"rejected": "matched to MQ  ID ' || m.id::text || '"}')::jsonb
+    from dr8_join_neighbors d join milliquas_v6 m
+    on q3c_join(d."RA", d."DEC", m.ra, m.dec, 0.0002777 * 1.5)
+    where d.sid = sources.id and d.rank = 1 ;
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    create temp table rbacc as (select o.source_id, sum(rb.rb_score)  as sumrb from
+    detections d join objectswithflux o on d.id = o.id join realbogus
+    rb on rb.detection_id = d.id group by o.source_id);
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    create index on rbacc (source_id);
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set score = rbacc.sumrb from rbacc where sources.id = rbacc.source_id and score >= 0;
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set score = dummy.sumrb from (select o.source_id, sum(rb.rb_score)
+    as sumrb from detections d join objectswithflux o on d.id = o.id
+    join realbogus rb on rb.detection_id = d.id group by o.source_id) dummy
+    where dummy.source_id = sources.id and sources.score = 0;
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set redshift = (case when d.z_spec = -99 then d.z_phot_median else d.z_spec end)
+    from dr8_join_neighbors d where d.rank = 1 and d.sid = sources.id;
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set score = -1,
+    altdata = ('{"rejected": "rejected for having z_dr8 < 0.0001"}')::jsonb
+    where sources.redshift <= 0.0001 or sources.redshift is null;'''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set score = -1,
+    altdata = ('{"rejected": "right on top of (< 1 arcsec) DR8 PSF  ' || d.id::text || '"}')::jsonb
+    from dr8_join_neighbors d where d.sid = sources.id and
+    d.rank = 1 and (d."TYPE" = 'PSF') and
+    q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600;
+    '''
+
+    db.DBSession().execute(q)
+
+    q = '''
+    update sources set neighbor_info = to_json(d) 
+    from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 
+    '''
+
+    db.DBSession().execute(q)
 
 
 def associate(debug=False):
@@ -191,9 +242,9 @@ def associate(debug=False):
     ''')
 
 
-    q = f'''select d.id, d.ra, d.dec, o.flux / o.fluxerr as snr 
+    q = f'''select d.id, d.ra, d.dec, o.flux / o.fluxerr as snr
     from detections d join objectswithflux o on d.id = o.id join realbogus
-    rb on rb.detection_id = d.id where o.source_id is NULL 
+    rb on rb.detection_id = d.id where o.source_id is NULL
     and rb.rb_score > {ASSOC_RB_MIN} order by o.id asc'''
 
     if debug:
