@@ -37,7 +37,14 @@ N_PREV_MULTI = 1
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
 
-def submit_thumbs(thumbids):
+def submit_thumbs():
+
+    thumbids = db.DBSession().query(db.models.Thumbnail.id).filter(
+        db.models.Thumbnail.source_id != None,
+        db.models.Thumbnail.public_url == None
+    )
+    thumbids = [t[0] for t in thumbids]
+
 
     ndt = datetime.datetime.utcnow()
     nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
@@ -296,7 +303,7 @@ def associate(debug=False):
     from sqlalchemy.orm import joinedload
     d1 = db.DBSession().query(db.Detection).filter(db.Detection.id.in_(
         [int(v) for v in bestdets.values()]
-    )).options(joinedload(db.Detection.thumbnails)).all()
+    )).all()
 
     detcache = {d.id: d for d in d1}
     sourceid_map = {}
@@ -305,88 +312,99 @@ def associate(debug=False):
     stups = []
     gtups = []
     sources = []
-    for sourceid in tqdm(bestdets):
-        bestdet = detcache[bestdets[sourceid]]
 
-        name = publish.get_next_name(num=curval)
-        curval += 1
-        source = db.models.Source(
-            id=name,
-            groups=[default_group],
-            ra=bestdet.ra,
-            dec=bestdet.dec
-        )
+    if len(bestdets) > 0:
+        for sourceid in tqdm(bestdets):
+            bestdet = detcache[bestdets[sourceid]]
 
-        sourceid_map[sourceid] = source
-        sources.append(source)
+            name = publish.get_next_name(num=curval)
+            curval += 1
+            source = db.models.Source(
+                id=name,
+                groups=[default_group],
+                ra=bestdet.ra,
+                dec=bestdet.dec
+            )
 
-        stups.append(f"('{name}', {bestdet.ra}, {bestdet.dec}, now(), now())")
-        gtups.append(f"('{name}', 1, now(), now())")
+            sourceid_map[sourceid] = source
+            sources.append(source)
 
-    db.DBSession().execute('INSERT INTO sources (id, ra, dec, created_at, modified) VALUES '
-                           f'{",".join(stups)}')
-    db.DBSession().execute('INSERT INTO group_sources (source_id, group_id, created_at, modified) '
-                           f'VALUES {",".join(gtups)}')
+            stups.append(f"('{name}', {bestdet.ra}, {bestdet.dec}, now(), now(), 'f', 'f', 'f', 0)")
+            gtups.append(f"('{name}', 1, now(), now())")
 
-    pid = [row[0] for row in db.DBSession().exeucte(
-        'INSERT INTO photometry (source_id, instrument_id, created_at, modified) '
-        f'VALUES {",".join(gtups)} RETURNING ID'
-    )]
+        db.DBSession().execute('INSERT INTO sources (id, ra, dec, created_at, modified, transient, varstar, is_roid, "offset") VALUES '
+                               f'{",".join(stups)}')
+        db.DBSession().execute('INSERT INTO group_sources (source_id, group_id, created_at, modified) '
+                               f'VALUES {",".join(gtups)}')
 
-    stups = [f"(now(), now(), {p}, '{source.sdss_url}', 'sdss')" for p, source in zip(
-        pid, sources
-    )]
+        pid = [row[0] for row in db.DBSession().execute(
+            'INSERT INTO photometry (source_id, instrument_id, created_at, modified) '
+            f'VALUES {",".join(gtups)} RETURNING ID'
+        )]
 
-    dtups = [f"(now(), now(), {p}, '{source.desi_dr8_url}', 'dr8')" for p, source in zip(
-        pid, sources
-    )]
+        stups = [f"(now(), now(), {p}, '{source.sdss_url}', 'sdss')" for p, source in zip(
+            pid, sources
+        )]
 
-    db.DBSession().execute(
-        'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
-        f"VALUES  {','.join(stups)}")
-    db.DBSession().execute(
-        'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
-        f"VALUES {','.join(dtups)}")
+        dtups = [f"(now(), now(), {p}, '{source.desi_dr8_url}', 'dr8')" for p, source in zip(
+            pid, sources
+        )]
 
-    db.DBSession().execute(f"select setval('namenum', {curval})")
-    db.DBSession().flush()
-
-    for sourceid, group in df.groupby('source'):
-        realid = sourceid_map[sourceid].id
-        dets = group.index.tolist()
         db.DBSession().execute(
-            f'''
-            update objectswithflux set source_id = '{realid}'
-            where objectswithflux.id in {tuple(dets)}
-            '''
+            'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
+            f"VALUES  {','.join(stups)}")
+        db.DBSession().execute(
+            'insert into thumbnails (created_at, modified, photometry_id, public_url, type) '
+            f"VALUES {','.join(dtups)}")
+
+
+        db.DBSession().execute(f"select setval('namenum', {curval})")
+        db.DBSession().flush()
+
+        query = []
+        for sourceid, group in df.groupby('source'):
+            realid = sourceid_map[sourceid].id
+            dets = group.index.tolist()
+            query.append(
+                f'''
+                update objectswithflux set source_id = '{realid}', modified=now()
+                where objectswithflux.id in {tuple(dets)}
+                '''
+            )
+
+        db.DBSession().execute(
+            ';'.join(query)
         )
 
+        bestids =  [int(v) for v in bestdets.values()]
 
-    db.DBSession().execute(f'UPDATE thumbnails SET modified=now(), photometry_id={pid}, '
-                           f'source_id={name} where detection_id={bestdet.id}')
+        db.DBSession().execute(f'UPDATE thumbnails SET modified=now(), photometry_id=photometry.id, '
+                               f'source_id=photometry.source_id from photometry join sources on '
+                               f'photometry.source_id = sources.id join objectswithflux on  '
+                               f'sources.id = objectswithflux.source_id where objectswithflux.id in {tuple(bestids)} '
+                               f'and thumbnails.detection_id = objectswithflux.id')
 
 
-    print(f'triggering alerts and forced photometry for {len(detection_ids)} detections')
-    db.DBSession().execute(
-        f'''update detections set triggers_alert = 't'
-        where detections.id in {tuple(triggers_alert)}'''
-    )
+        db.DBSession().execute(
+            f'''update detections set triggers_alert = 't'
+            from sources s join objectswithflux o on s.id=o.source_id
+            where detections.id = o.id'''
+        )
 
-    xmatch([s.id for s in sources])
+        xmatch([s.id for s in sources])
 
-    # need to commit so that sources will be there for forced photometry
-    # jobs running via slurm
-    db.DBSession().commit()
+        # need to commit so that sources will be there for forced photometry
+        # jobs running via slurm
+        db.DBSession().commit()
 
-    thumbids = []
-    for d in detcache.values():
-        for t in d.thumbnails:
-            thumbids.append(t.id)
+        if os.getenv('NERSC_HOST') == 'cori':
+            submit_thumbs()
+    else:
+        print('nothing to do')
+        db.DBSession().commit()
 
-    if os.getenv('NERSC_HOST') == 'cori':
-        submit_thumbs(thumbids)
 
 
 if __name__ == '__main__':
     db.DBSession().get_bind().echo=True
-    associate(debug=True)
+    associate()
