@@ -223,7 +223,7 @@ def xmatch(source_ids):
 
 def associate(debug=False):
 
-    db.DBSession().execute('LOCK TABLE ONLY objectswithflux IN EXCLUSIVE MODE;')
+    db.DBSession().execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;')
 
     r = db.DBSession().execute(
         'update objectswithflux set source_id = s.id, '
