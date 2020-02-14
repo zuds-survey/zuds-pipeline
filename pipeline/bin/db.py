@@ -2754,7 +2754,7 @@ class Alert(models.Base):
         alert = dict()
         alert['objectId'] = detection.source.id
         alert['candid'] = detection.id
-        alert['schemavsn'] = '0.2'
+        alert['schemavsn'] = '0.4'
         alert['publisher'] = 'ZUDS/NERSC'
 
         # do a bunch of cross matches to initially populate the candidate
