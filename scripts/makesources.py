@@ -108,14 +108,16 @@ def source_bestdet_from_solution(df):
 
 def xmatch(source_ids):
 
+    sids = '(' + ','.join([f"'{id}'" for id in source_ids]) + ')'
+
     # update dr8_join
     insert = f'''
     insert into dr8_join_neighbors (select s.id as sid, d.*, rank() over (partition by
     s.id  order by q3c_dist(s.ra, s.dec, d."RA", d."DEC") asc) 
     from sources s join dr8_north d 
     on q3c_join(s.ra, s.dec, d."RA", d."DEC", 30./3600.) where s.id in 
-    {tuple(source_ids)})
-    '''
+    %s)
+    ''' % (sids,)
 
     # this should take about 40 minutes
     db.DBSession().execute(insert)
@@ -124,8 +126,9 @@ def xmatch(source_ids):
     q = '''
     update sources set score = -1, 
     altdata = ('{"rejected": "matched to GAIA dr8 ID ' || d.id::text || '"}')::jsonb 
-    from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 and d."PARALLAX" > 0 ;
-    '''
+    from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 and d."PARALLAX" > 0 
+    and sources.id in %s;
+    ''' % (sids,)
 
     db.DBSession().execute(q)
 
@@ -134,8 +137,9 @@ def xmatch(source_ids):
     altdata = ('{"rejected": "matched to dr8 masked source ID ' || d.id::text || '"}')::jsonb 
     from dr8_join_neighbors d where d.sid = sources.id 
     and d.rank = 1 and 
-    (d."FRACMASKED_G" > 0.2 OR d."FRACMASKED_R" > 0.2 OR d."FRACMASKED_Z" > 0.2)  ;
-    '''
+    (d."FRACMASKED_G" > 0.2 OR d."FRACMASKED_R" > 0.2 OR d."FRACMASKED_Z" > 0.2) 
+    and sources.id in %s;
+    ''' % (sids,)
 
     db.DBSession().execute(q)
 
@@ -144,8 +148,8 @@ def xmatch(source_ids):
     altdata = ('{"rejected": "matched to hits  ID ' || h.id::text || '"}')::jsonb
     from dr8_join_neighbors d join hits h on
     q3c_join(d."RA", d."DEC", h.ra, h.dec, 0.0002777 * 1.5)
-    where d.sid = sources.id and d.rank = 1 ;
-    '''
+    where d.sid = sources.id and d.rank = 1 and sources.id in %s;
+    ''' % (sids,)
 
     db.DBSession().execute(q)
 
@@ -155,8 +159,8 @@ def xmatch(source_ids):
     altdata = ('{"rejected": "matched to MQ  ID ' || m.id::text || '"}')::jsonb
     from dr8_join_neighbors d join milliquas_v6 m
     on q3c_join(d."RA", d."DEC", m.ra, m.dec, 0.0002777 * 1.5)
-    where d.sid = sources.id and d.rank = 1 ;
-    '''
+    where d.sid = sources.id and d.rank = 1 and sources.id in %s;
+    ''' % (sids,)
 
     db.DBSession().execute(q)
 
@@ -164,18 +168,16 @@ def xmatch(source_ids):
     create temp table rbacc as (select o.source_id, sum(rb.rb_score)  as sumrb from
     detections d join objectswithflux o on d.id = o.id join realbogus
     rb on rb.detection_id = d.id group by o.source_id);
-    '''
 
-    db.DBSession().execute(q)
-
-    q = '''
     create index on rbacc (source_id);
     '''
 
     db.DBSession().execute(q)
 
+
     q = '''
     update sources set score = rbacc.sumrb from rbacc where sources.id = rbacc.source_id and score >= 0;
+    
     '''
 
     db.DBSession().execute(q)
@@ -191,16 +193,16 @@ def xmatch(source_ids):
 
     q = '''
     update sources set redshift = (case when d.z_spec = -99 then d.z_phot_median else d.z_spec end)
-    from dr8_join_neighbors d where d.rank = 1 and d.sid = sources.id;
-    '''
+    from dr8_join_neighbors d where d.rank = 1 and d.sid = sources.id and sources.id in %s;
+    ''' % (sids,)
 
     db.DBSession().execute(q)
 
     q = '''
     update sources set score = -1,
     altdata = ('{"rejected": "rejected for having z_dr8 < 0.0001"}')::jsonb
-    where sources.redshift <= 0.0001 or sources.redshift is null;'''
-
+    where sources.redshift <= 0.0001 or sources.redshift is null and sources.id in %s;'''  % (sids,)
+ 
     db.DBSession().execute(q)
 
     q = '''
@@ -208,14 +210,48 @@ def xmatch(source_ids):
     altdata = ('{"rejected": "right on top of (< 1 arcsec) DR8 PSF  ' || d.id::text || '"}')::jsonb
     from dr8_join_neighbors d where d.sid = sources.id and
     d.rank = 1 and (d."TYPE" = 'PSF') and
-    q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600;
-    '''
-
+    q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600 and sources.id in %s;
+    '''  % (sids,)
+ 
     db.DBSession().execute(q)
 
     q = '''
     update sources set neighbor_info = to_json(d) 
     from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 
+    and sources.id in %s 
+    ''' % (sids,)
+    
+    db.DBSession().execute(q)
+
+    q = '''
+
+    create temp table detection_times as (select d.id, 
+    s.obsjd - 2400000.5 as mjd from detections d join objectswithflux o on 
+    d.id = o.id join singleepochsubtractions se on 
+    se.id = o.image_id join scienceimages s on s.id = se.target_image_id
+    where o.source_id is not null) ;
+
+    insert into detection_times (id, mjd)  (select d.id, 
+    to_char(c.binright, 'J')::double precision - 2400000.5 
+    from detections d join objectswithflux o on d.id = o.id 
+    join multiepochsubtractions m on m.id = o.image_id join 
+    sciencecoadds c on c.id = m.target_image_id where 
+    o.source_id is not null);
+
+    create index on detection_times (id, mjd);
+    create index on detection_times (mjd, id);
+    
+    create temp table detection_order as (select s.id as source_id, d.id, 
+    rank() over (partition by s.id order by dt.mjd desc) 
+    from sources s join objectswithflux o on s.id = o.source_id 
+    join detections d on d.id = o.id join 
+    detection_times dt on d.id = dt.id );
+
+    create index on detection_order (source_id, id, rank);
+
+    update sources set last_mjd = dt.mjd from detection_order 
+    dord join detection_times dt on dord.id = dt.id where 
+    sources.id = dord.source_id and dord.rank = 1;    
     '''
 
     db.DBSession().execute(q)
@@ -225,14 +261,26 @@ def associate(debug=False):
 
     db.DBSession().execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;')
 
+    # make source / detection association temp table
+
+    db.DBSession().execute('''
+    create temp table detsource as (select d.id as detection_id, s.id as 
+    source_id from detections d join sources s on q3c_join(s.ra, s.dec,
+    d.ra, d.dec, 0.0002777 * 2)) ;
+
+    create index on detsource (detection_id, source_id);
+    create index on detsource (source_id, detection_id);
+    ''')
+
     r = db.DBSession().execute(
-        'update objectswithflux set source_id = s.id, '
-        'modified = now() from  detections d join objectswithflux o '
-        'on d.id = o.id join sources s on '
-        'q3c_join(d.ra, d.dec, s.ra, s.dec,  0.0002777*2) '
-        'where  o.source_id is NULL  and '
-        'objectswithflux.id = d.id returning d.id, s.id'
+    '''update objectswithflux set source_id = s.id, 
+    modified = now() from  detections d join objectswithflux o 
+    on d.id = o.id join detsource ds on ds.detection_id = d.id
+    join sources s on ds.source_id = s.id where  o.source_id is NULL   and o.created_at > now() - interval '7 days'
+    AND objectswithflux.id = d.id returning d.id, s.id'''
     )
+    
+    
     r = list(r)
     triggers_alert = [row[0] for row in r]
 
