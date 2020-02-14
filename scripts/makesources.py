@@ -202,7 +202,7 @@ def xmatch(source_ids):
     update sources set score = -1,
     altdata = ('{"rejected": "rejected for having z_dr8 < 0.0001"}')::jsonb
     where sources.redshift <= 0.0001 or sources.redshift is null and sources.id in %s;'''  % (sids,)
- 
+
     db.DBSession().execute(q)
 
     q = '''
@@ -212,7 +212,7 @@ def xmatch(source_ids):
     d.rank = 1 and (d."TYPE" = 'PSF') and
     q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600 and sources.id in %s;
     '''  % (sids,)
- 
+
     db.DBSession().execute(q)
 
     q = '''
@@ -220,7 +220,7 @@ def xmatch(source_ids):
     from dr8_join_neighbors d where d.sid = sources.id and d.rank = 1 
     and sources.id in %s 
     ''' % (sids,)
-    
+
     db.DBSession().execute(q)
 
     q = '''
@@ -279,8 +279,8 @@ def associate(debug=False):
     join sources s on ds.source_id = s.id where  o.source_id is NULL   and o.created_at > now() - interval '7 days'
     AND objectswithflux.id = d.id returning d.id, s.id'''
     )
-    
-    
+
+
     r = list(r)
     triggers_alert = [row[0] for row in r]
 
@@ -377,10 +377,10 @@ def associate(debug=False):
             sourceid_map[sourceid] = source
             sources.append(source)
 
-            stups.append(f"('{name}', {bestdet.ra}, {bestdet.dec}, now(), now(), 'f', 'f', 'f', 0)")
+            stups.append(f"('{name}', {bestdet.ra}, {bestdet.dec}, now(), now(), 'f', 'f', 'f', 0, 0)")
             gtups.append(f"('{name}', 1, now(), now())")
 
-        db.DBSession().execute('INSERT INTO sources (id, ra, dec, created_at, modified, transient, varstar, is_roid, "offset") VALUES '
+        db.DBSession().execute('INSERT INTO sources (id, ra, dec, created_at, modified, transient, varstar, is_roid, "offset", score) VALUES '
                                f'{",".join(stups)}')
         db.DBSession().execute('INSERT INTO group_sources (source_id, group_id, created_at, modified) '
                                f'VALUES {",".join(gtups)}')
