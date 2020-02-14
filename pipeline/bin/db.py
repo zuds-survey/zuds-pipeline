@@ -2307,6 +2307,8 @@ models.Source.forced_photometry = relationship('ForcedPhotometry',
                                                cascade='all')
 models.Source.best_detection = property(best_detection)
 
+models.Source.neighbor_info = sa.Column(psql.JSONB)
+
 
 def unphotometered_images(self):
     subq = DBSession().query(ForcedPhotometry.id,
