@@ -25,7 +25,7 @@ def logon():
             continue
         else:
             break
-        
+
     return s
 
 
@@ -398,6 +398,9 @@ def xmatch(ra, dec):
     out['ztfname'] = ','.join(ztfalerts(s, ra, dec))
     out['mqid'] = ','.join(milliquas(s, ra, dec))
     out['tnsid'] = ','.join(tns(s, ra, dec))
+
+    s.close()
+    cur.connection.close()
 
     return out
 
