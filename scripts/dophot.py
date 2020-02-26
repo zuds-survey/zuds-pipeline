@@ -37,7 +37,7 @@ for fn in imgs:
     sources = sub.unphotometered_sources
     sstop = time.time()
     db.print_time(sstart, sstop, sub, 'unphotometered sources')
-    
+
     if len(sources) == 0:
         stop = time.time()
         print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}')
@@ -58,11 +58,25 @@ for fn in imgs:
         print(e)
         continue
 
-    db.DBSession().add_all(phot)
-    db.DBSession().commit()    
+    #db.DBSession().add_all(phot)
+
+    gtups = ['(' + str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))  + ')'
+             for p in phot]
+
+    pid = [row[0] for row in db.DBSession().execute(
+        'INSERT INTO objectswithflux (source_id, image_id, created_at, modified '
+        'flux, fluxerr, type) '
+        f'VALUES {",".join(gtups)} RETURNING ID'
+    )]
+
+    ftups = ['(' + str((i, p.flags, p.ra, p.dec))  + ')' for i, p in zip(pid, phot)]
+    db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
+                           f'VALUES {",".join(ftups)}')
+
+    db.DBSession().commit()
     stop = time.time()
     print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}', flush=True)
-    
+
 
 
 
