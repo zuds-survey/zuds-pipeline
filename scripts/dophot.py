@@ -47,7 +47,7 @@ for fn in imgs:
         pstart = time.time()
         phot = sub.force_photometry(sources,
                                     assume_background_subtracted=True,
-                                    use_cutout=True,
+                                    use_cutout=False,
                                     direct_load={'sci': fn,
                                                  'mask': fn.replace('.fits', '.mask.fits'),
                                                  'rms': fn.replace('.fits', '.rms.fits')}
@@ -60,16 +60,16 @@ for fn in imgs:
 
     #db.DBSession().add_all(phot)
 
-    gtups = ['(' + str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))  + ')'
+    gtups = [str((p.source.id, p.image.id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))
              for p in phot]
 
     pid = [row[0] for row in db.DBSession().execute(
-        'INSERT INTO objectswithflux (source_id, image_id, created_at, modified '
+        'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
         'flux, fluxerr, type) '
         f'VALUES {",".join(gtups)} RETURNING ID'
     )]
 
-    ftups = ['(' + str((i, p.flags, p.ra, p.dec))  + ')' for i, p in zip(pid, phot)]
+    ftups = [str((i, p.flags, p.ra, p.dec)) for i, p in zip(pid, phot)]
     db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
                            f'VALUES {",".join(ftups)}')
 
