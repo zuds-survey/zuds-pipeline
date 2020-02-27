@@ -160,7 +160,7 @@ def do_one(fn, sciclass, subclass, refvers):
     #catcopy = db.HTTPArchiveCopy.from_product(cat)
     #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
     db.DBSession().add(sub)
-    db.DBSession().add(cat)
+    #db.DBSession().add(cat)
     db.DBSession().add_all(detections)
     db.DBSession().add_all(stamps)
 
@@ -215,4 +215,4 @@ if __name__ == '__main__':
             continue
         else:
             db.DBSession().commit()
-        
+
