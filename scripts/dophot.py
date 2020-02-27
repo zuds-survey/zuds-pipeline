@@ -48,7 +48,7 @@ for fn in imgs:
     doneids = [p.source_id for p in phot]
     needed = np.setdiff1d(sids, doneids)
 
-    sources = [sources[id] for id in needed]
+    sources = [sdict[id] for id in needed]
     sstop = time.time()
     db.print_time(sstart, sstop, sub, 'unphotometered sources')
 
