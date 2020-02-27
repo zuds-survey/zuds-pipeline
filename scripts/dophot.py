@@ -25,6 +25,8 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 imgs = mpi.get_my_share_of_work(infile)
 imgs = sorted(imgs, key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
 
+phot = []
+
 for fn in imgs:
 
     start = time.time()
@@ -57,7 +59,7 @@ for fn in imgs:
 
     try:
         pstart = time.time()
-        phot = sub.force_photometry(sources,
+        myphot = sub.force_photometry(sources,
                                     assume_background_subtracted=True,
                                     use_cutout=True,
                                     direct_load={'sci': fn,
@@ -70,24 +72,32 @@ for fn in imgs:
         print(e)
         continue
 
-    #db.DBSession().add_all(phot)
-
-    gtups = ['(' + str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))  + ')'
-             for p in phot]
-
-    pid = [row[0] for row in db.DBSession().execute(
-        'INSERT INTO objectswithflux (source_id, image_id, created_at, modified '
-        'flux, fluxerr, type) '
-        f'VALUES {",".join(gtups)} RETURNING ID'
-    )]
-
-    ftups = ['(' + str((i, p.flags, p.ra, p.dec))  + ')' for i, p in zip(pid, phot)]
-    db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
-                           f'VALUES {",".join(ftups)}')
-
-    db.DBSession().commit()
+    phot.extend(myphot)
     stop = time.time()
     print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}', flush=True)
+
+#db.DBSession().add_all(phot)
+
+dbstart = time.time()
+
+gtups = ['(' + str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))  + ')'
+         for p in phot]
+
+pid = [row[0] for row in db.DBSession().execute(
+    'INSERT INTO objectswithflux (source_id, image_id, created_at, modified '
+    'flux, fluxerr, type) '
+    f'VALUES {",".join(gtups)} RETURNING ID'
+)]
+
+ftups = ['(' + str((i, p.flags, p.ra, p.dec))  + ')' for i, p in zip(pid, phot)]
+db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
+                       f'VALUES {",".join(ftups)}')
+
+db.DBSession().commit()
+dbstop = time.time()
+
+print(f'phot: took {dbstop-dbstart:.2f} sec to do db insert', flush=True)
+
 
 
 
