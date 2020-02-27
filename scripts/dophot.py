@@ -1,4 +1,5 @@
 import db
+import numpy as np
 import sys
 import mpi
 import os
@@ -34,7 +35,18 @@ for fn in imgs:
     sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'), quiet=True)
 
     sstart = time.time()
-    sources = sub.unphotometered_sources
+
+    # get all the sources on the subtraction
+    sources = sub.sources_contained.all()
+    sdict = {s.id: s for s in sources}
+    sids = [s.id for s in sources]
+
+    # get all the photometry thats been done on the subtraction
+    phot = sub.forced_photometry
+    doneids = [p.source_id for p in phot]
+    needed = np.setdiff1d(sids, doneids)
+
+    sources = [sources[id] for id in needed]
     sstop = time.time()
     db.print_time(sstart, sstop, sub, 'unphotometered sources')
 
