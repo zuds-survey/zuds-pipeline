@@ -6,6 +6,7 @@ import os
 import time
 import archive
 from datetime import datetime, timedelta
+from astropy.coordinates import SkyCoord
 
 fmap = {1: 'zg',
         2: 'zr',
@@ -25,16 +26,18 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 imgs = mpi.get_my_share_of_work(infile)
 imgs = sorted(imgs, key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
 
-phot = []
-
 for fn in imgs:
 
     start = time.time()
+    lstart = time.time()
     sub = db.SingleEpochSubtraction.get_by_basename(os.path.basename(fn))
     sub.map_to_local_file(fn, quiet=True)
     sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'), quiet=True)
     sub._rmsimg = db.FITSImage()
     sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'), quiet=True)
+    lstop = time.time()
+
+    db.print_time(lstart, lstop, sub, 'load images')
 
     sstart = time.time()
 
