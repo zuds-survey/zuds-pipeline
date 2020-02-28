@@ -11,6 +11,55 @@ APERTURE_RADIUS = 3 * u.pixel
 APER_KEY = 'APCOR4'
 
 
+def raw_aperture_photometry(sci_path, rms_path, mask_path, ra, dec,
+                            apply_calibration=False):
+
+    ra = np.atleast_1d(ra)
+    dec = np.atleast_1d(dec)
+    coord = SkyCoord(ra, dec, unit='deg')
+
+    with fits.open(sci_path) as shdu:
+        header = shdu[0].header
+        swcs = WCS(header)
+        scipix = shdu[0].data
+
+    with fits.open(rms_path) as rhdu:
+        rmspix = rhdu[0].data
+
+    with fits.open(mask_path) as mhdu:
+        maskpix = mhdu[0].data
+
+
+    apertures = photutils.SkyCircularAperture(coord, r=APERTURE_RADIUS)
+    phot_table = photutils.aperture_photometry(scipix, apertures,
+                                               error=rmspix,
+                                               wcs=swcs)
+
+
+    pixap = apertures.to_pixel(swcs)
+    annulus_masks = pixap.to_mask(method='center')
+    maskpix = [annulus_mask.cutout(maskpix) for annulus_mask in annulus_masks]
+
+
+    if apply_calibration:
+        magzp = header['MAGZP']
+        apcor = header[APER_KEY]
+
+        phot_table['mag'] = -2.5 * np.log10(phot_table['aperture_sum']) + magzp + apcor
+        phot_table['magerr'] = 1.0826 * phot_table['aperture_sum_err'] / phot_table['aperture_sum']
+
+
+    # check for invalid photometry on masked pixels
+    phot_table['flags'] = [int(np.bitwise_or.reduce(m, axis=(0, 1))) for
+                           m in maskpix]
+
+    # rename some columns
+    phot_table.rename_column('aperture_sum', 'flux')
+    phot_table.rename_column('aperture_sum_err', 'fluxerr')
+
+    return phot_table
+
+
 def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
                         assume_background_subtracted=False, use_cutout=False,
                         direct_load=None):

@@ -157,20 +157,21 @@ def submit_forcephot_chain():
 
     os.chdir(scriptname.parent)
 
-    image_names = db.DBSession().query(db.SingleEpochSubtraction.basename).join(
+    image_names = db.DBSession().query(db.SingleEpochSubtraction.basename,
+                                       db.SingleEpochSubtraction.id).join(
         db.ReferenceImage,
         db.SingleEpochSubtraction.reference_image_id == db.ReferenceImage.id
     ).filter(
         db.ReferenceImage.version == 'zuds5',
     ).all()
 
-    image_names = sorted([i[0] for i in image_names], key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
+    image_names = sorted(image_names, key=lambda s: s[0].split('ztf_')[1].split('_')[0], reverse=True)
     image_names = image_names[:FORCEPHOT_IMAGE_LIMIT]
 
     imginname = f'{scriptname}'.replace('.sh', '.in')
     outnames = []
     with open(imginname, 'w') as f:
-        for name in image_names:
+        for name, idnum in image_names:
             #name = name[0]
             g = name.split('_sciimg')[0].split('_')
             q = g[-1]
@@ -178,7 +179,7 @@ def submit_forcephot_chain():
             b = g[-4]
             field = g[-5]
             outnames.append(f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{c}/'
-                            f'{q}/{b}/{name}')
+                            f'{q}/{b}/{name} {idnum}')
 
         f.write('\n'.join(outnames) + '\n')
 

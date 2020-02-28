@@ -7,6 +7,10 @@ import time
 import archive
 from datetime import datetime, timedelta
 from astropy.coordinates import SkyCoord
+from astropy.io import fits
+from astropy.wcs import WCS
+
+from photometry import raw_aperture_photometry
 
 fmap = {1: 'zg',
         2: 'zr',
@@ -17,7 +21,7 @@ db.init_db()
 #db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
-__whatami__ = 'Make the subtractions for ZUDS.'
+__whatami__ = 'Do the photometry for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the subs to do photometry on
 
@@ -26,58 +30,99 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 imgs = mpi.get_my_share_of_work(infile)
 imgs = sorted(imgs, key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
 
-for fn in imgs:
+def print_time(start, stop, obj, stepname):
+    print(f'took {stop-start:.2f} seconds to do {stepname} on {obj}')
+
+
+def get_source_data():
+    source_data = db.DBSession().query(db.models.Source.id,
+                                       db.models.Source.ra,
+                                       db.models.Source.dec).all()
+
+
+    return source_data
+
+
+if mpi.has_mpi():
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+
+    if rank == 0:
+        source_data = get_source_data()
+
+    else:
+        source_data = None
+    source_data = comm.bcast(source_data, root=0)
+
+else:
+    source_data = get_source_data()
+
+
+ids = [s[0] for s in source_data]
+
+source_coords = SkyCoord([s[1] for s in source_data],
+                         [s[2] for s in source_data],
+                         unit='deg')
+
+
+phot = []
+
+for fn, imgid in imgs:
 
     start = time.time()
-    lstart = time.time()
-    sub = db.SingleEpochSubtraction.get_by_basename(os.path.basename(fn))
-    sub.map_to_local_file(fn, quiet=True)
-    sub.mask_image.map_to_local_file(fn.replace('.fits', '.mask.fits'), quiet=True)
-    sub._rmsimg = db.FITSImage()
-    sub.rms_image.map_to_local_file(fn.replace('.fits', '.rms.fits'), quiet=True)
-    lstop = time.time()
+    maskname = fn.replace('.fits', '.mask.fits')
+    rmsname = fn.replace('.fits', '.rms.fits')
 
-    db.print_time(lstart, lstop, sub, 'load images')
+    # get the source ids that have already been done
+    done = db.DBSession().query(db.ForcedPhotometry.source_id).filter(
+        db.ForcedPhotometry.image_id == imgid
+    )
+    done = [d[0] for d in done]
 
-    sstart = time.time()
+    with fits.open(fn) as hdul:
+        wcs = WCS(hdul[0].header)
 
-    # get all the sources on the subtraction
-    sources = sub.sources_contained.all()
-    sdict = {s.id: s for s in sources}
-    sids = [s.id for s in sources]
+    ok = wcs.footprint_contains(source_coords)
+    ids_contained = ids[ok]
+    needed = np.setdiff1d(ids_contained, done)
+    needed_coords = source_coords[ok]
 
-    # get all the photometry thats been done on the subtraction
-    phot = sub.forced_photometry
-    doneids = [p.source_id for p in phot]
-    needed = np.setdiff1d(sids, doneids)
-
-    sources = [sdict[id] for id in needed]
-    sstop = time.time()
-    db.print_time(sstart, sstop, sub, 'unphotometered sources')
-
-    if len(sources) == 0:
+    if len(needed) == 0:
         stop = time.time()
-        print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}')
+        print(f'phot: no photometry needed on {fn},'
+              f' all done (in {stop-start:.2f} sec)')
         continue
 
     try:
         pstart = time.time()
-        myphot = sub.force_photometry(sources,
-                                    assume_background_subtracted=True,
-                                    use_cutout=True,
-                                    direct_load={'sci': fn,
-                                                 'mask': fn.replace('.fits', '.mask.fits'),
-                                                 'rms': fn.replace('.fits', '.rms.fits')}
-                                    )
+
+        ra = [s.ra.deg for s in needed_coords]
+        dec = [s.dec.deg for s in needed_coords]
+        phot_table = raw_aperture_photometry(fn, rmsname, maskname, ra, dec,
+                                             apply_calibration=False)
+
+        myphot = []
+        for k, (i, row) in enumerate(phot_table.iterrows()):
+            p = db.ForcedPhotometry(source_id=needed[k],
+                                    image_id=imgid,
+                                    flux=row['flux'],
+                                    fluxerr=row['fluxerr'],
+                                    flags=int(row['flags']),
+                                    ra=ra[k],
+                                    dec=dec[k])
+            myphot.append(p)
+
         pstop = time.time()
-        db.print_time(pstart, pstop, sub, 'actual force photometry')
+        print_time(pstart, pstop, fn, 'actual force photometry')
+
     except Exception as e:
         print(e)
         continue
 
     phot.extend(myphot)
     stop = time.time()
-    print(f'phot: took {stop-start:.2f} sec to do phot on {sub.basename}', flush=True)
+    print_time(start, stop, fn, 'start to finish')
 
 #db.DBSession().add_all(phot)
 
