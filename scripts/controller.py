@@ -177,7 +177,7 @@ def submit_forcephot_chain():
             c = g[-3]
             b = g[-4]
             field = g[-5]
-            outnames.append(f'/global/cfs/cdirs/m937/data/scratch/{field}/{c}/'
+            outnames.append(f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{c}/'
                             f'{q}/{b}/{name}')
 
         f.write('\n'.join(outnames) + '\n')

@@ -35,7 +35,7 @@ if __name__ == '__main__':
     for inpt in imgs:
 
         s = db.ScienceImage.get_by_basename(os.path.basename(inpt))
-        fn = f'/global/cscratch1/sd/dgold/zuds/{s.field:06d}/' \
+        fn = f'/global/cfs/cdirs/m937/www/data/scratch/{s.field:06d}/' \
              f'c{s.ccdid:02d}/q{s.qid}/{fid_map[s.fid]}/{s.basename}'
 
         shutil.copy(inpt, fn)
