@@ -28,7 +28,7 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 
 # get the work
 imgs = mpi.get_my_share_of_work(infile)
-imgs = sorted(imgs, key=lambda s: s.split('ztf_')[1].split('_')[0], reverse=True)
+imgs = sorted(imgs, key=lambda s: s[0].split('ztf_')[1].split('_')[0], reverse=True)
 
 def print_time(start, stop, obj, stepname):
     print(f'took {stop-start:.2f} seconds to do {stepname} on {obj}')
@@ -59,7 +59,7 @@ else:
     source_data = get_source_data()
 
 
-ids = [s[0] for s in source_data]
+ids = np.asarray([s[0] for s in source_data])
 
 source_coords = SkyCoord([s[1] for s in source_data],
                          [s[2] for s in source_data],
@@ -76,7 +76,7 @@ for fn, imgid in imgs:
 
     # get the source ids that have already been done
     done = db.DBSession().query(db.ForcedPhotometry.source_id).filter(
-        db.ForcedPhotometry.image_id == imgid
+        db.ForcedPhotometry.image_id == int(imgid)
     )
     done = [d[0] for d in done]
 
@@ -103,7 +103,7 @@ for fn, imgid in imgs:
                                              apply_calibration=False)
 
         myphot = []
-        for k, (i, row) in enumerate(phot_table.iterrows()):
+        for k, row in enumerate(phot_table):
             p = db.ForcedPhotometry(source_id=needed[k],
                                     image_id=imgid,
                                     flux=row['flux'],
@@ -128,16 +128,16 @@ for fn, imgid in imgs:
 
 dbstart = time.time()
 
-gtups = ['(' + str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))  + ')'
+gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry')) 
          for p in phot]
 
 pid = [row[0] for row in db.DBSession().execute(
-    'INSERT INTO objectswithflux (source_id, image_id, created_at, modified '
+    'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
     'flux, fluxerr, type) '
     f'VALUES {",".join(gtups)} RETURNING ID'
 )]
 
-ftups = ['(' + str((i, p.flags, p.ra, p.dec))  + ')' for i, p in zip(pid, phot)]
+ftups = [str((i, p.flags, p.ra, p.dec))  for i, p in zip(pid, phot)]
 db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
                        f'VALUES {",".join(ftups)}')
 
