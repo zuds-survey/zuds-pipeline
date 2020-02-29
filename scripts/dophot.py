@@ -131,20 +131,26 @@ dbstart = time.time()
 gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry')) 
          for p in phot]
 
-pid = [row[0] for row in db.DBSession().execute(
-    'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
-    'flux, fluxerr, type) '
-    f'VALUES {",".join(gtups)} RETURNING ID'
-)]
+if len(gtups) > 0:
 
-ftups = [str((i, p.flags, p.ra, p.dec))  for i, p in zip(pid, phot)]
-db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
-                       f'VALUES {",".join(ftups)}')
+    pid = [row[0] for row in db.DBSession().execute(
+        'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
+        'flux, fluxerr, type) '
+        f'VALUES {",".join(gtups)} RETURNING ID'
+    )]
 
-db.DBSession().commit()
-dbstop = time.time()
+    ftups = [str((i, p.flags, p.ra, p.dec))  for i, p in zip(pid, phot)]
+    db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
+                           f'VALUES {",".join(ftups)}')
 
-print(f'phot: took {dbstop-dbstart:.2f} sec to do db insert', flush=True)
+    db.DBSession().commit()
+    dbstop = time.time()
+
+    print(f'phot: took {dbstop-dbstart:.2f} sec to do db insert', flush=True)
+else:
+    print('nothing to push to the database.')
+
+    
 
 
 
