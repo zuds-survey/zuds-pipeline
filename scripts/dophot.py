@@ -96,7 +96,7 @@ def unphotometered_sources(image_id, footprint):
 
 phot = []
 
-for fn, imgid in imgs:
+for g, (fn, imgid) in enumerate(imgs):
 
     start = time.time()
     maskname = fn.replace('.fits', '.mask.fits')
@@ -134,20 +134,22 @@ for fn, imgid in imgs:
             myphot.append(p)
 
         pstop = time.time()
+        phot.extend(myphot)
         print_time(pstart, pstop, fn, 'actual force photometry')
 
-        commit_to_db(myphot)
 
     except Exception as e:
         print(e)
         continue
 
-    #phot.extend(myphot)
+    if (g + 1) % 200 == 0:
+        commit_to_db(phot)
+        phot = []
+
     stop = time.time()
     print_time(start, stop, fn, 'start to finish')
 
-#db.DBSession().add_all(phot)
-
+commit_to_db(phot)
 
 
 
