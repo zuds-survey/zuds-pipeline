@@ -63,7 +63,7 @@ def do_one(fn, sciclass, subclass, refvers):
     ccdid = f'c{sci.ccdid:02d}'
     qid = f'q{sci.qid}'
     fid = f'{fmap[sci.fid]}'
-    refname = f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/' \
+    refname = f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{ccdid}/{qid}/' \
               f'{fid}/ref.{field}_{ccdid}_{qid}_{fid}.{refvers}.fits'
 
     if not (db.ReferenceImage.get_by_basename(os.path.basename(refname))
@@ -103,7 +103,7 @@ def do_one(fn, sciclass, subclass, refvers):
     substart = time.time()
     sub = subclass.from_images(sci, ref,
                                data_product=False,
-                               tmpdir='tmp')
+                               tmpdir='/tmp')
 
     substop = time.time()
     print(

@@ -36,7 +36,7 @@ for _, job in jobs.iterrows():
     fid = f'{fmap[images[0].fid]}'
 
     for image in images:
-        path = f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/' \
+        path = f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{ccdid}/{qid}/' \
                f'{fid}/{image.basename}'
         image.map_to_local_file(path)
         image.mask_image.map_to_local_file(path.replace('sciimg', 'mskimg'))
