@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
+from sqlalchemy.dialects.postgresql import array
+
 
 from photometry import raw_aperture_photometry
 
@@ -28,42 +30,39 @@ infile = sys.argv[1]  # file listing all the subs to do photometry on
 
 # get the work
 imgs = mpi.get_my_share_of_work(infile)
-imgs = sorted(imgs, key=lambda s: s[0].split('ztf_')[1].split('_')[0], reverse=True)
+imgs = sorted(imgs, key=lambda s: s[0].split('ztf_')[1].split('_')[0],
+              reverse=True)
 
 def print_time(start, stop, obj, stepname):
     print(f'took {stop-start:.2f} seconds to do {stepname} on {obj}')
 
 
-def get_source_data():
-    source_data = db.DBSession().query(db.models.Source.id,
-                                       db.models.Source.ra,
-                                       db.models.Source.dec).all()
+def unphotometered_sources(image_id, footprint):
 
+    poly = array(tuple(footprint.ravel()))
 
-    return source_data
+    jcond2 = db.sa.and_(
+        db.ForcedPhotometry.image_id == image_id,
+        db.ForcedPhotometry.source_id == db.models.Source.id
+    )
 
+    query = db.DBSession().query(
+        db.models.Source.id,
+        db.models.Source.ra,
+        db.models.Source.dec
+    ).outerjoin(
+        db.ForcedPhotometry, jcond2
+    ).filter(
+        db.ForcedPhotometry.id == None
+    ).filter(
+        db.sa.func.q3c_poly_query(
+            db.models.Source.ra,
+            db.models.Source.dec,
+            poly
+        )
+    )#.with_for_update(of=models.Source)
 
-if mpi.has_mpi():
-    from mpi4py import MPI
-    comm = MPI.COMM_WORLD
-    rank = comm.Get_rank()
-
-    if rank == 0:
-        source_data = get_source_data()
-
-    else:
-        source_data = None
-    source_data = comm.bcast(source_data, root=0)
-
-else:
-    source_data = get_source_data()
-
-
-ids = np.asarray([s[0] for s in source_data])
-
-source_coords = SkyCoord([s[1] for s in source_data],
-                         [s[2] for s in source_data],
-                         unit='deg')
+    return query.all()
 
 
 phot = []
@@ -74,19 +73,11 @@ for fn, imgid in imgs:
     maskname = fn.replace('.fits', '.mask.fits')
     rmsname = fn.replace('.fits', '.rms.fits')
 
-    # get the source ids that have already been done
-    done = db.DBSession().query(db.ForcedPhotometry.source_id).filter(
-        db.ForcedPhotometry.image_id == int(imgid)
-    )
-    done = [d[0] for d in done]
-
     with fits.open(fn) as hdul:
-        wcs = WCS(hdul[0].header)
+        hd = hdul[0].header
+        wcs = WCS(hd)
 
-    ok = wcs.footprint_contains(source_coords)
-    ids_contained = ids[ok]
-    needed = np.setdiff1d(ids_contained, done)
-    needed_coords = source_coords[ok]
+    needed = unphotometered_sources(int(imgid), wcs.calc_footprint())
 
     if len(needed) == 0:
         stop = time.time()
@@ -97,14 +88,14 @@ for fn, imgid in imgs:
     try:
         pstart = time.time()
 
-        ra = [s.ra.deg for s in needed_coords]
-        dec = [s.dec.deg for s in needed_coords]
+        ra = [s[1] for s in needed]
+        dec = [s[2] for s in needed]
         phot_table = raw_aperture_photometry(fn, rmsname, maskname, ra, dec,
                                              apply_calibration=False)
 
         myphot = []
         for k, row in enumerate(phot_table):
-            p = db.ForcedPhotometry(source_id=needed[k],
+            p = db.ForcedPhotometry(source_id=needed[k][0],
                                     image_id=imgid,
                                     flux=row['flux'],
                                     fluxerr=row['fluxerr'],
@@ -128,7 +119,7 @@ for fn, imgid in imgs:
 
 dbstart = time.time()
 
-gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry')) 
+gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))
          for p in phot]
 
 if len(gtups) > 0:
@@ -150,7 +141,7 @@ if len(gtups) > 0:
 else:
     print('nothing to push to the database.')
 
-    
+
 
 
 
