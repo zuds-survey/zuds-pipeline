@@ -37,6 +37,35 @@ def print_time(start, stop, obj, stepname):
     print(f'took {stop-start:.2f} seconds to do {stepname} on {obj}')
 
 
+def commit_to_db(phot):
+    dbstart = time.time()
+
+    gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr,
+                  'photometry'))
+             for p in phot]
+
+    if len(gtups) > 0:
+
+        pid = [row[0] for row in db.DBSession().execute(
+            'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
+            'flux, fluxerr, type) '
+            f'VALUES {",".join(gtups)} RETURNING ID'
+        )]
+
+        ftups = [str((i, p.flags, p.ra, p.dec)) for i, p in zip(pid, phot)]
+        db.DBSession().execute(
+            f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
+            f'VALUES {",".join(ftups)}')
+
+        db.DBSession().commit()
+        dbstop = time.time()
+
+        print(f'phot: took {dbstop-dbstart:.2f} sec to do db insert',
+              flush=True)
+    else:
+        print('nothing to push to the database.')
+
+
 def unphotometered_sources(image_id, footprint):
 
     poly = array(tuple(footprint.ravel()))
@@ -107,41 +136,17 @@ for fn, imgid in imgs:
         pstop = time.time()
         print_time(pstart, pstop, fn, 'actual force photometry')
 
+        commit_to_db(myphot)
+
     except Exception as e:
         print(e)
         continue
 
-    phot.extend(myphot)
+    #phot.extend(myphot)
     stop = time.time()
     print_time(start, stop, fn, 'start to finish')
 
 #db.DBSession().add_all(phot)
-
-dbstart = time.time()
-
-gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr, 'photometry'))
-         for p in phot]
-
-if len(gtups) > 0:
-
-    pid = [row[0] for row in db.DBSession().execute(
-        'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
-        'flux, fluxerr, type) '
-        f'VALUES {",".join(gtups)} RETURNING ID'
-    )]
-
-    ftups = [str((i, p.flags, p.ra, p.dec))  for i, p in zip(pid, phot)]
-    db.DBSession().execute(f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
-                           f'VALUES {",".join(ftups)}')
-
-    db.DBSession().commit()
-    dbstop = time.time()
-
-    print(f'phot: took {dbstop-dbstart:.2f} sec to do db insert', flush=True)
-else:
-    print('nothing to push to the database.')
-
-
 
 
 
