@@ -1,5 +1,6 @@
 import db
 import numpy as np
+import pandas as pd
 import sys
 import mpi
 import os
@@ -94,11 +95,11 @@ def unphotometered_sources(image_id, footprint):
     return query.all()
 
 
-phot = []
+output = []
+start = time.time()
 
 for g, (fn, imgid) in enumerate(imgs):
 
-    start = time.time()
     maskname = fn.replace('.fits', '.mask.fits')
     rmsname = fn.replace('.fits', '.rms.fits')
 
@@ -122,19 +123,18 @@ for g, (fn, imgid) in enumerate(imgs):
         phot_table = raw_aperture_photometry(fn, rmsname, maskname, ra, dec,
                                              apply_calibration=False)
 
-        myphot = []
         for k, row in enumerate(phot_table):
-            p = db.ForcedPhotometry(source_id=needed[k][0],
-                                    image_id=imgid,
-                                    flux=row['flux'],
-                                    fluxerr=row['fluxerr'],
-                                    flags=int(row['flags']),
-                                    ra=ra[k],
-                                    dec=dec[k])
-            myphot.append(p)
+            p = {'source_id': needed[k][0],
+                 'image_id': imgid,
+                 'flux': row['flux'],
+                 'fluxerr':row['fluxerr'],
+                 'flags':int(row['flags']),
+                 'ra':ra[k],
+                 'dec':dec[k]}
+
+            output.append(p)
 
         pstop = time.time()
-        phot.extend(myphot)
         print_time(pstart, pstop, fn, 'actual force photometry')
 
 
@@ -142,14 +142,18 @@ for g, (fn, imgid) in enumerate(imgs):
         print(e)
         continue
 
-    if (g + 1) % 200 == 0:
-        commit_to_db(phot)
-        phot = []
+df = pd.DataFrame(output)
 
-    stop = time.time()
-    print_time(start, stop, fn, 'start to finish')
+if mpi.has_mpi():
+    from mpi4py import MPI
+    comm = MPI.COMM_WORLD
+    rank = comm.Get_rank()
+else:
+    rank = 0
 
-commit_to_db(phot)
+df.to_csv(f'output_{rank}.csv')
+stop = time.time()
+print_time(start, stop, rank, 'start to finish')
 
 
 
