@@ -63,7 +63,7 @@ for _, job in jobs.iterrows():
         stack = db.ScienceCoadd.from_images(
             images, outfile_name=outname,
             data_product=False,
-            tmpdir='tmp',
+            tmpdir='/tmp',
             nthreads=mpi.get_nthreads()
         )
     except Exception as e:
