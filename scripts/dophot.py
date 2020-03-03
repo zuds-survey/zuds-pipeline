@@ -41,7 +41,7 @@ def print_time(start, stop, obj, stepname):
 
 def write_csv(output):
     df = pd.DataFrame(output).to_records()
-    df.to_csv(f'output.csv')
+    df.to_csv(f'output.csv', index=False)
     stop = time.time()
     print_time(start, stop, 0, 'start to finish')
 
