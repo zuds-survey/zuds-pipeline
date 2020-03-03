@@ -11,6 +11,7 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
 from sqlalchemy.dialects.postgresql import array
+from itertools import chain
 
 
 from photometry import raw_aperture_photometry
@@ -36,6 +37,13 @@ imgs = sorted(imgs, key=lambda s: s[0].split('ztf_')[1].split('_')[0],
 
 def print_time(start, stop, obj, stepname):
     print(f'took {stop-start:.2f} seconds to do {stepname} on {obj}')
+
+
+def write_csv(output):
+    df = pd.DataFrame(output).to_records()
+    df.to_csv(f'output.csv')
+    stop = time.time()
+    print_time(start, stop, 0, 'start to finish')
 
 
 def commit_to_db(phot):
@@ -142,20 +150,17 @@ for g, (fn, imgid) in enumerate(imgs):
         print(e)
         continue
 
-df = pd.DataFrame(output)
 
 if mpi.has_mpi():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+    output = list(chain(*comm.gather(output, root=0)))
+    if rank == 0:
+        write_csv(output)
+
 else:
-    rank = 0
-
-df.to_csv(f'output_{rank}.csv')
-stop = time.time()
-print_time(start, stop, rank, 'start to finish')
-
-
+    write_csv(output)
 
 
 
