@@ -13,6 +13,8 @@ from astropy.wcs import WCS
 from sqlalchemy.dialects.postgresql import array
 from itertools import chain
 
+from io import StringIO
+
 
 from photometry import raw_aperture_photometry
 
@@ -42,8 +44,6 @@ def print_time(start, stop, obj, stepname):
 def write_csv(output):
     df = pd.DataFrame(output)
     df.to_csv(f'output.csv', index=False)
-    stop = time.time()
-    print_time(start, stop, 0, 'start to finish')
 
 
 def commit_to_db(phot):
@@ -155,13 +155,26 @@ if mpi.has_mpi():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+
+    # avoid pandas to csv bottleneck using parallelism
+    df = pd.DataFrame(output)
+    buf = StringIO()
+    df.to_csv(buf, index=False, header=rank == 0)
+    csvstr = buf.getvalue()
+
     output = comm.gather(output, root=0)
+
     if rank == 0:
-        output = list(chain(*output))
-        write_csv(output)
+        output = '\n'.join(output)
+        with open('output.csv', 'w') as f:
+            f.write(output)
 
 else:
-    write_csv(output)
+    df = pd.DataFrame(output)
+    df.to_csv('output.csv', index=False)
+
+stop = time.time()
+print_time(start, stop, 0, 'start to finish')
 
 
 
