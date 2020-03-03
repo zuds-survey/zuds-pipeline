@@ -40,7 +40,7 @@ def print_time(start, stop, obj, stepname):
 
 
 def write_csv(output):
-    df = pd.DataFrame(output).to_records()
+    df = pd.DataFrame(output)
     df.to_csv(f'output.csv', index=False)
     stop = time.time()
     print_time(start, stop, 0, 'start to finish')
@@ -155,8 +155,9 @@ if mpi.has_mpi():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
-    output = list(chain(*comm.gather(output, root=0)))
+    output = comm.gather(output, root=0)
     if rank == 0:
+        output = list(chain(*output))
         write_csv(output)
 
 else:
