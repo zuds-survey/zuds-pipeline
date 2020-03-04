@@ -2251,15 +2251,13 @@ class Detection(ObjectWithFlux, SpatiallyIndexed):
         return result
 
 
-class ForcedPhotometry(ObjectWithFlux, SpatiallyIndexed):
-    id = sa.Column(sa.Integer,
-                   sa.ForeignKey('objectswithflux.id', ondelete='CASCADE'),
-                   primary_key=True)
+class ForcedPhotometry(models.Base):
+    id = sa.Column(sa.Integer, primary_key=True)
     __tablename__ = 'forcedphotometry'
-    __mapper_args__ = {'polymorphic_identity': 'photometry',
-                       'inherit_condition': id == ObjectWithFlux.id}
 
     flags = sa.Column(sa.Integer)
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
 
     @property
     def mag(self):
@@ -2269,6 +2267,27 @@ class ForcedPhotometry(ObjectWithFlux, SpatiallyIndexed):
     @property
     def magerr(self):
         return 1.08573620476 * self.fluxerr / self.flux
+
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
+                                                   ondelete='CASCADE'),
+                         index=True)
+    image = relationship('CalibratedImage', back_populates='forced_photometry',
+                         cascade='all')
+
+    # thumbnails = relationship('Thumbnail', cascade='all')
+
+    source_id = sa.Column(sa.Text,
+                          sa.ForeignKey('sources.id', ondelete='CASCADE'),
+                          index=True)
+    source = relationship('Source', cascade='all')
+
+    flux = sa.Column(sa.Float)
+    fluxerr = sa.Column(sa.Float)
+
+    @hybrid_property
+    def snr(self):
+        return self.flux / self.fluxerr
+
 
 models.Source.thumbnails = relationship('Thumbnail', cascade='all')
 
