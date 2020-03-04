@@ -18,15 +18,15 @@ def raw_aperture_photometry(sci_path, rms_path, mask_path, ra, dec,
     dec = np.atleast_1d(dec)
     coord = SkyCoord(ra, dec, unit='deg')
 
-    with fits.open(sci_path) as shdu:
+    with fits.open(sci_path, memmap=False) as shdu:
         header = shdu[0].header
         swcs = WCS(header)
         scipix = shdu[0].data
 
-    with fits.open(rms_path) as rhdu:
+    with fits.open(rms_path, memmap=False) as rhdu:
         rmspix = rhdu[0].data
 
-    with fits.open(mask_path) as mhdu:
+    with fits.open(mask_path, memmap=False) as mhdu:
         maskpix = mhdu[0].data
 
 

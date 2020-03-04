@@ -141,10 +141,13 @@ for g, (fn, imgid) in enumerate(imgs):
                 ap_func = timeout(5)(raw_aperture_photometry)
                 phot_table = ap_func(fn, rmsname, maskname, ra, dec, apply_calibration=False)
             except TimeoutError:
-                print(f'timed out on {fn} ({i + 1} / 3)')
+                print(f'timed out on {fn} ({i + 1} / 3)', flush=True)
                 continue
             else:
                 break
+
+        if i == 2:
+            continue
 
         for k, row in enumerate(phot_table):
             p = {'source_id': needed[k][0],
