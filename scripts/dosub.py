@@ -103,7 +103,7 @@ def do_one(fn, sciclass, subclass, refvers):
     substart = time.time()
     sub = subclass.from_images(sci, ref,
                                data_product=False,
-                               tmpdir='/tmp')
+                               tmpdir='tmp')
 
     substop = time.time()
     print(
