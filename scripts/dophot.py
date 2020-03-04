@@ -134,12 +134,13 @@ if mpi.has_mpi():
     df.to_csv(buf, index=False, header=rank == 0)
     csvstr = buf.getvalue()
 
-    output = comm.gather(output, root=0)
+    csvstr = comm.gather(csvstr, root=0)
+    #print(output, flush=True)
 
     if rank == 0:
-        output = '\n'.join(output)
+        outstr = '\n'.join(csvstr)
         with open('output.csv', 'w') as f:
-            f.write(output)
+            f.write(outstr)
 
 else:
     df = pd.DataFrame(output)
