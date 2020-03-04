@@ -88,18 +88,21 @@ for g, (fn, imgid) in enumerate(imgs):
         hd = hdul[0].header
         wcs = WCS(hd)
 
+    nstart = time.time()
     try:
         needed = unphotometered_sources(int(imgid), wcs.calc_footprint())
 
     except Exception as e:
         print(e)
         continue
+    nstop = time.time()
+
+    print_time(nstart, nstop, fn, 'unphotometered sources')
 
 
     if len(needed) == 0:
-        stop = time.time()
         print(f'phot: no photometry needed on {fn},'
-              f' all done (in {stop-start:.2f} sec)')
+              f' all done (in {nstop-nstart:.2f} sec)')
         continue
 
     try:
