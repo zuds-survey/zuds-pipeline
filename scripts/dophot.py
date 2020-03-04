@@ -1,4 +1,6 @@
 import db
+db.DBSession.remove()
+db.init_db(timeout=60)
 import numpy as np
 import pandas as pd
 import sys
@@ -86,7 +88,13 @@ for g, (fn, imgid) in enumerate(imgs):
         hd = hdul[0].header
         wcs = WCS(hd)
 
-    needed = unphotometered_sources(int(imgid), wcs.calc_footprint())
+    try:
+        needed = unphotometered_sources(int(imgid), wcs.calc_footprint())
+
+    except Exception as e:
+        print(e)
+        continue
+
 
     if len(needed) == 0:
         stop = time.time()
