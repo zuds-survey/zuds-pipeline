@@ -46,35 +46,6 @@ def write_csv(output):
     df.to_csv(f'output.csv', index=False)
 
 
-def commit_to_db(phot):
-    dbstart = time.time()
-
-    gtups = [str((p.source_id, p.image_id, 'now()', 'now()', p.flux, p.fluxerr,
-                  'photometry'))
-             for p in phot]
-
-    if len(gtups) > 0:
-
-        pid = [row[0] for row in db.DBSession().execute(
-            'INSERT INTO objectswithflux (source_id, image_id, created_at, modified, '
-            'flux, fluxerr, type) '
-            f'VALUES {",".join(gtups)} RETURNING ID'
-        )]
-
-        ftups = [str((i, p.flags, p.ra, p.dec)) for i, p in zip(pid, phot)]
-        db.DBSession().execute(
-            f'INSERT INTO forcedphotometry (id, flags, ra, dec) '
-            f'VALUES {",".join(ftups)}')
-
-        db.DBSession().commit()
-        dbstop = time.time()
-
-        print(f'phot: took {dbstop-dbstart:.2f} sec to do db insert',
-              flush=True)
-    else:
-        print('nothing to push to the database.')
-
-
 def unphotometered_sources(image_id, footprint):
 
     poly = array(tuple(footprint.ravel()))
@@ -159,6 +130,7 @@ if mpi.has_mpi():
     # avoid pandas to csv bottleneck using parallelism
     df = pd.DataFrame(output)
     buf = StringIO()
+
     df.to_csv(buf, index=False, header=rank == 0)
     csvstr = buf.getvalue()
 
