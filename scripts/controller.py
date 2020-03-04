@@ -30,9 +30,7 @@ ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
                822,823,843,844,845,846,861,862,863]
 fid_map = {1: 'zg', 2:'zr', 3:'zi'}
 
-FORCEPHOT_IMAGE_LIMIT = 150000
-
-
+FORCEPHOT_IMAGE_LIMIT = 750000
 
 
 def _update_source_coordinate(source_object, detections):
@@ -219,6 +217,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
             f'"{str(stdout)}", "{str(stdout)}".'
         )
 
+    '''
     os.chdir(curdir)
     jobid = stdout.strip().split()[-1].decode('ascii')
 
@@ -273,6 +272,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     _ = stdout.strip().split()[-1].decode('ascii')
 
     return jobid
+    '''
 
 
 if __name__ == '__main__':
