@@ -14,6 +14,9 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from sqlalchemy.dialects.postgresql import array
 from itertools import chain
+from functools import wraps
+import errno
+import signal
 
 from io import StringIO
 
@@ -46,6 +49,29 @@ def print_time(start, stop, obj, stepname):
 def write_csv(output):
     df = pd.DataFrame(output)
     df.to_csv(f'output.csv', index=False)
+
+
+
+class TimeoutError(Exception):
+    pass
+
+def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+    def decorator(func):
+        def _handle_timeout(signum, frame):
+            raise TimeoutError(error_message)
+
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, _handle_timeout)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wraps(func)(wrapper)
+
+    return decorator
 
 
 def unphotometered_sources(image_id, footprint):
@@ -110,8 +136,15 @@ for g, (fn, imgid) in enumerate(imgs):
 
         ra = [s[1] for s in needed]
         dec = [s[2] for s in needed]
-        phot_table = raw_aperture_photometry(fn, rmsname, maskname, ra, dec,
-                                             apply_calibration=False)
+        for i in range(3):
+            try:
+                ap_func = timeout(5)(raw_aperture_photometry)
+                phot_table = ap_func(fn, rmsname, maskname, ra, dec, apply_calibration=False)
+            except TimeoutError:
+                print(f'timed out on {fn}')
+                continue
+            else:
+                break
 
         for k, row in enumerate(phot_table):
             p = {'source_id': needed[k][0],
