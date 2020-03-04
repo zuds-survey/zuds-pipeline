@@ -20,7 +20,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from skyportal import models
-from skyportal.models import (DBSession, init_db as idb)
+from skyportal.models import DBSession
 from skyportal.model_util import create_tables, drop_tables
 
 from datetime import datetime
@@ -256,14 +256,30 @@ def sub_name(frame, template):
     return sub
 
 
-def init_db(old=False):
+def init_db(old=False, timeout=None):
     hpss_dbhost = get_secret('hpss_dbhost')
     hpss_dbport = get_secret('hpss_dbport')
     hpss_dbusername = get_secret('hpss_dbusername')
     hpss_dbname = get_secret('hpss_dbname') if not old else get_secret('olddb')
     hpss_dbpassword = get_secret('hpss_dbpassword')
-    return idb(hpss_dbusername, hpss_dbname, hpss_dbpassword,
-               hpss_dbhost, hpss_dbport)
+
+    url = 'postgresql://{}:{}@{}:{}/{}'
+    url = url.format(hpss_dbusername, hpss_dbpassword or '',
+                     hpss_dbhost or '',
+                     hpss_dbport or '',
+                     hpss_dbname)
+
+
+    kwargs = {}
+    if timeout is not None:
+        kwargs['connect_args'] = {"options": f"-c statement_timeout={timeout}"}
+
+    conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
+
+    DBSession.configure(bind=conn)
+    models.Base.metadata.bind = conn
+
+    return conn
 
 
 def model_representation(o):
