@@ -217,6 +217,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
             f'"{str(stdout)}", "{str(stdout)}".'
         )
 
+    '''
     os.chdir(curdir)
     jobid = stdout.strip().split()[-1].decode('ascii')
 
@@ -271,6 +272,7 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     _ = stdout.strip().split()[-1].decode('ascii')
 
     return jobid
+    '''
 
 
 if __name__ == '__main__':
