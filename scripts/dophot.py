@@ -1,6 +1,6 @@
 import db
 db.DBSession.remove()
-db.init_db(timeout=60)
+db.init_db(timeout=60000)
 import numpy as np
 import pandas as pd
 import sys
@@ -145,7 +145,7 @@ if mpi.has_mpi():
     df.to_csv(buf, index=False, header=rank == 0)
     csvstr = buf.getvalue()
 
-    csvstr = comm.gather(csvstr, root=0)
+    csvstr = comm.Gather(csvstr, root=0)
     #print(output, flush=True)
 
     if rank == 0:
