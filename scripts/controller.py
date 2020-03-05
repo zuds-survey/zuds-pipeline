@@ -8,6 +8,7 @@ from tqdm import tqdm
 import sys
 import shutil
 import publish
+import random
 import numpy as np
 import traceback
 import pandas as pd
@@ -128,6 +129,78 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
     return jobid
 
 
+def submit_alert_job():
+
+    # get the what needs alerts
+    detids = db.DBSession().query(db.Detection.id).outerjoin(
+        db.Alert, db.Alert.detection_id == db.Detection.id
+    ).filter(
+        db.Detection.alert_ready == True,
+        db.Alert.id == None
+    ).all()
+
+    detids = [d[0] for d in detids]
+
+    curdir = os.getcwd()
+
+    ndt = datetime.datetime.utcnow()
+    nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
+
+    if len(detids) == 0:
+        raise RuntimeError('No detections to run make alerts for, abandoning '
+                           'forced photometry and alerting ')
+
+    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
+                      f'nightly/{nightdate}/{ndt}.alert.sh'.replace(' ', '_'))
+    scriptname.parent.mkdir(parents=True, exist_ok=True)
+
+    os.chdir(scriptname.parent)
+
+    detinname = f'{scriptname}'.replace('.sh', '.in')
+    with open(detinname, 'w') as f:
+        f.write('\n'.join([str(i) for i in detids]) + '\n')
+
+    jobscript = f"""#!/bin/bash
+    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+    #SBATCH -N 1
+    #SBATCH -C haswell
+    #SBATCH -q realtime
+    #SBATCH --exclusive
+    #SBATCH -J zuds
+    #SBATCH -t 00:60:00
+    #SBATCH -L SCRATCH
+    #SBATCH -A ***REMOVED***
+    #SBATCH -o {str(scriptname).replace('.sh', '.out')}
+
+    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
+
+        """
+
+    with open(scriptname, 'w') as f:
+        f.write(jobscript)
+
+    cmd = f'sbatch {scriptname}'
+    process = subprocess.Popen(
+        cmd.split(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    stdout, stderr = process.communicate()
+    print(stdout)
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f'Non-zero exit code from sbatch, output was '
+            f'"{str(stdout)}", "{str(stdout)}".'
+        )
+
+    os.chdir(curdir)
+    jobid = stdout.strip().split()[-1].decode('ascii')
+
+    return jobid
+
 def submit_forcephot_chain():
 
     # get the what needs alerts
@@ -165,6 +238,7 @@ def submit_forcephot_chain():
 
     image_names = sorted(image_names, key=lambda s: s[0].split('ztf_')[1].split('_')[0], reverse=True)
     image_names = image_names[:FORCEPHOT_IMAGE_LIMIT]
+    random.shuffle(image_names)
 
     imginname = f'{scriptname}'.replace('.sh', '.in')
     outnames = []
@@ -184,7 +258,7 @@ def submit_forcephot_chain():
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
 #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-#SBATCH -N 17
+#SBATCH -N 13
 #SBATCH -C haswell
 #SBATCH -q realtime
 #SBATCH --exclusive
@@ -194,7 +268,7 @@ def submit_forcephot_chain():
 #SBATCH -A ***REMOVED***
 #SBATCH -o {str(scriptname).replace('.sh', '.out')}
 
-HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds5
+HDF5_USE_FILE_LOCKING=FALSE srun -n 832 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds5
 
 """
 
@@ -217,62 +291,10 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 1088 -c1 --cpu_bind=cores shifter python $HO
             f'"{str(stdout)}", "{str(stdout)}".'
         )
 
-    '''
     os.chdir(curdir)
     jobid = stdout.strip().split()[-1].decode('ascii')
 
-    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
-                      f'nightly/{nightdate}/{ndt}.alert.sh'.replace(' ', '_'))
-    scriptname.parent.mkdir(parents=True, exist_ok=True)
-
-    os.chdir(scriptname.parent)
-
-    detinname = f'{scriptname}'.replace('.sh', '.in')
-    with open(detinname, 'w') as f:
-        f.write('\n'.join([str(i) for i in detids]) + '\n')
-
-    jobscript = f"""#!/bin/bash
-#SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
-#SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-#SBATCH -N 1
-#SBATCH -C haswell
-#SBATCH -q realtime
-#SBATCH --exclusive
-#SBATCH -J zuds
-#SBATCH -t 00:60:00
-#SBATCH -L SCRATCH
-#SBATCH -A ***REMOVED***
-#SBATCH --dependency=afterany:{jobid}
-#SBATCH -o {str(scriptname).replace('.sh', '.out')}
-
-HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
-
-    """
-
-    with open(scriptname, 'w') as f:
-        f.write(jobscript)
-
-    cmd = f'sbatch {scriptname}'
-    process = subprocess.Popen(
-        cmd.split(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-
-    stdout, stderr = process.communicate()
-    print(stdout)
-
-    if process.returncode != 0:
-        raise RuntimeError(
-            f'Non-zero exit code from sbatch, output was '
-            f'"{str(stdout)}", "{str(stdout)}".'
-        )
-
-    os.chdir(curdir)
-    _ = stdout.strip().split()[-1].decode('ascii')
-
     return jobid
-    '''
 
 
 if __name__ == '__main__':
@@ -288,6 +310,11 @@ if __name__ == '__main__':
         also_processing = db.DBSession().query(
             db.ForcePhotJob
         ).filter(db.ForcePhotJob.status == 'processing')
+
+        alert_processing = db.DBSession().query(
+            db.AlertJob
+        ).filter(db.AlertJob.status == 'processing')
+
 
         # get the slurm jobs and their statuses
 
@@ -305,6 +332,11 @@ if __name__ == '__main__':
                 db.DBSession().add(job)
 
         for job in also_processing:
+            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
+                job.status = 'done'
+                db.DBSession().add(job)
+
+        for job in alert_processing:
             if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
                 job.status = 'done'
                 db.DBSession().add(job)
@@ -398,6 +430,26 @@ if __name__ == '__main__':
             db.DBSession().add(job)
 
         db.DBSession().commit()
+
+        # see if an alert job should be launched
+        current_alert_jobs = db.DBSession().query(db.AlertJob).filter(
+            db.AlertJob.status == 'processing'
+        ).all()
+
+        if len(current_alert_jobs) == 0:
+            try:
+                slurm_id = submit_alert_job()
+            except RuntimeError as e:
+                exc_info = sys.exc_info()
+                traceback.print_exception(*exc_info)
+                print(f'continuing...', flush=True)
+                continue
+
+            job = db.AlertJob(status='processing', slurm_id=slurm_id)
+            db.DBSession().add(job)
+
+        db.DBSession().commit()
+
         #submit_Jobs()
 
 

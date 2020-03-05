@@ -3013,6 +3013,12 @@ class ForcePhotJob(models.Base):
                        nullable=False)
     slurm_id = sa.Column(sa.Text, index=True, nullable=False)
 
+class AlertJob(models.Base):
+    status = sa.Column(sa.Text, index=True, default='unsubmitted',
+                       nullable=False)
+    slurm_id = sa.Column(sa.Text, index=True, nullable=False)
+
+
 class FailedSubtraction(models.Base):
 
     target_image_id = sa.Column(sa.Integer, sa.ForeignKey(
