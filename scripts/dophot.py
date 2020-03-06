@@ -50,6 +50,28 @@ def write_csv(output):
     df = pd.DataFrame(output)
     df.to_csv(f'output.csv', index=False)
 
+    
+class TimeoutError(Exception):
+    pass
+
+
+def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
+    def decorator(func):
+        def _handle_timeout(signum, frame):
+            raise TimeoutError(error_message)
+
+        def wrapper(*args, **kwargs):
+            signal.signal(signal.SIGALRM, _handle_timeout)
+            signal.alarm(seconds)
+            try:
+                result = func(*args, **kwargs)
+            finally:
+                signal.alarm(0)
+            return result
+
+        return wraps(func)(wrapper)
+
+    return decorator
 
 
 def unphotometered_sources(image_id, footprint):
@@ -80,6 +102,15 @@ def unphotometered_sources(image_id, footprint):
     return query.all()
 
 
+@timeout(60)
+def get_wcs(fn):
+    with fits.open(fn) as hdul:
+        hd = hdul[0].header
+        wcs = WCS(hd)
+    return wcs
+
+safe_raw_ap = timeout(100)(raw_aperture_photometry)
+
 output = []
 start = time.time()
 
@@ -93,14 +124,15 @@ for g, (fn, imgid) in enumerate(imgs):
     maskname = fn.replace('.fits', '.mask.fits')
     rmsname = fn.replace('.fits', '.rms.fits')
 
-    with fits.open(fn) as hdul:
-        hd = hdul[0].header
-        wcs = WCS(hd)
+    try:
+        wcs = get_wcs(fn)
+    except TimeoutError:
+        print(f'timed out getting wcs on {fn}, continuing...')
+        continue
 
     nstart = time.time()
     try:
         needed = unphotometered_sources(int(imgid), wcs.calc_footprint())
-
     except Exception as e:
         print(e)
         continue
@@ -120,8 +152,8 @@ for g, (fn, imgid) in enumerate(imgs):
 
         ra = [s[1] for s in needed]
         dec = [s[2] for s in needed]
-        phot_table = raw_aperture_photometry(fn, rmsname, maskname,
-                                             ra, dec, apply_calibration=False)
+        phot_table = safe_raw_ap(fn, rmsname, maskname,
+                                 ra, dec, apply_calibration=False)
         for k, row in enumerate(phot_table):
             p = {'source_id': needed[k][0],
                  'image_id': imgid,
