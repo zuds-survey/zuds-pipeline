@@ -161,21 +161,21 @@ def submit_alert_job():
         f.write('\n'.join([str(i) for i in detids]) + '\n')
 
     jobscript = f"""#!/bin/bash
-    #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
-    #SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-    #SBATCH -N 1
-    #SBATCH -C haswell
-    #SBATCH -q realtime
-    #SBATCH --exclusive
-    #SBATCH -J zuds
-    #SBATCH -t 00:60:00
-    #SBATCH -L SCRATCH
-    #SBATCH -A ***REMOVED***
-    #SBATCH -o {str(scriptname).replace('.sh', '.out')}
+#SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
+#SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
+#SBATCH -N 1
+#SBATCH -C haswell
+#SBATCH -q realtime
+#SBATCH --exclusive
+#SBATCH -J zuds
+#SBATCH -t 00:60:00
+#SBATCH -L SCRATCH
+#SBATCH -A ***REMOVED***
+#SBATCH -o {str(scriptname).replace('.sh', '.out')}
 
-    HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
+HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
 
-        """
+    """
 
     with open(scriptname, 'w') as f:
         f.write(jobscript)
@@ -413,6 +413,8 @@ if __name__ == '__main__':
                 db.DBSession().commit()
 
         # see if a forcephot chain should be launched
+
+        """
         current_forcephot_jobs = db.DBSession().query(db.ForcePhotJob).filter(
             db.ForcePhotJob.status == 'processing'
         ).all()
@@ -430,6 +432,7 @@ if __name__ == '__main__':
             db.DBSession().add(job)
 
         db.DBSession().commit()
+        """
 
         # see if an alert job should be launched
         current_alert_jobs = db.DBSession().query(db.AlertJob).filter(
