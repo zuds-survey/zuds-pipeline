@@ -251,12 +251,19 @@ if __name__ == '__main__':
         for job in active_jobs:
             if job.slurm_id not in active_slurm_ids and job.status == 'processing':
                 job.status = 'done'
+                db.DBSession().add(job)
             elif job.status == 'ready_for_loading':
                 now = datetime.datetime.utcnow()
                 if not (0 < now.hour < 14):
-                    load_output(job)
-                    job.status = 'loaded'
-            db.DBSession().add(job)
+                    try:
+                        load_output(job)
+                    except Exception as e:
+                        exc_info = sys.exc_info()
+                        traceback.print_exception(*exc_info)
+                        continue
+                    else:
+                        job.status = 'loaded'
+                        db.DBSession().add(job)
         db.DBSession().commit()
 
         # reget active jobs
