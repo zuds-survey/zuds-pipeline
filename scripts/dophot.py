@@ -119,7 +119,7 @@ for g, (fn, imgid) in enumerate(imgs):
 
     now = time.time()
 
-    if now - start > 3600 * 0.5:  # 45 minutes
+    if now - start > 3600 * 0.75:  # 45 minutes
         break
 
     maskname = fn.replace('.fits', '.mask.fits')

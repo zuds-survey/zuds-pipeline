@@ -1,7 +1,7 @@
 begin;
 \timing
 
-SET maintenance_work_mem = 4GB;
+SET maintenance_work_mem = '4 GB';
 
 create table forcephot_temp as (select * from forcedphotometry);
 alter table forcephot_temp alter column id set default nextval('forcedphotometry_id_seq');

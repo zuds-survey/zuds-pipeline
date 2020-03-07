@@ -147,8 +147,7 @@ def submit_alert_job():
         raise RuntimeError('No detections to run make alerts for, abandoning '
                            'forced photometry and alerting ')
 
-    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
-                      f'nightly/{nightdate}/{ndt}.alert.sh'.replace(' ', '_'))
+    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/nightly/{nightdate}/{ndt}.alert.sh'.replace(' ', '_'))
     scriptname.parent.mkdir(parents=True, exist_ok=True)
 
     os.chdir(scriptname.parent)
