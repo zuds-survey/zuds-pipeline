@@ -31,7 +31,7 @@ ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
                822,823,843,844,845,846,861,862,863]
 fid_map = {1: 'zg', 2:'zr', 3:'zi'}
 
-FORCEPHOT_IMAGE_LIMIT = 750000
+FORCEPHOT_IMAGE_LIMIT = 1000000
 
 
 def _update_source_coordinate(source_object, detections):
@@ -241,6 +241,7 @@ def submit_forcephot_chain():
     random.shuffle(image_names)
 
     imginname = f'{scriptname}'.replace('.sh', '.in')
+
     outnames = []
     with open(imginname, 'w') as f:
         for name, idnum in image_names:
@@ -254,6 +255,10 @@ def submit_forcephot_chain():
                             f'{q}/{b}/{name} {idnum}')
 
         f.write('\n'.join(outnames) + '\n')
+
+    detinname = f'{scriptname}'.replace('.sh', '.in')
+    with open(detinname, 'w') as f:
+        f.write('\n'.join([str(i) for i in detids]) + '\n')
 
     jobscript = f"""#!/bin/bash
 #SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
