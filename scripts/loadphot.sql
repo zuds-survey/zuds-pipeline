@@ -1,12 +1,12 @@
 begin;
+\timing
 
 alter table forcedphotometry drop constraint "imagefk";
 alter table forcedphotometry drop constraint "sourcefk";
 alter table forcedphotometry drop constraint "usource_image";
-alter table forcedphotometry drop constraint "uimage_source";
+drop index "uimage_source";
 
-\copy forcedphotometry (id, source_id, image_id, flux,
-                        fluxerr, flags, ra, dec, created_at, modified) from 'output.csv';
+\copy forcedphotometry (source_id, image_id, flux, fluxerr, flags, ra, dec) from 'output.csv' with csv header;
 
 alter table forcedphotometry add constraint "imagefk" FOREIGN KEY (image_id)
   REFERENCES singleepochsubtractions (id) ON DELETE CASCADE;

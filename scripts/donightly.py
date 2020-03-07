@@ -47,7 +47,7 @@ if __name__ == '__main__':
         # commits
         try:
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
-        except (dosub.TooManyDetectionsError, OSError) as e:
+        except (dosub.TooManyDetectionsError, OSError, ValueError) as e:
             db.DBSession().rollback()
             print(f'Error: too many detections on {fn} sub')
             sci = db.ScienceImage.get_by_basename(os.path.basename(fn))
@@ -68,7 +68,6 @@ if __name__ == '__main__':
             db.DBSession().add(blocker)
             db.DBSession().commit()
             continue
-
         except dosub.PredecessorError as e:
             db.DBSession().rollback()
             sci = db.ScienceImage.get_by_basename(os.path.basename(fn))

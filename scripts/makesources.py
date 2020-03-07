@@ -106,7 +106,7 @@ def source_bestdet_from_solution(df):
     return source_bestdet
 
 
-def xmatch(source_ids):
+def xmatch(source_ids, insert_neighbors=True):
 
     sids = '(' + ','.join([f"'{id}'" for id in source_ids]) + ')'
 
@@ -142,11 +142,13 @@ def xmatch(source_ids):
         ''' % (chunk, sids)
 
         # this should take about 40 minutes
-        db.DBSession().execute(insert)
+
+        if insert_neighbors:
+            db.DBSession().execute(insert)
 
         q = '''
         update sources set score = -1, 
-        altdata = ('{"rejected": "matched to GAIA dr8 ID ' || d.id::text || '"}')::jsonb 
+        altdata = ('{"rejected": "matched to GAIA dr8"}')::jsonb 
         from %s d where d.sid = sources.id and  d.sep < 1.5  and d."PARALLAX" > 0
         and sources.id in %s;
         ''' % (tablename, sids)
@@ -155,7 +157,7 @@ def xmatch(source_ids):
 
         q = '''
         update sources set score = -1, 
-        altdata = ('{"rejected": "matched to dr8 masked source ID ' || d.id::text || '"}')::jsonb 
+        altdata = ('{"rejected": "matched to dr8 masked source ID"}')::jsonb 
         from %s d where d.sid = sources.id 
         and d.sep < 2 and 
         (d."FRACMASKED_G" > 0.2 OR d."FRACMASKED_R" > 0.2 OR d."FRACMASKED_Z" > 0.2) 
@@ -169,7 +171,7 @@ def xmatch(source_ids):
         altdata = ('{"rejected": "matched to hits  ID ' || h.id::text || '"}')::jsonb
         from %s d join hits h on
         q3c_join(d."RA", d."DEC", h.ra, h.dec, 0.0002777 * 1.5)
-        where d.sid = sources.id and sources.id in %s;
+        where d.sid = sources.id and sources.id in %s and d.sep < 1.5;
         ''' % (tablename, sids,)
 
         db.DBSession().execute(q)
@@ -180,17 +182,17 @@ def xmatch(source_ids):
         altdata = ('{"rejected": "matched to MQ  ID ' || m.id::text || '"}')::jsonb
         from %s d join milliquas_v6 m
         on q3c_join(d."RA", d."DEC", m.ra, m.dec, 0.0002777 * 1.5)
-        where d.sid = sources.id and sources.id in %s;
+        where d.sid = sources.id and sources.id in %s and d.sep < 1.5;
         ''' % (tablename, sids,)
 
         db.DBSession().execute(q)
 
         q = '''
         update sources set score = -1,
-        altdata = ('{"rejected": "right on top of (< 1 arcsec) DR8 PSF  ' || d.id::text || '"}')::jsonb
+        altdata = ('{"rejected": "right on top of (< 1 arcsec) DR8 PSF "}')::jsonb
         from %s d where d.sid = sources.id and
-        d.rank = 1 and (d."TYPE" = 'PSF') and
-        q3c_dist(sources.ra, sources.dec, d."RA", d."DEC") <= 1./3600 and sources.id in %s;
+        (d."TYPE" = 'PSF') and
+        sep < 1 and sources.id in %s;
         '''  % (tablename, sids,)
 
         db.DBSession().execute(q)

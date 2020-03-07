@@ -1,6 +1,6 @@
 import db
 db.DBSession.remove()
-db.init_db(timeout=60)
+db.init_db(timeout=60000)
 import numpy as np
 import pandas as pd
 import sys
@@ -50,10 +50,10 @@ def write_csv(output):
     df = pd.DataFrame(output)
     df.to_csv(f'output.csv', index=False)
 
-
-
+    
 class TimeoutError(Exception):
     pass
+
 
 def timeout(seconds=10, error_message=os.strerror(errno.ETIME)):
     def decorator(func):
@@ -102,22 +102,37 @@ def unphotometered_sources(image_id, footprint):
     return query.all()
 
 
+@timeout(60)
+def get_wcs(fn):
+    with fits.open(fn) as hdul:
+        hd = hdul[0].header
+        wcs = WCS(hd)
+    return wcs
+
+safe_raw_ap = timeout(100)(raw_aperture_photometry)
+
 output = []
 start = time.time()
 
 for g, (fn, imgid) in enumerate(imgs):
 
+    now = time.time()
+
+    if now - start > 3600 * 0.5:  # 45 minutes
+        break
+
     maskname = fn.replace('.fits', '.mask.fits')
     rmsname = fn.replace('.fits', '.rms.fits')
 
-    with fits.open(fn) as hdul:
-        hd = hdul[0].header
-        wcs = WCS(hd)
+    try:
+        wcs = get_wcs(fn)
+    except TimeoutError:
+        print(f'timed out getting wcs on {fn}, continuing...')
+        continue
 
     nstart = time.time()
     try:
         needed = unphotometered_sources(int(imgid), wcs.calc_footprint())
-
     except Exception as e:
         print(e)
         continue
@@ -131,24 +146,14 @@ for g, (fn, imgid) in enumerate(imgs):
               f' all done (in {nstop-nstart:.2f} sec)')
         continue
 
+
     try:
         pstart = time.time()
 
         ra = [s[1] for s in needed]
         dec = [s[2] for s in needed]
-        for i in range(3):
-            try:
-                ap_func = timeout(5)(raw_aperture_photometry)
-                phot_table = ap_func(fn, rmsname, maskname, ra, dec, apply_calibration=False)
-            except TimeoutError:
-                print(f'timed out on {fn} ({i + 1} / 3)', flush=True)
-                continue
-            else:
-                break
-
-        if i == 2:
-            continue
-
+        phot_table = safe_raw_ap(fn, rmsname, maskname,
+                                 ra, dec, apply_calibration=False)
         for k, row in enumerate(phot_table):
             p = {'source_id': needed[k][0],
                  'image_id': imgid,
@@ -173,20 +178,19 @@ if mpi.has_mpi():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
+    size = comm.Get_size()
 
     # avoid pandas to csv bottleneck using parallelism
     df = pd.DataFrame(output)
-    buf = StringIO()
-
-    df.to_csv(buf, index=False, header=rank == 0)
-    csvstr = buf.getvalue()
-
-    output = comm.gather(output, root=0)
+    df.to_csv(f'output_{rank:04d}.csv', index=False, header=rank==0)
+    comm.Barrier()
 
     if rank == 0:
-        output = '\n'.join(output)
         with open('output.csv', 'w') as f:
-            f.write(output)
+            for fn in [f'output_{r:04d}.csv' for r in range(size)]:
+                if os.path.exists(fn):
+                    with open(fn, 'r') as g:
+                        f.write(g.read())
 
 else:
     df = pd.DataFrame(output)
