@@ -42,7 +42,7 @@ def load_output(job):
     mydir = Path(os.path.dirname(__file__))
     sql = mydir / 'loadphot.sql'
     with open(sql, 'r') as f:
-        g = f.read().replace('FILENAME', job.output_file)
+        g = f.read().replace('FILENAME', f"'{job.output_file}'")
 
     sqlo = job.output_file + '.sql'
     with open(sqlo, 'w') as f:
@@ -110,9 +110,12 @@ def submit_forcephot_chain():
         db.Alert, db.Alert.detection_id == db.Detection.id
     ).filter(
         db.Detection.triggers_alert == True,
-        db.Detection.alert_ready.in_([False, None]),
+        db.sa.or_(
+            db.Detection.alert_ready == None,
+            db.Detection.alert_ready == False
+        ),
         db.Alert.id == None
-    ).all()
+    )
 
     detids = [d[0] for d in detids]
 
@@ -242,8 +245,10 @@ if __name__ == '__main__':
             if job.slurm_id not in active_slurm_ids and job.status == 'processing':
                 job.status = 'done'
             elif job.status == 'ready_for_loading':
-                load_output(job)
-                job.status = 'loaded'
+                now = datetime.datetime.utcnow()
+                if not (0 < now.hour < 14):
+                    load_output(job)
+                    job.status = 'loaded'
             db.DBSession().add(job)
         db.DBSession().commit()
 
@@ -257,7 +262,7 @@ if __name__ == '__main__':
                 db.ForcePhotJob.status == 'processing',
                 db.ForcePhotJob.status == 'ready_for_loading',
             )
-        )
+        ).all()
 
         if len(active_jobs) == 0:
             try:
