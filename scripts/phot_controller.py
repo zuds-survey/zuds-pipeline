@@ -236,7 +236,7 @@ if __name__ == '__main__':
                 db.ForcePhotJob.status == 'processing',
                 db.ForcePhotJob.status == 'ready_for_loading',
             )
-        )
+        ).all()
 
         if len(active_jobs) == 0:
             try:
