@@ -89,7 +89,7 @@ def submit_forcephot_chain():
         db.Alert, db.Alert.detection_id == db.Detection.id
     ).filter(
         db.Detection.triggers_alert == True,
-        db.Detection.alert_ready == False,
+        db.Detection.alert_ready.in_([False, None]),
         db.Alert.id == None
     ).all()
 
