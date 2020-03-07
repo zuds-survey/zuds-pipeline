@@ -50,7 +50,7 @@ def execute(cmd):
     popen.stdout.close()
     return_code = popen.wait()
     if return_code:
-        stdout, stderr = popen.communicate()
+        stderr = popen.stderr.read()
         print(stderr)
         raise subprocess.CalledProcessError(return_code, cmd)
 
