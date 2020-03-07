@@ -34,6 +34,29 @@ fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 FORCEPHOT_IMAGE_LIMIT = 1000000
 
 
+def execute(cmd):
+    popen = subprocess.Popen(cmd,
+                             stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE,
+                             universal_newlines=True
+                             )
+    lines = []
+    for stdout_line in iter(popen.stdout.readline, ""):
+        lines.append(stdout_line)
+        yield stdout_line
+
+    stdout = '\n'.join(lines)
+    popen.stdout.close()
+    return_code = popen.wait()
+    if return_code:
+        raise subprocess.CalledProcessError(return_code, cmd)
+
+    if 'COMMIT' not in stdout:
+        raise RuntimeError(
+            f'Transaction rolled back in psql, output was '
+            f'"{str(stdout)}"'
+        )
+
 
 def load_output(job):
 
@@ -53,27 +76,8 @@ def load_output(job):
           f"-d {get_secret('hpss_dbname')} -U {get_secret('hpss_dbusername')} " \
           f"-f {sqlo}"
 
-    process = subprocess.Popen(
-        shlex.split(cmd),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
 
-    stdout, stderr = process.communicate()
-
-    print(stdout)
-
-    if process.returncode != 0:
-        raise RuntimeError(
-            f'Non-zero exit code from psql, output was '
-            f'"{str(stdout)}", "{str(stderr)}".'
-        )
-
-    if not ('COMMIT' in stdout or 'COMMIT' in stderr):
-        raise RuntimeError(
-            f'Transaction rolled back in psql, output was '
-            f'"{str(stdout)}", "{str(stderr)}".'
-        )
+    execute(cmd)
 
     query = "update detections set alert_ready = 't' where id in %s" % (detids,)
     db.DBSession().execute(query)
