@@ -35,6 +35,7 @@ __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Do the photometry for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the subs to do photometry on
+outfile = sys.argv[2] # file listing all the photometry to load into the DB
 
 
 # get the work
@@ -50,7 +51,7 @@ def write_csv(output):
     df = pd.DataFrame(output)
     df.to_csv(f'output.csv', index=False)
 
-    
+
 class TimeoutError(Exception):
     pass
 
@@ -186,15 +187,25 @@ if mpi.has_mpi():
     comm.Barrier()
 
     if rank == 0:
-        with open('output.csv', 'w') as f:
+        with open(outfile, 'w') as f:
             for fn in [f'output_{r:04d}.csv' for r in range(size)]:
                 if os.path.exists(fn):
                     with open(fn, 'r') as g:
                         f.write(g.read())
+                os.remove(fn)
+
+        jobid = os.getenv('SLURM_JOB_ID')
+        if jobid is not None:
+            job = db.DBSession().query(db.ForcePhotJob).filter(
+                db.ForcePhotJob.slurm_id == jobid
+            ).first()
+            job.status = 'ready_for_loading'
+            db.DBSession().add(job)
+            db.DBSession().commit()
 
 else:
     df = pd.DataFrame(output)
-    df.to_csv('output.csv', index=False)
+    df.to_csv(outfile, index=False)
 
 stop = time.time()
 print_time(start, stop, 0, 'start to finish')
