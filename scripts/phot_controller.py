@@ -43,7 +43,8 @@ def execute(cmd):
     lines = []
     for stdout_line in iter(popen.stdout.readline, ""):
         lines.append(stdout_line)
-        yield stdout_line
+        print(stdout_line)
+        #yield stdout_line
 
     stdout = '\n'.join(lines)
     popen.stdout.close()
