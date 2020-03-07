@@ -14,6 +14,7 @@ import traceback
 import pandas as pd
 import datetime
 from pathlib import Path
+from secrets import get_secret
 
 DEFAULT_GROUP = 1
 DEFAULT_INSTRUMENT = 1
@@ -21,15 +22,14 @@ JOB_SIZE = 64 * 15
 
 ASSOC_RB_MIN = 0.4
 
-
 # query for the images to process
 
-ZUDS_FIELDS = [523,524,574,575,576,623,624,625,626,
-               627,670,671,672,673,674,675,714,715,
-               716,717,718,719,754,755,756,757,758,
-               759,789,790,791,792,793,819,820,821,
-               822,823,843,844,845,846,861,862,863]
-fid_map = {1: 'zg', 2:'zr', 3:'zi'}
+ZUDS_FIELDS = [523, 524, 574, 575, 576, 623, 624, 625, 626,
+               627, 670, 671, 672, 673, 674, 675, 714, 715,
+               716, 717, 718, 719, 754, 755, 756, 757, 758,
+               759, 789, 790, 791, 792, 793, 819, 820, 821,
+               822, 823, 843, 844, 845, 846, 861, 862, 863]
+fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 
 FORCEPHOT_IMAGE_LIMIT = 1000000
 
@@ -69,7 +69,6 @@ def get_job_statuses():
 
 
 def submit_job(images):
-
     ndt = datetime.datetime.utcnow()
     nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
 
@@ -104,7 +103,6 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 """
 
-
     with open(scriptname, 'w') as f:
         f.write(jobscript)
 
@@ -130,7 +128,6 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
 
 def submit_alert_job():
-
     # get the what needs alerts
     detids = db.DBSession().query(db.Detection.id).outerjoin(
         db.Alert, db.Alert.detection_id == db.Detection.id
@@ -201,106 +198,6 @@ HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME
 
     return jobid
 
-def submit_forcephot_chain():
-
-    # get the what needs alerts
-    detids = db.DBSession().query(db.Detection.id).outerjoin(
-        db.Alert, db.Alert.detection_id == db.Detection.id
-    ).filter(
-        db.Detection.triggers_alert == True,
-        db.Alert.id == None
-    ).all()
-
-    detids = [d[0] for d in detids]
-
-    if len(detids) == 0:
-        raise RuntimeError('No detections to run make alerts for, abandoning '
-                           'forced photometry and alerting ')
-
-    ndt = datetime.datetime.utcnow()
-    nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
-
-    curdir = os.getcwd()
-
-    scriptname = Path(f'/global/cscratch1/sd/dgold/zuds/'
-                      f'nightly/{nightdate}/{ndt}.phot.sh'.replace(' ', '_'))
-    scriptname.parent.mkdir(parents=True, exist_ok=True)
-
-    os.chdir(scriptname.parent)
-
-    image_names = db.DBSession().query(db.SingleEpochSubtraction.basename,
-                                       db.SingleEpochSubtraction.id).join(
-        db.ReferenceImage,
-        db.SingleEpochSubtraction.reference_image_id == db.ReferenceImage.id
-    ).filter(
-        db.ReferenceImage.version == 'zuds5',
-    ).all()
-
-    image_names = sorted(image_names, key=lambda s: s[0].split('ztf_')[1].split('_')[0], reverse=True)
-    image_names = image_names[:FORCEPHOT_IMAGE_LIMIT]
-    random.shuffle(image_names)
-
-    imginname = f'{scriptname}'.replace('.sh', '.in')
-
-    outnames = []
-    with open(imginname, 'w') as f:
-        for name, idnum in image_names:
-            #name = name[0]
-            g = name.split('_sciimg')[0].split('_')
-            q = g[-1]
-            c = g[-3]
-            b = g[-4]
-            field = g[-5]
-            outnames.append(f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{c}/'
-                            f'{q}/{b}/{name} {idnum}')
-
-        f.write('\n'.join(outnames) + '\n')
-
-    detinname = f'{scriptname}'.replace('.sh', '.in')
-    with open(detinname, 'w') as f:
-        f.write('\n'.join([str(i) for i in detids]) + '\n')
-
-    jobscript = f"""#!/bin/bash
-#SBATCH --image=registry.services.nersc.gov/dgold/ztf:latest
-#SBATCH --volume="/global/homes/d/dgold/lensgrinder/pipeline/:/pipeline;/global/homes/d/dgold:/home/desi;/global/homes/d/dgold/skyportal:/skyportal"
-#SBATCH -N 13
-#SBATCH -C haswell
-#SBATCH -q realtime
-#SBATCH --exclusive
-#SBATCH -J zuds
-#SBATCH -t 00:60:00
-#SBATCH -L SCRATCH
-#SBATCH -A ***REMOVED***
-#SBATCH -o {str(scriptname).replace('.sh', '.out')}
-
-HDF5_USE_FILE_LOCKING=FALSE srun -n 832 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/dophot.py {imginname} zuds5
-
-"""
-
-    with open(scriptname, 'w') as f:
-        f.write(jobscript)
-
-    cmd = f'sbatch {scriptname}'
-    process = subprocess.Popen(
-        cmd.split(),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-
-    stdout, stderr = process.communicate()
-    print(stdout)
-
-    if process.returncode != 0:
-        raise RuntimeError(
-            f'Non-zero exit code from sbatch, output was '
-            f'"{str(stdout)}", "{str(stdout)}".'
-        )
-
-    os.chdir(curdir)
-    jobid = stdout.strip().split()[-1].decode('ascii')
-
-    return jobid
-
 
 if __name__ == '__main__':
     while True:
@@ -312,14 +209,9 @@ if __name__ == '__main__':
             db.Job
         ).filter(db.Job.status == 'processing')
 
-        also_processing = db.DBSession().query(
-            db.ForcePhotJob
-        ).filter(db.ForcePhotJob.status == 'processing')
-
         alert_processing = db.DBSession().query(
             db.AlertJob
         ).filter(db.AlertJob.status == 'processing')
-
 
         # get the slurm jobs and their statuses
 
@@ -332,17 +224,14 @@ if __name__ == '__main__':
             continue
 
         for job in currently_processing:
-            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
-                job.status = 'done'
-                db.DBSession().add(job)
-
-        for job in also_processing:
-            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
+            if job.slurm_id not in list(
+                    map(str, job_statuses['JOBID'].tolist())):
                 job.status = 'done'
                 db.DBSession().add(job)
 
         for job in alert_processing:
-            if job.slurm_id not in list(map(str, job_statuses['JOBID'].tolist())):
+            if job.slurm_id not in list(
+                    map(str, job_statuses['JOBID'].tolist())):
                 job.status = 'done'
                 db.DBSession().add(job)
 
@@ -391,7 +280,8 @@ if __name__ == '__main__':
             results.extend(r.fetchall())
 
         if len(results) == 0:
-            print(f'{datetime.datetime.utcnow()}: No images to process, moving to forced photometry...')
+            print(
+                f'{datetime.datetime.utcnow()}: No images to process, moving to forced photometry...')
         else:
 
             nchunks = len(results) // JOB_SIZE
@@ -417,28 +307,6 @@ if __name__ == '__main__':
 
                 db.DBSession().commit()
 
-        # see if a forcephot chain should be launched
-
-        """
-        current_forcephot_jobs = db.DBSession().query(db.ForcePhotJob).filter(
-            db.ForcePhotJob.status == 'processing'
-        ).all()
-
-        if len(current_forcephot_jobs) == 0:
-            try:
-                slurm_id = submit_forcephot_chain()
-            except RuntimeError as e:
-                exc_info = sys.exc_info()
-                traceback.print_exception(*exc_info)
-                print(f'continuing...', flush=True)
-                continue
-
-            job = db.ForcePhotJob(status='processing', slurm_id=slurm_id)
-            db.DBSession().add(job)
-
-        db.DBSession().commit()
-        """
-
         # see if an alert job should be launched
         current_alert_jobs = db.DBSession().query(db.AlertJob).filter(
             db.AlertJob.status == 'processing'
@@ -458,6 +326,6 @@ if __name__ == '__main__':
 
         db.DBSession().commit()
 
-        #submit_Jobs()
+        # submit_Jobs()
 
 
