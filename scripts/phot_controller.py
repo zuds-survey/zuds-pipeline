@@ -80,7 +80,7 @@ def load_output(job):
           f"-f {sqlo}"
 
 
-    execute(cmd)
+    execute(cmd.split())
 
     query = "update detections set alert_ready = 't' where id in %s" % (detids,)
     db.DBSession().execute(query)
