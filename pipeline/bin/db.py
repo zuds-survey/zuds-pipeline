@@ -3013,6 +3013,8 @@ class ForcePhotJob(models.Base):
     status = sa.Column(sa.Text, index=True, default='unsubmitted',
                        nullable=False)
     slurm_id = sa.Column(sa.Text, index=True, nullable=False)
+    detection_file = sa.Column(sa.Text)
+    output_file = sa.Column(sa.Text)
 
 class AlertJob(models.Base):
     status = sa.Column(sa.Text, index=True, default='unsubmitted',
