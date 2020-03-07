@@ -20,8 +20,10 @@ create index "source_image_t" on forcephot_temp (source_id, image_id);
 create index "image_source_t" on forcephot_temp (image_id, source_id);
 
 -- all this happens fast  -- should be invisible to the end user
-
 truncate table forcedphotometry;
+
+-- kill conflicting backends
+SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'relation' AND relation = (select oid from pg_class where relname = 'forcedphotometry') and pid <> pg_backend_pid();
 drop table forcedphotometry;
 
 alter table forcephot_temp rename to forcedphotometry;

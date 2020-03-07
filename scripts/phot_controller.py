@@ -52,7 +52,28 @@ def load_output(job):
     cmd = f"psql -h {get_secret('hpss_dbhost')} -p {get_secret('hpss_dbport')} " \
           f"-d {get_secret('hpss_dbname')} -U {get_secret('hpss_dbusername')} " \
           f"-f {sqlo}"
-    subprocess.check_call(cmd.split())
+
+    process = subprocess.Popen(
+        shlex.split(cmd),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE
+    )
+
+    stdout, stderr = process.communicate()
+
+    print(stdout)
+
+    if process.returncode != 0:
+        raise RuntimeError(
+            f'Non-zero exit code from psql, output was '
+            f'"{str(stdout)}", "{str(stderr)}".'
+        )
+
+    if not ('COMMIT' in stdout or 'COMMIT' in stderr):
+        raise RuntimeError(
+            f'Transaction rolled back in psql, output was '
+            f'"{str(stdout)}", "{str(stderr)}".'
+        )
 
     query = "update detections set alert_ready = 't' where id in %s" % (detids,)
     db.DBSession().execute(query)
