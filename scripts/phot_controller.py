@@ -49,9 +49,9 @@ def execute(cmd):
     stdout = '\n'.join(lines)
     popen.stdout.close()
     return_code = popen.wait()
+    stderr = popen.stderr.read()
+    print(stderr)
     if return_code:
-        stderr = popen.stderr.read()
-        print(stderr)
         raise subprocess.CalledProcessError(return_code, cmd)
 
     if 'COMMIT' not in stdout:
