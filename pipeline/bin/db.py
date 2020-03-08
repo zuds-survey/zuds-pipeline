@@ -2307,6 +2307,7 @@ class ForcedPhotometry(models.Base):
 
 
 models.Source.thumbnails = relationship('Thumbnail', cascade='all')
+models.Source.accumulated_rb = sa.Column(sa.Float)
 
 def images(self, type=CalibratableImage):
 
