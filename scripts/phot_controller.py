@@ -64,7 +64,7 @@ def execute(cmd):
 def load_output(job):
 
     detids = np.genfromtxt(job.detection_file, dtype=None, encoding='ascii')
-    detids = str(tuple(detids.tolist()))
+    detidstr = str(tuple(detids.tolist()))
     mydir = Path(os.path.dirname(__file__))
     sql = mydir / 'loadphot.sql'
     with open(sql, 'r') as f:
@@ -82,9 +82,11 @@ def load_output(job):
 
     execute(cmd.split())
 
-    query = "update detections set alert_ready = 't' where id in %s" % (detids,)
-    db.DBSession().execute(query)
-    db.DBSession().commit()
+    query = "update detections set alert_ready = 't' where id in %s" % (detidstr,)
+
+    if len(detids) > 0:
+        db.DBSession().execute(query)
+        db.DBSession().commit()
 
 
 def get_job_statuses():
@@ -126,10 +128,6 @@ def submit_forcephot_chain():
 
     detids = [d[0] for d in detids]
 
-    if len(detids) == 0:
-        raise RuntimeError('No detections to run make alerts for, abandoning '
-                           'forced photometry and alerting ')
-
     ndt = datetime.datetime.utcnow()
     nightdate = f'{ndt.year}{ndt.month:02d}{ndt.day:02d}'
 
@@ -153,7 +151,10 @@ def submit_forcephot_chain():
                          key=lambda s: s[0].split('ztf_')[1].split('_')[0],
                          reverse=True)
     image_names = image_names[:FORCEPHOT_IMAGE_LIMIT]
-    random.shuffle(image_names)
+
+    if len(detids) > 0:
+        # only use the latest images
+        random.shuffle(image_names)
 
     imginname = f'{scriptname}'.replace('.sh', '.in')
     photoutname = imginname.replace('.in', '.output')
@@ -173,7 +174,6 @@ def submit_forcephot_chain():
 
         f.write('\n'.join(outnames) + '\n')
 
-    scriptname = f'{scriptname}'.replace('.sh', '.load.sh')
     detinname = f'{scriptname}'.replace('.sh', '.in')
 
     with open(detinname, 'w') as f:
