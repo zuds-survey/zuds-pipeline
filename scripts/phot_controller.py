@@ -278,7 +278,8 @@ if __name__ == '__main__':
             )
         ).all()
 
-        if len(active_jobs) == 0:
+        now = datetime.datetime.utcnow()
+        if len(active_jobs) == 0 and not (0 < now.hour < 14):
             try:
                 slurm_id, det, out = submit_forcephot_chain()
             except RuntimeError as e:
@@ -290,7 +291,6 @@ if __name__ == '__main__':
             job = db.ForcePhotJob(status='processing', slurm_id=slurm_id,
                                   detection_file=det, output_file=out)
             db.DBSession().add(job)
-
         db.DBSession().commit()
 
         # submit_Jobs()
