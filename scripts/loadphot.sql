@@ -26,6 +26,7 @@ truncate table forcedphotometry;
 SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'relation' AND relation = (select oid from pg_class where relname = 'forcedphotometry') and pid <> pg_backend_pid();
 SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'relation' AND relation = (select oid from pg_class where relname = 'sources') and pid <> pg_backend_pid();
 SELECT pg_terminate_backend(pid) FROM pg_locks WHERE locktype = 'relation' AND relation = (select oid from pg_class where relname = 'singleepochsubtractions') and pid <> pg_backend_pid();
+SELECT pg_sleep(1);
 drop table forcedphotometry;
 
 alter table forcephot_temp rename to forcedphotometry;
