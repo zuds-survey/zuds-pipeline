@@ -16,7 +16,7 @@ alter table forcephot_temp add constraint "imagefk_t" FOREIGN KEY (image_id)
 alter table forcephot_temp add constraint "sourcefk_t" FOREIGN KEY (source_id)
   REFERENCES sources (id) ON DELETE CASCADE;
 
-create index "source_image_t" on forcephot_temp (source_id, image_id);
+create unique index "source_image_t" on forcephot_temp (source_id, image_id);
 create index "image_source_t" on forcephot_temp (image_id, source_id);
 
 -- all this happens fast  -- should be invisible to the end user
