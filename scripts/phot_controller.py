@@ -174,7 +174,7 @@ def submit_forcephot_chain():
 
         f.write('\n'.join(outnames) + '\n')
 
-    detinname = f'{scriptname}'.replace('.sh', '.in')
+    detinname = f'{scriptname}'.replace('.sh', '.det.in')
 
     with open(detinname, 'w') as f:
         f.write('\n'.join([str(i) for i in detids]) + '\n')
