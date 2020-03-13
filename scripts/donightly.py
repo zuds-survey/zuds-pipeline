@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
         # commits
         try:
-            detections, sub = dosub.do_one(fn, sciclass, subclass, refvers)
+            detections, sub = dosub.do_one(fn, sciclass, subclass, refvers, tmpdir='tmp')
         except (dosub.TooManyDetectionsError, OSError, ValueError) as e:
             db.DBSession().rollback()
             print(f'Error: too many detections on {fn} sub')

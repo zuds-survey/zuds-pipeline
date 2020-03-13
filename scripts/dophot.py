@@ -125,6 +125,10 @@ for g, (fn, imgid) in enumerate(imgs):
     maskname = fn.replace('.fits', '.mask.fits')
     rmsname = fn.replace('.fits', '.rms.fits')
 
+    if not (os.path.exists(fn) and os.path.exists(maskname) and os.path.exists(rmsname)):
+        print(f'{fn}, {maskname}, and {rmsname} do not all exist, continuing...', flush=True)
+        continue
+
     try:
         wcs = get_wcs(fn)
     except TimeoutError:

@@ -29,7 +29,7 @@ class PredecessorError(Exception):
 
 
 # make a reference for each directory
-def do_one(fn, sciclass, subclass, refvers):
+def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
     tstart = time.time()
 
     sstart = time.time()
@@ -103,7 +103,7 @@ def do_one(fn, sciclass, subclass, refvers):
     substart = time.time()
     sub = subclass.from_images(sci, ref,
                                data_product=False,
-                               tmpdir='tmp')
+                               tmpdir=tmpdir)
 
     substop = time.time()
     print(

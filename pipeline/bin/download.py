@@ -192,7 +192,7 @@ if __name__ == '__main__':
             ~db.ZTFFile.id.in_(bad)
         ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
             db.ScienceImage.id.desc()
-        )
+        ).options(db.sa.orm.joinedload(db.ScienceImage.mask_image))
 
         idownload_q = idownload_base.filter(
             db.ScienceImage.field.in_(ZUDS_FIELDS)
@@ -214,6 +214,9 @@ if __name__ == '__main__':
 
         for sci in to_download:
             for t in ['sci', 'mask']:
+
+                if sci.id in bad:
+                    continue
 
                 if t == 'sci':
                     image = sci
@@ -260,7 +263,7 @@ if __name__ == '__main__':
                 # and archive the file to disk
 
                 if http:
-                    acopy = db.HTTPArchiveCopy.from_product(image)
+                    acopy = db.HTTPArchiveCopy.from_product(image, check=False)
                     acopy.put()
                     db.DBSession().add(acopy)
 

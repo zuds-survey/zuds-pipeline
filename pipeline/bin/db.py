@@ -542,7 +542,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
         archive.archive(self)
 
     @classmethod
-    def from_product(cls, product):
+    def from_product(cls, product, check=True):
         if not isinstance(product, ZTFFile):
             raise ValueError(
                 f'Cannot archive object "{product}", must be an instance of'
@@ -566,9 +566,13 @@ class HTTPArchiveCopy(ZTFFileCopy):
         # check to see if a copy with this URL already exists.
         # if so return it
 
-        old = DBSession().query(cls).filter(
-            cls.url == url
-        ).first()
+
+        if check: 
+            old = DBSession().query(cls).filter(
+                cls.url == url
+            ).first()
+        else:
+            old = None
 
         if old is None:
             copy = cls()

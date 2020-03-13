@@ -254,7 +254,7 @@ if __name__ == '__main__':
                 db.DBSession().add(job)
             elif job.status == 'ready_for_loading':
                 now = datetime.datetime.utcnow()
-                if not (0 < now.hour < 14):
+                if len(active_slurm_ids) == 0:
                     try:
                         load_output(job)
                     except Exception as e:
@@ -279,7 +279,24 @@ if __name__ == '__main__':
         ).all()
 
         now = datetime.datetime.utcnow()
-        if len(active_jobs) == 0 and not (0 < now.hour < 14):
+        hourok = 16 < now.hour < 19
+        fallback = len(active_slurm_ids) == 0 and hourok
+
+        detids = db.DBSession().query(db.Detection.id).outerjoin(
+            db.Alert, db.Alert.detection_id == db.Detection.id
+        ).filter(
+            db.Detection.triggers_alert == True,
+            db.sa.or_(
+                db.Detection.alert_ready == None,
+                db.Detection.alert_ready == False
+            ),
+            db.Alert.id == None
+        )
+
+        detids = [d[0] for d in detids]
+        needed = len(detids) > 0
+        
+        if len(active_jobs) == 0 and (fallback or needed):
             try:
                 slurm_id, det, out = submit_forcephot_chain()
             except RuntimeError as e:
