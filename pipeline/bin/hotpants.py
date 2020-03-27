@@ -71,7 +71,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
     il = scibkg - 10 * scibkgstd
     tl = refbkg - 10 * refbkgstd
 
-    satlev = 5e4  # not perfect, but close enough.
+    satlev = 5e3  # not perfect, but close enough.
 
     syscall = f'hotpants -inim {scipath} -hki -n i -c t ' \
               f'-tmplim {ref.local_path} -outim {outname} ' \

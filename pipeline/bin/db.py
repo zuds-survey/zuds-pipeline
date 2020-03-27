@@ -1556,6 +1556,26 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
                               primaryjoin=models.Thumbnail.image_id == id)
 
 
+    def basic_map(self, quiet=False):
+        datadir = Path(get_secret('base_data_directory'))
+        self.map_to_local_file(datadir / self.relname, quiet=quiet)
+        self.mask_image.map_to_local_file(datadir / self.mask_image.relname,
+                                          quiet=quiet)
+        weightpath = datadir / self.relname.replace('.fits', '.weight.fits')
+        if weightpath.exists():
+            self._weightimg = FITSImage()
+            self.weight_image.map_to_local_file(weightpath, quiet=quiet)
+
+        else:
+            rmspath = datadir / self.relname.replace('.fits', '.rms.fits')
+            if rmspath.exists():
+                self.rms_image.map_to_local_file(rmspath, quiet=quiet)
+            else:
+                raise FileNotFoundError(f'Neither "{weightpath}" nor '
+                                        f'"{rmspath}" exists for '
+                                        f'"{self.basename}".')
+
+
     @classmethod
     def from_file(cls, fname, use_existing_record=True, load_others=True):
         obj = super().from_file(
@@ -1591,25 +1611,6 @@ class CalibratedImage(CalibratableImage):
                        'inherit_condition': id == CalibratableImage.id}
 
     forced_photometry = relationship('ForcedPhotometry', cascade='all')
-
-    def basic_map(self, quiet=False):
-        datadir = Path(get_secret('base_data_directory'))
-        self.map_to_local_file(datadir / self.relname, quiet=quiet)
-        self.mask_image.map_to_local_file(datadir / self.mask_image.relname,
-                                          quiet=quiet)
-        weightpath = datadir / self.relname.replace('.fits', '.weight.fits')
-        if weightpath.exists():
-            self._weightimg = FITSImage()
-            self.weight_image.map_to_local_file(weightpath, quiet=quiet)
-
-        else:
-            rmspath = datadir / self.relname.replace('.fits', '.rms.fits')
-            if rmspath.exists():
-                self.rms_image.map_to_local_file(rmspath, quiet=quiet)
-            else:
-                raise FileNotFoundError(f'Neither "{weightpath}" nor '
-                                        f'"{rmspath}" exists for '
-                                        f'"{self.basename}".')
 
     def force_photometry(self, sources, assume_background_subtracted=False,
                          use_cutout=False, direct_load=None):
