@@ -84,7 +84,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
         syscall += f'-nsx {nsx} -nsy {nsy}'
     else:
         syscall += f'-nsx {nsx / 3} -nsy {nsy / 3} ' \
-                   f' -ko 3 -bgo 0 -nrx 3 -nry 3'
+                   f' -ko 4 -bgo 0 -nrx 3 -nry 3'
 
     return syscall
 
