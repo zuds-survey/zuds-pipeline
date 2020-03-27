@@ -1985,7 +1985,8 @@ class Subtraction(HasWCS):
         return self.target_image.mjd
 
     @classmethod
-    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp'):
+    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
+                    refined=None):
 
         directory = Path(tmpdir) / uuid.uuid4().hex
         directory.mkdir(exist_ok=True, parents=True)
@@ -2063,9 +2064,12 @@ class Subtraction(HasWCS):
         submask.boolean.map_to_local_file(directory / submask.boolean.basename)
         submask.boolean.save()
 
+        if refined is None:
+            refined = isinstance(sci, Coadd)
+
         command = prepare_hotpants(transact_sci, remapped_ref, outname,
                                    submask.boolean, directory, tmpdir=tmpdir,
-                                   refined=isinstance(sci, Coadd))
+                                   refined=refined)
 
         final_dir = os.path.dirname(sci.local_path)
         final_out = os.path.join(final_dir, os.path.basename(outname))
