@@ -567,7 +567,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
         # if so return it
 
 
-        if check: 
+        if check:
             old = DBSession().query(cls).filter(
                 cls.url == url
             ).first()
@@ -2828,7 +2828,7 @@ class Alert(models.Base):
         # do a bunch of cross matches to initially populate the candidate
         # subschema
         start = time.time()
-        candidate = xmatch(detection.ra, detection.dec)
+        candidate = xmatch(detection.ra, detection.dec, detection.source.id)
         alert['candidate'] = candidate
         stop = time.time()
         print_time(start, stop, detection, 'xmatch')

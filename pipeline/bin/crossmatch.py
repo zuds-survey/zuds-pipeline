@@ -181,7 +181,7 @@ def ps1(s, ra, dec):
     return out
 
 
-def legacysurvey(cur, ra, dec):
+def legacysurvey(cur, ra, dec, source_id):
     """ Cross-match candidate position with LegacySurvey DR8
 
     Warning: it assumes that there are at least 3 LegacySurvey matches
@@ -197,24 +197,22 @@ def legacysurvey(cur, ra, dec):
     ------
     out: dictionary with info on closest 3 sources within 30 arcsec
     """
-    table = 'dr8_north'
+    table = 'dr8_north_join_neighbors'
     if dec < 32:
-        table = 'dr8_south'
-    cur.execute('SELECT q3c_dist(%s,%s,"RA","DEC"),'
+        table = 'dr8_south_join_neighbors'
+    cur.execute('SELECT sep,'
                 '"OBJID","TYPE","RA","DEC","EBV","FLUX_G","FLUX_R", '
                 '"FLUX_Z","FLUX_W1","FLUX_W2","FLUX_W3","FLUX_W4", '
                 '"GAIA_PHOT_G_MEAN_MAG","PARALLAX", '
                 'z_phot_mean,z_phot_median,z_phot_std,z_phot_l68,z_phot_u68,'
                 'z_phot_l95,z_phot_u95,z_spec '
-                'FROM %s as t '
-                'WHERE q3c_radial_query("RA", "DEC", %s, %s, 0.0083) '
-                'ORDER BY q3c_dist(%s,%s,t."RA",t."DEC") LIMIT 3;' %(
-                    ra,dec,table,ra,dec,ra,dec))
+                f'FROM {table} where sid={source_id} order by rank '
+                f'desc limit 3')
     matches = cur.fetchall()
 
     out = {}
     for ii,match in enumerate(matches):
-        out['lsdistnr%s' %(ii+1)] = matches[ii][0]*3600
+        out['lsdistnr%s' %(ii+1)] = matches[ii][0]
         out['lsobjectid%s' %(ii+1)] = matches[ii][1]
         out['lstype%s' %(ii+1)] = matches[ii][2]
         out['lsebv%s' %(ii+1)] = matches[ii][5]
@@ -376,7 +374,7 @@ def tns(s, ra, dec):
     return names
 
 
-def xmatch(ra, dec):
+def xmatch(ra, dec, source_id):
     """ Cross-match against all necessary catalogs
 
     Parameters
@@ -394,7 +392,7 @@ def xmatch(ra, dec):
     cur = private_logon()
 
     out = ps1(s, ra, dec)
-    out.update(legacysurvey(cur, ra, dec))
+    out.update(legacysurvey(cur, ra, dec, source_id))
     out['ztfname'] = ','.join(ztfalerts(s, ra, dec))
     out['mqid'] = ','.join(milliquas(s, ra, dec))
     out['tnsid'] = ','.join(tns(s, ra, dec))
