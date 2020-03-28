@@ -201,7 +201,10 @@ def filter_sexcat(cat):
 
     start = time.time()
     new_aligned = None
-    ref_aligned = image.reference_image
+    if not isinstance(image, db.StackedSubtraction):
+        ref_aligned = image.reference_image
+    else:
+        ref_aligned = image.input_images[0].reference_image
     sub_aligned = None
     ml_model = None
 
