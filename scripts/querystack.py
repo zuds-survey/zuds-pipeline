@@ -9,7 +9,7 @@ import sys
 STACK_WINDOW = 7.  # days
 STACK_INTERVAL = timedelta(days=STACK_WINDOW)
 
-def solve_stacks(stackclass=db.ScienceCoadd):
+def solve_stacks(stackclass=db.ScienceCoadd, target_class=db.ScienceImage):
 
     # create the date table
     gs = db.sa.func.generate_series
@@ -27,7 +27,7 @@ def solve_stacks(stackclass=db.ScienceCoadd):
 
     daterange = db.DBSession().query(lcol, rcol).subquery()
 
-    target = db.sa.func.array_agg(db.ScienceImage.id).label('target')
+    target = db.sa.func.array_agg(target_class.id).label('target')
     stacksize = db.sa.func.array_length(target, 1).label('stacksize')
     stackcond = stacksize >= 2
     jcond = db.sa.and_(db.ScienceImage.obsdate > daterange.c.left,
@@ -92,7 +92,8 @@ if __name__ == '__main__':
 
     outfile = args.outfile
     stackclass = db.StackedSubtraction if args.sub else db.ScienceCoadd
+    targetclass = db.SingleEpochSubtraction if args.sub else db.ScienceImage
 
-    final = solve_stacks(stackclass=stackclass)
+    final = solve_stacks(stackclass=stackclass, target_class=targetclass)
     result = pd.read_sql(final.statement, db.DBSession().get_bind())
     result.to_csv(outfile, index=False)
