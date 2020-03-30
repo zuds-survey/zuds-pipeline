@@ -1937,6 +1937,11 @@ class StackedSubtraction(Coadd):
                                 secondary='stackedsubtraction_frames',
                                 cascade='all')
 
+    stack_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'),
+                         nullable=True, index=True)
+
+    stack = relationship('ScienceCoadd', uselist=False, cascade='all')
+
     @property
     def mjd(self):
         return DBSession().query(
