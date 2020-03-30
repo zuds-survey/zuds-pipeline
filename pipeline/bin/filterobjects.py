@@ -215,7 +215,9 @@ def filter_sexcat(cat):
 
             # cache the images for stamp making
             if new_aligned is None:
-                if isinstance(image.target_image, db.ScienceImage):
+                if isinstance(image, db.StackedSubtraction):
+                    new_aligned = image.stack
+                elif isinstance(image.target_image, db.ScienceImage):
                     new_aligned = image.target_image.aligned_to(
                         image.reference_image)
                 else:

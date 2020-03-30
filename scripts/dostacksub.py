@@ -18,15 +18,25 @@ __whatami__ = 'Make the references for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 # get the work
-jobs = mpi.get_my_share_of_work(infile, reader=pd.read_csv)
+jobs = mpi.get_my_share_of_work(infile)
 
 
-for _, job in jobs.iterrows():
+for job in jobs:
 
     tstart = time.time()
     sstart = time.time()
-    images = db.DBSession().query(db.SingleEpochSubtraction).filter(
-        db.SingleEpochSubtraction.target_image_id.in_(eval(job['target']))
+
+    images = db.DBSession().query(db.SingleEpochSubtraction).join(
+        db.ScienceImage.__table__,
+        db.SingleEpochSubtraction.target_image_id == db.ScienceImage.id
+    ).join(
+        db.CoaddImage.__table__, db.CoaddImage.image_id == db.ScienceImage.id
+    ).join(
+        db.ReferenceImage.__table__,
+        db.ReferenceImage.id == db.SingleEpochSubtraction.reference_image_id
+    ).filter(
+        db.CoaddImage.coadd_id == job,
+        db.ReferenceImage.version == 'zuds5'
     ).all()
 
     sameprops = db.GROUP_PROPERTIES + ['reference_image_id']
@@ -38,10 +48,7 @@ for _, job in jobs.iterrows():
     fid = f'{fmap[images[0].fid]}'
 
     for image in images:
-        path = f'/global/cscratch1/sd/dgold/zuds/{field}/{ccdid}/{qid}/' \
-               f'{fid}/{image.basename}'
-        image.map_to_local_file(path)
-        image.mask_image.map_to_local_file(path.replace('.fits', '.mask.fits'))
+        image.basic_map()
 
     basename = f'sub.{field}_{ccdid}_{qid}_{fid}_{job["left"]}_' \
                f'{job["right"]}.coadd.fits'
@@ -55,6 +62,7 @@ for _, job in jobs.iterrows():
         flush=True
     )
 
+
     stackstart = time.time()
     try:
         sub = db.StackedSubtraction.from_images(
@@ -67,8 +75,7 @@ for _, job in jobs.iterrows():
         db.DBSession().rollback()
         continue
 
-    sub.binleft = job['left']
-    sub.binright = job['right']
+    sub.stack_id = job
 
     stackstop = time.time()
     print(
