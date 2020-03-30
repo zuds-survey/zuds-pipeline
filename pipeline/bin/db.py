@@ -1929,10 +1929,6 @@ class StackedSubtraction(Coadd):
     __mapper_args__ = {'polymorphic_identity': 'stackedsub',
                        'inherit_condition': id == Coadd.id}
 
-    binleft = sa.Column(sa.DateTime(timezone=False), nullable=False)
-    binright = sa.Column(sa.DateTime(timezone=False), nullable=False)
-
-
     input_images = relationship('SingleEpochSubtraction',
                                 secondary='stackedsubtraction_frames',
                                 cascade='all')
@@ -1940,34 +1936,24 @@ class StackedSubtraction(Coadd):
     stack_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'),
                          nullable=True, index=True)
 
-    stack = relationship('ScienceCoadd', uselist=False, cascade='all')
+    stack = relationship('ScienceCoadd', uselist=False, cascade='all',
+                         foreign_keys=[stack_id])
 
     @property
     def mjd(self):
-        return DBSession().query(
-            sa.func.percentile_cont(
-                0.5
-            ).within_group(
-                (ScienceImage.obsjd - 2400000.5).asc()
-            )
-        ).join(
-            SingleEpochSubtraction,
-            SingleEpochSubtraction.target_image_id == ScienceImage.id
-        ).join(
-            StackedSubtractionFrame,
-            StackedSubtractionFrame.singleepochsubtraction_id ==
-            SingleEpochSubtraction.id
-        ).join(
-            type(self),
-            type(self).id == StackedSubtractionFrame.stackedsubtraction_id
-        ).filter(
-            type(self).id == self.id
-        ).first()[0]
+        return self.stack.mjd
 
-
-    @hybrid_property
+    @property
     def winsize(self):
-        return self.binright - self.binleft
+        return self.stack.winsize
+
+    @property
+    def binleft(self):
+        return self.stack.binleft
+
+    @property
+    def binright(self):
+        return self.stack.binright
 
 
 # Subtractions ################################################################
