@@ -168,9 +168,6 @@ if __name__ == '__main__':
     handler.setFormatter(fmter)
     logger.addHandler(handler)
 
-    # download the partnership images first, caltech second, public last
-    _gid_priorities = {2: 1, 3: 2, 1: 3}
-    sort_order = case(value=db.ScienceImage.ipac_gid, whens=_gid_priorities)
 
     bad = []
 
@@ -182,35 +179,21 @@ if __name__ == '__main__':
             tstart = time.time()
             icookie = ipac_authenticate()
 
-        idownload_base = db.DBSession().query(db.ScienceImage).outerjoin(
-            db.TapeCopy, db.ZTFFile.id == db.TapeCopy.product_id
-        ).outerjoin(
-            db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
+        idownload_q = db.DBSession().query(db.ScienceImage).outerjoin(
+            db.ZTFFileCopy, db.ScienceImage.id == db.ZTFFileCopy.product_id
         ).filter(
-            db.HTTPArchiveCopy.product_id == None,
-            db.TapeCopy.product_id == None,
-            ~db.ZTFFile.id.in_(bad)
-        ).with_for_update(skip_locked=True, of=db.ZTFFile).order_by(
+            db.ZTFFileCopy.product_id == None,
+            db.ScienceImage.field.in_(ZUDS_FIELDS)
+        ).order_by(
             db.ScienceImage.id.desc()
         ).options(db.sa.orm.joinedload(db.ScienceImage.mask_image))
-
-        idownload_q = idownload_base.filter(
-            db.ScienceImage.field.in_(ZUDS_FIELDS)
-        ).limit(CHUNK_SIZE)
 
         to_download = idownload_q.all()
 
         if len(to_download) == 0:
             # download for other fields
-            to_download = idownload_base.limit(CHUNK_SIZE).all()
-            http = False
-        else:
-            http = True
-
-        if len(to_download) == 0:
-            time.sleep(180.)  # sleep for 3 minutes
+            time.sleep(30.)  # sleep for 3 minutes
             continue
-
 
         for sci in to_download:
             for t in ['sci', 'mask']:
@@ -232,15 +215,11 @@ if __name__ == '__main__':
 
                 # ensure this has 12 components so that it can be used with
                 # retrieve
-                destination_base = Path(
-                    f'/global/cfs/cdirs/m937/zuds/data/xfer/{hostname}/'
-                    f'{image.field:06d}/'
-                    f'c{image.ccdid:02d}/'
-                    f'q{image.qid}/'
-                    f'{fmap[image.fid]}'
-                )
 
-                destination = f'{destination_base / image.basename}'
+                acopy = db.HTTPArchiveCopy.from_product(image, check=False)
+                destination = acopy.archive_path
+
+
                 try:
                     safe_download(target, destination, icookie, logger, raise_exc=True)
                 except requests.exceptions.RequestException as e:
@@ -252,34 +231,6 @@ if __name__ == '__main__':
                 # ensure the image header is written to the DB
                 image.load_header()
 
-                # associate it with the tape archive
-                tcopy = db.TapeCopy(
-                    member_name=destination,
-                    archive=archive,
-                    product=image
-                )
-                current_tarball.append(tcopy)
-
                 # and archive the file to disk
-
-                if http:
-                    acopy = db.HTTPArchiveCopy.from_product(image, check=False)
-                    acopy.put()
-                    db.DBSession().add(acopy)
-
-                if len(current_tarball) >= TAR_SIZE:
-                    # write the archive to the database
-                    db.DBSession().add(archive)
-
-                    size = 0
-                    for copy in archive.contents:
-                        size += os.path.getsize(copy.member_name)
-
-                    archive.size = size
-
-                    # submit it to tape
-                    submit_to_tape(archive)
-                    current_tarball, archive = reset_tarball()
-
-        db.DBSession().add_all(to_download)
-        db.DBSession().commit()
+                db.DBSession().add(acopy)
+                db.DBSession().commit()
