@@ -2924,52 +2924,47 @@ class Alert(models.Base):
 
         # calculate the detection history
         prevdets = []
-        if alert_type == 'single':
-            mymjd = detection.image.mjd
-        else:
-            mymjd = detection.image.target_image.max_mjd
-        for d in detection.source.detections:
-            if isinstance(d.image, MultiEpochSubtraction):
-                dmjd = d.image.target_image.max_mjd
-            else:
-                dmjd = d.image.mjd
-            if dmjd < mymjd and d is not detection:
-                prevdets.append(d)
 
-        sfunc = lambda d: d.image.mjd if isinstance(
-            d.image, SingleEpochSubtraction
-        ) else d.image.target_image.max_mjd
+        # get dates of single epoch detections
+        singledates = DBSession().query(ScienceImage.obsjd - MJD_TO_JD).join(
+            SingleEpochSubtraction, SingleEpochSubtraction.target_image_id == ScienceImage.id
+        ).join(
+            Detection, Detection.image_id == SingleEpochSubtraction.id
+        ).filter(
+            Detection.source_id == detection.source.id
+        ).all()
 
-        prevdets = list(
-            sorted(
-                prevdets,
-                key=sfunc
-            )
+        singledates = list(sorted([date[0] for date in singledates]))
+
+        multidates = DBSession().query(ScienceCoadd.binright).join(
+            MultiEpochSubtraction, MultiEpochSubtraction.target_image_id == ScienceCoadd.id
+        ).join(
+            Detection, Detection.image_id == MultiEpochSubtraction.id
+        ).filter(
+            Detection.source_id == detection.source.id
         )
+        multidates = list(sorted([date[0] for date in multidates]))
 
-        single_dets = [det for det in prevdets if isinstance(det.image, SingleEpochSubtraction)]
-        multi_dets = [det for det in prevdets if isinstance(det.image, MultiEpochSubtraction)]
-
-        candidate['ndethist_single'] = len(single_dets)
-        candidate['ndethist_stack'] = len(multi_dets)
+        candidate['ndethist_single'] = len(singledates)
+        candidate['ndethist_stack'] = len(multidates)
 
         stop = time.time()
         print_time(start, stop, detection, 'prevdets')
 
         start = time.time()
 
-        if len(single_dets) > 0:
-            starthist = single_dets[0].image.mjd + MJD_TO_JD
-            endhist = single_dets[-1].image.mjd + MJD_TO_JD
+        if len(singledates) > 0:
+            starthist = singledates[0] + MJD_TO_JD
+            endhist = singledates[-1] + MJD_TO_JD
             candidate['jdstarthist_single'] = starthist
             candidate['jdendhist_single'] = endhist
         else:
             candidate['jdstarthist_single'] = None
             candidate['jdendhist_single'] = None
 
-        if len(multi_dets) > 0:
-            starthist = multi_dets[0].image.target_image.min_mjd + MJD_TO_JD
-            endhist = multi_dets[-1].image.target_image.max_mjd + MJD_TO_JD
+        if len(multidates) > 0:
+            starthist = multidates[0] + MJD_TO_JD
+            endhist = multidates[-1] + MJD_TO_JD
             candidate['jdstarthist_stack'] = starthist
             candidate['jdendhist_stack'] = endhist
         else:
