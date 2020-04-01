@@ -2918,27 +2918,39 @@ class Alert(models.Base):
         start = time.time()
 
         # calculate the detection history
-        prevdets = []
+
+        if alert_type == 'single':
+            mymjd = detection.image.mjd
+        else:
+            mymjd = detection.image.target_image.max_mjd
 
         # get dates of single epoch detections
-        singledates = DBSession().query(ScienceImage.obsjd - MJD_TO_JD).join(
-            SingleEpochSubtraction, SingleEpochSubtraction.target_image_id == ScienceImage.id
+        singledates = DBSession().query(ScienceImage.obsjd - MJD_TO_JD).select_from(
+            ScienceImage.__table__
         ).join(
-            Detection, Detection.image_id == SingleEpochSubtraction.id
+            SingleEpochSubtraction.__table__, SingleEpochSubtraction.target_image_id == ScienceImage.id
+        ).join(
+            ObjectWithFlux.__table__, ObjectWithFlux.image_id == SingleEpochSubtraction.id
         ).filter(
-            Detection.source_id == detection.source.id
+            ObjectWithFlux.source_id == detection.source.id
         ).all()
+        singledates = list(sorted([date[0] for date in singledates if date[0] < mymjd]))
 
-        singledates = list(sorted([date[0] for date in singledates]))
-
-        multidates = DBSession().query(ScienceCoadd.binright).join(
-            MultiEpochSubtraction, MultiEpochSubtraction.target_image_id == ScienceCoadd.id
+        multidates = DBSession().query(sa.func.max(ScienceImage.obsjd) - MJD_TO_JD).select_from(
+            ScienceImage.__table__
         ).join(
-            Detection, Detection.image_id == MultiEpochSubtraction.id
+            CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
+        ).join(
+            ScienceCoadd.__table__, ScienceCoadd.id == CoaddImage.coadd_id
+        ).join(
+            MultiEpochSubtraction.__table__, MultiEpochSubtraction.target_image_id == ScienceCoadd.id
+        ).join(
+            ObjectWithFlux.__table__, ObjectWithFlux.image_id == MultiEpochSubtraction.id
         ).filter(
-            Detection.source_id == detection.source.id
-        )
-        multidates = list(sorted([date[0] for date in multidates]))
+            ObjectWithFlux.source_id == detection.source.id
+        ).group_by(ScienceCoadd.id)
+
+        multidates = list(sorted([date[0] for date in multidates if date[0] < mymjd]))
 
         candidate['ndethist_single'] = len(singledates)
         candidate['ndethist_stack'] = len(multidates)
