@@ -2936,7 +2936,9 @@ class Alert(models.Base):
         ).all()
         singledates = list(sorted([date[0] for date in singledates if date[0] < mymjd]))
 
-        multidates = DBSession().query(sa.func.max(ScienceImage.obsjd) - MJD_TO_JD).select_from(
+        multidates = DBSession().query(sa.func.min(ScienceImage.obsjd) - MJD_TO_JD,
+                                       sa.func.max(ScienceImage.obsjd) - MJD_TO_JD
+        ).select_from(
             ScienceImage.__table__
         ).join(
             CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
@@ -2950,7 +2952,8 @@ class Alert(models.Base):
             ObjectWithFlux.source_id == detection.source.id
         ).group_by(ScienceCoadd.id)
 
-        multidates = list(sorted([date[0] for date in multidates if date[0] < mymjd]))
+        multidates = list(sorted([date for date in multidates if date[0] < mymjd],
+                                 key=lambda d: d[1]))
 
         candidate['ndethist_single'] = len(singledates)
         candidate['ndethist_stack'] = len(multidates)
@@ -2970,8 +2973,8 @@ class Alert(models.Base):
             candidate['jdendhist_single'] = None
 
         if len(multidates) > 0:
-            starthist = multidates[0] + MJD_TO_JD
-            endhist = multidates[-1] + MJD_TO_JD
+            starthist = multidates[0][0] + MJD_TO_JD
+            endhist = multidates[-1][1] + MJD_TO_JD
             candidate['jdstarthist_stack'] = starthist
             candidate['jdendhist_stack'] = endhist
         else:
