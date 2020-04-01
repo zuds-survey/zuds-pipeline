@@ -41,17 +41,17 @@ def raw_aperture_photometry(sci_path, rms_path, mask_path, ra, dec,
     maskpix = [annulus_mask.cutout(maskpix) for annulus_mask in annulus_masks]
 
 
-    if apply_calibration:
-        magzp = header['MAGZP']
-        apcor = header[APER_KEY]
-
-        phot_table['mag'] = -2.5 * np.log10(phot_table['aperture_sum']) + magzp + apcor
-        phot_table['magerr'] = 1.0826 * phot_table['aperture_sum_err'] / phot_table['aperture_sum']
-
+    magzp = header['MAGZP']
+    apcor = header[APER_KEY]
 
     # check for invalid photometry on masked pixels
     phot_table['flags'] = [int(np.bitwise_or.reduce(m, axis=(0, 1))) for
                            m in maskpix]
+
+    phot_table['zp'] = magzp + apcor
+    phot_table['obsjd'] = header['OBSJD']
+    phot_table['filtercode'] = 'z' + header['FILTER'][-1]
+
 
     # rename some columns
     phot_table.rename_column('aperture_sum', 'flux')

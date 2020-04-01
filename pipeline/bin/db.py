@@ -1643,7 +1643,10 @@ class CalibratedImage(CalibratableImage):
                                     image=self,
                                     ra=r,
                                     dec=d,
-                                    source=source)
+                                    source=source,
+                                    zp=row['zp'],
+                                    obsjd=row['obsjd'],
+                                    filtercode=row['filtercode'])
             photometry.append(phot)
 
         return photometry
@@ -2321,6 +2324,10 @@ class ForcedPhotometry(models.Base):
     flux = sa.Column(sa.Float)
     fluxerr = sa.Column(sa.Float)
 
+    zp = sa.Column(sa.Float)
+    filtercode = sa.Column(sa.Text)
+    obsjd = sa.Column(sa.Float)
+
     @hybrid_property
     def snr(self):
         return self.flux / self.fluxerr
@@ -2417,25 +2424,13 @@ def light_curve(sourceid):
     lc_raw = []
 
     phot = DBSession().query(
-        ScienceImage.obsmjd,
-        ScienceImage.filtercode,
-        ScienceImage.magzp,
+        ForcedPhotometry.obsjd - MJD_TO_JD,
+        ForcedPhotometry.filtercode,
+        ForcedPhotometry.zp,
         ForcedPhotometry.flux,
         ForcedPhotometry.fluxerr,
         ForcedPhotometry.flags,
-        ScienceImage.maglimit,
-        ScienceImage.apcor,
         ForcedPhotometry.id
-    ).select_from(
-        sa.join(
-            ForcedPhotometry,
-            SingleEpochSubtraction,
-            ForcedPhotometry.image_id == SingleEpochSubtraction.id
-        ).join(
-            ScienceImage.__table__,
-            SingleEpochSubtraction.target_image_id ==
-            ScienceImage.id
-        )
     ).filter(
         ForcedPhotometry.source_id == sourceid
     )
@@ -2443,13 +2438,13 @@ def light_curve(sourceid):
     for photpoint in phot:
         photd = {'mjd': photpoint[0],
                  'filter': 'ztf' + photpoint[1][-1],
-                 'zp': photpoint[2] + photpoint[7],  # ap-correct the ZP
+                 'zp': photpoint[2],  # ap-correct the ZP
                  'zpsys': 'ab',
                  'flux': photpoint[3],
                  'fluxerr': photpoint[4],
                  'flags': photpoint[5],
-                 'lim_mag': -2.5 * np.log10(5 * photpoint[4]) + photpoint[2] + photpoint[7],
-                 'id': photpoint[8]}
+                 'lim_mag': -2.5 * np.log10(5 * photpoint[4]) + photpoint[2],
+                 'id': photpoint[-1]}
         lc_raw.append(photd)
 
     return Table(lc_raw)

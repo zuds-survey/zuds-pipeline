@@ -166,7 +166,10 @@ for g, (fn, imgid) in enumerate(imgs):
                  'fluxerr':row['fluxerr'],
                  'flags':int(row['flags']),
                  'ra':ra[k],
-                 'dec':dec[k]}
+                 'dec':dec[k],
+                 'zp': row['zp'],
+                 'filtercode': row['filtercode'],
+                 'obsjd': row['obsjd']}
 
             output.append(p)
 
