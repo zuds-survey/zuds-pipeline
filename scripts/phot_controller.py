@@ -295,8 +295,8 @@ if __name__ == '__main__':
 
         detids = [d[0] for d in detids]
         needed = len(detids) > 0
-        
-        if len(active_jobs) == 0 and (fallback or needed):
+
+        if len(active_jobs) == 0 and (fallback):
             try:
                 slurm_id, det, out = submit_forcephot_chain()
             except RuntimeError as e:
