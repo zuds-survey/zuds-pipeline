@@ -8,13 +8,13 @@ alter table forcephot_temp alter column id set default nextval('forcedphotometry
 alter table forcephot_temp alter column created_at set default now();
 alter table forcephot_temp alter column modified set default now();
 
-\copy forcephot_temp (source_id, image_id, flux, fluxerr, flags, ra, dec) from FILENAME with csv header;
+\copy forcephot_temp (source_id, image_id, flux, fluxerr, flags, ra, dec, zp, filtercode, obsjd) from FILENAME with csv header;
 
 alter table forcephot_temp add constraint "imagefk_t" FOREIGN KEY (image_id)
   REFERENCES singleepochsubtractions (id) ON DELETE CASCADE;
 
 alter table forcephot_temp add constraint "sourcefk_t" FOREIGN KEY (source_id)
-  REFERENCES sources (id) ON DELETE CASCADE;
+  REFERENCES sources (id) ON DELETE CASCADE;f
 
 create unique index "source_image_t" on forcephot_temp (source_id, image_id);
 create index "image_source_t" on forcephot_temp (image_id, source_id);
