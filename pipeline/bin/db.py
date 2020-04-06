@@ -1929,38 +1929,6 @@ class ScienceCoadd(Coadd):
         return self.binright - self.binleft
 
 
-class StackedSubtraction(Coadd):
-    id = sa.Column(sa.Integer, sa.ForeignKey('coadds.id', ondelete='CASCADE'),
-                   primary_key=True)
-    __mapper_args__ = {'polymorphic_identity': 'stackedsub',
-                       'inherit_condition': id == Coadd.id}
-
-    input_images = relationship('SingleEpochSubtraction',
-                                secondary='stackedsubtraction_frames',
-                                cascade='all')
-
-    stack_id = sa.Column(sa.Integer, sa.ForeignKey('sciencecoadds.id', ondelete='CASCADE'),
-                         nullable=True, index=True)
-
-    stack = relationship('ScienceCoadd', uselist=False, cascade='all',
-                         foreign_keys=[stack_id])
-
-    @property
-    def mjd(self):
-        return self.stack.mjd
-
-    @property
-    def winsize(self):
-        return self.stack.winsize
-
-    @property
-    def binleft(self):
-        return self.stack.binleft
-
-    @property
-    def binright(self):
-        return self.stack.binright
-
 
 # Subtractions ################################################################
 
