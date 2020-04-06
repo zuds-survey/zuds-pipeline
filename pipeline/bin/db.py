@@ -2194,13 +2194,17 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
-                    nthreads=1):
+                    nthreads=1, force_map_subs=True):
 
         if not isinstance(sci, ScienceCoadd):
             raise TypeError(f'Input science image "{sci.basename}" must be '
                             f'an instance of ScienceCoadd, got {type(sci)}.')
 
         images = overlapping_subtractions(sci, ref)
+
+        if force_map_subs:
+            for image in images:
+                image.basic_map()
 
         if len(images) != len(sci.input_images):
             raise ValueError('Number of single-epoch subtractions != number'
