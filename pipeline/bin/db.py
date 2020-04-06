@@ -1815,8 +1815,6 @@ def _coadd_from_images(cls, images, outfile_name, nthreads=1, data_product=False
                       f'updated...')
 
     properties = GROUP_PROPERTIES
-    if issubclass(cls, StackedSubtraction):
-        properties.append('reference_image_id')
 
     # make sure all images have the same field, filter, ccdid, qid:
     ensure_images_have_the_same_properties(images, properties)
