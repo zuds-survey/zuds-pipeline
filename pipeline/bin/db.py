@@ -2155,10 +2155,6 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
     def __table_args__(cls):
         return tuple()
 
-    @property
-    def input_subtractions(self):
-        return overlapping_subtractions(self.target_image, self.reference_image)
-
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
