@@ -1049,13 +1049,6 @@ class ZTFFile(models.Base, File):
 
         return obj
 
-    @property
-    def relname(self):
-        return f'{self.field:06d}/' \
-               f'c{self.ccdid:02d}/' \
-               f'q{self.qid}/' \
-               f'{fid_map[self.fid]}/' \
-               f'{self.basename}'
 
 
 class PipelineRegionFile(ZTFFile):
@@ -1949,7 +1942,9 @@ class Subtraction(HasWCS):
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
-                    refined=None):
+                    **kwargs):
+
+        refined = kwargs.get('refined', True)
 
         directory = Path(tmpdir) / uuid.uuid4().hex
         directory.mkdir(exist_ok=True, parents=True)
@@ -2026,9 +2021,6 @@ class Subtraction(HasWCS):
 
         submask.boolean.map_to_local_file(directory / submask.boolean.basename)
         submask.boolean.save()
-
-        if refined is None:
-            refined = isinstance(sci, Coadd)
 
         command = prepare_hotpants(transact_sci, remapped_ref, outname,
                                    submask.boolean, directory, tmpdir=tmpdir,
@@ -2170,7 +2162,10 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
 
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
-                    nthreads=1, force_map_subs=True):
+                    **kwargs):
+
+        nthreads = kwargs.get('nthreads', 1)
+        force_map_subs = kwargs.get('force_map_subs', True)
 
         if not isinstance(sci, ScienceCoadd):
             raise TypeError(f'Input science image "{sci.basename}" must be '
