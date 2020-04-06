@@ -2209,7 +2209,10 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
                              f'Single-epoch subtractions: '
                              f'{[i.basename for i in images]}')
 
-        coadd = _coadd_from_images(cls, images,  nthreads=nthreads, addbkg=False)
+        outfile_name = sub_name(sci.local_path, ref.local_path)
+
+        coadd = _coadd_from_images(cls, images, outfile_name,
+                                   nthreads=nthreads, addbkg=False)
         coadd.reference_image = ref
         coadd.target_image = sci
         coadd.seeing = sci.header['SEEING']
