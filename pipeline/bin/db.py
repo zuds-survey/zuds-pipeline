@@ -2175,6 +2175,7 @@ def overlapping_subtractions(sci, ref):
     return subq.all()
 
 
+
 class MultiEpochSubtraction(Subtraction, CalibratableImage):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
                                              ondelete='CASCADE'),
@@ -2187,9 +2188,18 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
     target_image = relationship('ScienceCoadd', cascade='all',
                                 foreign_keys=[target_image_id])
 
+    input_images = relationship('SingleEpochSubtraction',
+                                secondary='stackedsubtraction_frames',
+                                cascade='all')
+
+
     @declared_attr
     def __table_args__(cls):
         return tuple()
+
+    @property
+    def input_subtractions(self):
+        return overlapping_subtractions(self.target_image, self.reference_image)
 
 
     @classmethod
@@ -2216,16 +2226,19 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
         outfile_name = sub_name(sci.local_path, ref.local_path)
 
         coadd = _coadd_from_images(cls, images, outfile_name,
-                                   nthreads=nthreads, addbkg=False)
+                                   nthreads=nthreads, addbkg=False,
+                                   calculate_seeing=False)
+
         coadd.reference_image = ref
         coadd.target_image = sci
-        coadd.seeing = sci.header['SEEING']
+        coadd.header['SEEING'] = sci.header['SEEING']
+        coadd.save()
 
         return coadd
 
 
 StackedSubtractionFrame = join_model('stackedsubtraction_frames',
-                                     StackedSubtraction, SingleEpochSubtraction)
+                                     MultiEpochSubtraction, SingleEpochSubtraction)
 
 
 # Detections & Photometry #####################################################
