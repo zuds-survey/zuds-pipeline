@@ -1795,6 +1795,57 @@ class ScienceImage(CalibratedImage):
 
 # Coadds #######################################################################
 
+def _coadd_from_images(cls, images, outfile_name, nthreads=1, data_product=False,
+                       tmpdir='/tmp', copy_inputs=False, swarp_kws=None,
+                       calculate_seeing=True, addbkg=True):
+    """Make a coadd from a bunch of input images"""
+
+    images = np.atleast_1d(images)
+    mskoutname = outfile_name.replace('.fits', '.mask.fits')
+
+    basename = os.path.basename(outfile_name)
+
+    # see if a file with this name already exists in the DB
+    cond = cls.basename == basename
+    predecessor = DBSession().query(cls).filter(cond).first()
+
+    if predecessor is not None:
+        warnings.warn(f'WARNING: A "{cls}" object with the basename '
+                      f'"{basename}" already exists. The record will be '
+                      f'updated...')
+
+    properties = GROUP_PROPERTIES
+    if issubclass(cls, StackedSubtraction):
+        properties.append('reference_image_id')
+
+    # make sure all images have the same field, filter, ccdid, qid:
+    ensure_images_have_the_same_properties(images, properties)
+
+    # call swarp
+    coadd = run_coadd(cls, images, outfile_name, mskoutname,
+                      addbkg=addbkg, nthreads=nthreads,
+                      tmpdir=tmpdir, copy_inputs=copy_inputs,
+                      swarp_kws=swarp_kws)
+    coaddmask = coadd.mask_image
+
+    coadd.header['FIELD'] = coadd.field = images[0].field
+    coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
+    coadd.header['QID'] = coadd.qid = images[0].qid
+    coadd.header['FID'] = coadd.fid = images[0].fid
+
+
+    if calculate_seeing:
+        estimate_seeing(coadd)
+    coadd.save()
+
+    if data_product:
+        coadd_copy = HTTPArchiveCopy.from_product(coadd)
+        coaddmask_copy = HTTPArchiveCopy.from_product(coaddmask)
+        archive.archive(coadd_copy)
+        archive.archive(coaddmask_copy)
+
+    return coadd
+
 class Coadd(CalibratableImage):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
                                              ondelete='CASCADE'),
@@ -1840,58 +1891,10 @@ class Coadd(CalibratableImage):
     def __table_args__(cls):
         return tuple()
 
-    @classmethod
-    def from_images(cls, images, outfile_name, nthreads=1, data_product=False,
-                    tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
-        """Make a coadd from a bunch of input images"""
-
-        images = np.atleast_1d(images)
-        mskoutname = outfile_name.replace('.fits', '.mask.fits')
-
-        basename = os.path.basename(outfile_name)
-
-        # see if a file with this name already exists in the DB
-        cond = cls.basename == basename
-        predecessor = DBSession().query(cls).filter(cond).first()
-
-        if predecessor is not None:
-            warnings.warn(f'WARNING: A "{cls}" object with the basename '
-                          f'"{basename}" already exists. The record will be '
-                          f'updated...')
-
-        properties = GROUP_PROPERTIES
-        if issubclass(cls, StackedSubtraction):
-            properties.append('reference_image_id')
-
-        # make sure all images have the same field, filter, ccdid, qid:
-        ensure_images_have_the_same_properties(images, properties)
-
-        # call swarp
-        coadd = run_coadd(cls, images, outfile_name, mskoutname,
-                          addbkg=True, nthreads=nthreads,
-                          tmpdir=tmpdir, copy_inputs=copy_inputs,
-                          swarp_kws=swarp_kws)
-        coaddmask = coadd.mask_image
-
-        coadd.header['FIELD'] = coadd.field = images[0].field
-        coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
-        coadd.header['QID'] = coadd.qid = images[0].qid
-        coadd.header['FID'] = coadd.fid = images[0].fid
-
-        estimate_seeing(coadd)
-        coadd.save()
-
-        if data_product:
-            coadd_copy = HTTPArchiveCopy.from_product(coadd)
-            coaddmask_copy = HTTPArchiveCopy.from_product(coaddmask)
-            archive.archive(coadd_copy)
-            archive.archive(coaddmask_copy)
-
-        return coadd
+    from_images = classmethod(_coadd_from_images)
 
 
 CoaddImage = join_model('coadd_images', Coadd, CalibratableImage)
-
 
 
 class ReferenceImage(Coadd):
@@ -2157,6 +2160,21 @@ class SingleEpochSubtraction(Subtraction, CalibratedImage):
                                 foreign_keys=[target_image_id])
 
 
+def overlapping_subtractions(sci, ref):
+    subq = DBSession().query(
+        SingleEpochSubtraction
+    ).join(
+        ScienceImage.__table__, ScienceImage.id == SingleEpochSubtraction.target_image_id
+    ).join(
+        CoaddImage, CoaddImage.calibratableimage_id == ScienceImage.id
+    ).filter(
+        CoaddImage.coadd_id == sci.id,
+        SingleEpochSubtraction.reference_image_id == ref.id
+    )
+
+    return subq.all()
+
+
 class MultiEpochSubtraction(Subtraction, CalibratableImage):
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
                                              ondelete='CASCADE'),
@@ -2172,6 +2190,32 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
     @declared_attr
     def __table_args__(cls):
         return tuple()
+
+
+    @classmethod
+    def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
+                    nthreads=1):
+
+        if not isinstance(sci, ScienceCoadd):
+            raise TypeError(f'Input science image "{sci.basename}" must be '
+                            f'an instance of ScienceCoadd, got {type(sci)}.')
+
+        images = overlapping_subtractions(sci, ref)
+
+        if len(images) != len(sci.input_images):
+            raise ValueError('Number of single-epoch subtractions != number'
+                             f' of stack inputs. Stack inputs: '
+                             f'{[i.basename for i in sci.input_images]}, '
+                             f'Single-epoch subtractions: '
+                             f'{[i.basename for i in images]}')
+
+        coadd = _coadd_from_images(cls, images,  nthreads=nthreads, addbkg=False)
+        coadd.reference_image = ref
+        coadd.target_image = sci
+        coadd.seeing = sci.header['SEEING']
+
+        return coadd
+
 
 StackedSubtractionFrame = join_model('stackedsubtraction_frames',
                                      StackedSubtraction, SingleEpochSubtraction)
