@@ -95,7 +95,7 @@ def submit_job(images):
 #SBATCH -J zuds
 #SBATCH -t 00:60:00
 #SBATCH -L SCRATCH
-#SBATCH -A ***REMOVED***
+#SBATCH -A {get_secret('nersc_account')}
 #SBATCH -o {str(scriptname).replace('.sh', '.out')}
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/donightly.py {inname} zuds5
@@ -166,7 +166,7 @@ def submit_alert_job():
 #SBATCH -J zuds
 #SBATCH -t 00:60:00
 #SBATCH -L SCRATCH
-#SBATCH -A ***REMOVED***
+#SBATCH -A {get_secret('nersc_account')}
 #SBATCH -o {str(scriptname).replace('.sh', '.out')}
 
 HDF5_USE_FILE_LOCKING=FALSE srun -n 64 -c1 --cpu_bind=cores shifter python $HOME/lensgrinder/scripts/doalert.py {detinname}
