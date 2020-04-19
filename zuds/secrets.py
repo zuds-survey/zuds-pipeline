@@ -29,7 +29,7 @@ class SecretManager(object):
             self.config_path = Path(os.getenv('HOME')) / '.zuds'
 
         # check access to the file
-        bits = os.stat(self.config_path)
+        bits = os.stat(self.config_path).st_mode
         msgbase = '''Secrets file "%s" is accessible to %s, 
                      but must disallow access to group and world 
                      for security. Please run $chmod go-rwx %s 
