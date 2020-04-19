@@ -16,7 +16,7 @@ class SecretManager(object):
 
     def __init__(self, debug=False):
         """Read the configuration file and construct the secrets cache."""
-        
+
         # See if an alternative path to the secrets file is specified
         # using the environment variable 'ZUDS_CONFIG'
         self.config_path = os.getenv('ZUDS_CONFIG')
@@ -37,18 +37,18 @@ class SecretManager(object):
 
         # check for group access
         if bits & stat.S_IRWXG > 0:
-            raise SecretsFilePermissionError(msg % (self.config_path,
-                                                    'group',
-                                                    self.config_path))
+            raise SecretsFilePermissionError(msgbase % (self.config_path,
+                                                        'group',
+                                                        self.config_path))
 
         # check for world access
         if bits & stat.S_IRWXO > 0:
-            raise SecretsFilePermissionError(msg % (self.config_path,
-                                                    'world',
-                                                    self.config_path))
-            
+            raise SecretsFilePermissionError(msgbase % (self.config_path,
+                                                        'world',
+                                                        self.config_path))
+
         # load the secrets
-        self.cache = yaml.load(open(self.config_path, 'r'), 
+        self.cache = yaml.load(open(self.config_path, 'r'),
                                Loader=yaml.FullLoader)
 
     def __call__(self, key):
