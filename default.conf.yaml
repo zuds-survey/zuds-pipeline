@@ -25,9 +25,8 @@ nersc_username:
 nersc_host: "cori.nersc.gov"
 nersc_password: 
 
-# Kowalski credentials (if any). These are used for some calibrations,
-# like deriving the seeing of coadds, and for cross-matches used in
-# alert generation.
+# Kowalski credentials (if any). These are used for some cross-matches
+# aganist external catalogs.
 kowalski_username: 
 kowalski_password: 
 
