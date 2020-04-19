@@ -4,14 +4,15 @@ from photutils import CircularAperture
 from photutils import aperture_photometry
 from astropy.table import Table
 import time
-from seeing import estimate_seeing
+
 from tensorflow.keras.models import model_from_json, load_model
 import os
 from astropy.nddata.utils import Cutout2D
 from astropy.coordinates import SkyCoord
 from tensorflow.keras.utils import normalize as tf_norm
 
-import db
+from . import db
+from .seeing import estimate_seeing
 
 from scipy.optimize import minimize
 

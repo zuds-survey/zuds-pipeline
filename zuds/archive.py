@@ -1,11 +1,13 @@
-import db
+
 import os
 import stat
 import shutil
 from pathlib import Path
-from secrets import get_secret
+
 import requests
 
+from . import db
+from .secrets import get_secret
 
 perm = 0o755
 

@@ -1,11 +1,11 @@
 import os
-import db
 import shutil
 
-from utils import initialize_directory, quick_background_estimate
-from seeing import estimate_seeing
-from swarp import BKG_VAL
-from sextractor import run_sextractor
+from . import db
+from .utils import initialize_directory, quick_background_estimate
+from .seeing import estimate_seeing
+from .swarp import BKG_VAL
+from .sextractor import run_sextractor
 
 
 # split an iterable over some processes recursively

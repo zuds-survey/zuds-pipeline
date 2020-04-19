@@ -1,5 +1,4 @@
 import os
-import db
 import numpy as np
 import uuid
 from astropy.time import Time
@@ -12,9 +11,8 @@ import tempfile
 from astropy.wcs import WCS
 
 
-from utils import initialize_directory, quick_background_estimate
-
-import db
+from .utils import initialize_directory, quick_background_estimate
+from . import db
 
 CONF_DIR = Path(__file__).parent.parent / 'astromatic/makecoadd'
 SCI_CONF = CONF_DIR / 'default.swarp'

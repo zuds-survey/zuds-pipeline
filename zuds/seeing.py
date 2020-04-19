@@ -1,8 +1,8 @@
-import db
+from . import db
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from secrets import get_secret
+from .secrets import get_secret
 import penquins
 
 

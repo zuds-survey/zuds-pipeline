@@ -7,7 +7,8 @@ import psycopg2
 import os
 from astropy.coordinates import SkyCoord
 from penquins import Kowalski
-from secrets import get_secret
+
+from .secrets import get_secret
 
 
 def logon():

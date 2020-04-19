@@ -3,11 +3,12 @@ import subprocess
 from pathlib import Path
 import shutil
 import uuid
-import db
+
 import os
 from astropy.io import fits
 
-from utils import initialize_directory
+from . import db
+from .utils import initialize_directory
 
 SEX_CONF = Path(__file__).parent.parent / 'astromatic/sextractor.conf'
 PARAM_FILE = Path(__file__).parent.parent / 'astromatic/sextractor.param'
