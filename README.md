@@ -1,2 +1,1 @@
-# lensgrinder
-dockerized subtraction pipeline for CCD imagers 
+# zuds image processing pipeline 
