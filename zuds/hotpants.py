@@ -1,7 +1,5 @@
 from .utils import initialize_directory, quick_background_estimate
 from .seeing import estimate_seeing
-from .swarp import BKG_VAL
-from .sextractor import run_sextractor
 from .constants import BIG_RMS
 
 __all__ = ['prepare_hotpants']
@@ -16,6 +14,9 @@ def chunk(iterable, chunksize):
 
 def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
                      refined=False):
+
+    from .sextractor import run_sextractor
+    from .swarp import BKG_VAL
 
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image

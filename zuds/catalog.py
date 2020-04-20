@@ -5,13 +5,13 @@ from sqlalchemy.orm import relationship
 
 from .core import ZTFFile
 from .constants import GROUP_PROPERTIES, BAD_SUM
-from .image import CalibratableImage
 from .fitsfile import FITSFile
 
 __all__ = ['PipelineFITSCatalog', 'PipelineRegionFile']
 
 
 class PipelineRegionFile(ZTFFile):
+
     id = sa.Column(sa.Integer, sa.ForeignKey('ztffiles.id',
                                              ondelete='CASCADE'),
                    primary_key=True)
@@ -97,6 +97,9 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
 
     @classmethod
     def from_image(cls, image, tmpdir='/tmp', kill_flagged=True):
+
+        from .image import CalibratableImage
+
         if not isinstance(image, CalibratableImage):
             raise ValueError('Image is not an instance of '
                              'CalibratableImage.')

@@ -10,15 +10,14 @@ from copy import deepcopy
 from .crossmatch import xmatch
 from .core import Base, DBSession
 from .utils import print_time
-from .subtraction import SingleEpochSubtraction, MultiEpochSubtraction
 from .constants import MJD_TO_JD
-from .image import ScienceImage
-from .coadd import CoaddImage, ScienceCoadd
-from .detections import Detection
 
 __all__ = ['Alert']
 
 class Alert(Base):
+
+
+
     alert = sa.Column(psql.JSONB)
     creation_index = sa.Index('created_at_index', 'created_at')
 
@@ -59,7 +58,14 @@ class Alert(Base):
 
     @classmethod
     def from_detection(cls, detection):
+
+        from .subtraction import SingleEpochSubtraction, MultiEpochSubtraction
+        from .image import ScienceImage
+        from .coadd import CoaddImage, ScienceCoadd
+        from .detections import Detection
+
         obj = cls()
+
 
         if detection.source is None:
             raise ValueError('Cannot issue an alert for a detection that is '

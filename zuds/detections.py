@@ -4,7 +4,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 
 from .spatial import SpatiallyIndexed
 from .core import Base, DBSession
-from .filterobjects import filter_sexcat
+
 
 from .constants import BRAAI_MODEL
 
@@ -71,6 +71,8 @@ class Detection(Base, SpatiallyIndexed):
     @classmethod
     def from_catalog(cls, cat, filter=True):
         result = []
+
+        from .filterobjects import filter_sexcat
 
         # TODO: determine if prev dets that are updated should also be returned
 

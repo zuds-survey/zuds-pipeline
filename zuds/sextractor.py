@@ -7,11 +7,8 @@ import uuid
 import os
 from astropy.io import fits
 
-from .catalog import PipelineFITSCatalog
-from .image import FITSImage
 from .core import ZTFFile
 from .constants import BKG_BOX_SIZE, MASK_BORDER
-from .mask import BAD_SUM
 
 __all__ = ['prepare_sextractor', 'run_sextractor']
 
@@ -32,8 +29,8 @@ checkimage_map = {
 
 def prepare_sextractor(image, directory, checkimage_type=None,
                        catalog_type='FITS_LDAC', use_weightmap=True):
-
     """Set up the pipeline to do a run of source extractor."""
+    from .mask import BAD_SUM
 
     conf = SEX_CONF
     valid_types = ['rms', 'segm', 'bkgsub', 'bkg']
@@ -107,6 +104,9 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
                    tmpdir='/tmp', use_weightmap=True):
     """Run SExtractor on an image and produce the requested checkimages and
     catalogs, returning the results as ZUDS objects (potentially DB-backed)."""
+
+    from .image import FITSImage
+    from .catalog import PipelineFITSCatalog
 
     directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)

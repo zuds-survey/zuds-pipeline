@@ -13,9 +13,8 @@ from tensorflow.keras.models import model_from_json, load_model
 from tensorflow.keras.utils import normalize as tf_norm
 
 from .seeing import estimate_seeing
-from .constants import BRAAI_MODEL, RB_CUT
-from .image import ScienceImage
-from .subtraction import SingleEpochSubtraction
+from .constants import BRAAI_MODEL, RB_CUT, BAD_SUM
+
 
 __all__ = ['filter_sexcat']
 
@@ -64,6 +63,9 @@ def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned,
 def filter_sexcat(cat):
     """Read in sextractor catalog `incat` and filter it using Peter's technique.
     Write the results to sextractor catalog `outcat`."""
+
+    from .image import ScienceImage
+    from .subtraction import SingleEpochSubtraction
 
     """python ./badpix.py sub*.cat"""
 

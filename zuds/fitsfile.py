@@ -14,9 +14,6 @@ import numpy as np
 from .file import File, UnmappedFileError
 from .core import Base, DBSession
 from .spatial import HasPoly, SpatiallyIndexed
-from .swarp import run_align
-from .source import Source
-from .image import FITSImage
 
 
 __all__ = ['FITSFile', 'HasWCS']
@@ -148,6 +145,8 @@ class FITSFile(File):
             return header
 
     def save(self):
+        from .image import FITSImage
+
         try:
             f = self.local_path
         except UnmappedFileError:
@@ -261,6 +260,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
     def sources_contained(self):
         """Query the database and return all `Sources` contained by the
         polygon of this object"""
+        from .source import Source
         return DBSession().query(Source) \
             .filter(func.q3c_poly_query(Source.ra,
                                         Source.dec,
@@ -279,6 +279,9 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
 
     def aligned_to(self, other, persist_aligned=False, tmpdir='/tmp',
                    nthreads=1):
+
+        from .swarp import run_align
+
         """Return a version of this object that is pixel-by-pixel aligned to
         the WCS solution of another image with a WCS solution."""
 

@@ -16,8 +16,6 @@ from pathlib import Path
 
 from skyportal.models import Thumbnail
 from .core import Base
-from .subtraction import Subtraction
-from .coadd import ReferenceImage
 from .constants import CUTOUT_SIZE
 from .archive import URL_PREFIX, STAMP_PREFIX, _mkdir_recursive
 from .utils import fid_map
@@ -72,6 +70,9 @@ Thumbnail.detection_id = sa.Column(
 
 
 def from_detection(cls, detection, image):
+
+    from .subtraction import Subtraction
+    from .coadd import ReferenceImage
 
     if isinstance(image, Base):
         linkimage = image

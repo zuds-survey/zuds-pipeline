@@ -15,7 +15,6 @@ from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
 from .mask import MaskImageBase, MaskImage
 from .coadd import _coadd_from_images, ScienceCoadd, CoaddImage
-from .hotpants import prepare_hotpants
 from .constants import APER_KEY
 from .archive import archive
 
@@ -59,6 +58,8 @@ class Subtraction(HasWCS):
     @classmethod
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
                     **kwargs):
+
+        from .hotpants import prepare_hotpants
 
         refined = kwargs.get('refined', True)
 

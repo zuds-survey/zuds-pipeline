@@ -8,7 +8,6 @@ from astropy.wcs import WCS
 from .utils import initialize_directory
 from .constants import BKG_BOX_SIZE, GROUP_PROPERTIES, BKG_VAL
 from .mask import MaskImageBase, MaskImage
-from .image import FITSImage
 
 __all__ = ['prepare_swarp_sci', 'prepare_swarp_mask', 'prepare_swarp_align',
            'run_coadd', 'run_align']
@@ -163,6 +162,8 @@ def prepare_swarp_align(image, other, directory, nthreads=1,
 def run_align(image, other, tmpdir='/tmp',
               nthreads=1, persist_aligned=False):
 
+    from .image import FITSImage
+
     directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
@@ -211,6 +212,8 @@ def run_align(image, other, tmpdir='/tmp',
 def run_coadd(cls, images, outname, mskoutname, addbkg=True,
               nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
     """Run swarp on images `images`"""
+
+    from .image import FITSImage
 
     directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
