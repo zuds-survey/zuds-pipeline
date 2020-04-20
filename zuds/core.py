@@ -68,7 +68,7 @@ def bump_modified(session, flush_context, instances):
 Base = models.Base
 
 
-class ZTFFile(models.Base, File):
+class ZTFFile(Base, File):
     """A database-mapped, disk-mappable memory-representation of a file that
     is associated with a ZTF sky partition. This class is abstract and not
     designed to be instantiated, but it is also not a mixin. Think of it as a

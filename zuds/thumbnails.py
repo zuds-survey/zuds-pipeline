@@ -139,12 +139,10 @@ Thumbnail.from_detection = classmethod(from_detection)
 Thumbnail.bytes = deferred(sa.Column(psql.BYTEA))
 Thumbnail.persist = persist
 
-
 Thumbnail.image = relationship('CalibratableImage',
                      cascade='all',
                      back_populates='thumbnails',
                      foreign_keys=[Thumbnail.image_id])
-
 
 Thumbnail.source = relationship(
     'Source',

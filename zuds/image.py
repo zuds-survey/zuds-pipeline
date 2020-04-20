@@ -17,12 +17,9 @@ from .fitsfile import HasWCS
 from .plotting import discrete_cmap, colors
 from .constants import BIG_RMS
 from .secrets import get_secret
-from .mask import MaskImage
-from .source import Source
 from .catalog import PipelineFITSCatalog
 from .photometry import aperture_photometry, ForcedPhotometry
 from .constants import APER_KEY
-from .thumbnails import Thumbnail
 
 __all__ = ['FITSImage', 'CalibratableImageBase', 'CalibratableImage',
            'CalibratedImage', 'ScienceImage']
@@ -271,13 +268,13 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
 
     mask_image = relationship('MaskImage',
                               uselist=False,
-                              primaryjoin=MaskImage.parent_image_id == id)
+                              primaryjoin='MaskImage.parent_image_id == id')
 
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
     thumbnails = relationship('Thumbnail',
-                              primaryjoin=Thumbnail.image_id == id)
+                              primaryjoin='Thumbnail.image_id == id')
 
 
     def basic_map(self, quiet=False):
@@ -302,6 +299,7 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
 
     @classmethod
     def from_file(cls, fname, use_existing_record=True, load_others=True):
+        from .mask import MaskImage
         obj = super().from_file(
             fname, use_existing_record=use_existing_record,
             load_others=load_others
@@ -402,6 +400,8 @@ class CalibratedImage(CalibratableImage):
 
     @property
     def unphotometered_sources(self):
+
+        from .source import Source
 
         jcond2 = sa.and_(
             ForcedPhotometry.image_id == self.id,

@@ -7,22 +7,22 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship
 
-from .core import DBSession, join_model, Base
+from .core import DBSession
 from .constants import GROUP_PROPERTIES
 from .utils import ensure_images_have_the_same_properties
-from .swarp import run_coadd
 from .seeing import estimate_seeing
 from .archive import HTTPArchiveCopy
 from .image import CalibratableImage, ScienceImage
 from .archive import archive
 
-__all__ = ['Coadd', 'CoaddImage', 'ReferenceImage', 'ScienceCoadd']
+__all__ = ['Coadd', 'ReferenceImage', 'ScienceCoadd']
 
 
 def _coadd_from_images(cls, images, outfile_name, nthreads=1, data_product=False,
                        tmpdir='/tmp', copy_inputs=False, swarp_kws=None,
                        calculate_seeing=True, addbkg=True):
     """Make a coadd from a bunch of input images"""
+    from .swarp import run_coadd
 
     images = np.atleast_1d(images)
     mskoutname = outfile_name.replace('.fits', '.mask.fits')
@@ -83,6 +83,7 @@ class Coadd(CalibratableImage):
 
     @property
     def mjd(self):
+        from .joins import CoaddImage
         return DBSession().query(
             sa.func.percentile_cont(
                 0.5
@@ -114,8 +115,6 @@ class Coadd(CalibratableImage):
 
     from_images = classmethod(_coadd_from_images)
 
-
-CoaddImage = join_model('coadd_images', Coadd, CalibratableImage, base=Base)
 
 
 class ReferenceImage(Coadd):

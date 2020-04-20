@@ -9,12 +9,12 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
-from .core import DBSession, join_model, Base
+from .core import DBSession
 from .fitsfile import HasWCS
 from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
 from .mask import MaskImageBase, MaskImage
-from .coadd import _coadd_from_images, ScienceCoadd, CoaddImage
+from .coadd import _coadd_from_images, ScienceCoadd
 from .constants import APER_KEY
 from .archive import archive
 
@@ -236,6 +236,9 @@ class SingleEpochSubtraction(Subtraction, CalibratedImage):
 
 
 def overlapping_subtractions(sci, ref):
+
+    from .joins import CoaddImage
+
     subq = DBSession().query(
         SingleEpochSubtraction
     ).join(
@@ -310,7 +313,3 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
         return coadd
 
 
-StackedSubtractionFrame = join_model('stackedsubtraction_frames',
-                                     MultiEpochSubtraction,
-                                     SingleEpochSubtraction,
-                                     base=Base)

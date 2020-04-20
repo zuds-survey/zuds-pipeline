@@ -1,10 +1,9 @@
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 
-from .core import Base, join_model
-from .image import CalibratableImage
+from .core import Base
 
-__all__ = ['JobImage', 'ForcePhotJob', 'AlertJob', 'FailedSubtraction']
+__all__ = ['ForcePhotJob', 'AlertJob', 'FailedSubtraction']
 
 
 class Job(Base):
@@ -14,7 +13,6 @@ class Job(Base):
     slurm_id = sa.Column(sa.Text, index=True, nullable=False)
 
 
-JobImage = join_model('job_images', Job, CalibratableImage, base=Base)
 
 
 class ForcePhotJob(Base):

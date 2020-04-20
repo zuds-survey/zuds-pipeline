@@ -21,9 +21,16 @@ from .secrets import *
 from .seeing import *
 from .send import *
 from .sextractor import *
+
+from .thumbnails import *
 from .source import *
 from .spatial import *
 from .subtraction import *
 from .swarp import *
-from .thumbnails import *
 from .utils import *
+
+
+
+# this one needs to be last
+from .joins import *
+
