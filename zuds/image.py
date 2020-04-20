@@ -91,7 +91,7 @@ class CalibratableImageBase(FITSImage):
 
     def cmap_limits(self):
         interval = ZScaleInterval()
-        return interval.get_limits(self.data[~self.mask_image.boolean.data])
+        return interval.get_limits(self.data)
 
     def _call_source_extractor(self, checkimage_type=None, tmpdir='/tmp',
                                use_weightmap=True):
@@ -442,8 +442,6 @@ class ScienceImage(CalibratedImage):
     This class represents immutable metadata only.
     """
 
-    # __tablename__ = 'ipacrecords'
-
     # we dont want science image records to be deleted in a cascade.
     id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
                                              ondelete='RESTRICT'),
@@ -461,6 +459,16 @@ class ScienceImage(CalibratedImage):
         obj.ccdid = obj.header['CCDID']
         obj.qid = obj.header['QID']
         obj.fid = obj.header['FILTERID']
+
+        for attr, hkw in zip(['filtercode', 'obsjd', 'infobits',
+                              'pid', 'nid', 'expid', 'itid', 'obsdate',
+                              'seeing', 'airmass', 'moonillf', 'moonesb',
+                              'maglimit', 'crpix1', 'crpix2', 'crval1',
+                              'crval2', 'cd11', 'cd12', 'c21', 'cd22',
+                              'ipac_gid', 'imgtypecode', 'exptime',
+                              'filefracday'],
+                             [])
+
         return obj
 
     filtercode = sa.Column(sa.CHAR(2))
