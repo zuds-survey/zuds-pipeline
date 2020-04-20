@@ -3,6 +3,8 @@ import os
 import subprocess
 from pathlib import Path
 
+from astropy.visualization.interval import ZScaleInterval
+
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -12,7 +14,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from .core import ZTFFile, DBSession
 from . import sextractor
 from .fitsfile import HasWCS
-from .plotting import ZScaleInterval, discrete_cmap, colors
+from .plotting import discrete_cmap, colors
 from .constants import BIG_RMS
 from .secrets import get_secret
 from .mask import MaskImage

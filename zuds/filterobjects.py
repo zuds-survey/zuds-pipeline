@@ -12,9 +12,10 @@ from astropy.coordinates import SkyCoord
 from tensorflow.keras.models import model_from_json, load_model
 from tensorflow.keras.utils import normalize as tf_norm
 
-from . import db
 from .seeing import estimate_seeing
 from .constants import BRAAI_MODEL, RB_CUT
+from .image import ScienceImage
+from .subtraction import SingleEpochSubtraction
 
 __all__ = ['filter_sexcat']
 
@@ -121,7 +122,7 @@ def filter_sexcat(cat):
 
     start = time.time()
 
-    table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] & db.BAD_SUM > 0)] = 0
+    table['GOODCUT'][np.where(table['IMAFLAGS_ISO'] & BAD_SUM > 0)] = 0
     print('Number of candidates after external flag cut: ', np.sum(table['GOODCUT']))
 
     table['GOODCUT'][np.where(table['FLAGS'] > 2)] = 0
@@ -196,10 +197,7 @@ def filter_sexcat(cat):
 
     start = time.time()
     new_aligned = None
-    if not isinstance(image, db.StackedSubtraction):
-        ref_aligned = image.reference_image
-    else:
-        ref_aligned = image.input_images[0].reference_image
+    ref_aligned = image.input_images[0].reference_image
     sub_aligned = None
     ml_model = None
 
@@ -210,16 +208,14 @@ def filter_sexcat(cat):
 
             # cache the images for stamp making
             if new_aligned is None:
-                if isinstance(image, db.StackedSubtraction):
-                    new_aligned = image.stack
-                elif isinstance(image.target_image, db.ScienceImage):
+                if isinstance(image.target_image, ScienceImage):
                     new_aligned = image.target_image.aligned_to(
                         image.reference_image)
                 else:
                     new_aligned = image.target_image
 
             if sub_aligned is None:
-                if isinstance(image, db.SingleEpochSubtraction):
+                if isinstance(image, SingleEpochSubtraction):
                     sub_aligned = image.aligned_to(image.reference_image)
                 else:
                     sub_aligned = image

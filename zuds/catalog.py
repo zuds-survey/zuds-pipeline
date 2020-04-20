@@ -4,8 +4,7 @@ import pandas as pd
 from sqlalchemy.orm import relationship
 
 from .core import ZTFFile
-from .mask import BAD_SUM
-from .constants import GROUP_PROPERTIES
+from .constants import GROUP_PROPERTIES, BAD_SUM
 from .image import CalibratableImage
 from .fitsfile import FITSFile
 
