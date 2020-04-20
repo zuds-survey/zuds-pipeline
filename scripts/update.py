@@ -1,6 +1,4 @@
-import os
-from secrets import get_secret
-import db
+import zuds
 import numpy as np
 import pandas as pd
 from datetime import datetime
@@ -15,14 +13,14 @@ WHERECLAUSE = ''
 
 if __name__ == '__main__':
 
-    db.init_db()
+    zuds.init_db()
 
     zquery = query.ZTFQuery()
     start = datetime.now()
 
     # get the maximum nid
-    sm = db.DBSession().query(db.ScienceImage).order_by(
-        db.ScienceImage.obsjd.desc()
+    sm = zuds.DBSession().query(zuds.ScienceImage).order_by(
+        zuds.ScienceImage.obsjd.desc()
     ).first()
 
     if sm is None:
@@ -50,14 +48,14 @@ if __name__ == '__main__':
         zquery.load_metadata(kind='sci', sql_query=WHERECLAUSE + (' AND ' if WHERECLAUSE != '' else '') +
                              f'NID >= {nid_lo} AND NID <= {nid_hi} AND '
                              f'IPAC_GID > 0',
-                             auth=[get_secret('ipac_username'),
-                                   get_secret('ipac_password')])
+                             auth=[zuds.get_secret('ipac_username'),
+                                   zuds.get_secret('ipac_password')])
         metatable = zquery.metatable
         metatables.append(metatable)
 
     metatable = pd.concat(metatables)
-    current_paths = db.DBSession().query(db.ScienceImage.basename).filter(
-        db.ScienceImage.nid == max_nid
+    current_paths = zuds.DBSession().query(zuds.ScienceImage.basename).filter(
+        zuds.ScienceImage.nid == max_nid
     ).all()
     print(f'pulled {len(metatable)} images')
 
@@ -66,9 +64,9 @@ if __name__ == '__main__':
     del metatable['ipac_pub_date']
     del metatable['rcid']
 
-    meta_images = [db.ScienceImage(**row.to_dict()) for _, row
+    meta_images = [zuds.ScienceImage(**row.to_dict()) for _, row
                    in metatable.iterrows()]
-    meta_masks = [db.MaskImage(parent_image=s, field=s.field, qid=s.qid,
+    meta_masks = [zuds.MaskImage(parent_image=s, field=s.field, qid=s.qid,
                                ccdid=s.ccdid, fid=s.fid, ra1=s.ra1,
                                ra2=s.ra2, ra3=s.ra3, ra4=s.ra4,
                                dec1=s.dec1, dec2=s.dec2, dec3=s.dec3,
@@ -86,8 +84,8 @@ if __name__ == '__main__':
         meta_masks[index].basename = basenames[index].replace('sciimg',
                                                               'mskimg')
 
-        db.DBSession().add(meta_images[index])
-        db.DBSession().add(meta_masks[index])
+        zuds.DBSession().add(meta_images[index])
+        zuds.DBSession().add(meta_masks[index])
 
     #for basename, img, mask in zip(basenames, meta_images, meta_masks):
     #    img.basename = basename
@@ -97,7 +95,7 @@ if __name__ == '__main__':
 
     #db.DBSession().add_all(meta_images)
     #db.DBSession().add_all(meta_masks)
-    db.DBSession().commit()
+    zuds.DBSession().commit()
 
     end = datetime.now()
 

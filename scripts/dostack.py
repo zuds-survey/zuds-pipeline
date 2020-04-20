@@ -1,14 +1,10 @@
-import db
 import sys
-import mpi
 import os
 import time
-import archive
 import pandas as pd
 
-fmap = {1: 'zg',
-        2: 'zr',
-        3: 'zi'}
+import zuds
+zuds.init_db()
 
 #db.init_db()
 #db.DBSession().get_bind().echo = True
@@ -18,22 +14,22 @@ __whatami__ = 'Make the references for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 # get the work
-jobs = mpi.get_my_share_of_work(infile, reader=pd.read_csv)
+jobs = zuds.get_my_share_of_work(infile, reader=pd.read_csv)
 
 
 for _, job in jobs.iterrows():
 
     tstart = time.time()
     sstart = time.time()
-    images = db.DBSession().query(db.ZTFFile).filter(
-        db.ZTFFile.id.in_(eval(job['target']))
+    images = zuds.DBSession().query(zuds.ZTFFile).filter(
+        zuds.ZTFFile.id.in_(eval(job['target']))
     ).all()
-    db.ensure_images_have_the_same_properties(images, db.GROUP_PROPERTIES)
+    zuds.ensure_images_have_the_same_properties(images, zuds.GROUP_PROPERTIES)
 
     field = f'{images[0].field:06d}'
     ccdid = f'c{images[0].ccdid:02d}'
     qid = f'q{images[0].qid}'
-    fid = f'{fmap[images[0].fid]}'
+    fid = f'{zuds.fid_map[images[0].fid]}'
 
     for image in images:
         path = f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{ccdid}/{qid}/' \
@@ -45,7 +41,7 @@ for _, job in jobs.iterrows():
                f'{job["right"]}.coadd.fits'
 
 
-    prev = db.ScienceCoadd.get_by_basename(basename)
+    prev = zuds.ScienceCoadd.get_by_basename(basename)
     outname = os.path.join(os.path.dirname(images[0].local_path), basename)
     sstop = time.time()
 
@@ -60,15 +56,15 @@ for _, job in jobs.iterrows():
 
     stackstart = time.time()
     try:
-        stack = db.ScienceCoadd.from_images(
+        stack = zuds.ScienceCoadd.from_images(
             images, outfile_name=outname,
             data_product=False,
             tmpdir='/tmp',
-            nthreads=mpi.get_nthreads()
+            nthreads=zuds.get_nthreads()
         )
     except Exception as e:
         print(e, [i.basename for i in images], flush=True)
-        db.DBSession().rollback()
+        zuds.DBSession().rollback()
         continue
 
     stack.binleft = job['left']
@@ -82,11 +78,11 @@ for _, job in jobs.iterrows():
 
     archstart = time.time()
 
-    scopy = db.HTTPArchiveCopy.from_product(stack)
-    archive.archive(scopy)
-    db.DBSession().add(scopy)
-    db.DBSession().add(stack)
-    db.DBSession().commit()
+    scopy = zuds.HTTPArchiveCopy.from_product(stack)
+    zuds.archive(scopy)
+    zuds.DBSession().add(scopy)
+    zuds.DBSession().add(stack)
+    zuds.DBSession().commit()
     archstop = time.time()
 
     print(

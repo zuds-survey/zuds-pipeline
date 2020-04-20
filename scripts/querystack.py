@@ -1,21 +1,23 @@
-import db
+import zuds
 from datetime import timedelta
 import pandas as pd
 import sys
 
+import sqlalchemy as sa
+
 outfile = sys.argv[1]
 
-db.init_db()
+zuds.init_db()
 
 # set the stack window size
 STACK_WINDOW = 7.  # days
 STACK_INTERVAL = timedelta(days=STACK_WINDOW)
 
 # create the date table
-gs = db.sa.func.generate_series
-timetype = db.sa.DateTime(timezone=False)
-mindate = db.sa.cast('2017-01-03', timetype)
-maxdate = db.sa.cast(db.sa.func.now(), timetype)
+gs = sa.func.generate_series
+timetype = sa.DateTime(timezone=False)
+mindate = sa.cast('2017-01-03', timetype)
+maxdate = sa.cast(sa.func.now(), timetype)
 
 lcol = gs(mindate,
           maxdate - STACK_INTERVAL,
@@ -25,36 +27,36 @@ rcol = gs(mindate + STACK_INTERVAL,
           maxdate,
           STACK_INTERVAL).label('right')
 
-daterange = db.DBSession().query(lcol, rcol).subquery()
+daterange = zuds.DBSession().query(lcol, rcol).subquery()
 
-target = db.sa.func.array_agg(db.ScienceImage.id).label('target')
-stacksize = db.sa.func.array_length(target, 1).label('stacksize')
+target = sa.func.array_agg(zuds.ScienceImage.id).label('target')
+stacksize = sa.func.array_length(target, 1).label('stacksize')
 stackcond = stacksize >= 2
-jcond = db.sa.and_(db.ScienceImage.obsdate > daterange.c.left,
-                   db.ScienceImage.obsdate <= daterange.c.right)
+jcond = sa.and_(zuds.ScienceImage.obsdate > daterange.c.left,
+                zuds.ScienceImage.obsdate <= daterange.c.right)
 
-res = db.DBSession().query(db.ScienceImage.field,
-                           db.ScienceImage.ccdid,
-                           db.ScienceImage.qid,
-                           db.ScienceImage.fid,
+res = zuds.DBSession().query(zuds.ScienceImage.field,
+                           zuds.ScienceImage.ccdid,
+                           zuds.ScienceImage.qid,
+                           zuds.ScienceImage.fid,
                            daterange.c.left, daterange.c.right,
                            target).select_from(
-    db.sa.join(db.SingleEpochSubtraction, db.ScienceImage.__table__,
-               db.SingleEpochSubtraction.target_image_id ==
-               db.ScienceImage.id).join(
-        db.ReferenceImage.__table__, db.ReferenceImage.__table__.c.id ==
-                           db.SingleEpochSubtraction.reference_image_id
+    sa.join(zuds.SingleEpochSubtraction, zuds.ScienceImage.__table__,
+            zuds.SingleEpochSubtraction.target_image_id ==
+            zuds.ScienceImage.id).join(
+        zuds.ReferenceImage.__table__, zuds.ReferenceImage.__table__.c.id ==
+                                       zuds.SingleEpochSubtraction.reference_image_id
     ).join(daterange, jcond)
 ).filter(
-    db.ScienceImage.seeing < 4.,
-    db.ScienceImage.maglimit > 19.2,
-    db.ReferenceImage.version == 'zuds5',
-    db.ScienceImage.filefracday > 20200107000000
+    zuds.ScienceImage.seeing < 4.,
+    zuds.ScienceImage.maglimit > 19.2,
+    zuds.ReferenceImage.version == 'zuds5',
+    zuds.ScienceImage.filefracday > 20200107000000
 ).group_by(
-    db.ScienceImage.field,
-    db.ScienceImage.ccdid,
-    db.ScienceImage.qid,
-    db.ScienceImage.fid,
+    zuds.ScienceImage.field,
+    zuds.ScienceImage.ccdid,
+    zuds.ScienceImage.qid,
+    zuds.ScienceImage.fid,
     daterange.c.left, daterange.c.right
 ).having(
     stackcond
@@ -62,22 +64,22 @@ res = db.DBSession().query(db.ScienceImage.field,
     stacksize.desc()
 ).subquery()
 
-excludecond = db.sa.and_(
-    db.ScienceCoadd.field == res.c.field,
-    db.ScienceCoadd.ccdid == res.c.ccdid,
-    db.ScienceCoadd.qid == res.c.qid,
-    db.ScienceCoadd.fid == res.c.fid,
-    db.ScienceCoadd.binleft == res.c.left,
-    db.ScienceCoadd.binright == res.c.right
+excludecond = sa.and_(
+    zuds.ScienceCoadd.field == res.c.field,
+    zuds.ScienceCoadd.ccdid == res.c.ccdid,
+    zuds.ScienceCoadd.qid == res.c.qid,
+    zuds.ScienceCoadd.fid == res.c.fid,
+    zuds.ScienceCoadd.binleft == res.c.left,
+    zuds.ScienceCoadd.binright == res.c.right
 )
 
 
 # get the coadds where there is no existing coadd already
-final = db.DBSession().query(res).outerjoin(
-    db.ScienceCoadd, excludecond
+final = zuds.DBSession().query(res).outerjoin(
+    zuds.ScienceCoadd, excludecond
 ).filter(
-    db.ScienceCoadd.id == None
+    zuds.ScienceCoadd.id == None
 )
 
-result = pd.read_sql(final.statement, db.DBSession().get_bind())
+result = pd.read_sql(final.statement, zuds.DBSession().get_bind())
 result.to_csv(outfile, index=False)

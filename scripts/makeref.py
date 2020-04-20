@@ -1,18 +1,11 @@
-import db
 import os
 import sys
-import mpi
 import time
-import archive
 import pandas as pd
 from pathlib import Path
 
-
-fmap = {1: 'zg',
-        2: 'zr',
-        3: 'zi'}
-
-db.init_db()
+import zuds
+zuds.init_db()
 #db.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
@@ -24,7 +17,7 @@ max_date = pd.to_datetime(sys.argv[3])  # maximum allowable date for refimgs
 version = sys.argv[4]
 
 # get the work
-my_dirs = mpi.get_my_share_of_work(infile)
+my_dirs = zuds.get_my_share_of_work(infile)
 
 # make a reference for each directory
 for d in my_dirs:
@@ -38,7 +31,7 @@ for d in my_dirs:
     # load the objects partway into memory
     ok = []
     for fn in sci_fns:
-        sci = db.ScienceImage.get_by_basename(fn.name)
+        sci = zuds.ScienceImage.get_by_basename(fn.name)
         sci.map_to_local_file(f'{fn}')
         maskname = f'{fn.parent / sci.mask_image.basename}'
         sci.mask_image.map_to_local_file(maskname)
@@ -74,37 +67,37 @@ for d in my_dirs:
     if len(top) == 0:
         print(f'Not enough images ({len(top)} < 14) to make reference '
               f'for {d}. Skipping...')
-        db.DBSession().rollback()
+        zuds.DBSession().rollback()
         continue
 
-    
+
     coaddname = os.path.join(d, f'ref.{ok[0].field:06d}_c{ok[0].ccdid:02d}'
-                                f'_q{ok[0].qid}_{fmap[ok[0].fid]}.{version}.fits')
+                                f'_q{ok[0].qid}_{zuds.fid_map[ok[0].fid]}.{version}.fits')
 
     if len(top) < 14:
         print(f'Not enough images ({len(top)} < 14) to make reference '
               f'{coaddname}. Skipping...')
-        db.DBSession().rollback()
+        zuds.DBSession().rollback()
         continue
 
 
     try:
-        coadd = db.ReferenceImage.from_images(top, coaddname,
-                                              data_product=True,
-                                              nthreads=mpi.get_nthreads(),
-                                              tmpdir='./tmp')
+        coadd = zuds.ReferenceImage.from_images(top, coaddname,
+                                                data_product=True,
+                                                nthreads=zuds.get_nthreads(),
+                                                tmpdir='./tmp')
         coadd.version = version
     except TypeError as e:
         print(e, [t.basename for t in top], coaddname)
-        db.DBSession().rollback()
+        zuds.DBSession().rollback()
         continue
     else:
-        db.DBSession().add(coadd)
-        catalog = db.PipelineFITSCatalog.from_image(coadd)
-        catcopy = db.HTTPArchiveCopy.from_product(catalog)
-        archive.archive(catcopy)
-        db.DBSession().add(catcopy)
-        db.DBSession().commit()
+        zuds.DBSession().add(coadd)
+        catalog = zuds.PipelineFITSCatalog.from_image(coadd)
+        catcopy = zuds.HTTPArchiveCopy.from_product(catalog)
+        zuds.archive(catcopy)
+        zuds.DBSession().add(catcopy)
+        zuds.DBSession().commit()
 
     t_stop = time.time()
     print(f'it took {t_stop - t_start} sec to make {coaddname}.', flush=True)

@@ -1,17 +1,10 @@
-import db
 import sys
-import mpi
 import os
 import traceback
 import time
-import archive
-import numpy as np
+import zuds
 
-fmap = {1: 'zg',
-        2: 'zr',
-        3: 'zi'}
-
-db.init_db()
+zuds.init_db()
 #db.DBSession().autoflush = False
 #db.DBSession().get_bind().echo = True
 
@@ -19,6 +12,7 @@ __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the subtractions for ZUDS.'
 
 MAX_DETS = 50
+
 
 class TooManyDetectionsError(Exception):
     pass
@@ -41,11 +35,11 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
     weightname = fn.replace('.fits', '.weight.fits')
     rmsname = fn.replace('.fits', '.rms.fits')
     if os.path.exists(weightname):
-        sci._weightimg = db.FITSImage.from_file(weightname)
+        sci._weightimg = zuds.FITSImage.from_file(weightname)
     elif os.path.exists(rmsname):
-        sci._rmsimg = db.FITSImage.from_file(rmsname)
+        sci._rmsimg = zuds.FITSImage.from_file(rmsname)
     else:
-        if sciclass == db.ScienceImage:
+        if sciclass == zuds.ScienceImage:
             # use sextractor to make the science image
             _ = sci.rms_image
         else:
@@ -62,22 +56,22 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
     field = f'{sci.field:06d}'
     ccdid = f'c{sci.ccdid:02d}'
     qid = f'q{sci.qid}'
-    fid = f'{fmap[sci.fid]}'
+    fid = f'{zuds.fid_map[sci.fid]}'
     refname = f'/global/cfs/cdirs/m937/www/data/scratch/{field}/{ccdid}/{qid}/' \
               f'{fid}/ref.{field}_{ccdid}_{qid}_{fid}.{refvers}.fits'
 
-    if not (db.ReferenceImage.get_by_basename(os.path.basename(refname))
+    if not (zuds.ReferenceImage.get_by_basename(os.path.basename(refname))
             and os.path.exists(refname)):
-        db.DBSession().rollback()
+        zuds.DBSession().rollback()
         raise RuntimeError(f'Ref {refname} does not exist. Skipping...')
 
 
     rstart = time.time()
 
-    ref = db.ReferenceImage.get_by_basename(os.path.basename(refname))
+    ref = zuds.ReferenceImage.get_by_basename(os.path.basename(refname))
     ref.map_to_local_file(refname)
     ref.mask_image.map_to_local_file(refname.replace('.fits', '.mask.fits'))
-    ref._weightimg = db.FITSImage.from_file(refname.replace('.fits',
+    ref._weightimg = zuds.FITSImage.from_file(refname.replace('.fits',
                                                             '.weight.fits'))
     rstop = time.time()
 
@@ -86,8 +80,7 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
         flush=True
     )
 
-
-    basename = db.sub_name(sci.basename, ref.basename)
+    basename = zuds.sub_name(sci.basename, ref.basename)
 
     prev = subclass.get_by_basename(basename)
     #prev=None
@@ -114,7 +107,7 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
 
 
     catstart = time.time()
-    cat = db.PipelineFITSCatalog.from_image(sub)
+    cat = zuds.PipelineFITSCatalog.from_image(sub)
 
     catstop = time.time()
     print(
@@ -123,7 +116,7 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
     )
 
     dstart = time.time()
-    detections = db.Detection.from_catalog(cat, filter=True)
+    detections = zuds.Detection.from_catalog(cat, filter=True)
 
     if len(detections) > MAX_DETS:
         raise TooManyDetectionsError(
@@ -139,11 +132,11 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
 
     stampstart = time.time()
 
-    if isinstance(sub, db.SingleEpochSubtraction):
+    if isinstance(sub, zuds.SingleEpochSubtraction):
         sub_target = sub.aligned_to(sub.reference_image)
     else:
         sub_target = sub
-    if isinstance(sub.target_image, db.ScienceImage):
+    if isinstance(sub.target_image, zuds.ScienceImage):
         new_target = sub.target_image.aligned_to(sub.reference_image)
     else:
         new_target = sub.target_image
@@ -151,7 +144,7 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
     for detection in detections:
         for i in [sub_target, new_target, sub.reference_image]:
             # make a stamp for the first detection
-            stamp = db.models.Thumbnail.from_detection(
+            stamp = zuds.Thumbnail.from_detection(
                 detection, i
             )
             stamps.append(stamp)
@@ -160,10 +153,10 @@ def do_one(fn, sciclass, subclass, refvers, tmpdir='/tmp'):
     #subcopy = db.HTTPArchiveCopy.from_product(sub)
     #catcopy = db.HTTPArchiveCopy.from_product(cat)
     #mskcopy = db.HTTPArchiveCopy.from_product(sub.mask_image)
-    db.DBSession().add(sub)
+    zuds.DBSession().add(sub)
     #db.DBSession().add(cat)
-    db.DBSession().add_all(detections)
-    db.DBSession().add_all(stamps)
+    zuds.DBSession().add_all(detections)
+    zuds.DBSession().add_all(stamps)
 
     #db.DBSession().add(mskcopy)
     #db.DBSession().add(catcopy)
@@ -199,21 +192,21 @@ if __name__ == '__main__':
     infile = sys.argv[1]  # file listing all the images to make subtractions of
     refvers = sys.argv[2]
 
-    subclass = db.MultiEpochSubtraction
-    sciclass = db.ScienceCoadd
+    subclass = zuds.MultiEpochSubtraction
+    sciclass = zuds.ScienceCoadd
 
     #subclass = db.SingleEpochSubtraction
     #sciclass = db.ScienceImage
 
     # get the work
-    imgs = mpi.get_my_share_of_work(infile)
+    imgs = zuds.get_my_share_of_work(infile)
     for fn in imgs:
         try:
             detections, sub = do_one(fn, sciclass, subclass, refvers)
         except Exception as e:
             traceback.print_exception(*sys.exc_info())
-            db.DBSession().rollback()
+            zuds.DBSession().rollback()
             continue
         else:
-            db.DBSession().commit()
+            zuds.DBSession().commit()
 

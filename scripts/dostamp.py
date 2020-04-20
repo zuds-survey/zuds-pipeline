@@ -1,30 +1,23 @@
-import db
 import sys
-import mpi
-import os
 import time
-import archive
-import pandas as pd
+import zuds
+zuds.init_db()
 
-fmap = {1: 'zg',
-        2: 'zr',
-        3: 'zi'}
-
-db.init_db()
-db.DBSession().get_bind().echo = True
+zuds.init_db()
+zuds.DBSession().get_bind().echo = True
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Make the references for ZUDS.'
 
 infile = sys.argv[1]  # file listing all the images to make subtractions of
 # get the work
-sources = mpi.get_my_share_of_work(infile)
+sources = zuds.get_my_share_of_work(infile)
 
 for source_id in sources:
 
     tstart = time.time()
     sstart = time.time()
-    source = db.DBSession().query(db.models.Source).get(source_id)
+    source = zuds.DBSession().query(zuds.Source).get(source_id)
 
     bestdet = source.best_detection
     best_sub = bestdet.image
@@ -34,7 +27,7 @@ for source_id in sources:
     field = f'{best_sub.field:06d}'
     ccdid = f'c{best_sub.ccdid:02d}'
     qid = f'q{best_sub.qid}'
-    fid = f'{fmap[best_sub.fid]}'
+    fid = f'{zuds.fid_map[best_sub.fid]}'
 
     stamps = []
 
@@ -49,13 +42,13 @@ for source_id in sources:
         stamps = []
         for i in [best_sub, best_new, remapped]:
             # make a stamp for the first detection
-            stamp = db.Thumbnail.from_detection(bestdet, i)
+            stamp = zuds.Thumbnail.from_detection(bestdet, i)
             stamps.append(stamp)
         source.add_linked_thumbnails(commit=False)
     except Exception as e:
         print(e, flush=True)
-        db.DBSession().rollback()
+        zuds.DBSession().rollback()
         continue
 
-    db.DBSession().add_all(stamps)
-    db.DBSession().commit()
+    zuds.DBSession().add_all(stamps)
+    zuds.DBSession().commit()

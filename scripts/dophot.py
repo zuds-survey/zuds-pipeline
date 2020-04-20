@@ -1,35 +1,19 @@
-import db
-db.DBSession.remove()
-db.init_db(timeout=60000)
-import numpy as np
+import zuds
+zuds.init_db(timeout=60000)
 import pandas as pd
 import sys
-import mpi
 import os
 import time
-import archive
-from datetime import datetime, timedelta
-from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.wcs import WCS
 from sqlalchemy.dialects.postgresql import array
-from itertools import chain
 from functools import wraps
 import errno
 import signal
+import sqlalchemy as sa
 
-from io import StringIO
 
-
-from photometry import raw_aperture_photometry
-
-fmap = {1: 'zg',
-        2: 'zr',
-        3: 'zi'}
-
-db.init_db()
-#db.DBSession().autoflush = False
-#db.DBSession().get_bind().echo = True
+zuds.init_db()
 
 __author__ = 'Danny Goldstein <danny@caltech.edu>'
 __whatami__ = 'Do the photometry for ZUDS.'
@@ -39,13 +23,9 @@ outfile = sys.argv[2] # file listing all the photometry to load into the DB
 
 
 # get the work
-imgs = mpi.get_my_share_of_work(infile)
+imgs = zuds.get_my_share_of_work(infile)
 imgs = sorted(imgs, key=lambda s: s[0].split('ztf_')[1].split('_')[0],
               reverse=True)
-
-def print_time(start, stop, obj, stepname):
-    print(f'took {stop-start:.2f} seconds to do {stepname} on {obj}')
-
 
 def write_csv(output):
     df = pd.DataFrame(output)
@@ -79,26 +59,26 @@ def unphotometered_sources(image_id, footprint):
 
     poly = array(tuple(footprint.ravel()))
 
-    jcond2 = db.sa.and_(
-        db.ForcedPhotometry.image_id == image_id,
-        db.ForcedPhotometry.source_id == db.models.Source.id
+    jcond2 = sa.and_(
+        zuds.ForcedPhotometry.image_id == image_id,
+        zuds.ForcedPhotometry.source_id == zuds.Source.id
     )
 
-    query = db.DBSession().query(
-        db.models.Source.id,
-        db.models.Source.ra,
-        db.models.Source.dec
+    query = zuds.DBSession().query(
+        zuds.Source.id,
+        zuds.Source.ra,
+        zuds.Source.dec
     ).outerjoin(
-        db.ForcedPhotometry, jcond2
+        zuds.ForcedPhotometry, jcond2
     ).filter(
-        db.ForcedPhotometry.id == None
+        zuds.ForcedPhotometry.id == None
     ).filter(
-        db.sa.func.q3c_poly_query(
-            db.models.Source.ra,
-            db.models.Source.dec,
+        sa.func.q3c_poly_query(
+            zuds.Source.ra,
+            zuds.Source.dec,
             poly
         )
-    )#.with_for_update(of=models.Source)
+    )
 
     return query.all()
 
@@ -110,7 +90,9 @@ def get_wcs(fn):
         wcs = WCS(hd)
     return wcs
 
-safe_raw_ap = timeout(100)(raw_aperture_photometry)
+
+safe_raw_ap = timeout(100)(zuds.raw_aperture_photometry)
+
 
 output = []
 start = time.time()
@@ -143,7 +125,7 @@ for g, (fn, imgid) in enumerate(imgs):
         continue
     nstop = time.time()
 
-    print_time(nstart, nstop, fn, 'unphotometered sources')
+    zuds.print_time(nstart, nstop, fn, 'unphotometered sources')
 
 
     if len(needed) == 0:
@@ -174,15 +156,14 @@ for g, (fn, imgid) in enumerate(imgs):
             output.append(p)
 
         pstop = time.time()
-        print_time(pstart, pstop, fn, 'actual force photometry')
-
+        zuds.print_time(pstart, pstop, fn, 'actual force photometry')
 
     except Exception as e:
         print(e)
         continue
 
 
-if mpi.has_mpi():
+if zuds.has_mpi():
     from mpi4py import MPI
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
@@ -203,19 +184,16 @@ if mpi.has_mpi():
 
         jobid = os.getenv('SLURM_JOB_ID')
         if jobid is not None:
-            job = db.DBSession().query(db.ForcePhotJob).filter(
-                db.ForcePhotJob.slurm_id == jobid
+            job = zuds.DBSession().query(zuds.ForcePhotJob).filter(
+                zuds.ForcePhotJob.slurm_id == jobid
             ).first()
             job.status = 'ready_for_loading'
-            db.DBSession().add(job)
-            db.DBSession().commit()
+            zuds.DBSession().add(job)
+            zuds.DBSession().commit()
 
 else:
     df = pd.DataFrame(output)
     df.to_csv(outfile, index=False)
 
 stop = time.time()
-print_time(start, stop, 0, 'start to finish')
-
-
-
+zuds.print_time(start, stop, 0, 'start to finish')

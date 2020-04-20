@@ -1,42 +1,33 @@
-import db
 import os
 import sys
-import time
-import mpi
-import numpy as np
+import zuds
 import dosub
-import send
 import shutil
-import makesources
 import traceback
-from argparse import ArgumentParser
 
-fid_map = {1: 'zg', 2: 'zr', 3: 'zi'}
 
 if __name__ == '__main__':
 
     send_alerts = True
+    zuds.init_db()
 
     infile = sys.argv[1]
     refvers = sys.argv[2]
 
-    # subclass = db.MultiEpochSubtraction
-    # sciclass = db.ScienceCoadd
-
-    subclass = db.SingleEpochSubtraction
-    sciclass = db.ScienceImage
+    subclass = zuds.SingleEpochSubtraction
+    sciclass = zuds.ScienceImage
 
     # get the work
-    imgs = mpi.get_my_share_of_work(infile)
+    imgs = zuds.get_my_share_of_work(infile)
 
     subs = []
     dirs = []
     all_detections = []
     for inpt in imgs:
 
-        s = db.ScienceImage.get_by_basename(os.path.basename(inpt))
+        s = zuds.ScienceImage.get_by_basename(os.path.basename(inpt))
         fn = f'/global/cfs/cdirs/m937/www/data/scratch/{s.field:06d}/' \
-             f'c{s.ccdid:02d}/q{s.qid}/{fid_map[s.fid]}/{s.basename}'
+             f'c{s.ccdid:02d}/q{s.qid}/{zuds.fid_map[s.fid]}/{s.basename}'
 
         shutil.copy(inpt, fn)
         shutil.copy(
@@ -48,39 +39,39 @@ if __name__ == '__main__':
         try:
             detections, sub = dosub.do_one(fn, sciclass, subclass, refvers, tmpdir='tmp')
         except (dosub.TooManyDetectionsError, OSError, ValueError) as e:
-            db.DBSession().rollback()
+            zuds.DBSession().rollback()
             print(f'Error: too many detections on {fn} sub')
-            sci = db.ScienceImage.get_by_basename(os.path.basename(fn))
-            ref = db.DBSession().query(
-                db.ReferenceImage
+            sci = zuds.ScienceImage.get_by_basename(os.path.basename(fn))
+            ref = zuds.DBSession().query(
+                zuds.ReferenceImage
             ).filter(
-                db.ReferenceImage.field == sci.field,
-                db.ReferenceImage.ccdid == sci.ccdid,
-                db.ReferenceImage.qid == sci.qid,
-                db.ReferenceImage.fid == sci.fid,
-                db.ReferenceImage.version == refvers
+                zuds.ReferenceImage.field == sci.field,
+                zuds.ReferenceImage.ccdid == sci.ccdid,
+                zuds.ReferenceImage.qid == sci.qid,
+                zuds.ReferenceImage.fid == sci.fid,
+                zuds.ReferenceImage.version == refvers
             ).first()
-            blocker = db.FailedSubtraction(
+            blocker = zuds.FailedSubtraction(
                 target_image=sci,
                 reference_image=ref,
                 reason=str(e)
             )
-            db.DBSession().add(blocker)
-            db.DBSession().commit()
+            zuds.DBSession().add(blocker)
+            zuds.DBSession().commit()
             continue
         except dosub.PredecessorError as e:
-            db.DBSession().rollback()
-            sci = db.ScienceImage.get_by_basename(os.path.basename(fn))
-            ref = db.DBSession().query(
-                db.ReferenceImage
+            zuds.DBSession().rollback()
+            sci = zuds.ScienceImage.get_by_basename(os.path.basename(fn))
+            ref = zuds.DBSession().query(
+                zuds.ReferenceImage
             ).filter(
-                db.ReferenceImage.field == sci.field,
-                db.ReferenceImage.ccdid == sci.ccdid,
-                db.ReferenceImage.qid == sci.qid,
-                db.ReferenceImage.fid == sci.fid,
-                db.ReferenceImage.version == refvers
+                zuds.ReferenceImage.field == sci.field,
+                zuds.ReferenceImage.ccdid == sci.ccdid,
+                zuds.ReferenceImage.qid == sci.qid,
+                zuds.ReferenceImage.fid == sci.fid,
+                zuds.ReferenceImage.version == refvers
             ).first()
-            basename = db.sub_name(sci.basename, ref.basename)
+            basename = zuds.sub_name(sci.basename, ref.basename)
             subname = os.path.join(os.path.dirname(fn), basename)
             prev = subclass.from_file(subname)
             subs.append(prev)
@@ -88,161 +79,13 @@ if __name__ == '__main__':
             continue
 
         except Exception as e:
-            db.DBSession().rollback()
+            zuds.DBSession().rollback()
             traceback.print_exception(*sys.exc_info())
             continue
-
-
 
         else:
             subs.append(sub)
             dirs.append(os.path.dirname(fn))
-            db.DBSession().add(sub)
-            db.DBSession().add_all(detections)
-            db.DBSession().commit()
-
-"""            
-
-    for sub in subs:
-        for d in sub.detections:
-            tstart = time.time()
-            makesources.associate(d)
-            db.DBSession().commit()
-            tstop = time.time()
-            print(f'took {tstop-tstart:.2f} to associate {d.id}', flush=True)
-
-            if d.triggers_phot:
-                # it's a new source -- update thumbnails post commit.
-                # doing this post commit (with the triggers_phot flag)
-                # avoids database deadlocks
-
-                for t in d.thumbnails:
-                    t.photometry = d.source.photometry[0]
-                    t.source = d.source
-                    t.persist()
-                    db.DBSession().add(t)
-
-                # update the source ra and dec
-                # best = source.best_detection
-
-                # just doing this in case the new LC point
-                # isn't yet flushed to the DB
-
-                # if detection.snr > best.snr:
-                #    best = detection
-
-                # source.ra = best.ra
-                # source.dec = best.dec
-
-                db.DBSession().flush()
-
-                if len(d.source.thumbnails) == len(d.source.photometry[0].thumbnails):
-                    lthumbs = d.source.return_linked_thumbnails()
-                    db.DBSession().add_all(lthumbs)
-                db.DBSession().add(d)
-                db.DBSession().commit()
-
-    for sub, d in zip(subs, dirs):
-        start = time.time()
-        # have to remap the sub
-        sub.find_in_dir(d)
-        sub.mask_image.find_in_dir(d)
-
-
-        sub._rmsimg = db.FITSImage()
-        sub.rms_image.map_to_local_file(sub.local_path.replace(
-            '.fits', '.rms.fits'
-        ))
-
-        sources = sub.unphotometered_sources
-        if len(sources) == 0:
-            continue
-
-        fp = sub.force_photometry(sources,
-                                  assume_background_subtracted=True,
-                                  use_cutout=True)
-        stop = time.time()
-
-        print(f'took {stop-start:.2f} sec for single-epoch photometry on '
-              f'{sub.basename}', flush=True)
-
-        db.DBSession().add_all(fp)
-        db.DBSession().commit()
-
-    # now do the forced photometry
-    detections = []
-    for sub in subs:
-        for d in sub.detections:
-            if d.triggers_phot:
-                detections.append(d)
-
-    tasks = {}
-    for detection in detections:
-        hits = detection.source.unphotometered_images
-        for hit in hits:
-            if hit not in tasks:
-                tasks[hit] = [detection.source]
-                hitname = '/global/cscratch1/sd/dgold/zuds/' \
-                          f'{hit.field:06d}/c{hit.ccdid:02d}/' \
-                          f'q{hit.qid}/{fid_map[hit.fid]}/{hit.basename}'
-                hit.map_to_local_file(hitname)
-                hit.mask_image.map_to_local_file(hitname.replace(
-                    '.fits', '.mask.fits'
-                ))
-                rmsname = hitname.replace('.fits', '.rms.fits')
-                hit._rmsimg = db.FITSImage()
-                hit.rms_image.map_to_local_file(rmsname)
-
-
-            else:
-                tasks[hit].append(detection.source)
-
-    for hit in tasks:
-        sources = tasks[hit]
-        start = time.time()
-
-        try:
-            fp = hit.force_photometry(
-                sources, assume_background_subtracted=True,
-                use_cutout=True
-            )
-        except np.AxisError as e:
-            # this image doesn't contain the coordinate
-            continue
-        #h.mask_image.clear()
-        #h.rms_image.clear()
-        #h.clear()
-        db.DBSession().add_all(fp)
-        stop = time.time()
-        print(f'took {stop-start:.2f} sec to do forcephot on {hit.basename}')
-    db.DBSession().commit()
-
-    # issue an alert for each detection
-
-    alerts = []
-    for sub in subs:
-        for d in sub.detections:
-            if d.triggers_alert and d.alert is None:
-                alert = db.Alert.from_detection(d)
-                db.DBSession().add(alert)
-                alerts.append(alert)
-                print(f'made alert for {d.id} (source {d.source.id})', flush=True)
-                np.testing.assert_allclose(
-                    alert.alert['candidate']['jd'] - db.MJD_TO_JD,
-                    max(a['mjd'] for a in alert.alert['light_curve'])
-                )
-
-    if send_alerts:
-        db.DBSession().commit()
-
-        for alert in alerts:
-            send.send_alert(alert)
-            print(f'sent alert for {alert.detection_id} '
-                  f'(source {alert.detection.source.id})')
-            alert.sent = True
-            db.DBSession().add(alert)
-            db.DBSession().commit()
-            print(f'alert id {alert.id}, alert detection id {alert.detection_id}, '
-                  f'detection id {alert.detection.id}, '
-                  f'source id {alert.detection.source_id}', flush=True)
-"""
+            zuds.DBSession().add(sub)
+            zuds.DBSession().add_all(detections)
+            zuds.DBSession().commit()
