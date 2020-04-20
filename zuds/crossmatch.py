@@ -10,6 +10,8 @@ from penquins import Kowalski
 
 from .secrets import get_secret
 
+__all__ = ['xmatch']
+
 
 def logon():
     """ Log onto Kowalski """
@@ -25,9 +27,8 @@ def logon():
             print('continuing..')
             continue
         else:
-            break
-
-    return s
+            return s
+    raise e
 
 
 def private_logon():

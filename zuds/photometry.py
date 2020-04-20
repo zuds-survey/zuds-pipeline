@@ -1,14 +1,62 @@
 import photutils
 import numpy as np
 from astropy.coordinates import SkyCoord
-from astropy import units as u
 from astropy.io import fits
 from astropy.table import vstack
 from astropy.wcs import WCS
 
+import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql as psql
+from sqlalchemy.orm import relationship
+from sqlalchemy.ext.hybrid import hybrid_property
 
-APERTURE_RADIUS = 3 * u.pixel
-APER_KEY = 'APCOR4'
+from .core import Base
+from .constants import APER_KEY, APERTURE_RADIUS
+
+__all__ = ['ForcedPhotometry', 'raw_aperture_photometry', 'aperture_photometry']
+
+
+class ForcedPhotometry(Base):
+    id = sa.Column(sa.Integer, primary_key=True)
+    __tablename__ = 'forcedphotometry'
+
+    flags = sa.Column(sa.Integer)
+    ra = sa.Column(psql.DOUBLE_PRECISION)
+    dec = sa.Column(psql.DOUBLE_PRECISION)
+
+    @property
+    def mag(self):
+        return -2.5 * np.log10(self.flux) + self.image.header['MAGZP'] + \
+               self.image.header[APER_KEY]
+
+    @property
+    def magerr(self):
+        return 1.08573620476 * self.fluxerr / self.flux
+
+    image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratedimages.id',
+                                                   ondelete='CASCADE'),
+                         index=True)
+    image = relationship('CalibratedImage', back_populates='forced_photometry',
+                         cascade='all')
+
+    # thumbnails = relationship('Thumbnail', cascade='all')
+
+    source_id = sa.Column(sa.Text,
+                          sa.ForeignKey('sources.id', ondelete='CASCADE'),
+                          index=True)
+    source = relationship('Source', cascade='all')
+
+    flux = sa.Column(sa.Float)
+    fluxerr = sa.Column(sa.Float)
+
+    zp = sa.Column(sa.Float)
+    filtercode = sa.Column(sa.Text)
+    obsjd = sa.Column(sa.Float)
+
+    @hybrid_property
+    def snr(self):
+        return self.flux / self.fluxerr
+
 
 
 def raw_aperture_photometry(sci_path, rms_path, mask_path, ra, dec,

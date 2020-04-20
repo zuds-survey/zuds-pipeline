@@ -1,7 +1,12 @@
-import numpy as np
 import os
+import numpy as np
 
-NTHREADS_PER_NODE = 64
+__all__ = ['get_nthreads', 'get_my_share_of_work',
+           'has_mpi']
+
+
+from .constants import NTHREADS_PER_NODE
+
 
 def default_reader(f):
     return np.atleast_1d(np.genfromtxt(f, dtype=None, encoding='ascii'))

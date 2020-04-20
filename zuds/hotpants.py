@@ -1,16 +1,10 @@
-import os
-import shutil
-
-from . import db
 from .utils import initialize_directory, quick_background_estimate
 from .seeing import estimate_seeing
 from .swarp import BKG_VAL
 from .sextractor import run_sextractor
+from .constants import BIG_RMS
 
-
-# split an iterable over some processes recursively
-_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
-             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
+__all__ = ['prepare_hotpants']
 
 
 def chunk(iterable, chunksize):
@@ -79,7 +73,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path}  -v 0 -oni {subrms} ' \
-              f'-fin {db.BIG_RMS} '
+              f'-fin {BIG_RMS} '
     if not refined:
         syscall += f'-nsx {nsx} -nsy {nsy}'
     else:

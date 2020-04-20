@@ -1,5 +1,4 @@
 """ This code sends ZUDS alerts to IPAC topics """
-
 import os
 import pickle
 import json
@@ -7,6 +6,9 @@ import confluent_kafka
 import fastavro
 import avro.schema
 from io import BytesIO
+
+
+__all__ = ['send_alert']
 
 
 def combine_schemas(schema_files):
@@ -39,7 +41,6 @@ def load_single_avsc(file_path, names):
     return schema
 
 
-
 def send(topicname, records, schema):
     """ Send an avro "packet" to a particular topic at IPAC
     Parameters
@@ -62,7 +63,6 @@ def send(topicname, records, schema):
     # Send an avro alert
     producer.produce(topic=topicname, value=out.read())
     producer.flush()
-
 
 
 def send_alert(alert_object):
@@ -96,7 +96,6 @@ def send_alert(alert_object):
              "schema_stack/alert.avsc"])
         topicname = "ztf_%s_programid2_zuds_stack" %alert_date
         send(topicname, [alert], schema)
-
 
 
 if __name__=="__main__":

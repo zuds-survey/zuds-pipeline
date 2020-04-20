@@ -1,9 +1,13 @@
-from . import db
 import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
-from .secrets import get_secret
 import penquins
+
+from .secrets import get_secret
+from .catalog import PipelineFITSCatalog
+
+
+__all__ = ['estimate_seeing']
 
 
 def estimate_seeing(image):
@@ -16,7 +20,7 @@ def estimate_seeing(image):
     catalog = image.catalog
 
     if catalog is None or not catalog.ismapped:
-        catalog = db.PipelineFITSCatalog.from_image(image)
+        catalog = PipelineFITSCatalog.from_image(image)
 
 
     q = {"query_type": "cone_search",

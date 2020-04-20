@@ -163,10 +163,13 @@ setup(name=PACKAGENAME,
       package_dir={'zuds': 'zuds',
                    'skyportal': 'zuds/skyportal/skyportal',
                    'baselayer': 'zuds/skyportal/baselayer'},
+      package_data={'zuds': ['alert_schemas/*', 'astromatic/*',
+                             'config/*', 'astromatic/makecoadd/*',
+                             'astromatic/makesub/*']},
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
       url=URL,
       long_description=LONG_DESCRIPTION,
-      )
+)
 

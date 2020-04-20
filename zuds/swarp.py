@@ -1,23 +1,23 @@
-import os
-import numpy as np
 import uuid
-from astropy.time import Time
 import shutil
-import pandas as pd
-from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
-import tempfile
 from astropy.wcs import WCS
 
 
-from .utils import initialize_directory, quick_background_estimate
-from . import db
+from .utils import initialize_directory
+from .constants import BKG_BOX_SIZE, GROUP_PROPERTIES, BKG_VAL
+from .mask import MaskImageBase, MaskImage
+from .image import FITSImage
+
+__all__ = ['prepare_swarp_sci', 'prepare_swarp_mask', 'prepare_swarp_align',
+           'run_coadd', 'run_align']
+
 
 CONF_DIR = Path(__file__).parent.parent / 'astromatic/makecoadd'
 SCI_CONF = CONF_DIR / 'default.swarp'
 MSK_CONF = CONF_DIR / 'mask.swarp'
-BKG_VAL = 150.  # counts
+
 
 
 def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
@@ -74,7 +74,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
     wgtout = outname.replace('.fits', '.weight.fits')
 
     syscall = f'swarp -c {conf} @{inlist} ' \
-              f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \
+              f'-BACK_SIZE {BKG_BOX_SIZE} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
@@ -144,10 +144,10 @@ def prepare_swarp_align(image, other, directory, nthreads=1,
         f'{extension}.weight.fits'
     )
 
-    combtype = 'OR' if isinstance(image, db.MaskImageBase) else 'CLIPPED'
+    combtype = 'OR' if isinstance(image, MaskImageBase) else 'CLIPPED'
 
     syscall = f'swarp -c {conf} {impath} ' \
-              f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \
+              f'-BACK_SIZE {BKG_BOX_SIZE} ' \
               f'-IMAGEOUT_NAME {outname} ' \
               f'-NTHREADS {nthreads} ' \
               f'-VMEM_DIR {directory} ' \
@@ -185,13 +185,13 @@ def run_align(image, other, tmpdir='/tmp',
         else:
             break
 
-    restype = db.MaskImageBase if isinstance(image, db.MaskImage) else db.FITSImage
+    restype = MaskImageBase if isinstance(image, MaskImage) else FITSImage
 
     result = restype.from_file(outname)
     result.parent_image = image
-    weightimage = db.FITSImage.from_file(outweight)
+    weightimage = FITSImage.from_file(outweight)
 
-    if isinstance(image, db.MaskImage):
+    if isinstance(image, MaskImage):
         result.update_from_weight_map(weightimage)
 
     # load everything into memory and unmap if the disk file is going to be
@@ -255,10 +255,10 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
     # load the result
     coadd = cls.from_file(outname)
     coaddweightname = outname.replace('.fits', '.weight.fits')
-    coadd._weightimg = db.FITSImage.from_file(coaddweightname)
+    coadd._weightimg = FITSImage.from_file(coaddweightname)
 
-    coaddmask = db.MaskImage.from_file(mskoutname)
-    coaddmaskweight = db.FITSImage.from_file(mskoutweightname)
+    coaddmask = MaskImage.from_file(mskoutname)
+    coaddmaskweight = FITSImage.from_file(mskoutweightname)
     coaddmask.update_from_weight_map(coaddmaskweight)
 
     # keep a record of the images that went into the coadd
@@ -268,7 +268,7 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
     # set the ccdid, qid, field, fid for the coadd
     # (and mask) based on the input images
 
-    for prop in db.GROUP_PROPERTIES:
+    for prop in GROUP_PROPERTIES:
         for img in [coadd, coaddmask]:
             setattr(img, prop, getattr(images[0], prop))
 
@@ -286,13 +286,3 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
 
     shutil.rmtree(directory)
     return coadd
-
-
-def ensure_images_have_the_same_properties(images, properties):
-    """Raise a ValueError if images have different fid, ccdid, qid, or field."""
-    for prop in properties:
-        vals = np.asarray([getattr(image, prop) for image in images])
-        if not all(vals == vals[0]):
-            raise ValueError(f'To be coadded, images must all have the same {prop}. '
-                             f'These images had: {[(image.id, getattr(image, prop)) for image in images]}.')
-

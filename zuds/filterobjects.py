@@ -5,29 +5,22 @@ from photutils import aperture_photometry
 from astropy.table import Table
 import time
 
-from tensorflow.keras.models import model_from_json, load_model
 import os
 from astropy.nddata.utils import Cutout2D
 from astropy.coordinates import SkyCoord
+
+from tensorflow.keras.models import model_from_json, load_model
 from tensorflow.keras.utils import normalize as tf_norm
 
 from . import db
 from .seeing import estimate_seeing
+from .constants import BRAAI_MODEL, RB_CUT
 
-from scipy.optimize import minimize
+__all__ = ['filter_sexcat']
+
 
 CUTSIZE = 11 # pixels
-RB_CUT = {1 : 0.3,
-          2 : 0.3,
-          3 : 0.6
-          }
-BRAAI_MODEL = 'braai_d6_m9'
 old_norm = int(BRAAI_MODEL.split('d6_m')[1]) <= 7
-
-
-# split an iterable over some processes recursively
-_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
-             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
 
 
 def load_model_helper(path, model_base_name):
@@ -65,6 +58,7 @@ def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned,
         else:
             triplet[:, :, i] = cutout.data / np.linalg.norm(cutout.data)
     return triplet
+
 
 def filter_sexcat(cat):
     """Read in sextractor catalog `incat` and filter it using Peter's technique.

@@ -1,5 +1,9 @@
-from pathlib import Path
 import numpy as np
+from pathlib import Path
+
+__all__ = ['initialize_directory', 'quick_background_estimate',
+           'fid_map', '_split', 'print_time',
+           'ensure_images_have_the_same_properties']
 
 
 def initialize_directory(directory):
@@ -29,3 +33,31 @@ def quick_background_estimate(image, nsamp=None, mask_image=None):
     bkgstd = 1.4826 * np.median(np.abs(bkgpix - bkg))
 
     return bkg, bkgstd
+
+
+fid_map = {
+    1: 'zg',
+    2: 'zr',
+    3: 'zi'
+}
+
+
+# split an iterable over some processes recursively
+_split = lambda iterable, n: [iterable[:len(iterable)//n]] + \
+             _split(iterable[len(iterable)//n:], n - 1) if n != 0 else []
+
+
+def print_time(start, stop, detection, step):
+    print(f'took {stop-start:.2f} sec to do {step} for {detection.id}',
+          flush=True)
+
+
+def ensure_images_have_the_same_properties(images, properties):
+    """Raise a ValueError if images have different fid, ccdid, qid, or field."""
+    for prop in properties:
+        vals = np.asarray([getattr(image, prop) for image in images])
+        if not all(vals == vals[0]):
+            raise ValueError(f'To be coadded, images must all have the same {prop}. '
+                             f'These images had: {[(image.id, getattr(image, prop)) for image in images]}.')
+
+

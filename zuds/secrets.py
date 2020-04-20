@@ -3,10 +3,12 @@ import yaml
 import stat
 from pathlib import Path
 
-__all__ = ['get_secret']
+__all__ = ['get_secret', 'SecretManager', 'SecretsFilePermissionError']
+
 
 class SecretsFilePermissionError(Exception):
     pass
+
 
 class SecretManager(object):
     """Class that manages access to secrets from the ZUDS configuration /
@@ -27,6 +29,10 @@ class SecretManager(object):
 
             # use the default
             self.config_path = Path(os.getenv('HOME')) / '.zuds'
+
+            if not self.config_path.exists():
+                print(f'Default configuration file "{self.config_path}" does'
+                      f'not exist, creating..')
 
         # check access to the file
         bits = os.stat(self.config_path).st_mode
@@ -58,5 +64,6 @@ class SecretManager(object):
                 raise ValueError(f'Secret value for key "{key}" is undefined.')
         else:
             raise KeyError(f'Nonexistent secret requested: "{key}".')
+
 
 get_secret = SecretManager()

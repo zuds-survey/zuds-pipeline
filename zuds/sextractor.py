@@ -7,14 +7,19 @@ import uuid
 import os
 from astropy.io import fits
 
-from . import db
-from .utils import initialize_directory
+from .catalog import PipelineFITSCatalog
+from .image import FITSImage
+from .core import ZTFFile
+from .constants import BKG_BOX_SIZE, MASK_BORDER
+from .mask import BAD_SUM
+
+__all__ = ['prepare_sextractor', 'run_sextractor']
+
 
 SEX_CONF = Path(__file__).parent.parent / 'astromatic/sextractor.conf'
 PARAM_FILE = Path(__file__).parent.parent / 'astromatic/sextractor.param'
 NNW_FILE = Path(__file__).parent.parent / 'astromatic/default.nnw'
 CONV_FILE = Path(__file__).parent.parent / 'astromatic/default.conv'
-
 
 
 checkimage_map = {
@@ -23,8 +28,6 @@ checkimage_map = {
     'bkgsub': '-BACKGROUND',
     'bkg': 'BACKGROUND'
 }
-
-MASK_BORDER = 10 #pix
 
 
 def prepare_sextractor(image, directory, checkimage_type=None,
@@ -67,7 +70,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
               f'-CHECKIMAGE_NAME {cnamestr} ' \
               f'-CATALOG_NAME {outname} ' \
               f'-CATALOG_TYPE {catalog_type} ' \
-              f'-BACK_SIZE {db.BKG_BOX_SIZE} ' \
+              f'-BACK_SIZE {BKG_BOX_SIZE} ' \
               f'-PARAMETERS_NAME {PARAM_FILE} ' \
               f'-STARNNW_NAME {NNW_FILE} ' \
               f'-FILTER_NAME {CONV_FILE} ' \
@@ -80,7 +83,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
         imgbase = os.path.basename(impath)
         weightname = directory / imgbase.replace('.fits', '.false.weight.fits')
         falseweight = np.ones_like(image.mask_image.data)
-        falseweight[(image.mask_image.data & db.BAD_SUM) > 0] = 0
+        falseweight[(image.mask_image.data & BAD_SUM) > 0] = 0
 
         if image.basename.endswith('sciimg.fits'):
             falseweight[:MASK_BORDER] = 0
@@ -121,14 +124,14 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
     result = []
     for name in outnames:
         if name.endswith('.cat'):
-            product = db.PipelineFITSCatalog.from_file(name,
-                                                       use_existing_record=True)
+            product = PipelineFITSCatalog.from_file(name,
+                                                    use_existing_record=True)
         else:
-            product = db.FITSImage.from_file(
+            product = FITSImage.from_file(
                 name, use_existing_record=True
             )
 
-        if isinstance(image, db.ZTFFile):
+        if isinstance(image, ZTFFile):
             product.field = image.field
             product.ccdid = image.ccdid
             product.qid = image.qid
