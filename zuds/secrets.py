@@ -72,8 +72,11 @@ class SecretManager(object):
             value = self.cache[key]
             if value is None:
                 raise ValueError(f'Secret value for key "{key}" is undefined.')
+            else:
+                return value
         else:
             raise KeyError(f'Nonexistent secret requested: "{key}".')
+
 
 
 get_secret = SecretManager()

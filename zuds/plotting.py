@@ -1,8 +1,6 @@
 import numpy as np
-from matplotlib import colors
-import matplotlib.pyplot as plt
+
 from astropy.wcs import WCS
-from matplotlib.patches import Ellipse
 
 
 from .constants import CMAP_RANDOM_SEED
@@ -12,6 +10,7 @@ __all__ = ['show_images', 'discrete_cmap', 'plot_triplet']
 
 
 def plot_triplet(tr):
+    import matplotlib.pyplot as plt
     fig = plt.figure(figsize=(8, 2), dpi=100)
     ax = fig.add_subplot(131)
     ax.axis('off')
@@ -30,6 +29,7 @@ def discrete_cmap(ncolors):
     that can be used to color an IntegerFITSImage.
 
     The first color in the list is always black."""
+    from matplotlib import colors
 
     prng = np.random.RandomState(CMAP_RANDOM_SEED)
     h = prng.uniform(low=0.0, high=1.0, size=ncolors)
@@ -43,6 +43,8 @@ def discrete_cmap(ncolors):
 
 def show_images(image_or_images, catalog=None, titles=None, reproject=False,
                 ds9=False):
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Ellipse
     imgs = np.atleast_1d(image_or_images)
     n = len(imgs)
 

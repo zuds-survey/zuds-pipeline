@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 from astropy.visualization.interval import ZScaleInterval
+from matplotlib import colors
 
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
@@ -14,7 +15,7 @@ from sqlalchemy.ext.declarative import declared_attr
 from .core import ZTFFile, DBSession
 from . import sextractor
 from .fitsfile import HasWCS
-from .plotting import discrete_cmap, colors
+from .plotting import discrete_cmap
 from .constants import BIG_RMS
 from .secrets import get_secret
 from .catalog import PipelineFITSCatalog
@@ -264,17 +265,16 @@ class CalibratableImage(CalibratableImageBase, ZTFFile):
                        'inherit_condition': id == ZTFFile.id}
 
     detections = relationship('Detection', cascade='all')
-    objects = relationship('ObjectWithFlux', cascade='all')
 
     mask_image = relationship('MaskImage',
                               uselist=False,
-                              primaryjoin='MaskImage.parent_image_id == id')
+                              primaryjoin='MaskImage.parent_image_id == CalibratableImage.id')
 
     catalog = relationship('PipelineFITSCatalog', uselist=False,
                            primaryjoin=PipelineFITSCatalog.image_id == id)
 
     thumbnails = relationship('Thumbnail',
-                              primaryjoin='Thumbnail.image_id == id')
+                              primaryjoin='Thumbnail.image_id == CalibratableImage.id')
 
 
     def basic_map(self, quiet=False):

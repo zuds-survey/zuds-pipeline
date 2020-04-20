@@ -51,7 +51,7 @@ class Detection(Base, SpatiallyIndexed):
     image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
                                                    ondelete='CASCADE'),
                          index=True)
-    image = relationship('CalibratableImage', back_populates='objects',
+    image = relationship('CalibratableImage', back_populates='detections',
                          cascade='all')
 
     # thumbnails = relationship('Thumbnail', cascade='all')
