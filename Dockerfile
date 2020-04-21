@@ -75,24 +75,6 @@ RUN curl -SL https://heasarc.gsfc.nasa.gov/docs/software/ftools/fitsverify/fitsv
     && cd .. \
     && rm -rf fitsverify*
 
-# wcslib
-
-RUN curl -SL ftp://ftp.atnf.csiro.au/pub/software/wcslib/wcslib-5.20.tar.bz2 \
-    -o wcslib-5.20.tar.bz2 \
-    && tar xjf wcslib-5.20.tar.bz2 \
-    && cd wcslib-5.20 \
-    && chmod -R u+w . \
-    && patch -p1 < ../rules/patch_wcslib \
-    && autoconf \
-    && CC="gcc" CFLAGS="-O3 -fPIC -pthread" \
-    CPPFLAGS="-I/usr/include" \
-    LDFLAGS="-L/usr/lib" \
-    ./configure  \
-    --disable-fortran \
-    --prefix="/usr" \
-    && make -j 4 && make install \
-    && cd .. \
-    && rm -rf wcslib*
 
 # wcstools
 
@@ -165,7 +147,6 @@ RUN apt-get install -y wget
 RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
-\
 
 
 # Install mpi4py.
@@ -180,7 +161,7 @@ RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65db
 
 
 
-RUN pip install git+https://github.com/zuds-survey/zuds-pipeline
+RUN pip install git+https://github.com/zuds-survey/zuds-pipeline.git
 
 RUN python -c "import astropy"
 RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
