@@ -183,7 +183,7 @@ setup(name=PACKAGENAME,
                         'SQLAlchemy>=1.3.7',
                         'tensorflow>=2.0.0',
                         'ztfquery>=1.6.2'],
-      dependency_links=['git+https://github.com/dmitryduev/kowalski.git@cc7eaaa79#egg=penquins-1.0.3']
+      dependency_links=['git+https://github.com/dmitryduev/kowalski.git@cc7eaaa79#egg=penquins-1.0.3'],
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
