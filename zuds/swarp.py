@@ -13,7 +13,7 @@ __all__ = ['prepare_swarp_sci', 'prepare_swarp_mask', 'prepare_swarp_align',
            'run_coadd', 'run_align']
 
 
-CONF_DIR = Path(__file__).parent.parent / 'astromatic/makecoadd'
+CONF_DIR = Path(__file__).parent / 'astromatic/makecoadd'
 SCI_CONF = CONF_DIR / 'default.swarp'
 MSK_CONF = CONF_DIR / 'mask.swarp'
 

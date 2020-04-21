@@ -96,7 +96,7 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
         reverse_ind_name: sa.Index(reverse_ind_name,
                                    model_attrs[column_2],
                                    model_attrs[column_1])
-        
+
     })
     model = type(model_1.__name__ + model_2.__name__, (base,), model_attrs)
 

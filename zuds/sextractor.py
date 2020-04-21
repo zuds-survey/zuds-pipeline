@@ -13,10 +13,10 @@ from .constants import BKG_BOX_SIZE, MASK_BORDER
 __all__ = ['prepare_sextractor', 'run_sextractor']
 
 
-SEX_CONF = Path(__file__).parent.parent / 'astromatic/sextractor.conf'
-PARAM_FILE = Path(__file__).parent.parent / 'astromatic/sextractor.param'
-NNW_FILE = Path(__file__).parent.parent / 'astromatic/default.nnw'
-CONV_FILE = Path(__file__).parent.parent / 'astromatic/default.conv'
+SEX_CONF = Path(__file__).parent / 'astromatic/sextractor.conf'
+PARAM_FILE = Path(__file__).parent / 'astromatic/sextractor.param'
+NNW_FILE = Path(__file__).parent / 'astromatic/default.nnw'
+CONV_FILE = Path(__file__).parent / 'astromatic/default.conv'
 
 
 checkimage_map = {
