@@ -7,7 +7,6 @@ from sqlalchemy.exc import UnboundExecutionError
 from sqlalchemy.ext.hybrid import hybrid_property
 
 from skyportal import models
-from skyportal.models import DBSession
 from skyportal.model_util import create_tables, drop_tables
 
 from .file import File
@@ -17,26 +16,7 @@ from .utils import fid_map
 __all__ = ['DBSession', 'create_tables', 'drop_tables',
            'Base', 'init_db', 'join_model', 'ZTFFile']
 
-
-def init_db(timeout=None):
-
-    username = get_secret('db_username')
-    password = get_secret('db_password')
-    port = get_secret('db_port')
-    host = get_secret('db_host')
-    dbname = get_secret('db_name')
-
-    url = 'postgresql://{}:{}@{}:{}/{}'
-    url = url.format(username, password or '', host or '', port or '', dbname)
-
-    kwargs = {}
-    if timeout is not None:
-        kwargs['connect_args'] = {"options": f"-c statement_timeout={timeout}"}
-
-    conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
-
-    DBSession.configure(bind=conn)
-    models.Base.metadata.bind = conn
+Base = models.Base
 
 
 def model_representation(o):
@@ -49,23 +29,12 @@ def model_representation(o):
     return f"<{type(o).__name__}({', '.join(attr_list)})>"
 
 
-models.Base.__repr__ = model_representation
-models.Base.modified = sa.Column(
+Base.__repr__ = model_representation
+Base.modified = sa.Column(
     sa.DateTime(timezone=False),
     default=sa.func.now(),
     onupdate=sa.func.now()
 )
-
-# Automatically update the `modified` attribute of Base
-# when objects are updated.
-@event.listens_for(DBSession(), 'before_flush')
-def bump_modified(session, flush_context, instances):
-    for object in session.dirty:
-        if isinstance(object, models.Base) and session.is_modified(object):
-            object.modified = sa.func.now()
-
-
-Base = models.Base
 
 
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
@@ -225,3 +194,35 @@ class ZTFFile(Base, File):
             ]),
             self.basename
         )
+
+
+def init_db(timeout=None):
+
+    username = get_secret('db_username')
+    password = get_secret('db_password')
+    port = get_secret('db_port')
+    host = get_secret('db_host')
+    dbname = get_secret('db_name')
+
+    url = 'postgresql://{}:{}@{}:{}/{}'
+    url = url.format(username, password or '', host or '', port or '', dbname)
+
+    kwargs = {}
+    if timeout is not None:
+        kwargs['connect_args'] = {"options": f"-c statement_timeout={timeout}"}
+
+    conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
+
+    DBSession.configure(bind=conn)
+    Base.metadata.bind = conn
+
+init_db()
+
+# Automatically update the `modified` attribute of Base
+# when objects are updated.
+@event.listens_for(DBSession(), 'before_flush')
+def bump_modified(session, flush_context, instances):
+    for object in session.dirty:
+        if isinstance(object, Base) and session.is_modified(object):
+            object.modified = sa.func.now()
+

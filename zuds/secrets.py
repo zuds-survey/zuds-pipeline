@@ -70,10 +70,7 @@ class SecretManager(object):
     def __call__(self, key):
         if key in self.cache:
             value = self.cache[key]
-            if value is None:
-                raise ValueError(f'Secret value for key "{key}" is undefined.')
-            else:
-                return value
+            return value
         else:
             raise KeyError(f'Nonexistent secret requested: "{key}".')
 

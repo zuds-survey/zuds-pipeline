@@ -1,3 +1,14 @@
+import warnings
+from sqlalchemy.exc import SAWarning
+warnings.filterwarnings(action='ignore', category=SAWarning,
+                        message='.*Thumbnail.source')
+warnings.filterwarnings(action='ignore', category=SAWarning,
+                        message='.*Source.thumbnails')
+
+# disable annoying tensorflow warnings
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
+
 from .alert import *
 from .archive import *
 from .bookkeeping import *
@@ -33,4 +44,3 @@ from .utils import *
 
 # this one needs to be last
 from .joins import *
-
