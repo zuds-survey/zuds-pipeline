@@ -11,7 +11,7 @@ SHELL ["/bin/bash", "-c"]
 RUN apt-get update \
     && apt-get install -y curl procps build-essential gfortran git subversion \
     flex pkg-config cmake \
-    autoconf m4 libtool automake locales libopenblas-dev postgresql-q3c \
+    autoconf m4 libtool automake locales libopenblas-dev \
     && rm -fr /var/lib/apt/lists/*
 
 # We install everything directly into /usr so that we do
@@ -160,6 +160,8 @@ RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65db
     && rm -rf mpi4py*
 
 
+RUN conda install postgresql ipython
+RUN apt-get update && apt-get install -y libbz2-dev
 RUN pip install zuds
 
 RUN python -c "import astropy"
@@ -167,5 +169,5 @@ RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
 
 # Precompile all python modules.  Ignore errors.
 
-RUN python -m compileall -f "/usr/lib/python3.6/site-packages"; exit 0
+RUN python -m compileall -f "/usr/lib/python3.7/site-packages"; exit 0
 
