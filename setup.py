@@ -174,7 +174,7 @@ setup(name=PACKAGENAME,
                         'matplotlib>=3.1.1',
                         'numpy>=1.16.4',
                         'pandas>=0.24.2',
-                        'penquins>=1.0.2',
+                        'git+https://github.com/dmitryduev/kowalski.git'
                         'photutils>=0.7.1',
                         'psycopg2>=2.8.3',
                         'PyYAML>=5.1.1',
