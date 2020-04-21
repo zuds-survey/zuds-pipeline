@@ -42,7 +42,7 @@ def discrete_cmap(ncolors):
 
 
 def show_images(image_or_images, catalog=None, titles=None, reproject=False,
-                ds9=False):
+                ds9=False, figsize='auto'):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Ellipse
     imgs = np.atleast_1d(image_or_images)
@@ -73,7 +73,8 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
                                subplot_kw={
                                    'projection': WCS(
                                        align_target.astropy_header)
-                               } if reproject else None)
+                               } if reproject else None,
+                               figsize=None if figsize == 'auto' else figsize)
 
         ax = np.atleast_1d(ax)
         for a in ax.ravel()[n:]:
