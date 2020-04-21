@@ -71,6 +71,7 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
         column_1 = f'{table_1[:-1]}_id'
     if column_2 is None:
         column_2 = f'{table_2[:-1]}_id'
+    reverse_ind_name = f'{join_table}_reverse_ind'
 
     model_attrs = {
         '__tablename__': join_table,
@@ -81,6 +82,7 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
         column_2: sa.Column(column_2, sa.ForeignKey(f'{table_2}.{fk_2}',
                                                     ondelete='CASCADE'),
                             primary_key=True),
+        reverse_ind_name: sa.Index(reverse_ind_name, column_2, column_1)
     }
 
     model_attrs.update({

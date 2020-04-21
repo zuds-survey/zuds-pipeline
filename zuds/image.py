@@ -33,10 +33,10 @@ class FITSImage(HasWCS):
     matplotlib. Also defines some properties that help to optimally render
     the image (cmap, cmap_limits)"""
 
-    def show(self, axis=None, align_to=None):
+    def show(self, axis=None, align_to=None, figsize=(5, 5)):
         if axis is None:
             import matplotlib.pyplot as plt
-            fig, axis = plt.subplots()
+            fig, axis = plt.subplots(figsize=figsize)
 
         if align_to is not None:
             image = self.aligned_to(align_to)
@@ -515,6 +515,9 @@ class ScienceImage(CalibratedImage):
     imgtypecode = sa.Column(sa.CHAR(1))
     exptime = sa.Column(sa.Float)
     filefracday = sa.Column(psql.BIGINT)
+
+    nidind = sa.Index('sci_nid_ind', nid)
+    jdind = sa.Index("sci_obsjd_ind", obsjd)
 
     @hybrid_property
     def obsmjd(self):
