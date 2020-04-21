@@ -2,13 +2,13 @@
 set -e
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
-CREATE USER decam_admin;
-CREATE DATABASE decam;
-GRANT ALL PRIVILEGES ON DATABASE decam TO decam_admin;
-ALTER ROLE DECAM_ADMIN WITH SUPERUSER;
+CREATE USER admin;
+CREATE DATABASE zuds;
+GRANT ALL PRIVILEGES ON DATABASE zuds TO admin;
+ALTER ROLE admin WITH SUPERUSER;
 EOSQL
 
-psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "decam" <<-EOSQL
+psql -v ON_ERROR_STOP=1 --username "admin" --dbname "zuds" <<-EOSQL
 CREATE EXTENSION q3c;
 EOSQL
 
