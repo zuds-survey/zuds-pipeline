@@ -81,8 +81,7 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
                             primary_key=True),
         column_2: sa.Column(column_2, sa.ForeignKey(f'{table_2}.{fk_2}',
                                                     ondelete='CASCADE'),
-                            primary_key=True),
-        reverse_ind_name: sa.Index(reverse_ind_name, column_2, column_1)
+                            primary_key=True)
     }
 
     model_attrs.update({
@@ -93,7 +92,11 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
         model_2.__name__.lower(): relationship(model_2, cascade='all',
                                                foreign_keys=[
                                                    model_attrs[column_2]
-                                               ])
+                                               ]),
+        reverse_ind_name: sa.Index(reverse_ind_name,
+                                   model_attrs[column_2],
+                                   model_attrs[column_1])
+        
     })
     model = type(model_1.__name__ + model_2.__name__, (base,), model_attrs)
 
