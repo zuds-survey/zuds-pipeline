@@ -21,6 +21,7 @@ from .secrets import get_secret
 from .catalog import PipelineFITSCatalog
 from .photometry import aperture_photometry, ForcedPhotometry
 from .constants import APER_KEY
+from .utils import fid_map
 
 __all__ = ['FITSImage', 'CalibratableImageBase', 'CalibratableImage',
            'CalibratedImage', 'ScienceImage']
@@ -460,14 +461,32 @@ class ScienceImage(CalibratedImage):
         obj.qid = obj.header['QID']
         obj.fid = obj.header['FILTERID']
 
-        for attr, hkw in zip(['filtercode', 'obsjd', 'infobits',
-                              'pid', 'nid', 'expid', 'itid', 'obsdate',
+        if obj.filtercode is None:
+            obj.filtercode = fid_map[obj.fid]
+
+        fname = obj.header['FILENAME']
+
+        if obj.imgtypecode is None:
+            obj.imgtypecode = fname.split('.')[0][-1]
+
+        if obj.filefracday is None:
+            obj.filefracday = int(fname.split('_')[1])
+
+        for attr, hkw in zip(['obsjd', 'infobits',
+                              'pid', 'nid', 'expid',
                               'seeing', 'airmass', 'moonillf', 'moonesb',
                               'maglimit', 'crpix1', 'crpix2', 'crval1',
-                              'crval2', 'cd11', 'cd12', 'c21', 'cd22',
-                              'ipac_gid', 'imgtypecode', 'exptime',
-                              'filefracday'],
-                             [])
+                              'crval2', 'cd11', 'cd12', 'cd21', 'cd22',
+                              'ipac_gid', 'exptime'],
+                             ['OBSJD', 'INFOBITS', 'DBPID',
+                              'DBNID', 'DBEXPID', 'SEEING',
+                              'AIRMASS', 'MOONILLF', 'MOONESB',
+                              'MAGLIM', 'CRPIX1', 'CRPIX2',
+                              'CRVAL1', 'CRVAL2', 'CD11', 'CD12',
+                              'CD21', 'CD22', 'PROGRMID', 'EXPTIME']):
+
+            if getattr(obj, attr) is None:
+                setattr(obj, attr, obj.header[hkw])
 
         return obj
 

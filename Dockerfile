@@ -165,7 +165,5 @@ RUN pip install zuds
 RUN python -c "import astropy"
 RUN python -c "import matplotlib.font_manager as fm; f = fm.FontManager"
 
-# Precompile all python modules.  Ignore errors.
 
-RUN python -m compileall -f "/usr/lib/python3.7/site-packages"; exit 0
 
