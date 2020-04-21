@@ -142,8 +142,6 @@ RUN mkdir /home/zuds/.astropy
 WORKDIR /home/zuds
 ENV HOME /home/zuds
 
-RUN apt-get install -y wget
-
 RUN git clone https://github.com/acbecker/hotpants.git && \
     cd hotpants && make -j4 CFITSIOINCDIR=/usr/include CFITSIOLIBDIR=/usr/lib && \
     cp hotpants /usr/bin && cd .. && rm -rf hotpants
@@ -160,7 +158,7 @@ RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65db
     && rm -rf mpi4py*
 
 
-RUN conda install postgresql ipython
+RUN conda install postgresql ipython notebook
 RUN apt-get update && apt-get install -y libbz2-dev
 RUN pip install zuds
 
