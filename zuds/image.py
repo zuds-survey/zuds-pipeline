@@ -482,8 +482,8 @@ class ScienceImage(CalibratedImage):
                               'DBNID', 'DBEXPID', 'SEEING',
                               'AIRMASS', 'MOONILLF', 'MOONESB',
                               'MAGLIM', 'CRPIX1', 'CRPIX2',
-                              'CRVAL1', 'CRVAL2', 'CD11', 'CD12',
-                              'CD21', 'CD22', 'PROGRMID', 'EXPTIME']):
+                              'CRVAL1', 'CRVAL2', 'CD1_1', 'CD1_2',
+                              'CD2_1', 'CD2_2', 'PROGRMID', 'EXPTIME']):
 
             if getattr(obj, attr) is None:
                 setattr(obj, attr, obj.header[hkw])
