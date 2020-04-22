@@ -163,7 +163,7 @@ RUN apt-get update && apt-get install -y libbz2-dev
 
 RUN pip install zuds
 
-RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz  -O demo.tar.gz && \
+RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz -o demo.tar.gz && \
     mkdir ~/.data && cd ~/.data && tar -xvzf ../demo.tar.gz && \
     rm ../demo.tar.gz
 
