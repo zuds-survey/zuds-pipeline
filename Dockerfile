@@ -161,7 +161,6 @@ RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65db
 RUN conda install postgresql ipython notebook
 RUN apt-get update && apt-get install -y libbz2-dev
 
-RUN echo 2
 RUN pip install zuds
 
 RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz  -O demo.tar.gz && \
