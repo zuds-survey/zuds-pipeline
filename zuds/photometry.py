@@ -9,6 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.schema import UniqueConstraint
 
 from .core import Base
 from .constants import APER_KEY, APERTURE_RADIUS
@@ -52,6 +53,9 @@ class ForcedPhotometry(Base):
     zp = sa.Column(sa.Float)
     filtercode = sa.Column(sa.Text)
     obsjd = sa.Column(sa.Float)
+
+    uniq = UniqueConstraint(image_id, source_id)
+    reverse_idx = sa.Index('source_image', source_id, image_id)
 
     @hybrid_property
     def snr(self):
@@ -135,6 +139,11 @@ def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
         phot_table = photutils.aperture_photometry(pixels_bkgsub, apertures,
                                                    error=bkgrms,
                                                    wcs=wcs)
+
+        phot_table['zp'] = calibratable.header['MAGZP'] + calibratable.header['APCOR4']
+        phot_table['obsjd'] = calibratable.header['OBSJD']
+        phot_table['filtercode'] = 'z' + calibratable.header['FILTER'][-1]
+
 
         pixap = apertures.to_pixel(wcs)
         annulus_masks = pixap.to_mask(method='center')

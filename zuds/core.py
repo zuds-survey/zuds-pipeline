@@ -9,6 +9,8 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from skyportal import models
 from skyportal.model_util import create_tables, drop_tables
 
+from baselayer.app.json_util import to_json
+
 from .file import File
 from .secrets import get_secret
 from .utils import fid_map
@@ -29,7 +31,16 @@ def model_representation(o):
     return f"<{type(o).__name__}({', '.join(attr_list)})>"
 
 
+def model_str(o):
+    if sa.inspection.inspect(o).expired:
+        DBSession().refresh(o)
+    inst = sa.inspect(o)
+    attr_list = {g.key: getattr(o, g.key) for g in inst.mapper.column_attrs}
+    return to_json(attr_list)
+
+
 Base.__repr__ = model_representation
+Base.__str__ = model_str
 Base.modified = sa.Column(
     sa.DateTime(timezone=False),
     default=sa.func.now(),

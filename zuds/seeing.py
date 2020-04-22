@@ -2,8 +2,6 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy import units as u
 import penquins
-from astroquery.gaia import Gaia
-
 
 from .secrets import get_secret
 from .catalog import PipelineFITSCatalog
@@ -63,6 +61,7 @@ def estimate_seeing(image):
 
     else:
         # use astroquery
+        from astroquery.gaia import Gaia
 
         job = Gaia.launch_job("select ra, dec from gaiadr2.gaia_source "
                               f"WHERE 1=CONTAINS(POINT('ICRS', ra, dec), "
