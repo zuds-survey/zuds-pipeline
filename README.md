@@ -38,7 +38,7 @@ to install `zuds`, as well as:
   * [postgresql >= 10](https://www.postgresql.org/)
   * [cfitsio](https://heasarc.gsfc.nasa.gov/fitsio/)
   
-To install hotpants, cd into the `hotpants` directory and type `make`. Then copy the `hotpants` executable to your `PATH`. It should then be available to the `zuds` library. 
+After you have completed this step, to install hotpants, cd into the `hotpants` directory and type `make`. Then copy the `hotpants` executable to your `PATH`. It should then be available to the `zuds` library. 
 
 
 ### Via docker-compose
