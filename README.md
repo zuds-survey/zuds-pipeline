@@ -14,6 +14,12 @@ An object-oriented pipeline for ZTF image processing. Current capabilities inclu
   
 ## Installation
 
+To install the package you can simply do 
+
+    pip install zuds
+    
+However, there are some external libraries you need to build first. The sections below present some methods for how you can install everything needed to run the pipeline. 
+
 Prerequisites:
 
   * [SExtractor >= 2.25.0](https://github.com/astromatic/sextractor)
