@@ -37,12 +37,7 @@ Clone this repository, then run
 
     bash build.conda.sh
     
-to install `zuds`, as well as:
-
-  * [SExtractor >= 2.25.0](https://github.com/astromatic/sextractor)
-  * [SWarp >= 2.38.0](https://github.com/astromatic/swarp)
-  * [postgresql >= 10](https://www.postgresql.org/)
-  * [cfitsio](https://heasarc.gsfc.nasa.gov/fitsio/)
+to install `zuds`, sextractor, swarp, postgres, and cfitsio.
   
 After you have completed this step, to install hotpants, cd into the `hotpants` directory and type `make`. Then copy the `hotpants` executable to your `PATH`. It should then be available to the `zuds` library. 
 
