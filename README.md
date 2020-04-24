@@ -1,4 +1,4 @@
-# ZUDS Image Processing Pipeline
+# ZUDS Image Processing Pipeline [WIP]
 
 An object-oriented pipeline for ZTF image processing. Current capabilities include:
 
