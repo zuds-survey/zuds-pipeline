@@ -18,7 +18,7 @@ To install the package you can simply do
 
     pip install zuds
     
-However, there are some external libraries you need to build first. The sections below present some methods for how you can install everything needed to run the pipeline. 
+However, there are some external tools you need for the image processing steps to work. The sections below present some methods for how you can install everything needed to run the pipeline. 
 
 Prerequisites:
 
