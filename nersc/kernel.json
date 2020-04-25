@@ -2,7 +2,7 @@
     "argv": [
       "shifter",
       "--image=dannygoldstein/zuds:0.1dev",
-      "--volume=$HOME:/home/zuds",
+      "--volume=HOMEDIR:/home/zuds",
       "/opt/conda/bin/python",
       "-m",
       "ipykernel_launcher",
