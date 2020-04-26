@@ -3,6 +3,7 @@ import os
 import subprocess
 from pathlib import Path
 
+
 from astropy.visualization.interval import ZScaleInterval
 from matplotlib import colors
 
@@ -22,6 +23,7 @@ from .catalog import PipelineFITSCatalog
 from .photometry import aperture_photometry, ForcedPhotometry
 from .constants import APER_KEY
 from .utils import fid_map
+from .download import safe_download, ipac_authenticate
 
 __all__ = ['FITSImage', 'CalibratableImageBase', 'CalibratableImage',
            'CalibratedImage', 'ScienceImage']
@@ -519,6 +521,8 @@ class ScienceImage(CalibratedImage):
     nidind = sa.Index('sci_nid_ind', nid)
     jdind = sa.Index("sci_obsjd_ind", obsjd)
 
+    ipac_auth = None
+
     @hybrid_property
     def obsmjd(self):
         return self.obsjd - 2400000.5
@@ -540,3 +544,21 @@ class ScienceImage(CalibratedImage):
                f'ztf_{sffd}_{self.field:06d}_' \
                f'{self.filtercode}_c{self.ccdid:02d}_' \
                f'{self.imgtypecode}_q{self.qid}_{suffix}'
+
+    def download(self, suffix='sciimg.fits', destination=None,
+                 cookie=None):
+
+        if destination is None:
+            destination = Path.cwd()
+
+        destination = Path(destination)
+        if destination.is_dir():
+            destination /= self.basename.replace('sciimg.fits', suffix)
+
+        if cookie is None:
+            cookie = ipac_authenticate()
+
+        target = self.ipac_path(suffix)
+        safe_download(target=target, destination=destination, cookie=cookie,
+                      raise_exc=True)
+

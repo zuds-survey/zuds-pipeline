@@ -4,11 +4,14 @@ import os
 import pandas as pd
 from pathlib import Path
 import subprocess
-from secrets import get_secret
-import db
-import tempfile
+import zuds
+from zuds import get_secret
+import requests
 import io
 import shutil
+import sqlalchemy as sa
+import numpy as np
+
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
@@ -101,31 +104,39 @@ rm {os.path.basename(tarfile)}
     return jobid
 
 
-def retrieve_images(image_whereclause,
+def retrieve_images(images_or_ids,
                     job_script_destination='.',
                     frame_destination='.', log_destination='.',
-                    preserve_dirs=False, n_jobs=14, http_only=False):
+                    preserve_dirs=False, n_jobs=14, tape=True,
+                    http=True, ipac=True, archive_new=True):
 
     """Image whereclause should be a clause element on ZTFFile."""
 
-    if not http_only:
-        jt = db.sa.join(db.ZTFFile, db.TapeCopy,
-                        db.ZTFFile.id == db.TapeCopy.product_id)
-        full_query = db.DBSession().query(
-            db.ZTFFile, db.TapeCopy
+    images_or_ids = np.atleast_1d(images_or_ids)
+    ids = [i if isinstance(i, int) else i.id for i in images_or_ids]
+
+    got = []
+
+    if tape:
+        jt = sa.join(zuds.ZTFFile, zuds.TapeCopy,
+                     zuds.ZTFFile.id == zuds.TapeCopy.product_id)
+        full_query = zuds.DBSession().query(
+            zuds.ZTFFile, zuds.TapeCopy
         ).select_from(jt).outerjoin(
-            db.HTTPArchiveCopy, db.ZTFFile.id == db.HTTPArchiveCopy.product_id
+            zuds.HTTPArchiveCopy, zuds.ZTFFile.id == zuds.HTTPArchiveCopy.product_id
         ).filter(
-            db.HTTPArchiveCopy.product_id == None
+            zuds.HTTPArchiveCopy.product_id == None
         )
-        full_query = full_query.filter(image_whereclause)
+        full_query = full_query.filter(zuds.ZTFFile.id.in_(ids),
+                                       zuds.ZTFFile.fid != 3)  # dont use i-band from tape
 
         # this is the query to get the image paths
-        metatable = pd.read_sql(full_query.statement, db.DBSession().get_bind())
+        metatable = pd.read_sql(full_query.statement, zuds.DBSession().get_bind())
 
         df = metatable[['basename', 'archive_id']]
         df = df.rename({'archive_id': 'tarpath'}, axis='columns')
         tars = df['tarpath'].unique()
+        got.extend(metatable['product_id'].tolist())
 
         # if nothing is found raise valueerror
         if len(tars) == 0:
@@ -198,7 +209,6 @@ def retrieve_images(image_whereclause,
 
         dependency_dict = {}
 
-        import numpy as np
         for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
                 ordered) // n_jobs)):
 
@@ -215,29 +225,71 @@ def retrieve_images(image_whereclause,
                 'basename']:
                 dependency_dict[image] = jobid
 
-    # now do the ones that are on disk
+    if http:
 
-    jt = db.sa.join(db.ZTFFile, db.HTTPArchiveCopy,
-                    db.ZTFFile.id == db.HTTPArchiveCopy.product_id)
+        # now do the ones that are on disk
+        jt = sa.join(zuds.ZTFFile, zuds.HTTPArchiveCopy,
+                     zuds.ZTFFile.id == zuds.HTTPArchiveCopy.product_id)
 
-    full_query = db.DBSession().query(
-        db.ZTFFile, db.HTTPArchiveCopy
-    ).select_from(jt)
+        full_query = zuds.DBSession().query(
+            zuds.ZTFFile, zuds.HTTPArchiveCopy
+        ).select_from(jt)
 
-    full_query = full_query.filter(image_whereclause)
+        full_query = full_query.filter(zuds.ZTFFile.id.in_(ids))
 
-    # this is the query to get the image paths
-    metatable2 = pd.read_sql(full_query.statement, db.DBSession().get_bind())
+        # this is the query to get the image paths
+        metatable2 = pd.read_sql(full_query.statement, zuds.DBSession().get_bind())
+        got.extend(metatable2['product_id'].tolist())
 
-    # copy each image over
-    for _, row in metatable2.iterrows():
-        path = row['archive_path']
-        if preserve_dirs:
-            target = Path(os.path.join(*path.split('/')[-5:]))
-        else:
-            target = Path(os.path.basename(path))
+        # copy each image over
+        for _, row in metatable2.iterrows():
+            path = row['archive_path']
+            if preserve_dirs:
+                target = Path(frame_destination) / os.path.join(*path.split('/')[-5:])
+            else:
+                target = Path(frame_destination) / os.path.basename(path)
 
-        target.parent.mkdir(exist_ok=True, parents=True)
-        shutil.copy(path, target)
+            if Path(target).absolute() == Path(path).absolute():
+                # don't overwrite an already existing file
+                continue
 
-    return dependency_dict, metatable
+            target.parent.mkdir(exist_ok=True, parents=True)
+            shutil.copy(path, target)
+
+    # download the remaining images individually from IPAC
+
+    if ipac:
+        remaining = np.setdiff1d(ids, got)
+        remaining = zuds.DBSession().query(zuds.ZTFFile).filter(
+            zuds.ZTFFile.id.in_(remaining)
+        ).all()
+
+        cookie = zuds.ipac_authenticate()
+
+        for i in remaining:
+            if preserve_dirs:
+                destination = Path(frame_destination) / i.relname
+            else:
+                destination = Path(frame_destination) / i.basename
+
+            suffix = 'mskimg.fits' if isinstance(i, zuds.MaskImage) else 'sciimg.fits'
+
+            try:
+                i.download(suffix=suffix, destination=destination, cookie=cookie)
+            except requests.RequestException:
+                continue
+
+            if archive_new:
+                acopy = zuds.HTTPArchiveCopy.from_product(i, check=False)
+                destination = acopy.archive_path
+
+                i.map_to_local_file(destination)
+
+                # ensure the image header is written to the DB
+                i.load_header()
+
+                # and archive the file to disk
+                zuds.DBSession().add(acopy)
+                zuds.DBSession().commit()
+
+

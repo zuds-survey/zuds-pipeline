@@ -40,6 +40,7 @@ from .subtraction import *
 from .swarp import *
 from .utils import *
 
+from .download import *
 
 
 # this one needs to be last
