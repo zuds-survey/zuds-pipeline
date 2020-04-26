@@ -35,9 +35,9 @@ result = zuds.DBSession().query(
 ).select_from(sub).join(
     zuds.MaskImage,
     zuds.MaskImage.parent_image_id == sub.c.id
-).filter(sub.c.rank < MAX_IMGS)
+).filter(sub.c.rank <= MAX_IMGS)
 
-final = pd.DataFrame(result.all(), columns=['id1', 'id2'])
+final = pd.DataFrame(result.all(), columns=['id1', 'id2']).astype(str)
 
 with open(outfile_name, 'w') as f:
     f.write('\n'.join(final['id1'].tolist()) + '\n')

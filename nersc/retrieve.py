@@ -113,7 +113,7 @@ def retrieve_images(images_or_ids,
     """Image whereclause should be a clause element on ZTFFile."""
 
     images_or_ids = np.atleast_1d(images_or_ids)
-    ids = [i if isinstance(i, int) else i.id for i in images_or_ids]
+    ids = [int(i) if not hasattr(i, 'id') else i.id for i in images_or_ids]
 
     got = []
 
@@ -259,7 +259,7 @@ def retrieve_images(images_or_ids,
     # download the remaining images individually from IPAC
 
     if ipac:
-        remaining = np.setdiff1d(ids, got)
+        remaining = [int(i) for i in np.setdiff1d(ids, got)]
         remaining = zuds.DBSession().query(zuds.ZTFFile).filter(
             zuds.ZTFFile.id.in_(remaining)
         ).all()
@@ -278,15 +278,16 @@ def retrieve_images(images_or_ids,
                 i.download(suffix=suffix, destination=destination, cookie=cookie)
             except requests.RequestException:
                 continue
-
+            
             if archive_new:
-                acopy = zuds.HTTPArchiveCopy.from_product(i, check=False)
-                destination = acopy.archive_path
 
                 i.map_to_local_file(destination)
 
                 # ensure the image header is written to the DB
                 i.load_header()
+                
+                acopy = zuds.HTTPArchiveCopy.from_product(i, check=False)
+                acopy.put()
 
                 # and archive the file to disk
                 zuds.DBSession().add(acopy)

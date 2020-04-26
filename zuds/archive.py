@@ -225,7 +225,8 @@ def archive(copy):
     if os.getenv('NERSC_HOST') == 'cori':
         if not path.parent.exists():
             _mkdir_recursive(path.parent)
-        shutil.copy(product.local_path, path)
+        if not os.path.abspath(product.local_path) == os.path.abspath(path):
+            shutil.copy(product.local_path, path)
         os.chmod(path, perm)
     else:
         archive_copy_over_http(copy)
