@@ -275,7 +275,10 @@ def retrieve_images(images_or_ids,
             suffix = 'mskimg.fits' if isinstance(i, zuds.MaskImage) else 'sciimg.fits'
 
             try:
-                i.download(suffix=suffix, destination=destination, cookie=cookie)
+                if isinstance(i, zuds.MaskImage):
+                    i.parent_image.download(suffix=suffix, destination=destination, cookie=cookie)
+                else:
+                    i.download(suffix=suffix, destination=destination, cookie=cookie)
             except requests.RequestException:
                 continue
             
