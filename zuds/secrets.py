@@ -17,7 +17,7 @@ class SecretManager(object):
     `get_secret` function (as `__call__`) that is used elsewhere in
     the codebase."""
 
-    def __init__(self):
+    def reload_conf(self):
         """Read the configuration file and construct the secrets cache."""
 
         # See if an alternative path to the secrets file is specified
@@ -67,6 +67,9 @@ class SecretManager(object):
         self.cache = yaml.load(open(self.config_path, 'r'),
                                Loader=yaml.FullLoader)
 
+    def __init__(self):
+        self.reload_conf()
+
     def __call__(self, key):
         if key in self.cache:
             value = self.cache[key]
@@ -75,5 +78,5 @@ class SecretManager(object):
             raise KeyError(f'Nonexistent secret requested: "{key}".')
 
 
-
 get_secret = SecretManager()
+reload_conf = get_secret.reload_conf
