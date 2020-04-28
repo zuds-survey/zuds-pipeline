@@ -83,6 +83,30 @@ def estimate_seeing(image):
     ind = d2d < 1 * u.arcsec
     catok = catalog.data[ind]
 
+    # if there are no matches in gaia, try sdss
+    if len(catok) == 0:
+        from astroquery.sdss import SDSS
+        pos = SkyCoord(image.ra, image.dec, unit='deg')
+
+        g = SDSS.query_region(pos, radius='1.2 deg',
+                              photoobj_fields=['ra', 'dec',
+                                               'probPSF',
+                                               'psfMag_r']
+                              )
+
+        calibrators = g[(g['probPSF'] > 0.9) &
+                        (g['psfMag_r'] < 19) &
+                        (g['psfMag_r'] > 16)]
+
+        matchcoord = SkyCoord(calibrators['ra'], calibrators['dec'], unit='deg')
+        idx, d2d, _ = catcoord.match_to_catalog_sky(matchcoord)
+        ind = d2d < 1 * u.arcsec
+        catok = catalog.data[ind]
+
+        if len(catok) == 0:
+            raise RuntimeError('Unable to find any calibrators to estimate '
+                               f'the seeing on "{image.basename}"')
+
     seeings = []
     for row in catok:
         fwhm = row['FWHM_IMAGE']
