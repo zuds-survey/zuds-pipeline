@@ -46,7 +46,10 @@ class PipelineRegionFile(ZTFFile):
 
         filtered = 'GOODCUT' in catalog.data.dtype.names
 
+        # do this bidirectionally for headless mode
         reg.catalog = catalog
+        catalog.regionfile = reg
+
         with open(reg.local_path, 'w') as f:
             f.write('global color=green dashlist=8 3 width=1 font="helvetica '
                     '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '

@@ -267,6 +267,7 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
     # keep a record of the images that went into the coadd
     coadd.input_images = images.tolist()
     coadd.mask_image = coaddmask
+    coaddmask.parent_image = coadd
 
     # set the ccdid, qid, field, fid for the coadd
     # (and mask) based on the input images
