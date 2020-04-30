@@ -13,7 +13,7 @@ def chunk(iterable, chunksize):
 
 
 def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
-                     refined=False, subtract_back=True, rigid=False):
+                     nreg_side=3, subtract_new_back=True, hotpants_kws=None):
 
     from .sextractor import run_sextractor
     from .swarp import BKG_VAL
@@ -21,7 +21,10 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image
 
-    if subtract_back:
+    if hotpants_kws is None:
+        hotpants_kws = {}
+
+    if subtract_new_back:
         scimbkg = run_sextractor(sci, checkimage_type=['bkgsub'])[1]
         scimbkg.data += BKG_VAL
         scimbkg.save()
@@ -77,14 +80,17 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
               f'-rss {rss} -tni {refrms.local_path} ' \
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path}  -v 0 -oni {subrms} ' \
-              f'-fin {BIG_RMS} '
-    if rigid:
-        syscall += f'-nsx {nsx} -nsy {nsy} -bgo 0 -ko 4'
-    elif not refined:
-        syscall += f'-nsx {nsx} -nsy {nsy}'
-    else:
-        syscall += f'-nsx {nsx / 3} -nsy {nsy / 3} ' \
-                   f' -ko 4 -bgo 0 -nrx 3 -nry 3'
+              f'-fin {BIG_RMS} -nsx {nsx / nreg_side} -nsy {nsy / nreg_side} ' \
+              f'-nrx {nreg_side} -nry {nreg_side} '
+
+    for key in hotpants_kws:
+        syscall += f' -{key} {hotpants_kws[key]}'
+
+    if 'bgo' not in hotpants_kws:
+        syscall += ' -bgo 0'
+
+    if 'ko' not in hotpants_kws:
+        syscall += ' -ko 4'
 
     return syscall
 
