@@ -13,7 +13,7 @@ def chunk(iterable, chunksize):
 
 
 def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
-                     refined=False):
+                     refined=False, subtract_back=True):
 
     from .sextractor import run_sextractor
     from .swarp import BKG_VAL
@@ -21,9 +21,12 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image
 
-    scimbkg = run_sextractor(sci, checkimage_type=['bkgsub'])[1]
-    scimbkg.data += BKG_VAL
-    scimbkg.save()
+    if subtract_back:
+        scimbkg = run_sextractor(sci, checkimage_type=['bkgsub'])[1]
+        scimbkg.data += BKG_VAL
+        scimbkg.save()
+    else:
+        scimbkg = sci
 
     # if requested, copy the input images to a temporary working directory
     impaths = [im.local_path for im in [scimbkg, ref]]

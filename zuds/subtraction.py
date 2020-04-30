@@ -62,6 +62,7 @@ class Subtraction(HasWCS):
         from .hotpants import prepare_hotpants
 
         refined = kwargs.get('refined', True)
+        subtract_back = kwargs.get('subtract_back', True)
 
         directory = Path(tmpdir) / uuid.uuid4().hex
         directory.mkdir(exist_ok=True, parents=True)
@@ -141,7 +142,7 @@ class Subtraction(HasWCS):
 
         command = prepare_hotpants(transact_sci, remapped_ref, outname,
                                    submask.boolean, directory, tmpdir=tmpdir,
-                                   refined=refined)
+                                   refined=refined, subtract_back=subtract_back)
 
         final_dir = os.path.dirname(sci.local_path)
         final_out = os.path.join(final_dir, os.path.basename(outname))
