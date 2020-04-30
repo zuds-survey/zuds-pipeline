@@ -13,7 +13,7 @@ def chunk(iterable, chunksize):
 
 
 def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
-                     refined=False, subtract_back=True):
+                     refined=False, subtract_back=True, rigid=False):
 
     from .sextractor import run_sextractor
     from .swarp import BKG_VAL
@@ -78,7 +78,9 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
               f'-ini {scirms.local_path} ' \
               f'-imi {submask.local_path}  -v 0 -oni {subrms} ' \
               f'-fin {BIG_RMS} '
-    if not refined:
+    if rigid:
+        syscall += f'-nsx {nsx} -nsy {nsy} -bgo 0 -ko 4'
+    elif not refined:
         syscall += f'-nsx {nsx} -nsy {nsy}'
     else:
         syscall += f'-nsx {nsx / 3} -nsy {nsy / 3} ' \
