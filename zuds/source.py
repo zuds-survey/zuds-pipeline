@@ -6,7 +6,7 @@ from astropy.table import Table
 
 from skyportal.models import Source
 
-from .core import DBSession
+from .core import DBSession, without_database
 from .utils import fid_map
 from .image import CalibratableImage
 from .photometry import ForcedPhotometry
@@ -23,6 +23,7 @@ Source.thumbnails = relationship('Thumbnail', cascade='all')
 Source.accumulated_rb = sa.Column(sa.Float)
 
 
+@without_database([])
 def images(self, type=CalibratableImage):
 
     candidates = DBSession().query(type).filter(
@@ -36,7 +37,7 @@ def images(self, type=CalibratableImage):
 
     return candidates.all()
 
-
+@without_database([])
 def best_detection(self):
     return DBSession().query(
         Detection
@@ -62,6 +63,7 @@ Source.best_detection = property(best_detection)
 Source.neighbor_info = sa.Column(psql.JSONB)
 
 
+@without_database([])
 def unphotometered_images(self):
     subq = DBSession().query(ForcedPhotometry.id,
                              ForcedPhotometry.image_id).filter(
@@ -108,6 +110,7 @@ Source.unphotometered_images = property(unphotometered_images)
 Source.force_photometry = force_photometry
 
 
+@without_database([])
 def light_curve(sourceid):
     lc_raw = []
 

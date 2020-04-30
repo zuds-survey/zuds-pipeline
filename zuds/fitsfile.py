@@ -12,7 +12,7 @@ import fitsio  # for catalogs, faster
 import numpy as np
 
 from .file import File, UnmappedFileError
-from .core import Base, DBSession
+from .core import Base, DBSession, without_database
 from .spatial import HasPoly, SpatiallyIndexed
 
 
@@ -257,6 +257,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         return self
 
     @property
+    @without_database([])
     def sources_contained(self):
         """Query the database and return all `Sources` contained by the
         polygon of this object"""

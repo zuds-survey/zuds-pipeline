@@ -85,7 +85,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
         if not isinstance(product, ZTFFile):
             raise ValueError(
                 f'Cannot archive object "{product}", must be an instance of'
-                f'PipelineFITSProduct.')
+                f'ZTFFile.')
 
         field = product.field
         qid = product.qid

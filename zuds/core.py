@@ -16,9 +16,26 @@ from .secrets import get_secret
 from .utils import fid_map
 
 __all__ = ['DBSession', 'create_tables', 'drop_tables',
-           'Base', 'init_db', 'join_model', 'ZTFFile']
+           'Base', 'init_db', 'join_model', 'ZTFFile',
+           'without_database']
 
 Base = models.Base
+
+
+def without_database(retval):
+    ## Decorator that tells the wrapped function to return retval if
+    ## there is no active database connection
+    def wrapped(func):
+        def interior(*args, **kwargs):
+            try:
+                bind = DBSession().get_bind()
+            except UnboundExecutionError:
+                return retval
+            else:
+                return func(*args, **kwargs)
+        return interior
+    return wrapped
+
 
 
 def model_representation(o):
@@ -114,7 +131,6 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
     return model
 
 
-
 class ZTFFile(Base, File):
     """A database-mapped, disk-mappable memory-representation of a file that
     is associated with a ZTF sky partition. This class is abstract and not
@@ -165,15 +181,12 @@ class ZTFFile(Base, File):
         self.find_in_dir(dirname)
 
     @classmethod
+    @without_database(None)
     def get_by_basename(cls, basename):
 
-        try:
-            obj = DBSession().query(cls).filter(
-                cls.basename == basename
-            ).first()
-        except UnboundExecutionError:
-            # Running without a database
-            obj = None
+        obj = DBSession().query(cls).filter(
+            cls.basename == basename
+        ).first()
 
         if obj is not None:
             obj.clear()  # get a fresh copy
@@ -232,7 +245,6 @@ def init_db(timeout=None):
     DBSession.configure(bind=conn)
     Base.metadata.bind = conn
 
-init_db()
 
 # Automatically update the `modified` attribute of Base
 # when objects are updated.
