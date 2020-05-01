@@ -1,6 +1,6 @@
 [submodule "skyportal"]
 	path = zuds/skyportal
-	url = git@github.com:skyportal/skyportal.git
+	url = https://github.com/skyportal/skyportal.git
 [submodule "hotpants"]
 	path = hotpants
 	url = https://github.com/zuds-survey/hotpants.git
