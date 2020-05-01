@@ -35,7 +35,7 @@ class FITSImage(HasWCS):
     matplotlib. Also defines some properties that help to optimally render
     the image (cmap, cmap_limits)"""
 
-    def show(self, axis=None, align_to=None, figsize=(5, 5)):
+    def show(self, axis=None, align_to=None, figsize=(5, 5), limits=None):
         if axis is None:
             import matplotlib.pyplot as plt
             fig, axis = plt.subplots(figsize=figsize)
@@ -45,7 +45,10 @@ class FITSImage(HasWCS):
         else:
             image = self
 
-        vmin, vmax = image.cmap_limits()
+        if limits is None:
+            vmin, vmax = image.cmap_limits()
+        else:
+            vmin, vmax = limits
 
         axis.imshow(image.data,
                     vmin=vmin,
@@ -53,6 +56,8 @@ class FITSImage(HasWCS):
                     norm=image.cmap_norm(),
                     cmap=image.cmap(),
                     interpolation='none')
+
+        return axis.figure
 
     @property
     def datatype(self):

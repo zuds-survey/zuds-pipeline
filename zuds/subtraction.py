@@ -145,7 +145,8 @@ class Subtraction(HasWCS):
                                    submask.boolean, directory, tmpdir=tmpdir,
                                    nreg_side=nreg_side,
                                    subtract_new_back=subtract_new_back,
-                                   hotpants_kws=hotpants_kws)
+                                   hotpants_kws=hotpants_kws
+                                   )
 
         final_dir = os.path.dirname(sci.local_path)
         final_out = os.path.join(final_dir, os.path.basename(outname))
