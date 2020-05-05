@@ -4,7 +4,8 @@ import stat
 from pathlib import Path
 
 
-__all__ = ['get_secret', 'SecretManager', 'SecretsFilePermissionError']
+__all__ = ['get_secret', 'SecretManager', 'SecretsFilePermissionError',
+           'load_config', 'reload_config']
 
 
 class SecretsFilePermissionError(Exception):
@@ -17,11 +18,40 @@ class SecretManager(object):
     `get_secret` function (as `__call__`) that is used elsewhere in
     the codebase."""
 
-    def reload_conf(self):
+    def load_config(self, config_path):
+
+        # check access to the file
+        bits = os.stat(config_path).st_mode
+        msgbase = 'Secrets file "%s" is accessible to %s, ' \
+                  'but must disallow access to group and world ' \
+                  'for security. Please run $chmod go-rwx %s ' \
+                  'on the command line and retry.'
+
+        # check for group access
+        if bits & stat.S_IRWXG > 0:
+            raise SecretsFilePermissionError(msgbase % (config_path,
+                                                        'group',
+                                                        config_path))
+
+        # check for world access
+        if bits & stat.S_IRWXO > 0:
+            raise SecretsFilePermissionError(msgbase % (config_path,
+                                                        'world',
+                                                        config_path))
+
+        # load the secrets
+        self.cache = yaml.load(open(config_path, 'r'),
+                               Loader=yaml.FullLoader)
+        self.config_path = config_path
+
+    def reload_config(self):
         """Read the configuration file and construct the secrets cache."""
 
         # See if an alternative path to the secrets file is specified
         # using the environment variable 'ZUDS_CONFIG'
+        self.load_config(self.config_path)
+
+    def __init__(self):
         self.config_path = os.getenv('ZUDS_CONFIG')
 
         # if no config_path is specified via an environment variable,
@@ -44,31 +74,7 @@ class SecretManager(object):
 
                 os.chmod(self.config_path, stat.S_IRUSR | stat.S_IWUSR)
 
-        # check access to the file
-        bits = os.stat(self.config_path).st_mode
-        msgbase = 'Secrets file "%s" is accessible to %s, ' \
-                  'but must disallow access to group and world ' \
-                  'for security. Please run $chmod go-rwx %s ' \
-                  'on the command line and retry.'
-
-        # check for group access
-        if bits & stat.S_IRWXG > 0:
-            raise SecretsFilePermissionError(msgbase % (self.config_path,
-                                                        'group',
-                                                        self.config_path))
-
-        # check for world access
-        if bits & stat.S_IRWXO > 0:
-            raise SecretsFilePermissionError(msgbase % (self.config_path,
-                                                        'world',
-                                                        self.config_path))
-
-        # load the secrets
-        self.cache = yaml.load(open(self.config_path, 'r'),
-                               Loader=yaml.FullLoader)
-
-    def __init__(self):
-        self.reload_conf()
+        self.reload_config()
 
     def __call__(self, key):
         if key in self.cache:
@@ -79,4 +85,5 @@ class SecretManager(object):
 
 
 get_secret = SecretManager()
-reload_conf = get_secret.reload_conf
+reload_config = get_secret.reload_config
+load_config = get_secret.load_config
