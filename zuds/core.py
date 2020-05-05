@@ -60,8 +60,8 @@ Base.__repr__ = model_representation
 Base.__str__ = model_str
 Base.modified = sa.Column(
     sa.DateTime(timezone=False),
-    default=sa.func.now(),
-    onupdate=sa.func.now()
+    server_default=sa.func.now(),
+    server_onupdate=sa.func.now()
 )
 
 
@@ -244,13 +244,4 @@ def init_db(timeout=None):
 
     DBSession.configure(bind=conn)
     Base.metadata.bind = conn
-
-
-# Automatically update the `modified` attribute of Base
-# when objects are updated.
-@event.listens_for(DBSession(), 'before_flush')
-def bump_modified(session, flush_context, instances):
-    for object in session.dirty:
-        if isinstance(object, Base) and session.is_modified(object):
-            object.modified = sa.func.now()
 
