@@ -1,0 +1,52 @@
+# Credentials / secrets / configuration file for the ZUDS pipeline. In
+# order to be used, this file must disallow access to world or group
+# (i.e., have go-rwx permissions). Otherwise an error will be raised
+# when the file is parsed.
+
+# Postgres database endpoint (if any). If no endpoint is specified or
+# if an endpoint connection cannot be made using the credentials
+# provided, the pipeline is run with no database backend (i.e.,
+# psql-free, memory-only).
+db_host: "localhost"
+db_port: 5432
+db_username: "admin"
+db_name: "zuds_test"
+db_password:
+
+# IPAC credentials (if any). These are used for retrieving image
+# metadata using ztfquery from IPAC and for handling image downloads.
+ipac_username:
+ipac_password:
+
+# NERSC credentials (if any). These are used for running the pipeline
+# in real-time mode at NERSC.
+nersc_account:
+nersc_username:
+nersc_host: "cori.nersc.gov"
+nersc_password:
+
+# Kowalski credentials (if any). These are used for some cross-matches
+# aganist external catalogs.
+kowalski_username:
+kowalski_password:
+
+# GROWTH marshal credentials (if any). These are not currently used,
+# but are listed here as they may be used in the future.
+marshal_username:
+marshal_password:
+
+# Skyportal credentials (if any). These are not currently used, but
+# are listed here as they may be used in the future.
+skyportal_token:
+
+
+# Path to the Tachibana and Miller (2018) star/galaxy catalog, if it
+# exists on the local disk.  Used for star galaxy separation in alert
+# generation.
+ps1_dir:
+
+# Location of directory to stage incoming data.
+staging_cmddir: "/global/cfs/cdirs/m937/staging"
+
+# Root of scratch data tree.
+base_data_directory: "/global/cfs/cdirs/m937/www/data/scratch"
