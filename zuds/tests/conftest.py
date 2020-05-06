@@ -10,7 +10,7 @@ import zuds
 # initialize the database
 print('Loading test configuration from test_config.yaml')
 basedir = pathlib.Path(os.path.dirname(__file__))
-zuds.load_config(basedir / '../config/test.config.yaml')
+zuds.load_config(basedir / '../config/test.conf.yaml')
 zuds.init_db()
 
 # make sure the database is fresh
