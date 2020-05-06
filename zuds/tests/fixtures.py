@@ -3,7 +3,11 @@ import json
 from pathlib import Path
 from zuds import DBSession, ScienceImage, PipelineFITSCatalog
 
+from tempfile import mkdtemp
+
 datadir = Path(__file__).parent / 'data'
+
+TMP_DIR = mkdtemp()
 
 class BaseMeta:
     sqlalchemy_session = DBSession()

@@ -2,20 +2,25 @@ import os
 import pytest
 import pathlib
 from zuds.tests.fixtures import (ScienceImageFactory,
-                                 TriangulumScienceImageFactory)
+                                 TriangulumScienceImageFactory,
+                                 TMP_DIR)
 import uuid
 import zuds
+import shutil
 
 
 # initialize the database
 print('Loading test configuration from test_config.yaml')
 basedir = pathlib.Path(os.path.dirname(__file__))
-zuds.load_config(basedir / '../config/test.conf.yaml')
+config = basedir / '../config/test.conf.yaml'
+target = pathlib.Path(TMP_DIR) / config.name
+shutil.copy(config, target)
+os.chmod(target, 0o700)
+zuds.load_config(target)
+zuds.create_database(force=True)
 zuds.init_db()
 
-# make sure the database is fresh
-zuds.drop_tables()
-zuds.create_tables()
+
 
 @pytest.fixture
 def science_image():

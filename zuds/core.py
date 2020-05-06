@@ -1,4 +1,9 @@
 import os
+import subprocess
+import sys
+import argparse
+import textwrap
+
 from skyportal.models import DBSession
 import sqlalchemy as sa
 from sqlalchemy import event
@@ -14,10 +19,11 @@ from baselayer.app.json_util import to_json
 from .file import File
 from .secrets import get_secret
 from .utils import fid_map
+from .status import status
 
 __all__ = ['DBSession', 'create_tables', 'drop_tables',
            'Base', 'init_db', 'join_model', 'ZTFFile',
-           'without_database']
+           'without_database', 'create_database']
 
 Base = models.Base
 
@@ -245,3 +251,97 @@ def init_db(timeout=None):
     DBSession.configure(bind=conn)
     Base.metadata.bind = conn
 
+
+def create_database(force=False):
+    db = get_secret('db_name')
+    user = get_secret('db_username')
+    host = get_secret('db_host')
+    port = get_secret('db_port')
+    password = get_secret('db_password')
+
+    psql_cmd = 'psql'
+    flags = f'-U {user}'
+
+    if password:
+        psql_cmd = f'PGPASSWORD="{password}" {psql_cmd}'
+    flags += f' --no-password'
+
+    if host:
+        flags += f' -h {host}'
+
+    if port:
+        flags += f' -p {port}'
+
+
+    def run(cmd):
+        return subprocess.run(cmd,
+                              stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE,
+                              shell=True)
+
+
+    def test_db(database):
+        test_cmd = f"{psql_cmd} {flags} -c 'SELECT 0;' {database}"
+        p = run(test_cmd)
+
+        try:
+            with status('Testing database connection'):
+                if not p.returncode == 0:
+                    raise RuntimeError()
+        except:
+            print(textwrap.dedent(
+                f'''
+                 !!! Error accessing database:
+                 The most common cause of database connection errors is a
+                 misconfigured `pg_hba.conf`.
+                 We tried to connect to the database with the following parameters:
+                   database: {db}
+                   username: {user}
+                   host:     {host}
+                   port:     {port}
+                 The postgres client exited with the following error message:
+                 {'-' * 78}
+                 {p.stderr.decode('utf-8').strip()}
+                 {'-' * 78}
+                 Please modify your `pg_hba.conf`, and use the following command to
+                 check your connection:
+                   {test_cmd}
+                '''))
+
+            sys.exit(1)
+
+
+    plat = run('uname').stdout
+    if b'Darwin' in plat:
+        print('* Configuring MacOS postgres')
+        sudo = ''
+    else:
+        print('* Configuring Linux postgres [may ask for sudo password]')
+        sudo = 'sudo -u postgres'
+
+    # Ask for sudo password here so that it is printed on its own line
+    # (better than inside a `with status` section)
+    run(f'{sudo} echo -n')
+
+    with status(f'Creating user {user}'):
+        run(f'{sudo} createuser {user}')
+
+    if force:
+        try:
+            with status('Removing existing databases'):
+                p = run(f'{sudo} dropdb {db}')
+                if p.returncode != 0:
+                    raise RuntimeError()
+        except:
+            print('Could not delete database: \n\n'
+                  f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n')
+            sys.exit(1)
+
+    with status(f'Creating databases'):
+        run(f'{sudo} createdb -w {db}')
+        run(f'{sudo} createdb -w {db}')
+        run(f'psql {flags}\
+              -c "GRANT ALL PRIVILEGES ON DATABASE {db} TO {user};"\
+              {db}')
+
+    test_db(db)
