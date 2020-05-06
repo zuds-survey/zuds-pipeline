@@ -51,7 +51,7 @@ class SecretManager(object):
         # using the environment variable 'ZUDS_CONFIG'
         self.load_config(self.config_path)
 
-    def __init__(self):
+    def initialize_config(self):
         self.config_path = os.getenv('ZUDS_CONFIG')
 
         # if no config_path is specified via an environment variable,
@@ -76,7 +76,13 @@ class SecretManager(object):
 
         self.reload_config()
 
+    def is_loaded(self):
+        return hasattr(self, 'cache')
+
     def __call__(self, key):
+        # initialize the secretsmanager lazily
+        if not self.is_loaded():
+            self.initialize_config()
         if key in self.cache:
             value = self.cache[key]
             return value
