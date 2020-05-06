@@ -5,10 +5,6 @@ warnings.filterwarnings(action='ignore', category=SAWarning,
 warnings.filterwarnings(action='ignore', category=SAWarning,
                         message='.*Source.thumbnails')
 
-# disable annoying tensorflow warnings
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
-
 from .alert import *
 from .archive import *
 from .bookkeeping import *
