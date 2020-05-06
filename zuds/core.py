@@ -3,6 +3,7 @@ import subprocess
 import sys
 import argparse
 import textwrap
+from distutils.version import LooseVersion as Version
 
 from skyportal.models import DBSession
 import sqlalchemy as sa
@@ -20,12 +21,20 @@ from .file import File
 from .secrets import get_secret
 from .utils import fid_map
 from .status import status
+from .env import DependencyError, output
 
 __all__ = ['DBSession', 'create_tables', 'drop_tables',
            'Base', 'init_db', 'join_model', 'ZTFFile',
            'without_database', 'create_database']
 
 Base = models.Base
+
+
+def run(cmd):
+    return subprocess.run(cmd,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          shell=True)
 
 
 def without_database(retval):
@@ -67,7 +76,7 @@ Base.__str__ = model_str
 Base.modified = sa.Column(
     sa.DateTime(timezone=False),
     server_default=sa.func.now(),
-    server_onupdate=sa.func.now()
+    onupdate=sa.func.now()
 )
 
 
@@ -231,6 +240,77 @@ class ZTFFile(Base, File):
         )
 
 
+def check_postgres_extensions(deps, username, password, host, port, database):
+
+    psql_cmd = f'psql '
+    flags = f'-U {username} '
+
+    if password:
+        psql_cmd = f'PGPASSWORD="{password}" {psql_cmd}'
+    flags += f' --no-password'
+
+    if host:
+        flags += f' -h {host}'
+
+    if port:
+        flags += f' -p {port}'
+
+    get_version = lambda v: v.split('\n')[2].strip()
+
+    fail = []
+    for dep, min_version in deps:
+
+        query = f'{dep} >= {min_version}'
+        clause = f"SELECT max(extversion) FROM pg_extension WHERE extname = '{dep}';"
+        cmd = psql_cmd + f' {flags} {database}'
+        splcmd = cmd.split()
+        splcmd += ['-c', f"{clause}"]
+        cmd += f'-c "{clause}"'
+
+        try:
+            with status(query):
+                success, out = output(splcmd)
+                try:
+                    version = get_version(out.decode('utf-8').strip())
+                    print(f'[{version.rjust(8)}]'.rjust(40 - len(query)),
+                          end='')
+                except:
+                    raise ValueError('Could not parse version')
+
+                if not (Version(version) >= Version(min_version)):
+                    raise RuntimeError(
+                        f'Required {min_version}, found {version}'
+                    )
+        except ValueError:
+            print(
+                f'\n[!] Sorry, but our script could not parse the output of '
+                f'`{" ".join(cmd.replace(password, "***"))}`; '
+                f'please file a bug, or see `zuds/core.py`\n'
+            )
+            raise
+        except Exception as e:
+            fail.append((dep, e, cmd, min_version))
+
+    if fail:
+        failstr = ''
+        for (pkg, exc, cmd, min_version) in fail:
+            repcmd = cmd
+            if password is not None:
+                repcmd = repcmd.replace(password, '***')
+            failstr += f'    - {pkg}: `{repcmd}`\n'
+            failstr += '     ' + str(exc) + '\n'
+
+        msg = f'''
+[!] Some system dependencies seem to be unsatisfied
+
+The failed checks were:
+
+{failstr}
+'''
+        raise DependencyError(msg)
+
+
+
 def init_db(timeout=None):
 
     username = get_secret('db_username')
@@ -246,8 +326,15 @@ def init_db(timeout=None):
     if timeout is not None:
         kwargs['connect_args'] = {"options": f"-c statement_timeout={timeout}"}
 
-    conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
+    print(f'Checking for postgres extensions:')
+    deps = [('q3c', '1.8.0')]
+    try:
+        check_postgres_extensions(deps, username, password, host, port, dbname)
+    except DependencyError:
+        DBSession.remove()
+        raise
 
+    conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
     DBSession.configure(bind=conn)
     Base.metadata.bind = conn
 
@@ -271,14 +358,6 @@ def create_database(force=False):
 
     if port:
         flags += f' -p {port}'
-
-
-    def run(cmd):
-        return subprocess.run(cmd,
-                              stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE,
-                              shell=True)
-
 
     def test_db(database):
         test_cmd = f"{psql_cmd} {flags} -c 'SELECT 0;' {database}"
@@ -308,7 +387,7 @@ def create_database(force=False):
                    {test_cmd}
                 '''))
 
-            sys.exit(1)
+            raise
 
 
     plat = run('uname').stdout
@@ -324,24 +403,43 @@ def create_database(force=False):
     run(f'{sudo} echo -n')
 
     with status(f'Creating user {user}'):
-        run(f'{sudo} createuser {user}')
+        run(f'{sudo} createuser --superuser {user}')
 
     if force:
         try:
-            with status('Removing existing databases'):
+            with status('Removing existing database'):
                 p = run(f'{sudo} dropdb {db}')
                 if p.returncode != 0:
                     raise RuntimeError()
         except:
             print('Could not delete database: \n\n'
                   f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n')
-            sys.exit(1)
+            raise
 
-    with status(f'Creating databases'):
-        run(f'{sudo} createdb -w {db}')
-        run(f'{sudo} createdb -w {db}')
-        run(f'psql {flags}\
-              -c "GRANT ALL PRIVILEGES ON DATABASE {db} TO {user};"\
-              {db}')
+    try:
+        with status(f'Creating database'):
+            p = run(f'{sudo} createdb {flags} -w {db}')
+            msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
+            if p.returncode != 0 and 'already exists' not in msg:
+                raise RuntimeError()
+
+            p = run(f'psql {flags} -c "GRANT ALL PRIVILEGES ON DATABASE {db} TO {user};" {db}')
+            msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
+            if p.returncode != 0:
+                raise RuntimeError()
+
+    except:
+        print(f'Could not create database: \n\n{msg}\n')
+        raise
+
+    try:
+        with status(f'Creating extensions'):
+            p = run(f'psql {flags} -c "CREATE EXTENSION q3c" {db}')
+            msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
+            if p.returncode != 0 and 'already exists' not in msg:
+                raise RuntimeError()
+    except:
+        print(f'Could not create extensions: \n\n{msg}\n')
+        raise
 
     test_db(db)

@@ -573,9 +573,7 @@ class ScienceImageFactory(factory.alchemy.SQLAlchemyModelFactory):
     class Meta(BaseMeta):
         model = ScienceImage
 
-    created_at = "2020-04-28T12:15:09.449065"
     basename = "ztf_20200428501227_000763_zi_c14_o_q4_sciimg.fits"
-    modified = "2020-04-28T15:33:04.384323"
     type = "sci"
     field = 763
     qid = 4

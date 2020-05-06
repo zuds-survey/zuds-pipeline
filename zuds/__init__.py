@@ -1,3 +1,11 @@
+
+# check dependencies
+from .env import check_dependencies
+from .constants import SYSTEM_DEPENDENCIES
+check_dependencies(SYSTEM_DEPENDENCIES)
+
+
+# disable expected warnings
 import warnings
 from sqlalchemy.exc import SAWarning
 warnings.filterwarnings(action='ignore', category=SAWarning,

@@ -70,3 +70,27 @@ REFERENCE_VERSION = 'zuds5'
 ACTIVE_FIELDS = [631, 762, 763, 722, 676, 724, 677,
                  761, 678, 720, 721, 679, 863, 846, 823, 862,
                  845, 822, 793, 844, 759, 821, 719, 792, 758, 791]
+
+
+SYSTEM_DEPENDENCIES = {
+    'psql': (
+        ['psql', '--version'],
+        lambda v: v.split('\n')[-1].split()[2],
+        '9.6',
+    ),
+    'sextractor (sex)': (
+        ['sex', '--version'],
+        lambda v: v.split()[2],
+        '2.18.0'
+    ),
+    'swarp': (
+        ['swarp', '--version'],
+        lambda v: v.split()[2],
+        '2.38.0'
+    ),
+    'hotpants': (
+        ['hotpants'],
+        lambda v: v.split('\n')[1].split()[-1],
+        '5.1.11'
+    )
+}
