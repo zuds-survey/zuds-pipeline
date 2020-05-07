@@ -327,7 +327,7 @@ def init_db(timeout=None):
         kwargs['connect_args'] = {"options": f"-c statement_timeout={timeout}"}
 
     print(f'Checking for postgres extensions:')
-    deps = [('q3c', '1.8.0')]
+    deps = [('q3c', '1.5.0')]
     try:
         check_postgres_extensions(deps, username, password, host, port, dbname)
     except DependencyError:
@@ -337,6 +337,12 @@ def init_db(timeout=None):
     conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
     DBSession.configure(bind=conn)
     Base.metadata.bind = conn
+
+    @event.listens_for(DBSession(), 'before_flush')
+    def bump_modified(session, flush_context, instances):
+        for object in session.dirty:
+            if isinstance(object, Base) and session.is_modified(object):
+                object.modified = sa.func.now()
 
 
 def create_database(force=False):

@@ -138,10 +138,6 @@ def retrieve_images(images_or_ids,
         tars = df['tarpath'].unique()
         got.extend(metatable['product_id'].tolist())
 
-        # if nothing is found raise valueerror
-        if len(tars) == 0:
-            raise ValueError('No images match the given query')
-
         # sort tarball retrieval by location on tape
         t = datetime.datetime.utcnow().isoformat().replace(' ', '_')
         hpss_in = Path(job_script_destination) / f'hpss_{t}.in'
@@ -281,14 +277,14 @@ def retrieve_images(images_or_ids,
                     i.download(suffix=suffix, destination=destination, cookie=cookie)
             except requests.RequestException:
                 continue
-            
+
             if archive_new:
 
                 i.map_to_local_file(destination)
 
                 # ensure the image header is written to the DB
                 i.load_header()
-                
+
                 acopy = zuds.HTTPArchiveCopy.from_product(i, check=False)
                 acopy.put()
 
