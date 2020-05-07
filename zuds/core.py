@@ -263,13 +263,13 @@ def check_postgres_extensions(deps, username, password, host, port, database):
         query = f'{dep} >= {min_version}'
         clause = f"SELECT max(extversion) FROM pg_extension WHERE extname = '{dep}';"
         cmd = psql_cmd + f' {flags} {database}'
-        splcmd = cmd.split()
-        splcmd += ['-c', f"{clause}"]
-        cmd += f'-c "{clause}"'
+        cmd += f' -c "{clause}"'
 
         try:
             with status(query):
-                success, out = output(splcmd)
+                success, out = output(cmd, shell=True)
+                if not success:
+                    raise ValueError(out.decode("utf-8").strip())
                 try:
                     version = get_version(out.decode('utf-8').strip())
                     print(f'[{version.rjust(8)}]'.rjust(40 - len(query)),
@@ -284,7 +284,7 @@ def check_postgres_extensions(deps, username, password, host, port, database):
         except ValueError:
             print(
                 f'\n[!] Sorry, but our script could not parse the output of '
-                f'`{" ".join(cmd.replace(password, "***"))}`; '
+                f'`{cmd.replace(password, "***")}`; '
                 f'please file a bug, or see `zuds/core.py`\n'
             )
             raise
@@ -298,7 +298,7 @@ def check_postgres_extensions(deps, username, password, host, port, database):
             if password is not None:
                 repcmd = repcmd.replace(password, '***')
             failstr += f'    - {pkg}: `{repcmd}`\n'
-            failstr += '     ' + str(exc) + '\n'
+            failstr += '     ' + str(exc).replace(password, '***') + '\n'
 
         msg = f'''
 [!] Some system dependencies seem to be unsatisfied

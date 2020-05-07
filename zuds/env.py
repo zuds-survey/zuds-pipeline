@@ -5,9 +5,10 @@ from distutils.version import LooseVersion as Version
 __all__ = ['check_dependencies', 'DependencyError', 'output']
 
 
-def output(cmd):
+def output(cmd, shell=False):
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                         stderr=subprocess.STDOUT)
+                         stderr=subprocess.STDOUT,
+                         shell=shell)
     out, err = p.communicate()
     success = (p.returncode == 0)
     return success, out
