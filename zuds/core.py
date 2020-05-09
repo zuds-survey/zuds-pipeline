@@ -262,8 +262,7 @@ def check_postgres_extensions(deps, username, password, host, port, database):
 
         query = f'{dep} >= {min_version}'
         clause = f"SELECT max(extversion) FROM pg_extension WHERE extname = '{dep}';"
-        cmd = psql_cmd + f' {flags} {database}'
-        cmd += f' -c "{clause}"'
+        cmd = psql_cmd + f' {flags} {database} -c "{clause}"'
 
         try:
             with status(query):
