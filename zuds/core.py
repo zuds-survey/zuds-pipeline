@@ -255,7 +255,11 @@ def check_postgres_extensions(deps, username, password, host, port, database):
     if port:
         flags += f' -p {port}'
 
-    get_version = lambda v: v.split('\n')[2].strip()
+    def get_version(v):
+        lines = v.split('\n')
+        for i, line in enumerate(lines):
+            if '1 row' in line.strip():
+                return lines[i - 1].strip()
 
     fail = []
     for dep, min_version in deps:
