@@ -102,7 +102,7 @@ class CalibratableImageBase(FITSImage):
         return interval.get_limits(self.data)
 
     def _call_source_extractor(self, checkimage_type=None, tmpdir='/tmp',
-                               use_weightmap=True):
+                               use_weightmap=True, sextractor_kws=None):
 
         rs = sextractor.run_sextractor
         success = False
@@ -110,7 +110,7 @@ class CalibratableImageBase(FITSImage):
             try:
                 results = rs(
                     self, checkimage_type=checkimage_type, tmpdir=tmpdir,
-                    use_weightmap=use_weightmap
+                    use_weightmap=use_weightmap, sextractor_kws=sextractor_kws
                 )
             except subprocess.CalledProcessError as e:
                 print(f'Caught CalledProcessError {e}, retrying... {_+1} / 3')

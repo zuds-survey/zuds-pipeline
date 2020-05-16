@@ -28,9 +28,13 @@ checkimage_map = {
 
 
 def prepare_sextractor(image, directory, checkimage_type=None,
-                       catalog_type='FITS_LDAC', use_weightmap=True):
+                       catalog_type='FITS_LDAC', use_weightmap=True,
+                       sextractor_kws=None):
     """Set up the pipeline to do a run of source extractor."""
     from .mask import BAD_SUM
+
+    if sextractor_kws is None:
+        sextractor_kws = {}
 
     conf = SEX_CONF
     valid_types = ['rms', 'segm', 'bkgsub', 'bkg']
@@ -95,13 +99,16 @@ def prepare_sextractor(image, directory, checkimage_type=None,
         syscall += f'-WEIGHT_IMAGE {image.weight_image.local_path} ' \
                    f'-WEIGHT_TYPE MAP_WEIGHT'
 
+    for kw in sextractor_kws:
+        syscall += f' -{kw} {sextractor_kws[kw]} '
+
     outnames = [outname] + coutnames
 
     return syscall, outnames
 
 
 def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
-                   tmpdir='/tmp', use_weightmap=True):
+                   tmpdir='/tmp', use_weightmap=True, sextractor_kws=None):
     """Run SExtractor on an image and produce the requested checkimages and
     catalogs, returning the results as ZUDS objects (potentially DB-backed)."""
 
@@ -113,7 +120,8 @@ def run_sextractor(image, checkimage_type=None, catalog_type='FITS_LDAC',
 
     command, outnames = prepare_sextractor(
         image, directory, checkimage_type=checkimage_type,
-        catalog_type=catalog_type, use_weightmap=use_weightmap
+        catalog_type=catalog_type, use_weightmap=use_weightmap,
+        sextractor_kws=sextractor_kws
     )
 
     # run it
