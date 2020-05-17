@@ -116,7 +116,7 @@ def _coadd_from_images(cls, images, outname, data_product=False,
         calibrate_astrometry(transact_images, scamp_kws=scamp_kws,
                              tmpdir=tmpdir)
 
-    transact_outname = f'{directory / os.path.basename(outname))}'
+    transact_outname = f'{directory / os.path.basename(outname)}'
     command = prepare_swarp_sci(transact_images, transact_outname, directory,
                                 swarp_kws=sci_swarp_kws,
                                 swarp_zp_key=swarp_zp_key)
