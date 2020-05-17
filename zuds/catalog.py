@@ -101,9 +101,9 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     @classmethod
     def from_image(cls, image, tmpdir='/tmp', kill_flagged=True):
 
-        from .image import CalibratableImage
+        from .image import CalibratableImageBase, CalibratableImage
 
-        if not isinstance(image, CalibratableImage):
+        if not isinstance(image, CalibratableImageBase):
             raise ValueError('Image is not an instance of '
                              'CalibratableImage.')
 
@@ -117,7 +117,10 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         rec = df.to_records(index=False)
         cat.data = rec
         cat.basename = image.basename.replace('.fits', '.cat')
-        cat.image_id = image.id
+
+        if isinstance(image, CalibratableImage):
+            cat.image_id = image.id
+
         cat.image = image
         image.catalog = cat
 
