@@ -1,10 +1,28 @@
 import numpy as np
 from pathlib import Path
+from astropy.time import Time
 
 __all__ = ['initialize_directory', 'quick_background_estimate',
            'fid_map', '_split', 'print_time',
-           'ensure_images_have_the_same_properties']
+           'ensure_images_have_the_same_properties',
+           'get_time']
 
+
+def get_time(image, format):
+    """Search the header of image `image` for a number of keys that
+    provide the observation date, if one is found, return it in the
+    specified format (string)."""
+
+    time_keys = ['OBSMJD', 'MJD-OBS', 'OBSJD', 'JD-OBS', 'DATE-OBS',
+                 'UTC-OBS', 'OBSDATE']
+    time_formats = ['mjd', 'mjd', 'jd', 'jd', 'iso', 'iso', 'iso']
+
+    for k, f in zip(time_keys, time_formats):
+        if k in image.header:
+            t = Time(image.header[k], format=f)
+            return getattr(t, format)
+
+    raise ValueError(f'No matching keys found for image "{image.basename}"')
 
 def initialize_directory(directory):
     directory = Path(directory)
