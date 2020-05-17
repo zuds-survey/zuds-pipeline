@@ -1,3 +1,4 @@
+import os
 import uuid
 import shutil
 from pathlib import Path
@@ -18,23 +19,17 @@ SCI_CONF = CONF_DIR / 'default.swarp'
 MSK_CONF = CONF_DIR / 'mask.swarp'
 
 
+def prepare_swarp_sci(images, outname, directory, swarp_kws=None,
+                      swarp_zp_key='MAGZP'):
 
-def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
-                      nthreads=1, swarp_kws=None):
     conf = SCI_CONF
     initialize_directory(directory)
 
-    if copy_inputs:
-        impaths = []
-        for image in images:
-            shutil.copy(image.local_path, directory)
-            impaths.append(str(directory / image.basename))
-    else:
-        impaths = [im.local_path for im in images]
+    impaths = [im.local_path for im in images]
 
     # normalize all images to the same zeropoint
     for im, path in zip(images, impaths):
-        if 'MAGZP' in im.header:
+        if swarp_zp_key in im.header:
             fluxscale = 10**(-0.4 * (im.header['MAGZP'] - 25.))
             im.header['FLXSCALE'] = fluxscale
             im.header_comments['FLXSCALE'] = 'Flux scale factor for coadd / DG'
@@ -49,7 +44,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
     # directory
     wgtpaths = []
     for image in images:
-        if not image.weight_image.ismapped or copy_inputs:
+        if not image.weight_image.ismapped:
             wgtpath = f"{directory / image.basename.replace('.fits', '.weight.fits')}"
             image.weight_image.map_to_local_file(wgtpath)
             image.weight_image.save()
@@ -78,8 +73,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
               f'-WEIGHT_IMAGE @{inweight} ' \
-              f'-WEIGHTOUT_NAME {wgtout} ' \
-              f'-NTHREADS {nthreads} '
+              f'-WEIGHTOUT_NAME {wgtout} '
 
     if swarp_kws is not None:
         for kw in swarp_kws:
@@ -89,13 +83,11 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
 
 
 def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
-                       copy_inputs=False, nthreads=1):
+                       swarp_kws=None):
+
+
     conf = MSK_CONF
     initialize_directory(directory)
-
-    if copy_inputs:
-        for image in masks:
-            shutil.copy(image.local_path, directory)
 
     # get the images in string form
     allims = ' '.join([c.local_path for c in masks])
@@ -105,8 +97,11 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
-              f'-WEIGHTOUT_NAME {mskoutweightname} ' \
-              f'-NTHREADS {nthreads}'
+              f'-WEIGHTOUT_NAME {mskoutweightname} '
+
+    if swarp_kws is not None:
+        for kw in swarp_kws:
+            syscall += f'-{kw.upper()} {swarp_kws[kw]} '
 
     return syscall
 
@@ -210,18 +205,76 @@ def run_align(image, other, tmpdir='/tmp',
 
 
 def run_coadd(cls, images, outname, mskoutname, addbkg=True,
-              nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
+              tmpdir='/tmp', sci_swarp_kws=None, mask_swarp_kws=None,
+              solve_astrometry=False, swarp_zp_key='MAGZP', scamp_kws=None):
     """Run swarp on images `images`"""
 
-    from .image import FITSImage
+    from .core import ZTFFile
+    from .image import FITSImage, CalibratableImageBase
+    from .catalog import PipelineFITSCatalog
 
+    # create the directory for the transaction
     directory = Path(tmpdir) / uuid.uuid4().hex
     directory.mkdir(exist_ok=True, parents=True)
 
-    command = prepare_swarp_sci(images, outname, directory,
-                                copy_inputs=copy_inputs,
-                                nthreads=nthreads,
-                                swarp_kws=swarp_kws)
+    # we are gonna copy the inputs into the directory, then reload them
+    # off of disk to keep things transactionally isolated
+
+    transact_images = []
+
+    for image in images:
+        shutil.copy(image.local_path, directory)
+        if image.mask_image is None:
+            raise ValueError(f'Image "{image.basename}" does not have a mask. '
+                             f'Map this image to a mask and try again.')
+        shutil.copy(image.mask_image.local_path, directory)
+
+        # TODO: I'm not currently certain whether .head files will also
+        # automatically translate to .weight or .rms files. Need to
+        # investigate this to see if these should be remade by calling
+        # sextractor after the .head files are already present, to
+        # propagate the new WCS solutions to the weight/noise maps.
+
+        # For now assume the .head files also apply to the weight / rms maps
+        # and copy them over
+
+        if hasattr(image, '_rmsimg'):
+            shutil.copy(image.rms_image.local_path, directory)
+        elif hasattr(image, '_weightimg'):
+            shutil.copy(image.weight_image.local_path, directory)
+
+        make_catalog = image.catalog is None
+        if not make_catalog:
+            shutil.copy(image.catalog.local_path, directory)
+
+        # create the transaction elements
+        transact_name = directory / image.basename
+        transact_mask_name = directory / image.mask_image.basename
+        transact_image = CalibratableImageBase.from_file(transact_name)
+        transact_mask = MaskImageBase.from_file(transact_mask_name)
+        transact_image.mask_image = transact_mask
+
+        # make the catalog if needed
+        if make_catalog:
+            transact_image.catalog = PipelineFITSCatalog.from_image(
+                transact_image
+            )
+        else:
+            transact_cat_name = directory / image.catalog.basename
+            transact_cat = PipelineFITSCatalog.from_file(transact_cat_name)
+            transact_image.catalog = transact_cat
+
+        transact_images.append(transact_image)
+
+    if solve_astrometry:
+        from .scamp import calibrate_astrometry
+        calibrate_astrometry(transact_images, scamp_kws=scamp_kws,
+                             tmpdir=tmpdir)
+
+    transact_outname = f'{directory / os.path.basename(outname))}'
+    command = prepare_swarp_sci(transact_images, transact_outname, directory,
+                                swarp_kws=sci_swarp_kws,
+                                swarp_zp_key=swarp_zp_key)
 
     # run swarp
     while True:
@@ -236,11 +289,15 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
             break
 
     # now swarp together the masks
-    masks = [image.mask_image for image in images]
-    mskoutweightname = directory / Path(mskoutname.replace('.fits', '.weight.fits')).name
-    command = prepare_swarp_mask(masks, mskoutname, mskoutweightname,
-                                 directory, copy_inputs=False,
-                                 nthreads=nthreads)
+    transact_masks = [image.mask_image for image in transact_images]
+
+    transact_mskoutname = f'{directory / os.path.basename(mskoutname)}'
+    mskoutweightname = directory / Path(mskoutname.replace('.fits',
+                                                           '.weight.fits')).name
+
+    command = prepare_swarp_mask(transact_masks, transact_mskoutname,
+                                 mskoutweightname, directory,
+                                 swarp_kws=mask_swarp_kws)
 
     # run swarp
     while True:
@@ -254,11 +311,22 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
         else:
             break
 
+    transact_weightname = transact_outname.replace('.fits', '.weight.fits')
+    weight_outname = outname.replace('.fits', '.weight.fits')
+
+    # move things back over
+    product_map = {
+        transact_outname: outname,
+        transact_weightname: weight_outname,
+        transact_mskoutname: mskoutname
+    }
+
+    for key in product_map:
+        shutil.copy(key, product_map[key])
 
     # load the result
-    coadd = cls.from_file(outname)
-    coaddweightname = outname.replace('.fits', '.weight.fits')
-    coadd._weightimg = FITSImage.from_file(coaddweightname)
+    coadd = cls.from_file(outname, load_others=False)
+    coadd._weightimg = FITSImage.from_file(weight_outname)
 
     coaddmask = MaskImage.from_file(mskoutname)
     coaddmaskweight = FITSImage.from_file(mskoutweightname)
@@ -271,10 +339,10 @@ def run_coadd(cls, images, outname, mskoutname, addbkg=True,
 
     # set the ccdid, qid, field, fid for the coadd
     # (and mask) based on the input images
-
-    for prop in GROUP_PROPERTIES:
-        for img in [coadd, coaddmask]:
-            setattr(img, prop, getattr(images[0], prop))
+    if all([isinstance(i, ZTFFile) for i in images]):
+        for prop in GROUP_PROPERTIES:
+            for img in [coadd, coaddmask]:
+                setattr(img, prop, getattr(images[0], prop))
 
     if addbkg:
         coadd.data += BKG_VAL

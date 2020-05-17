@@ -18,9 +18,12 @@ from .archive import archive
 __all__ = ['Coadd', 'ReferenceImage', 'ScienceCoadd']
 
 
-def _coadd_from_images(cls, images, outfile_name, nthreads=1, data_product=False,
-                       tmpdir='/tmp', copy_inputs=False, swarp_kws=None,
-                       calculate_seeing=True, addbkg=True):
+def _coadd_from_images(cls, images, outfile_name, data_product=False,
+                       tmpdir='/tmp', copy_inputs=False, sci_swarp_kws=None,
+                       mask_swarp_kws=None, calculate_seeing=True, addbkg=True,
+                       enforce_partition=True, solve_astrometry=False,
+                       swarp_zp_key='MAGZP', scamp_kws=None, set_date=False):
+
     """Make a coadd from a bunch of input images"""
     from .swarp import run_coadd
 
@@ -39,23 +42,22 @@ def _coadd_from_images(cls, images, outfile_name, nthreads=1, data_product=False
 
     properties = GROUP_PROPERTIES
 
-    # make sure all images have the same field, filter, ccdid, qid:
-    ensure_images_have_the_same_properties(images, properties)
+    if enforce_partition:
+
+        # make sure all images have the same field, filter, ccdid, qid:
+        ensure_images_have_the_same_properties(images, properties)
 
     # call swarp
     coadd = run_coadd(cls, images, outfile_name, mskoutname,
-                      addbkg=addbkg, nthreads=nthreads,
-                      tmpdir=tmpdir, copy_inputs=copy_inputs,
-                      swarp_kws=swarp_kws)
+                      addbkg=addbkg, tmpdir=tmpdir, copy_inputs=copy_inputs,
+                      sci_swarp_kws=sci_swarp_kws, mask_swarp_kws=mask_swarp_kws,
+                      solve_astrometry=solve_astrometry, swarp_zp_key=swarp_zp_key,
+                      scamp_kws=scamp_kws)
     coaddmask = coadd.mask_image
-
-    coadd.header['FIELD'] = coadd.field = images[0].field
-    coadd.header['CCDID'] = coadd.ccdid = images[0].ccdid
-    coadd.header['QID'] = coadd.qid = images[0].qid
-    coadd.header['FID'] = coadd.fid = images[0].fid
 
     if calculate_seeing:
         estimate_seeing(coadd)
+
     coadd.save()
 
     if data_product:
