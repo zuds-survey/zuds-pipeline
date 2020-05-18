@@ -26,7 +26,7 @@ def _coadd_from_images(cls, images, outname, data_product=False,
                        tmpdir='/tmp', sci_swarp_kws=None,
                        mask_swarp_kws=None, calculate_seeing=True, addbkg=True,
                        enforce_partition=True, solve_astrometry=False,
-                       swarp_zp_key='MAGZP', scamp_kws=None, set_date=False):
+                       swarp_zp_key='MAGZP', scamp_kws=None, set_date=True):
 
     """Make a coadd from a bunch of input images"""
     from .swarp import prepare_swarp_sci, prepare_swarp_mask
