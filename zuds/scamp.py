@@ -55,18 +55,20 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
 
     # run scamp
     subprocess.check_call(command.split())
+    mskimgs = [i.mask_image for i in images]
 
-    for i, c in zip(images, catpaths):
-        headpath = f'{c}'.replace('.cat', '.head')
-        if inplace:
-            header = fits.Header.fromfile(headpath)
+    for images in [images, mskimgs]:
+        for i, c in zip(images, catpaths):
+            headpath = f'{c}'.replace('.cat', '.head')
+            if inplace:
+                header = fits.Header.fromfile(headpath)
 
-            for k in dict(header):
-                i.header[k] = header[k]
-                i.header_comments[k] = header.comments[k]
+                for k in dict(header):
+                    i.header[k] = header[k]
+                    i.header_comments[k] = header.comments[k]
 
-            i.save()
-        else:
-            shutil.copy(headpath, Path(i.local_path).parent)
+                i.save()
+            else:
+                shutil.copy(headpath, Path(i.local_path).parent)
 
     shutil.rmtree(directory)
