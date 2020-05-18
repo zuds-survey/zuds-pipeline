@@ -59,14 +59,12 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     # remove photometric keywords from the headers
     for c in catpaths:
         headpath = f'{c}'.replace('.cat', '.head')
-        header = fits.Header.fromfile(headpath)
+        header = fits.Header.fromfile(headpath, sep='\n')
 
         for key in ['FLXSCALE', 'MAGZEROP', 'PHOTIRMS', 'PHOTINST', 'PHOTLINK']:
             del header[key]
 
-        outstr = header.tostring().encode('ascii')
-        with open(headpath, 'w') as f:
-            f.write(outstr)
+        header.tofile(headpath, sep='\n')
 
     # write the result
     mskimgs = [i.mask_image for i in images]
@@ -74,7 +72,7 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         for i, c in zip(imgs, catpaths):
             headpath = f'{c}'.replace('.cat', '.head')
             if inplace:
-                header = fits.Header.fromfile(headpath)
+                header = fits.Header.fromfile(headpath, sep='\n')
 
                 for k in dict(header):
                     i.header[k] = header[k]
