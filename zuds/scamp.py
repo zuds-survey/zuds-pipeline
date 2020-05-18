@@ -55,8 +55,19 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
 
     # run scamp
     subprocess.check_call(command.split())
-    mskimgs = [i.mask_image for i in images]
 
+    # remove photometric keywords from the headers
+    for c in catpaths:
+        headpath = f'{c}'.replace('.cat', '.head')
+        header = fits.Header.fromfile(headpath)
+
+        for key in ['FLXSCALE', 'MAGZEROP', 'PHOTIRMS', 'PHOTINST', 'PHOTLINK']:
+            del header[key]
+
+        header.tofile(headpath)
+
+    # write the result
+    mskimgs = [i.mask_image for i in images]
     for imgs in [images, mskimgs]:
         for i, c in zip(imgs, catpaths):
             headpath = f'{c}'.replace('.cat', '.head')
