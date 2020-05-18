@@ -8,11 +8,6 @@ from .env import check_dependencies
 
 SCAMP_CONF = Path(__file__).parent / 'astromatic/default.scamp'
 
-# check to see that we have scamp
-check_dependencies(
-
-)
-
 
 def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     """Derive astrometric solution for input images
