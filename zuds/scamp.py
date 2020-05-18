@@ -71,7 +71,8 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         for line in lines:
             key = line[:8].strip()
             if key in ['FLXSCALE', 'MAGZEROP', 'PHOTIRMS',
-                       'PHOTINST', 'PHOTLINK', 'COMMENT']:
+                       'PHOTINST', 'PHOTLINK', 'COMMENT',
+                       'HISTORY']:
                 continue
             else:
                 out.append(line)
