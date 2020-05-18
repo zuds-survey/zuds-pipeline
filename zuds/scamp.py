@@ -64,7 +64,9 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         for key in ['FLXSCALE', 'MAGZEROP', 'PHOTIRMS', 'PHOTINST', 'PHOTLINK']:
             del header[key]
 
-        header.tofile(headpath)
+        outstr = header.tostring().encode('ascii')
+        with open(headpath, 'w') as f:
+            f.write(outstr)
 
     # write the result
     mskimgs = [i.mask_image for i in images]
