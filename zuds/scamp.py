@@ -84,7 +84,9 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         for i, c in zip(imgs, catpaths):
             headpath = f'{c}'.replace('.cat', '.head')
             if inplace:
-                header = fits.Header.fromfile(headpath, sep='\n')
+                with open(headpath, 'r') as f:
+                    content = f.read()
+                header = fits.Header.fromstring(content, sep='\n')
 
                 for k in dict(header):
                     i.header[k] = header[k]
