@@ -210,13 +210,14 @@ def _coadd_from_images(cls, images, outname, data_product=False,
 
     shutil.rmtree(directory)
 
-    if calculate_seeing:
-        estimate_seeing(coadd)
-
     if solve_astrometry:
         from .scamp import calibrate_astrometry
         calibrate_astrometry([coadd], inplace=True, scamp_kws=scamp_kws,
                              tmpdir=tmpdir)
+
+    if calculate_seeing:
+        estimate_seeing(coadd)
+
 
     coadd.save()
 
