@@ -103,7 +103,7 @@ def _coadd_from_images(cls, images, outname, data_product=False,
             mjd = get_time(transact_image, 'mjd')
             transact_image.header['MJD-OBS'] = mjd
             transact_image.header_comments['MJD-OBS'] = 'MJD of observation (DG)'
-
+            transact_image.save()
 
         # make the catalog if needed
         if make_catalog:
