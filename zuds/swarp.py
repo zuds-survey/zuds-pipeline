@@ -29,7 +29,7 @@ def prepare_swarp_sci(images, outname, directory, swarp_kws=None,
     # normalize all images to the same zeropoint
     for im, path in zip(images, impaths):
         if swarp_zp_key in im.header:
-            fluxscale = 10**(-0.4 * (im.header['MAGZP'] - 25.))
+            fluxscale = 10**(-0.4 * (im.header[swarp_zp_key] - 25.))
             im.header['FLXSCALE'] = fluxscale
             im.header_comments['FLXSCALE'] = 'Flux scale factor for coadd / DG'
             im.header['FLXSCLZP'] = 25.
