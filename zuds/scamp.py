@@ -13,7 +13,7 @@ SCAMP_CONF = Path(__file__).parent / 'astromatic/default.scamp'
 def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     """Derive astrometric solution for input images
 
-    :param catalogs: list of mapped HasWCS --
+    :param catalogs: list of mapped CalibratableImageBase --
     the images to astrometrically calibrate
     :param scamp_kws: dict -- configuration parameters to pass to scamp, e.g.,
     {'ASTREF_CATALOG': 'GAIA-DR1'}
@@ -25,7 +25,6 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     transactional isolation
     """
 
-    from .image import CalibratableImageBase
     from .file import UnmappedFileError
     from .catalog import PipelineFITSCatalog
 
@@ -42,8 +41,7 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
                           f' MJD-OBS keyword, proper motions may not be used'
                           f' in deriving astrometric solution...')
 
-    catalogs = [i.catalog if isinstance(i, CalibratableImageBase)
-                else i.parent_image.catalog for i in images]
+    catalogs = [i.catalog for i in images]
 
     catpaths = []
     for catalog in catalogs:
@@ -105,5 +103,7 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
                 shutil.copy(headpath,
                             Path(i.local_path).parent /
                             i.basename.replace('.fits', '.head'))
+
+    #
 
     shutil.rmtree(directory)
