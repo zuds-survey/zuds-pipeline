@@ -88,7 +88,7 @@ def _coadd_from_images(cls, images, outname, data_product=False,
         elif hasattr(image, '_weightimg'):
             shutil.copy(image.weight_image.local_path, directory)
 
-        make_catalog = image.catalog is None
+        make_catalog = (not hasattr(image, 'catalog')) or image.catalog is None
         if not make_catalog:
             shutil.copy(image.catalog.local_path, directory)
 
