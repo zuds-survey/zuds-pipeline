@@ -160,7 +160,6 @@ class FITSFile(File):
 
         nhdu = max(self._DATA_HDU, self._HEADER_HDU) + 1
 
-
         if isinstance(self, FITSImage):
             if nhdu == 1:
                 fits.writeto(f, data, self.astropy_header, overwrite=True)
@@ -179,9 +178,11 @@ class FITSFile(File):
                 hdul.writeto(f, overwrite=True)
         else:  # it's a catalog
             with fitsio.FITS(f, 'rw', clobber=True) as out:
+                odata = []
+                oheader = []
                 for i in range(nhdu):
-                    data = None
-                    header = None
+                    data = out[i].read()
+                    header = out[i].read_header()
                     if i == self._DATA_HDU:
                         data = self.data
                     if i == self._HEADER_HDU:
@@ -193,8 +194,11 @@ class FITSFile(File):
                                 'comment': self.header_comments[key]
                             }
                             header.append(card)
-                    out.write(data, header=header)
+                    odata.append(data)
+                    oheader.append(header)
 
+                for data, header in zip(odata, oheader):
+                    out.write(data, header=header)
 
         self.unload_data()
 
