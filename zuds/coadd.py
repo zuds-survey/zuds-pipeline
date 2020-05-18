@@ -99,6 +99,12 @@ def _coadd_from_images(cls, images, outname, data_product=False,
         transact_mask = MaskImageBase.from_file(transact_mask_name)
         transact_image.mask_image = transact_mask
 
+        if not 'MJD-OBS' in transact_image.header:
+            mjd = get_time(transact_image, 'mjd')
+            transact_image.header['MJD-OBS'] = mjd
+            transact_image.header_comments['MJD-OBS'] = 'MJD of observation (DG)'
+
+
         # make the catalog if needed
         if make_catalog:
             transact_image.catalog = PipelineFITSCatalog.from_image(
@@ -194,7 +200,7 @@ def _coadd_from_images(cls, images, outname, data_product=False,
     if set_date:
         mjds = [get_time(i, 'mjd') for i in images]
         coadd.header['MJD-OBS'] = np.median(mjds)
-        coadd.header_comments['MJD-OBS'] = 'Median MJD of the coadd inputs //DG'
+        coadd.header_comments['MJD-OBS'] = 'Median MJD of the coadd inputs (DG)'
 
     if addbkg:
         coadd.data += BKG_VAL
@@ -210,14 +216,8 @@ def _coadd_from_images(cls, images, outname, data_product=False,
 
     shutil.rmtree(directory)
 
-    if solve_astrometry:
-        from .scamp import calibrate_astrometry
-        calibrate_astrometry([coadd], inplace=True, scamp_kws=scamp_kws,
-                             tmpdir=tmpdir)
-
     if calculate_seeing:
         estimate_seeing(coadd)
-
 
     coadd.save()
 

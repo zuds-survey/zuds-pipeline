@@ -3,6 +3,7 @@ from uuid import uuid4
 import shutil
 import subprocess
 from astropy.io import fits
+import warnings
 from .utils import initialize_directory
 from .env import check_dependencies
 
@@ -36,6 +37,10 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     for image in images:
         if not hasattr(image, 'catalog') or image.catalog is None:
             _ = PipelineFITSCatalog.from_image(image)
+        if not 'MJD-OBS' in image.header:
+            warnings.warn(f'Image "{image.basename}" header does not contain'
+                          f' MJD-OBS keyword, proper motions may not be used'
+                          f' in deriving astrometric solution...')
 
     catalogs = [i.catalog if isinstance(i, CalibratableImageBase)
                 else i.parent_image.catalog for i in images]
@@ -50,6 +55,8 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         # left in the original directory prematurely
         shutil.copy(catalog.local_path, directory)
         catpaths.append(str(directory / catalog.basename))
+
+
 
     # create the scamp command
     command = f'scamp -c {SCAMP_CONF} '
