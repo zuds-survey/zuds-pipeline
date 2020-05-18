@@ -66,7 +66,7 @@ DISTORT_DEGREES        3               # Polynom degree for each group
 
 #---------------------------- Photometric solution ----------------------------
 
-SOLVE_PHOTOM           Y               # Compute photometric solution (Y/N) ?
+SOLVE_PHOTOM           N               # Compute photometric solution (Y/N) ?
 MAGZERO_OUT            0.0             # Magnitude zero-point(s) in output
 MAGZERO_INTERR         0.01            # Internal mag.zero-point accuracy
 MAGZERO_REFERR         0.03            # Photom.field mag.zero-point accuracy

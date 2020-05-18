@@ -57,8 +57,8 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     subprocess.check_call(command.split())
     mskimgs = [i.mask_image for i in images]
 
-    for images in [images, mskimgs]:
-        for i, c in zip(images, catpaths):
+    for imgs in [images, mskimgs]:
+        for i, c in zip(imgs, catpaths):
             headpath = f'{c}'.replace('.cat', '.head')
             if inplace:
                 header = fits.Header.fromfile(headpath)
