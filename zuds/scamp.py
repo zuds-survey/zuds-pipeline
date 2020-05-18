@@ -76,7 +76,7 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
             else:
                 out.append(line)
         with open(headpath, 'w') as f:
-            f.write('\n'.join(out))
+            f.write(''.join(out))
 
     # write the result
     mskimgs = [i.mask_image for i in images]
