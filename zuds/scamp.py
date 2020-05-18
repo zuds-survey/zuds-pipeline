@@ -26,6 +26,7 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
 
     from .image import CalibratableImageBase
     from .file import UnmappedFileError
+    from .catalog import PipelineFITSCatalog
 
     # create a directory for the transaction
     directory = Path(tmpdir) / uuid4().hex
@@ -35,6 +36,10 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
                 else i.parent_image.catalog for i in images]
 
     # make sure all catalogs are mapped
+    for image in images:
+        if not hasattr(image, 'catalog') or image.catalog is None:
+            _ = PipelineFITSCatalog.from_image(image)
+
     catpaths = []
     for catalog in catalogs:
         if not catalog.ismapped:
