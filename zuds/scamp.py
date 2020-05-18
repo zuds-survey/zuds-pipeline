@@ -32,13 +32,13 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     directory = Path(tmpdir) / uuid4().hex
     initialize_directory(directory)
 
-    catalogs = [i.catalog if isinstance(i, CalibratableImageBase)
-                else i.parent_image.catalog for i in images]
-
     # make sure all catalogs are mapped
     for image in images:
         if not hasattr(image, 'catalog') or image.catalog is None:
             _ = PipelineFITSCatalog.from_image(image)
+
+    catalogs = [i.catalog if isinstance(i, CalibratableImageBase)
+                else i.parent_image.catalog for i in images]
 
     catpaths = []
     for catalog in catalogs:
