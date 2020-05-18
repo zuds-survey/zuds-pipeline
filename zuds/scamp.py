@@ -69,6 +69,8 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
 
                 i.save()
             else:
-                shutil.copy(headpath, Path(i.local_path).parent)
+                shutil.copy(headpath,
+                            Path(i.local_path).parent /
+                            i.basename.replace('.fits', '.head'))
 
     shutil.rmtree(directory)
