@@ -177,7 +177,7 @@ class FITSFile(File):
 
                 hdul.writeto(f, overwrite=True)
         else:  # it's a catalog
-            with fitsio.FITS(f, 'rw', clobber=True) as out:
+            with fitsio.FITS(f, 'r') as out:
                 odata = []
                 oheader = []
                 for i in range(nhdu):
@@ -197,6 +197,7 @@ class FITSFile(File):
                     odata.append(data)
                     oheader.append(header)
 
+            with fitsio.FITS(f, 'rw', clobber=True) as out:
                 for data, header in zip(odata, oheader):
                     out.write(data, header=header)
 
