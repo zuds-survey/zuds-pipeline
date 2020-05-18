@@ -61,8 +61,10 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         headpath = f'{c}'.replace('.cat', '.head')
         header = fits.Header.fromfile(headpath, sep='\n')
 
-        for key in ['FLXSCALE', 'MAGZEROP', 'PHOTIRMS', 'PHOTINST', 'PHOTLINK']:
+        for key in ['FLXSCALE', 'MAGZEROP', 'PHOTIRMS', 'PHOTINST', 'PHOTLINK',
+                    'COMMENT']:
             del header[key]
+
 
         header.tofile(headpath, sep='\n')
 
