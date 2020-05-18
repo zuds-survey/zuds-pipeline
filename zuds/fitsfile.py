@@ -198,8 +198,10 @@ class FITSFile(File):
                     oheader.append(header)
 
             with fitsio.FITS(f, 'rw', clobber=True) as out:
-                for data, header in zip(odata, oheader):
-                    out.write(data, header=header)
+                for data, header, extname in zip(odata, oheader, [None,
+                                                                  'LDAC_IMHEAD',
+                                                                  'LDAC_OBJECTS']):
+                    out.write(data, header=header, extname=extname)
 
         self.unload_data()
 
