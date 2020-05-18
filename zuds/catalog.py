@@ -111,7 +111,11 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         cat = image.catalog
 
         for prop in GROUP_PROPERTIES:
-            setattr(cat, prop, getattr(image, prop))
+            try:
+                setattr(cat, prop, getattr(image, prop))
+            except AttributeError:
+                # this catalog is for a CalibratableImageBase
+                continue
 
         df = pd.DataFrame(cat.data)
         rec = df.to_records(index=False)
