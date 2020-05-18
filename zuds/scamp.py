@@ -44,7 +44,7 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
         # copy the catalogs to the directory so that .head files are not
         # left in the original directory prematurely
         shutil.copy(catalog.local_path, directory)
-        catpaths.append(directory / catalog.basename)
+        catpaths.append(str(directory / catalog.basename))
 
     # create the scamp command
     command = f'scamp -c {SCAMP_CONF} '
