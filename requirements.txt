@@ -36,7 +36,6 @@ Pillow>=6
 # baselayer
 supervisor>=4
 psycopg2-binary
-pyyaml
 tornado>=6.0.3
 pyzmq>=0.17
 pyjwt
