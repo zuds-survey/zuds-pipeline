@@ -153,84 +153,6 @@ class NumpyArray(sa.types.TypeDecorator):
         return np.array(value)
 
 
-class Source(Base):
-    id = sa.Column(sa.String, primary_key=True)
-    # TODO should this column type be decimal? fixed-precison numeric
-    ra = sa.Column(sa.Float)
-    dec = sa.Column(sa.Float)
-
-    ra_dis = sa.Column(sa.Float)
-    dec_dis = sa.Column(sa.Float)
-
-    ra_err = sa.Column(sa.Float, nullable=True)
-    dec_err = sa.Column(sa.Float, nullable=True)
-
-    offset = sa.Column(sa.Float, default=0.0)
-    redshift = sa.Column(sa.Float, nullable=True)
-
-    altdata = sa.Column(psql.JSONB, nullable=True)
-
-    last_detected = sa.Column(sa.DateTime, nullable=True)
-    dist_nearest_source = sa.Column(sa.Float, nullable=True)
-    mag_nearest_source = sa.Column(sa.Float, nullable=True)
-    e_mag_nearest_source = sa.Column(sa.Float, nullable=True)
-
-    transient = sa.Column(sa.Boolean, default=False)
-    varstar = sa.Column(sa.Boolean, default=False)
-    is_roid = sa.Column(sa.Boolean, default=False)
-
-    score = sa.Column(sa.Float, nullable=True)
-
-    ## pan-starrs
-    sgmag1 = sa.Column(sa.Float, nullable=True)
-    srmag1 = sa.Column(sa.Float, nullable=True)
-    simag1 = sa.Column(sa.Float, nullable=True)
-    objectidps1 = sa.Column(sa.BigInteger, nullable=True)
-    sgscore1 = sa.Column(sa.Float, nullable=True)
-    distpsnr1 = sa.Column(sa.Float, nullable=True)
-
-    origin = sa.Column(sa.String, nullable=True)
-    simbad_class = sa.Column(sa.Unicode, nullable=True, )
-    simbad_info = sa.Column(psql.JSONB, nullable=True)
-    gaia_info = sa.Column(psql.JSONB, nullable=True)
-    tns_info = sa.Column(psql.JSONB, nullable=True)
-    tns_name = sa.Column(sa.Unicode, nullable=True)
-
-    photometry = relationship('Photometry', back_populates='source',
-                              cascade='save-update, merge, refresh-expire, expunge',
-                              single_parent=True,
-                              passive_deletes=True,
-                              order_by="Photometry.observed_at")
-
-    detect_photometry_count = sa.Column(sa.Integer, nullable=True)
-    thumbnails = relationship('Thumbnail', back_populates='source',
-                              secondary='photometry',
-                              cascade='save-update, merge, refresh-expire, expunge')
-
-    def add_linked_thumbnails(self):
-        sdss_thumb = Thumbnail(photometry=self.photometry[0],
-                               public_url=self.sdss_url,
-                               type='sdss')
-        dr8_thumb = Thumbnail(photometry=self.photometry[0],
-                              public_url=self.desi_dr8_url,
-                              type='dr8')
-        DBSession().add_all([sdss_thumb, dr8_thumb])
-        DBSession().commit()
-
-    @property
-    def sdss_url(self):
-        """Construct URL for public Sloan Digital Sky Survey (SDSS) cutout."""
-        return (f"http://skyservice.pha.jhu.edu/DR9/ImgCutout/getjpeg.aspx"
-                f"?ra={self.ra}&dec={self.dec}&scale=0.3&width=200&height=200"
-                f"&opt=G&query=&Grid=on")
-
-    @property
-    def desi_dr8_url(self):
-        """Construct URL for public DESI DR8 cutout."""
-        return (f"http://legacysurvey.org/viewer/jpeg-cutout?ra={self.ra}"
-                f"&dec={self.dec}&size=200&layer=dr8&pixscale=0.262&bands=grz")
-
-
 class Telescope(Base):
     name = sa.Column(sa.String, nullable=False)
     nickname = sa.Column(sa.String, nullable=False)
@@ -253,21 +175,6 @@ class Instrument(Base):
                              nullable=False, index=True)
     telescope = relationship('Telescope', back_populates='instruments')
     photometry = relationship('Photometry', back_populates='instrument')
-
-
-class Thumbnail(Base):
-    # TODO delete file after deleting row
-    type = sa.Column(sa.Enum('new', 'ref', 'sub', 'sdss', 'dr8', "new_gz",
-                             'ref_gz', 'sub_gz',
-                             name='thumbnail_types', validate_strings=True))
-    file_uri = sa.Column(sa.String(), nullable=True, index=False, unique=False)
-    public_url = sa.Column(sa.String(), nullable=True, index=False, unique=False)
-    origin = sa.Column(sa.String, nullable=True)
-    photometry_id = sa.Column(sa.ForeignKey('photometry.id', ondelete='CASCADE'),
-                              nullable=False, index=True)
-    photometry = relationship('Photometry', back_populates='thumbnails')
-    source = relationship('Source', back_populates='thumbnails', uselist=False,
-                          secondary='photometry')
 
 
 def without_database(retval):
