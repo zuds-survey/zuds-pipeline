@@ -14,8 +14,7 @@ from sqlalchemy.orm import relationship
 
 from pathlib import Path
 
-from skyportal.models import Thumbnail
-from .core import Base
+from .core import Base, Thumbnail
 from .constants import CUTOUT_SIZE
 from .archive import URL_PREFIX, STAMP_PREFIX, _mkdir_recursive
 from .utils import fid_map
