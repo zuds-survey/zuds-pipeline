@@ -4,9 +4,7 @@ from sqlalchemy import func, Index
 from sqlalchemy.dialects import postgresql as psql
 from astropy.table import Table
 
-from skyportal.models import Source
-
-from .core import DBSession, without_database
+from .core import DBSession, without_database, Source
 from .utils import fid_map
 from .image import CalibratableImage
 from .photometry import ForcedPhotometry
