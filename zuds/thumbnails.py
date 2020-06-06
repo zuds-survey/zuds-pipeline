@@ -33,10 +33,6 @@ class Thumbnail(Base):
     origin = sa.Column(sa.String, nullable=True)
     bytes = deferred(sa.Column(psql.BYTEA))
 
-    photometry_id = sa.Column(sa.ForeignKey('photometry.id', ondelete='CASCADE'),
-                              nullable=False, index=True)
-    photometry = relationship('Photometry', back_populates='thumbnails')
-
     image_id = sa.Column(sa.Integer, sa.ForeignKey('calibratableimages.id',
                                                    ondelete='CASCADE'),
                          index=True, nullable=True)

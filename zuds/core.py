@@ -153,30 +153,6 @@ class NumpyArray(sa.types.TypeDecorator):
         return np.array(value)
 
 
-class Telescope(Base):
-    name = sa.Column(sa.String, nullable=False)
-    nickname = sa.Column(sa.String, nullable=False)
-    lat = sa.Column(sa.Float, nullable=False)
-    lon = sa.Column(sa.Float, nullable=False)
-    elevation = sa.Column(sa.Float, nullable=False)
-    diameter = sa.Column(sa.Float, nullable=False)
-    instruments = relationship('Instrument', back_populates='telescope',
-                               cascade='save-update, merge, refresh-expire, expunge',
-                               passive_deletes=True)
-
-
-class Instrument(Base):
-    name = sa.Column(sa.String, nullable=False)
-    type = sa.Column(sa.String, nullable=False)
-    band = sa.Column(sa.String, nullable=False)
-
-    telescope_id = sa.Column(sa.ForeignKey('telescopes.id',
-                                           ondelete='CASCADE'),
-                             nullable=False, index=True)
-    telescope = relationship('Telescope', back_populates='instruments')
-    photometry = relationship('Photometry', back_populates='instrument')
-
-
 def without_database(retval):
     ## Decorator that tells the wrapped function to return retval if
     ## there is no active database connection
