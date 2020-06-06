@@ -2,10 +2,6 @@ import io
 import os
 import gzip
 import numpy as np
-from astropy.coordinates import SkyCoord
-from astropy.nddata import Cutout2D
-from astropy.visualization.interval import ZScaleInterval
-from astropy.io import fits
 
 import sqlalchemy as sa
 from sqlalchemy.orm import deferred
@@ -60,6 +56,7 @@ class Thumbnail(Base):
 
         from .subtraction import Subtraction
         from .coadd import ReferenceImage
+        from astropy.io import fits
 
         if isinstance(image, Base):
             linkimage = image
@@ -98,6 +95,7 @@ class Thumbnail(Base):
 
     def persist(self):
         """Persist a thumbnail to the disk. Currently only works on cori."""
+        from astropy.visualization.interval import ZScaleInterval
 
         if os.getenv('NERSC_HOST') != 'cori':
             raise RuntimeError('Must be on cori to persist stamps.')
@@ -124,6 +122,7 @@ class Thumbnail(Base):
     def array(self):
         """Convert the bytes property of a Thumbnail to a numpy array
         representing the equivalent pixel values"""
+        from astropy.io import fits
         if self.bytes is None:
             raise ValueError('Cannot coerce array from empty bytes attribute')
         fitsbuf = io.BytesIO(gzip.decompress(self.bytes))
@@ -133,6 +132,9 @@ class Thumbnail(Base):
 
 def make_stamp(name, ra, dec, vmin, vmax, data, wcs, save=True,
                size=CUTOUT_SIZE):
+    from astropy.coordinates import SkyCoord
+    from astropy.nddata import Cutout2D
+
     coord = SkyCoord(ra, dec, frame='icrs', unit='deg')
     cutout = Cutout2D(data, coord, size, wcs=wcs, fill_value=0.)
 

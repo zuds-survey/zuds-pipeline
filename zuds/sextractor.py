@@ -5,7 +5,6 @@ import shutil
 import uuid
 
 import os
-from astropy.io import fits
 
 from .core import ZTFFile
 from .constants import BKG_BOX_SIZE, MASK_BORDER
@@ -32,6 +31,7 @@ def prepare_sextractor(image, directory, checkimage_type=None,
                        sextractor_kws=None):
     """Set up the pipeline to do a run of source extractor."""
     from .mask import BAD_SUM
+    from astropy.io import fits
 
     if sextractor_kws is None:
         sextractor_kws = {}

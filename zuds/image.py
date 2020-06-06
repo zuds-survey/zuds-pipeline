@@ -3,10 +3,6 @@ import os
 import subprocess
 from pathlib import Path
 
-
-from astropy.visualization.interval import ZScaleInterval
-from matplotlib import colors
-
 import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.hybrid import hybrid_property
@@ -32,7 +28,7 @@ __all__ = ['FITSImage', 'CalibratableImageBase', 'CalibratableImage',
 class FITSImage(HasWCS):
     """A `FITSFile` with a data member representing an image. Same as
     FITSFile, but provides the method show() to render the image in
-    matplotlib. Also defines some properties that help to optimally render
+    matplotlib. Also defines some properties that help to better render
     the image (cmap, cmap_limits)"""
 
     def show(self, axis=None, align_to=None, figsize=(5, 5), limits=None):
@@ -68,6 +64,7 @@ class FITSImage(HasWCS):
             return 'int'
 
     def cmap_limits(self):
+        from astropy.visualization.interval import ZScaleInterval
         if self.datatype == 'float':
             interval = ZScaleInterval()
             return interval.get_limits(self.data)
@@ -82,6 +79,7 @@ class FITSImage(HasWCS):
             return discrete_cmap(ncolors)
 
     def cmap_norm(self):
+        from matplotlib import colors
         if self.datatype == 'float':
             return None
         else:
@@ -98,6 +96,7 @@ class CalibratableImageBase(FITSImage):
 
 
     def cmap_limits(self):
+        from astropy.visualization.interval import ZScaleInterval
         interval = ZScaleInterval()
         return interval.get_limits(self.data)
 

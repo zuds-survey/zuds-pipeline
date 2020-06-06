@@ -1,7 +1,4 @@
 import numpy as np
-from astropy.coordinates import SkyCoord
-from astropy import units as u
-import penquins
 
 from .secrets import get_secret
 from .catalog import PipelineFITSCatalog
@@ -12,6 +9,9 @@ __all__ = ['estimate_seeing']
 
 def estimate_seeing(image):
     """Estimate the seeing on an image by comparing its catalog to GAIA stars."""
+    from astropy.coordinates import SkyCoord
+    from astropy import units as u
+    import penquins
 
     catalog = image.catalog
 

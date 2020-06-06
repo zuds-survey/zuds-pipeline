@@ -1,9 +1,4 @@
-import photutils
 import numpy as np
-from astropy.coordinates import SkyCoord
-from astropy.io import fits
-from astropy.table import vstack
-from astropy.wcs import WCS
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
@@ -66,6 +61,12 @@ class ForcedPhotometry(Base):
 def raw_aperture_photometry(sci_path, rms_path, mask_path, ra, dec,
                             apply_calibration=False):
 
+    import photutils
+    from astropy.coordinates import SkyCoord
+    from astropy.io import fits
+    from astropy.table import vstack
+    from astropy.wcs import WCS
+
     ra = np.atleast_1d(ra)
     dec = np.atleast_1d(dec)
     coord = SkyCoord(ra, dec, unit='deg')
@@ -115,6 +116,12 @@ def raw_aperture_photometry(sci_path, rms_path, mask_path, ra, dec,
 def aperture_photometry(calibratable, ra, dec, apply_calibration=False,
                         assume_background_subtracted=False, use_cutout=False,
                         direct_load=None):
+
+    import photutils
+    from astropy.coordinates import SkyCoord
+    from astropy.io import fits
+    from astropy.table import vstack
+    from astropy.wcs import WCS
 
     ra = np.atleast_1d(ra)
     dec = np.atleast_1d(dec)

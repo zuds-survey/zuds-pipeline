@@ -61,7 +61,8 @@ class Alert(Base):
 
         from .subtraction import SingleEpochSubtraction, MultiEpochSubtraction
         from .image import ScienceImage
-        from .coadd import CoaddImage, ScienceCoadd
+        from .coadd import ScienceCoadd
+        from .joins import CoaddImage
         from .detections import Detection
 
         obj = cls()

@@ -4,7 +4,6 @@ import uuid
 import subprocess
 import numpy as np
 from pathlib import Path
-from astropy.io import fits
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
@@ -60,6 +59,7 @@ class Subtraction(HasWCS):
                     **kwargs):
 
         from .hotpants import prepare_hotpants
+        from astropy.io import fits
 
         subtract_new_back = kwargs.get('subtract_back', True)
         nreg_side = kwargs.get('nreg_side', 3)

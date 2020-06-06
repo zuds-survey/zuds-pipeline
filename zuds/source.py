@@ -2,7 +2,6 @@ import sqlalchemy as sa
 from sqlalchemy.orm import relationship
 from sqlalchemy import func, Index
 from sqlalchemy.dialects import postgresql as psql
-from astropy.table import Table
 
 from .core import DBSession, without_database, Base
 from .utils import fid_map
@@ -35,20 +34,12 @@ class Source(Base, SpatiallyIndexed):
 
     thumbnails = relationship('Thumbnail', cascade='all')
     detections = relationship('Detection', cascade='all')
-    photometry = relationship('Photometry', back_populates='source',
-                              cascade='save-update, merge, refresh-expire, expunge',
-                              single_parent=True,
-                              passive_deletes=True,
-                              order_by="Photometry.observed_at")
-
     forced_photometry = relationship('ForcedPhotometry', cascade='all')
 
     def add_linked_thumbnails(self):
-        sdss_thumb = Thumbnail(photometry=self.photometry[0],
-                               public_url=self.sdss_url,
+        sdss_thumb = Thumbnail(public_url=self.sdss_url,
                                type='sdss')
-        dr8_thumb = Thumbnail(photometry=self.photometry[0],
-                              public_url=self.desi_dr8_url,
+        dr8_thumb = Thumbnail(public_url=self.desi_dr8_url,
                               type='dr8')
         DBSession().add_all([sdss_thumb, dr8_thumb])
         DBSession().commit()
@@ -93,6 +84,7 @@ class Source(Base, SpatiallyIndexed):
     @property
     @without_database([])
     def light_curve(self):
+        from astropy.table import Table
         lc_raw = []
 
         phot = DBSession().query(
