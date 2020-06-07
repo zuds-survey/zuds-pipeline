@@ -39,7 +39,7 @@ class BaseMixin(object):
     id = sa.Column(sa.Integer, primary_key=True)
     created_at = sa.Column(sa.DateTime, nullable=False, server_default=sa.func.now())
     modified = sa.Column(sa.DateTime, nullable=False, server_default=sa.func.now(),
-                         server_onupdate=sa.func.now())
+                         onupdate=sa.func.now())
 
     @declared_attr
     def __tablename__(cls):

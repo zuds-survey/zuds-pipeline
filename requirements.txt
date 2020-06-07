@@ -1,9 +1,6 @@
 # zuds pipeline
 
 astropy>=4.0.1.post1
-avro-python3>=1.8.2
-confluent-kafka>=1.4.0
-fastavro>=0.21.7
 fitsio>=1.0.5
 matplotlib>=3.1.1
 numpy>=1.16.4
@@ -15,40 +12,8 @@ PyYAML>=5.1.1
 requests>=2.22.0
 scipy>=1.3.0
 SQLAlchemy>=1.3.7
-tensorflow>=2.0.0
 ztfquery>=1.6.2
-
-# skyportal
-dask>=0.15.0
-joblib>=0.11
-bokeh==0.12.9
-pytest-randomly>=2.1.1
 factory-boy==2.11.1
-tqdm>=4.23.2
-astroquery>=0.4
-sqlalchemy-utils
-apispec>=3.2.0
-marshmallow>=3.4.0
-marshmallow-sqlalchemy>=0.21.0
-marshmallow-enum>=1.5.1
-Pillow>=6
-
-# baselayer
-supervisor>=4
-psycopg2-binary
-tornado>=6.0.3
-pyzmq>=0.17
-pyjwt
-distributed>=1.21.1
-simplejson
-selenium>=3.12.0
-pytest==4.3.1
-social-auth-core>=3.0.0
-social-auth-app-tornado>=1.0.0
-social-auth-storage-sqlalchemy>=1.1.0
-selenium-requests
-arrow==0.15.4
-jinja2
-python-dateutil
-
-
+sncosmo>=2.1.0
+pytest-randomly>=2.1.1
+pytest>=4.3.1
