@@ -17,3 +17,4 @@ factory-boy==2.11.1
 sncosmo>=2.1.0
 pytest-randomly>=2.1.1
 pytest>=4.3.1
+astroquery>=0.3

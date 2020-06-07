@@ -1,7 +1,7 @@
 import factory
-import json
+import uuid
 from pathlib import Path
-from zuds import DBSession, ScienceImage, PipelineFITSCatalog
+from zuds import DBSession, ScienceImage
 
 from tempfile import mkdtemp
 
@@ -10,7 +10,7 @@ datadir = Path(__file__).parent / 'data'
 TMP_DIR = mkdtemp()
 
 class BaseMeta:
-    sqlalchemy_session = DBSession()
+    sqlalchemy_session = DBSession
     sqlalchemy_session_persistence = 'commit'
 
 
@@ -18,7 +18,7 @@ class TriangulumScienceImageFactory(factory.alchemy.SQLAlchemyModelFactory):
     class Meta(BaseMeta):
         model = ScienceImage
 
-    basename = "ztf_20171229173808_000651_zg_c03_o_q1_sciimg.fits"
+    basename = f"ztf_20171229173808_000651_zg_c03_o_q1_sciimg-{uuid.uuid4()}.fits"
     ra1 = 23.852027389390017
     dec1 = 31.35253978382308
     ra2 = 23.85248973060998
@@ -573,7 +573,7 @@ class ScienceImageFactory(factory.alchemy.SQLAlchemyModelFactory):
     class Meta(BaseMeta):
         model = ScienceImage
 
-    basename = "ztf_20200428501227_000763_zi_c14_o_q4_sciimg.fits"
+    basename = f"ztf_20200428501227_000763_zi_c14_o_q4_sciimg-{uuid.uuid4()}.fits"
     type = "sci"
     field = 763
     qid = 4

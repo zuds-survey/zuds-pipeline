@@ -133,7 +133,7 @@ def recursive_glob(basedir, pattern):
 PACKAGENAME = 'zuds'
 DESCRIPTION = 'ZTF/ZUDS image processing pipeline'
 LONG_DESCRIPTION = ''
-AUTHOR = 'The ZUDS Developers'
+AUTHOR = 'Danny Goldstein & The ZUDS Developers'
 AUTHOR_EMAIL = 'danny@caltech.edu'
 LICENSE = 'BSD'
 URL = 'https://github.com/zuds-survey/zuds-pipeline'
@@ -169,7 +169,8 @@ setup(name=PACKAGENAME,
                         'ztfquery>=1.6.2',
                         "simplejson",
                         "pytest==4.3.1",
-                        'sncosmo>=2.1.0'],
+                        'sncosmo>=2.1.0',
+                        'astroquery>=0.3'],
       author=AUTHOR,
       author_email=AUTHOR_EMAIL,
       license=LICENSE,
