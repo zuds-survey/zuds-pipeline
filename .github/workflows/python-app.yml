@@ -38,8 +38,10 @@ jobs:
         astromatic-source-extractor cfitsio
     - name: Install hotpants
       run: |
+        apt-get update
+        apt-get install libcfitsio3-dev
         cd hotpants
-        CFITSIOINCDIR="${CONDA}/include" LIBS="-L ${CONDA}/lib -lm -lcfitsio -lcurl" make -e
+        LIBS="-lm -lcfitsio -lcurl" make -e
         cp hotpants ${CONDA}/bin
         cd -
     - name: Install dependencies
