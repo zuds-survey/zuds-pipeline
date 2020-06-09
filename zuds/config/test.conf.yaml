@@ -9,8 +9,8 @@
 # psql-free, memory-only).
 db_host: localhost
 db_port: 5432
-db_username: "admin"
-db_name: "zuds_test"
+db_username: postgres
+db_name: zuds_test
 db_password:
 
 # IPAC credentials (if any). These are used for retrieving image
