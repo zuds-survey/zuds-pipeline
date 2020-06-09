@@ -18,6 +18,7 @@ from astropy import units as u
 from astropy.coordinates import SkyCoord, search_around_sky
 from sklearn.cluster import DBSCAN
 
+from zuds.secrets import get_secret
 from scipy.sparse import csr_matrix
 
 ASSOC_RB_MIN = 0.4

@@ -22,11 +22,13 @@ def logon():
                 verbose=False, username=username, password=password)
         except Exception as e:
             traceback.print_exception(*sys.exc_info())
-            print('continuing..')
-            continue
+            if i > 2:
+                raise
+            else:
+                print('continuing..')
+                continue
         else:
             return s
-    raise e
 
 
 def private_logon():
