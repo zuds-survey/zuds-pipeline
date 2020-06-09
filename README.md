@@ -1,5 +1,7 @@
 # ZUDS Image Processing Pipeline [WIP]
 
+![Build](https://github.com/zuds-survey/zuds-pipeline/workflows/Python%20application/badge.svg)
+
 An object-oriented pipeline for ZTF image processing. Current capabilities include:
 
   * Image coaddition
