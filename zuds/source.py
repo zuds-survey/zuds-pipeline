@@ -111,6 +111,7 @@ class Source(Base, SpatiallyIndexed):
 
         return Table(lc_raw)
 
+    @property
     def unphotometered_images(self):
         subq = DBSession().query(ForcedPhotometry.id,
                                  ForcedPhotometry.image_id).filter(
@@ -130,7 +131,7 @@ class Source(Base, SpatiallyIndexed):
             subq.c.id == None
         )
 
-        return q
+        return q.all()
 
     def force_photometry(self, assume_background_subtracted=True):
         out = []

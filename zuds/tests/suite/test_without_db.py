@@ -16,7 +16,4 @@ def test_source_without_database(source):
     assert source.images() == []
     assert source.best_detection is None
     assert len(source.light_curve) == 0
-    assert source.unphotometered_images.all() == []
-
-
-
+    assert source.unphotometered_images == []
