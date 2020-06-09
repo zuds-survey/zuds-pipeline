@@ -40,7 +40,7 @@ jobs:
       run: |
         cd hotpants
         CFITSIOINCDIR="${CONDA}/include" LIBS="-L ${CONDA}/lib -lm -lcfitsio -lcurl" make -e
-        export PATH=${PATH}:${PWD}
+        cp hotpants ${CONDA}/bin
         cd -
     - name: Install dependencies
       run: |
