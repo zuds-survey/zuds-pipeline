@@ -89,7 +89,6 @@ def check_postgres_extensions(deps, username, password, host, port, database):
                 if not success:
                     raise ValueError(out.decode("utf-8").strip())
                 try:
-                    print(out.decode('utf-8').strip())
                     version = get_version(out.decode('utf-8').strip())
                     print(f'[{version.rjust(8)}]'.rjust(40 - len(query)),
                           end='')
