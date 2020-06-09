@@ -4,12 +4,11 @@ import uuid
 import subprocess
 import numpy as np
 from pathlib import Path
-from astropy.io import fits
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
-from .core import DBSession, without_database
+from .core import DBSession
 from .fitsfile import HasWCS
 from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
@@ -60,6 +59,7 @@ class Subtraction(HasWCS):
                     **kwargs):
 
         from .hotpants import prepare_hotpants
+        from astropy.io import fits
 
         subtract_new_back = kwargs.get('subtract_back', True)
         nreg_side = kwargs.get('nreg_side', 3)
@@ -240,7 +240,6 @@ class SingleEpochSubtraction(Subtraction, CalibratedImage):
                                 foreign_keys=[target_image_id])
 
 
-@without_database([])
 def overlapping_subtractions(sci, ref):
 
     from .joins import CoaddImage

@@ -1,4 +1,3 @@
-import requests
 import time
 import datetime
 import stat
@@ -17,7 +16,7 @@ ipac_cookie = None
 
 
 def ipac_authenticate():
-
+    import requests
     target = os.path.join(ipac_root, 'account', 'signon', 'login.do')
 
     r = requests.post(target, data={'josso_username':ipac_username,
@@ -34,7 +33,7 @@ def ipac_authenticate():
 
 
 def download_file(target, destination, cookie):
-
+    import requests
     path = Path(destination)
     if not path.parent.exists():
         path.parent.mkdir(parents=True)
@@ -71,6 +70,7 @@ def download_file(target, destination, cookie):
 
 
 def safe_download(target, destination, cookie, raise_exc=False):
+    import requests
     try:
         download_file(target, destination, cookie)
     except requests.RequestException as e:

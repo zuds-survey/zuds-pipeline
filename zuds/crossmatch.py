@@ -2,11 +2,8 @@ import sys
 import numpy as np
 import traceback
 import math
-from astropy.io import fits
 import psycopg2
 import os
-from astropy.coordinates import SkyCoord
-from penquins import Kowalski
 
 from .secrets import get_secret
 
@@ -15,6 +12,7 @@ __all__ = ['xmatch']
 
 def logon():
     """ Log onto Kowalski """
+    from penquins import Kowalski
     username = get_secret('kowalski_username')
     password = get_secret('kowalski_password')
     for i in range(3):
@@ -24,11 +22,13 @@ def logon():
                 verbose=False, username=username, password=password)
         except Exception as e:
             traceback.print_exception(*sys.exc_info())
-            print('continuing..')
-            continue
+            if i > 2:
+                raise
+            else:
+                print('continuing..')
+                continue
         else:
             return s
-    raise e
 
 
 def private_logon():
@@ -47,7 +47,7 @@ def abmag(flux):
     # don't take the log of 0!
     if flux <= 0:
         return 0
-    return -2.5*np.log10(flux)+22.5
+    return -2.5 * np.log10(flux) + 22.5
 
 
 def getsgtable(dec):
@@ -102,6 +102,9 @@ def ps1(s, ra, dec):
     out: dictionary containing info on closest three matches within 30 arcsec
     """
     # Coordinates of source
+    from astropy.coordinates import SkyCoord
+    from astropy.io import fits
+
     c1 = SkyCoord(ra, dec, unit='deg')
 
     # Query
@@ -252,6 +255,7 @@ def ztfalerts(s, ra, dec):
     ztfname (np array): list of ZTF names for any sources within 1.5 arcseconds
     """
     # Coordinates of source
+    from astropy.coordinates import SkyCoord
     c1 = SkyCoord(ra, dec, unit='deg')
 
     # Query
@@ -298,6 +302,7 @@ def milliquas(s, ra, dec):
     mqname (np array): list of IDs for any milliquas sources within 1.5 arcsec
     """
     # Coordinates of source
+    from astropy.coordinates import SkyCoord
     c1 = SkyCoord(ra, dec, unit='deg')
 
     # Query
@@ -344,6 +349,8 @@ def tns(s, ra, dec):
     mqname (np array): list of IDs for any TNS sources within 1.5 arcsec
     """
     # Coordinates of source
+
+    from astropy.coordinates import SkyCoord
     c1 = SkyCoord(ra, dec, unit='deg')
 
     # Query

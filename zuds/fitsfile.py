@@ -3,16 +3,12 @@ from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy import func
 from pathlib import Path
 
-from astropy.wcs.utils import proj_plane_pixel_scales, WCS
-from astropy import units as u
-
-from astropy.io import fits
 import fitsio  # for catalogs, faster
 
 import numpy as np
 
 from .file import File, UnmappedFileError
-from .core import Base, DBSession, without_database
+from .core import Base, DBSession
 from .spatial import HasPoly, SpatiallyIndexed
 
 
@@ -74,6 +70,7 @@ class FITSFile(File):
         """Load a header from disk into memory. Sets the values of
         database-backed variables that store metadata. These can later be
         flushed to the database using SQLalchemy."""
+        from astropy.io import fits
         with fits.open(self.local_path) as hdul:
             hd = dict(hdul[self._HEADER_HDU].header)
             hdc = {card.keyword: card.comment
@@ -88,6 +85,7 @@ class FITSFile(File):
 
     def load_data(self):
         """Load data from disk into memory"""
+        from astropy.io import fits
         with fits.open(self.local_path, memmap=False) as hdul:  # throws
             # UnmappedFileError
             data = hdul[self._DATA_HDU].data
@@ -130,6 +128,7 @@ class FITSFile(File):
         """astropy.io.fits.Header representation of the database-mapped
         metadata columns header and header_comments. This attribute may not
         reflect the current header on disk"""
+        from astropy.io import fits
         if self.header is None or self.header_comments is None:
             # haven't seen the file on disk yet
             raise AttributeError(f'This image does not have a header '
@@ -146,6 +145,7 @@ class FITSFile(File):
 
     def save(self):
         from .image import FITSImage
+        from astropy.io import fits
 
         try:
             f = self.local_path
@@ -227,6 +227,7 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
     def wcs(self):
         """Astropy representation of the fits file's WCS solution.
         Lives in memory only."""
+        from astropy.wcs.utils import WCS
         return WCS(self.astropy_header)
 
     @classmethod
@@ -257,7 +258,6 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
         return self
 
     @property
-    @without_database([])
     def sources_contained(self):
         """Query the database and return all `Sources` contained by the
         polygon of this object"""
@@ -270,6 +270,8 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
     @property
     def pixel_scale(self):
         """The pixel scales of the detector in the X and Y image dimensions. """
+        from astropy.wcs.utils import proj_plane_pixel_scales
+        from astropy import units as u
         units = self.wcs.world_axis_units
         u1 = getattr(u, units[0])
         u2 = getattr(u, units[1])

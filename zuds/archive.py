@@ -2,8 +2,6 @@ import os
 import shutil
 from pathlib import Path
 
-import requests
-
 from .core import Base, ZTFFile, DBSession
 from .secrets import get_secret
 from .utils import fid_map
@@ -69,6 +67,7 @@ class HTTPArchiveCopy(ZTFFileCopy):
     archive_path = sa.Column(sa.Text)
 
     def get(self):
+        import requests
         product = self.product
         with open(product.basename, 'wb') as f:
             r = requests.get(self.url)
@@ -177,6 +176,7 @@ def _mkdir_recursive(path):
 
 
 def archive_copy_over_http(copy):
+    import requests
     product = copy.product
     product.save()
     # authenticate to nersc system

@@ -2,9 +2,6 @@
 import os
 import pickle
 import json
-import confluent_kafka
-import fastavro
-import avro.schema
 from io import BytesIO
 
 
@@ -15,6 +12,7 @@ def combine_schemas(schema_files):
     """Combine multiple nested schemas into a single schema.
     Taken from Eric's lsst-dm Github page
     """
+    import avro.schema
     known_schemas = avro.schema.Names()
 
     for s in schema_files:
@@ -32,6 +30,7 @@ def load_single_avsc(file_path, names):
     Taken from Eric's lsst-dm Github page
     """
 
+    import avro.schema
     curdir = os.path.dirname(__file__)
     file_path = os.path.join(curdir, '..', 'alert_schemas', file_path)
 
@@ -53,6 +52,10 @@ def send(topicname, records, schema):
     #schema_definition = fastavro.schema.load_schema(schemafile)
 
     # Write into an in-memory "file"
+
+    import fastavro
+    import confluent_kafka
+
     out = BytesIO()
     fastavro.writer(out, schema, records)
     out.seek(0) # go back to the beginning

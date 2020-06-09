@@ -1,17 +1,7 @@
-
 # check dependencies
 from .env import check_dependencies
 from .constants import SYSTEM_DEPENDENCIES
 check_dependencies(SYSTEM_DEPENDENCIES)
-
-
-# disable expected warnings
-import warnings
-from sqlalchemy.exc import SAWarning
-warnings.filterwarnings(action='ignore', category=SAWarning,
-                        message='.*Thumbnail.source')
-warnings.filterwarnings(action='ignore', category=SAWarning,
-                        message='.*Source.thumbnails')
 
 from .alert import *
 from .archive import *
@@ -29,6 +19,7 @@ from .fitsfile import *
 from .hotpants import *
 from .image import *
 from .mask import *
+from .model_util import *
 from .mpi import *
 from .photometry import *
 from .plotting import *
@@ -36,7 +27,6 @@ from .secrets import *
 from .seeing import *
 from .send import *
 from .sextractor import *
-
 from .thumbnails import *
 from .source import *
 from .spatial import *
