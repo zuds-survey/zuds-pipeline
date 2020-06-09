@@ -235,7 +235,7 @@ def create_database(force=False):
 
     try:
         with status(f'Creating database'):
-            p = run(f'{sudo} createdb {flags} -w {db}')
+            p = run(f'{sudo} createdb  {db}')
             msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
             if p.returncode != 0 and 'already exists' not in msg:
                 raise RuntimeError()
