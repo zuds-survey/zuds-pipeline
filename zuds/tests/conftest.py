@@ -29,10 +29,9 @@ target = pathlib.Path(TMP_DIR) / config.name
 shutil.copy(config, target)
 os.chmod(target, 0o700)
 zuds.load_config(target)
-zuds.init_db()
-
 zuds.create_database()
 
+zuds.init_db()
 # ensure the database is empty when the test suite starts
 with warnings.catch_warnings():
     warnings.simplefilter('ignore', category=sa_exc.SAWarning)
