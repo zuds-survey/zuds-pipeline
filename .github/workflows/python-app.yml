@@ -25,8 +25,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install postgresql-q3c
         sudo systemctl start postgresql.service
-        sudo -u postgres createdb zuds_test
-        sudo -u postgres createuser --superuser admin
+        sudo createdb zuds_test
+        sudo createuser --superuser admin
     - name: Setup Anaconda
       uses: s-weigand/setup-conda@v1.0.3
       with:
