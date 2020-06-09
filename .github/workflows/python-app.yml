@@ -39,7 +39,7 @@ jobs:
     - name: Install hotpants
       run: |
         sudo apt-get update
-        sudo apt-get install libcfitsio3-dev
+        sudo apt-get install libcfitsio-dev
         cd hotpants
         LIBS="-lm -lcfitsio -lcurl" make -e
         cp hotpants ${CONDA}/bin
