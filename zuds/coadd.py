@@ -108,13 +108,11 @@ class Coadd(CalibratableImage):
         images = self.input_images
         return max([image.mjd for image in images])
 
-
     @declared_attr
     def __table_args__(cls):
         return tuple()
 
     from_images = classmethod(_coadd_from_images)
-
 
 
 class ReferenceImage(Coadd):

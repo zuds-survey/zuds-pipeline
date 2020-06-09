@@ -13,10 +13,13 @@ from .utils import fid_map
 from .json_util import to_json
 
 
-__all__ = ['DBSession', 'Base', 'init_db', 'join_model', 'ZTFFile',
-           'without_database']
+__all__ = ['DBSession', 'Base', 'init_db', 'join_model', 'ZTFFile']
 
 
+# Leave autoflush off by default, providing database-free functionality.
+# If the user wants to persist things to the database to take advantage of
+# relational capabilities, init_db must be called to initialize and configure a
+# database session that autoflushes, providing a seamless interface to the DB.
 DBSession = scoped_session(sessionmaker())
 
 
@@ -26,9 +29,9 @@ def init_db(user, database, password=None, host=None, port=None):
     url = 'postgresql://{}:{}@{}:{}/{}'
     url = url.format(user, password or '', host or '', port or '', database)
 
+    DBSession.remove()
     conn = sa.create_engine(url, client_encoding='utf8')
-
-    DBSession.configure(bind=conn)
+    DBSession.configure(bind=conn, autoflush=True)
     Base.metadata.bind = conn
 
     return conn
@@ -153,21 +156,6 @@ class NumpyArray(sa.types.TypeDecorator):
         return np.array(value)
 
 
-def without_database(retval):
-    ## Decorator that tells the wrapped function to return retval if
-    ## there is no active database connection
-    def wrapped(func):
-        def interior(*args, **kwargs):
-            try:
-                bind = DBSession().get_bind()
-            except UnboundExecutionError:
-                return retval
-            else:
-                return func(*args, **kwargs)
-        return interior
-    return wrapped
-
-
 class ZTFFile(Base, File):
     """A database-mapped, disk-mappable memory-representation of a file that
     is associated with a ZTF sky partition. This class is abstract and not
@@ -218,7 +206,6 @@ class ZTFFile(Base, File):
         self.find_in_dir(dirname)
 
     @classmethod
-    @without_database(None)
     def get_by_basename(cls, basename):
 
         obj = DBSession().query(cls).filter(

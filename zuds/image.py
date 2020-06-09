@@ -9,7 +9,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.ext.declarative import declared_attr
 
-from .core import ZTFFile, DBSession, without_database
+from .core import ZTFFile, DBSession
 from . import sextractor
 from .fitsfile import HasWCS
 from .plotting import discrete_cmap
@@ -406,7 +406,6 @@ class CalibratedImage(CalibratableImage):
             pass
 
     @property
-    @without_database([])
     def unphotometered_sources(self):
 
         from .source import Source

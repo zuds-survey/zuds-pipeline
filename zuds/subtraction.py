@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
-from .core import DBSession, without_database
+from .core import DBSession
 from .fitsfile import HasWCS
 from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
@@ -240,7 +240,6 @@ class SingleEpochSubtraction(Subtraction, CalibratedImage):
                                 foreign_keys=[target_image_id])
 
 
-@without_database([])
 def overlapping_subtractions(sci, ref):
 
     from .joins import CoaddImage

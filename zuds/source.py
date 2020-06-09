@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import func, Index
 from sqlalchemy.dialects import postgresql as psql
 
-from .core import DBSession, without_database, Base
+from .core import DBSession, Base
 from .utils import fid_map
 from .image import CalibratableImage
 from .photometry import ForcedPhotometry
@@ -57,7 +57,6 @@ class Source(Base, SpatiallyIndexed):
         return (f"http://legacysurvey.org/viewer/jpeg-cutout?ra={self.ra}"
                 f"&dec={self.dec}&size=200&layer=dr8&pixscale=0.262&bands=grz")
 
-    @without_database([])
     def images(self, type=CalibratableImage):
 
         candidates = DBSession().query(type).filter(
@@ -71,7 +70,7 @@ class Source(Base, SpatiallyIndexed):
 
         return candidates.all()
 
-    @without_database([])
+    @property
     def best_detection(self):
         return DBSession().query(
             Detection
@@ -82,7 +81,6 @@ class Source(Base, SpatiallyIndexed):
         ).first()
 
     @property
-    @without_database([])
     def light_curve(self):
         from astropy.table import Table
         lc_raw = []
@@ -113,7 +111,6 @@ class Source(Base, SpatiallyIndexed):
 
         return Table(lc_raw)
 
-    @without_database([])
     def unphotometered_images(self):
         subq = DBSession().query(ForcedPhotometry.id,
                                  ForcedPhotometry.image_id).filter(

@@ -1,10 +1,12 @@
 import os
-import sys
+import warnings
 import pytest
 import pathlib
 import requests
+from sqlalchemy import exc as sa_exc
 from zuds.tests.fixtures import (ScienceImageFactory,
                                  TriangulumScienceImageFactory,
+                                 SourceFactory,
                                  TMP_DIR)
 import uuid
 import zuds
@@ -28,12 +30,15 @@ shutil.copy(config, target)
 os.chmod(target, 0o700)
 zuds.load_config(target)
 zuds.init_db()
+
 zuds.create_database()
 
 # ensure the database is empty when the test suite starts
-zuds.drop_tables()
+with warnings.catch_warnings():
+    warnings.simplefilter('ignore', category=sa_exc.SAWarning)
+    zuds.drop_tables()
+
 zuds.create_tables()
-zuds.DBSession.remove()
 
 
 def _get_mask(url):
@@ -54,12 +59,6 @@ def _get_sci(url, mask):
     s.mask_image = mask
     return s
 
-
-@pytest.fixture
-def db():
-    zuds.init_db()
-    yield zuds.DBSession()
-    zuds.DBSession.remove()
 
 @pytest.fixture
 def mask_image_data_20200531():
@@ -100,4 +99,8 @@ def science_image():
 def triangulum_science_image():
     return TriangulumScienceImageFactory(basename=uuid.uuid4().hex)
 
+
+@pytest.fixture
+def source():
+    return SourceFactory()
 
