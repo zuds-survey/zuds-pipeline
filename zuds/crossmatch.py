@@ -47,7 +47,7 @@ def abmag(flux):
     # don't take the log of 0!
     if flux <= 0:
         return 0
-    return -2.5*np.log10(flux)+22.5
+    return -2.5 * np.log10(flux) + 22.5
 
 
 def getsgtable(dec):
