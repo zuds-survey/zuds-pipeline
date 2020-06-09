@@ -103,7 +103,7 @@ def check_postgres_extensions(deps, username, password, host, port, database):
         except ValueError:
             print(
                 f'\n[!] Sorry, but our script could not parse the output of '
-                f'`{cmd.replace(password, "***")}`; '
+                f'`{cmd.replace(password, "***") if password else cmd}`; '
                 f'please file a bug, or see `zuds/core.py`\n'
             )
             raise
