@@ -21,9 +21,8 @@ jobs:
         sudo apt-get update
         sudo apt-get install postgresql-q3c  
         sudo systemctl start postgresql.service
-        su - postgres 
-        createdb zuds_test
-        createuser --superuser admin
+        sudo -u postgres createdb zuds_test
+        sudo -u postgres createuser --superuser admin
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
