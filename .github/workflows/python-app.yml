@@ -20,7 +20,7 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install postgresql-q3c  
-        service postgresql start
+        sudo systemctl start postgresql.service
         su - postgres 
         createdb zuds_test
         createuser --superuser admin
