@@ -7,7 +7,7 @@
 # if an endpoint connection cannot be made using the credentials
 # provided, the pipeline is run with no database backend (i.e.,
 # psql-free, memory-only).
-db_host: "localhost"
+db_host:
 db_port: 5432
 db_username: "admin"
 db_name: "zuds_test"

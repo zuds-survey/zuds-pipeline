@@ -13,7 +13,7 @@ from .utils import fid_map
 from .json_util import to_json
 
 
-__all__ = ['DBSession', 'Base', 'init_db', 'join_model', 'ZTFFile']
+__all__ = ['DBSession', 'Base', 'join_model', 'ZTFFile']
 
 
 # Leave autoflush off by default, providing database-free functionality.
@@ -21,20 +21,6 @@ __all__ = ['DBSession', 'Base', 'init_db', 'join_model', 'ZTFFile']
 # relational capabilities, init_db must be called to initialize and configure a
 # database session that autoflushes, providing a seamless interface to the DB.
 DBSession = scoped_session(sessionmaker())
-
-
-# The db has to be initialized later; this is done by the app itself
-# See `app_server.py`
-def init_db(user, database, password=None, host=None, port=None):
-    url = 'postgresql://{}:{}@{}:{}/{}'
-    url = url.format(user, password or '', host or '', port or '', database)
-
-    DBSession.remove()
-    conn = sa.create_engine(url, client_encoding='utf8')
-    DBSession.configure(bind=conn, autoflush=True)
-    Base.metadata.bind = conn
-
-    return conn
 
 
 class BaseMixin(object):

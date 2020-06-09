@@ -55,7 +55,6 @@ def create_tables(retry=5):
                 time.sleep(3)
 
 
-
 def check_postgres_extensions(deps, username, password, host, port, database):
 
     psql_cmd = f'psql '
