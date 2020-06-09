@@ -62,7 +62,7 @@ def check_dependencies(deps):
         for (pkg, exc) in fail:
             cmd, get_version, min_version = deps[pkg]
             failstr += f'    - {pkg}: `{" ".join(cmd)}`\n'
-            failstr += '     ' + exc + '\n'
+            failstr += '     ' + str(exc) + '\n'
 
         msg = f'''
 [!] Some system dependencies seem to be unsatisfied'
