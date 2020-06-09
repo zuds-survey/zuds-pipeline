@@ -20,9 +20,9 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install postgresql-q3c  
-        pg_ctl start -l logfile
-        createdb zuds_test
-        createuser --superuser admin
+        su postgres pg_ctl start -l logfile
+        su postgres createdb zuds_test
+        su postgres createuser --superuser admin
     - name: Set up Python 3.8
       uses: actions/setup-python@v2
       with:
