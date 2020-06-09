@@ -38,7 +38,7 @@ jobs:
         astromatic-source-extractor cfitsio
     - name: Install hotpants
       run: |
-        CONDA_PREFIX=`conda info | grep "active env location" | awk -F: '{print $2}' | awk '{$1=$1};1'`
+        export CONDA_PREFIX=`conda info | grep "active env location" | awk -F: '{print $2}' | awk '{$1=$1};1'`
         cd hotpants
         CFITSIOINCDIR="$CONDA_PREFIX/include" LIBS="-L $CONDA_PREFIX/lib -lm -lcfitsio -lcurl" make -e
         make install
