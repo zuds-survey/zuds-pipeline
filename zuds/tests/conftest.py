@@ -8,7 +8,6 @@ from zuds.tests.fixtures import (ScienceImageFactory,
                                  TriangulumScienceImageFactory,
                                  SourceFactory,
                                  TMP_DIR)
-import pdb
 import uuid
 import zuds
 import shutil
@@ -96,6 +95,14 @@ def mask_image_data_20200604():
 @pytest.fixture
 def sci_image_data_20200604(mask_image_data_20200604):
     return _get_sci(URLS[2], mask_image_data_20200604)
+
+
+@pytest.fixture
+def refimg_data_first2_imgs(sci_image_data_20200531, sci_image_data_20200601):
+    imgs = [sci_image_data_20200531, sci_image_data_20200601]
+    out = os.path.join(TMP_DIR, f'ref-{uuid.uuid4().hex}.fits')
+    ref = zuds.ReferenceImage.from_images(imgs, out)
+    return ref
 
 
 @pytest.fixture
