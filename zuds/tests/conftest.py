@@ -8,6 +8,7 @@ from zuds.tests.fixtures import (ScienceImageFactory,
                                  TriangulumScienceImageFactory,
                                  SourceFactory,
                                  TMP_DIR)
+import pdb
 import uuid
 import zuds
 import shutil
@@ -43,6 +44,9 @@ zuds.create_tables()
 def _get_mask(url):
     r = requests.get(url)
     outname = pathlib.Path(TMP_DIR) / url.split('/')[-1]
+    outname = str(outname.absolute()).replace(
+        '.fits', f'.{uuid.uuid4().hex}.fits'
+    )
     with open(outname, 'wb') as f:
         f.write(r.content)
 
@@ -52,10 +56,15 @@ def _get_mask(url):
 def _get_sci(url, mask):
     r = requests.get(url)
     outname = pathlib.Path(TMP_DIR) / url.split('/')[-1]
+    outname = str(outname.absolute()).replace(
+        '.fits', f'.{uuid.uuid4().hex}.fits'
+    )
+    mskpath = mask.local_path
     with open(outname, 'wb') as f:
         f.write(r.content)
     s = zuds.ScienceImage.from_file(outname, load_others=False)
     s.mask_image = mask
+    mask.map_to_local_file(mskpath)
     return s
 
 
