@@ -12,19 +12,37 @@ on:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         python-version: [3.6, 3.7, 3.8]
+        os: [ubuntu-latest, macos-latest]
     steps:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
-    - name: Set up Postgres & q3c
+    - name: Set up Postgres & q3c (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get update
         sudo apt-get install postgresql-q3c
         sudo systemctl start postgresql.service
+    - name: Set up homebrew and install postgres (mac)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+        brew install cfitsio postgresql
+        brew services start postgresql
+    - name: Checkout, compile, and install q3c (mac)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        cd ..
+        git clone https://github.com/segasai/q3c.git
+        cd q3c
+        git checkout v1.8.2
+        make
+        make install
+        cd ../zuds-pipeline
     - name: Setup Anaconda
       uses: s-weigand/setup-conda@v1.0.3
       with:
@@ -34,12 +52,20 @@ jobs:
       run: >-
         conda install -c conda-forge astromatic-swarp
         astromatic-source-extractor
-    - name: Install hotpants
+    - name: Install hotpants (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get update
         sudo apt-get install libcfitsio-dev libcurl4-openssl-dev
         cd hotpants
         LIBS="-lm -lcfitsio -lcurl" make -e
+        cp hotpants ${CONDA}/bin
+        cd -
+    - name: Install hotpants (mac)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        cd hotpants
+        make
         cp hotpants ${CONDA}/bin
         cd -
     - name: Install dependencies
