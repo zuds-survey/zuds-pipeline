@@ -36,12 +36,13 @@ jobs:
     - name: Checkout, compile, and install q3c
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
+        cd ..
         git clone https://github.com/segasai/q3c.git
         cd q3c
         git checkout v1.8.2
         make
         make install
-        cd -
+        cd ../zuds-pipeline
     - name: Setup Anaconda
       uses: s-weigand/setup-conda@v1.0.3
       with:
