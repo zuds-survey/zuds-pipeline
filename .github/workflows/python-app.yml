@@ -21,19 +21,19 @@ jobs:
     - uses: actions/checkout@v2
       with:
         submodules: recursive
-    - name: Set up Postgres & q3c
+    - name: Set up Postgres & q3c (ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get update
         sudo apt-get install postgresql-q3c
         sudo systemctl start postgresql.service
-    - name: Set up homebrew and install postgres
+    - name: Set up homebrew and install postgres (mac)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
         /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
         brew install cfitsio postgresql
         brew services start postgresql
-    - name: Checkout, compile, and install q3c
+    - name: Checkout, compile, and install q3c (mac)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
         cd ..
@@ -52,7 +52,7 @@ jobs:
       run: >-
         conda install -c conda-forge astromatic-swarp
         astromatic-source-extractor
-    - name: Install hotpants
+    - name: Install hotpants (ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |
         sudo apt-get update
@@ -61,7 +61,7 @@ jobs:
         LIBS="-lm -lcfitsio -lcurl" make -e
         cp hotpants ${CONDA}/bin
         cd -
-    - name: Install hotpants
+    - name: Install hotpants (mac)
       if: ${{ matrix.os == 'macos-latest' }}
       run: |
         cd hotpants
