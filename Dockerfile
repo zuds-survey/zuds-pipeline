@@ -19,7 +19,8 @@ ADD setup.py zuds ./
 
 # move TMPDIR off /tmp which is small on docker
 RUN mkdir $HOME/.piptemp && \
-    TMPDIR=$HOME/.piptemp pip install --cache-dir=/data/vincents/ --build /data/vincents/ . jupyter
+    TMPDIR=$HOME/.piptemp pip install --cache-dir=$HOME/.piptemp --build $HOME/.piptemp . jupyter && \
+    rm -r $HOME/.piptemp
 
 RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz -o demo.tar.gz && \
     mkdir ~/.data && cd ~/.data && tar -xvzf ../demo.tar.gz && \
