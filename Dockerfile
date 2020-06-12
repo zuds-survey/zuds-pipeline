@@ -17,7 +17,8 @@ SHELL ["/bin/bash", "-c"]
 
 ADD setup.py zuds ./
 
-RUN pip install . jupyter
+# move TMPDIR off /tmp which is small on docker
+RUN mkdir $HOME/.piptemp && TMPDIR=$HOME/.piptemp pip install . jupyter
 
 RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz -o demo.tar.gz && \
     mkdir ~/.data && cd ~/.data && tar -xvzf ../demo.tar.gz && \
