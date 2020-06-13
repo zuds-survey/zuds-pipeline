@@ -18,7 +18,7 @@ SHELL ["/bin/bash", "-c"]
 ADD setup.py zuds ./
 
 # move TMPDIR off /tmp which is small on docker
-RUN mkdir $HOME/.piptemp && \
+RUN df -h && mkdir $HOME/.piptemp && \
     TMPDIR=$HOME/.piptemp pip install --cache-dir=$HOME/.piptemp --build $HOME/.piptemp . jupyter && \
     rm -r $HOME/.piptemp
 
