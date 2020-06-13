@@ -25,8 +25,8 @@ ADD setup.py zuds requirements.txt zuds-pipeline/
 #    rm -r $HOME/.piptemp $HOME/.pipbuild $HOME/.pipcache
 
 RUN pip install jupyter && \
-    pip install -r requirements.txt && \
-    cd zuds-pipeline && pip install .
+    cd zuds-pipeline && pip install -r requirements.txt && \
+    pip install .
 
 
 RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz -o demo.tar.gz && \
