@@ -15,19 +15,12 @@ RUN apt-get update && apt-get install -y libcfitsio-dev libcurl4-openssl-dev pos
 
 SHELL ["/bin/bash", "-c"]
 
-RUN mkdir zuds-pipeline
-ADD setup.py zuds requirements.txt zuds-pipeline/
+RUN mkdir zuds-pipeline && mkdir zuds-pipeline/zuds
+ADD setup.py requirements.txt zuds-pipeline/
+ADD zuds zuds-pipeline/zuds/
 
-# move TMPDIR off /tmp which is small on docker
-#RUN df -h && mkdir $HOME/.piptemp $HOME/.pipbuild $HOME/.pipcache && \
-#    TMPDIR=$HOME/.piptemp pip install --cache-dir=$HOME/.pipcache --build
-#$HOME/.pipbuild . jupyter && \
-#    rm -r $HOME/.piptemp $HOME/.pipbuild $HOME/.pipcache
-
-RUN pip install jupyter && \
-    cd zuds-pipeline && pip install -r requirements.txt && \
-    pip install .
-
+RUN pip --no-cache-dir install jupyter && cd zuds-pipeline && \
+    pip install --no-cache-dir . && cd -
 
 RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz -o demo.tar.gz && \
     mkdir ~/.data && cd ~/.data && tar -xvzf ../demo.tar.gz && \
