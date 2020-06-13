@@ -29,3 +29,4 @@ jobs:
         repository: dannygoldstein/zuds
         tag_with_ref: true
         tag_with_sha: true
+        build_args: shm-size=4g
