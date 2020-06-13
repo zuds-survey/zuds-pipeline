@@ -19,11 +19,4 @@ RUN mkdir zuds-pipeline && mkdir zuds-pipeline/zuds
 ADD setup.py requirements.txt zuds-pipeline/
 ADD zuds zuds-pipeline/zuds/
 
-RUN pip --no-cache-dir install jupyter && cd zuds-pipeline && \
-    pip install --no-cache-dir . && cd -
-
-RUN curl https://portal.nersc.gov/cfs/m937/demo.tar.gz -o demo.tar.gz && \
-    mkdir ~/.data && cd ~/.data && tar -xvzf ../demo.tar.gz && \
-    rm ../demo.tar.gz
-
-ENTRYPOINT ["jupyter", "notebook", "--no-browser", "--port=8888", "--ip=0.0.0.0", "--allow-root", "--NotebookApp.token=''"]
+RUN cd zuds-pipeline && pip install --no-cache-dir . && cd -
