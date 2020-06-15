@@ -10,11 +10,11 @@ import shutil
 import sqlalchemy as sa
 import numpy as np
 
-from .core import ZTFFile, RefDBSession
-from .archive import TapeCopy, HTTPArchiveCopy
-from .secrets import get_secret
-from .mask import MaskImage
-from .download import ipac_authenticate
+from zuds.core import ZTFFile, RefDBSession
+from zuds.archive import TapeCopy, HTTPArchiveCopy
+from zuds.secrets import get_secret
+from zuds.mask import MaskImage
+from zuds.download import ipac_authenticate
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
@@ -294,3 +294,48 @@ def retrieve_images(images_or_ids,
                 RefDBSession().commit()
 
 
+if __name__ == '__main__':
+
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('idfile', help='The name of the file to read image ids '
+                                       'from, one ID per line.')
+    parser.add_argument('--no-http', required=False, action='store_true',
+                        help='Do not use http to download images from ipac.',
+                        default=False)
+    parser.add_argument('--no-tape', required=False, action='store_true',
+                        help='Do not pull images off tape.', default=False)
+    parser.add_argument('--no-local', required=False, action='store_true',
+                        help='Do not pull files that exist on disk in other '
+                             'locations.', default=False)
+    parser.add_argument('--n-jobs', required=False, default=14, type=int,
+                        help='Number of HSI jobs to launch to pull files off of '
+                             'tape.')
+    parser.add_argument('-j', required=False, default='.', type=str,
+                        help='Destination directory for output job scripts.')
+    parser.add_argument('--no-preserve-dirs', required=False, default=False,
+                        action='store_true', help='Pull the files in flat format, '
+                                                  'do not preserve their directory '
+                                                  'hierarchy.')
+    parser.add_argument('-f', required=False, default='.', type=str,
+                        help='Destination directory for output frames.')
+    parser.add_argument('-l', required=False, default='.', type=str,
+                        help='Destination directory for output logs.')
+    parser.add_argument('--archive-new', required=False, default=False,
+                        action='store_true',
+                        help='Store the copies of the images pulled via this '
+                             'process to the database as HTTPArchiveCopies.')
+
+    args = parser.parse_args()
+
+    # read the data and pull the images
+    import zuds
+    import numpy as np
+    zuds.init_db(ref=True)
+
+    ids = np.genfromtxt(args.idfile, encoding='ascii').tolist()
+    retrieve_images(ids, job_script_destination=args.j,
+                    frame_destination=args.f,
+                    log_destination=args.l, archive_new=args.archive_new,
+                    ipac=~args.no_http, http=~args.no_local, tape=~args.no_tape,
+                    n_jobs=args.n_jobs, preserve_dirs=~args.no_preserve_dirs)
