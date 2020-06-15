@@ -333,7 +333,7 @@ if __name__ == '__main__':
     import numpy as np
     zuds.init_db(ref=True)
 
-    ids = np.genfromtxt(args.idfile, encoding='ascii').tolist()
+    ids = np.genfromtxt(args.idfile, encoding='ascii', dtype=int).tolist()
     retrieve_images(ids, job_script_destination=args.j,
                     frame_destination=args.f,
                     log_destination=args.l, archive_new=args.archive_new,
