@@ -23,6 +23,7 @@ from .model_util import *
 from .mpi import *
 from .photometry import *
 from .plotting import *
+from .retrieve import *
 from .secrets import *
 from .seeing import *
 from .send import *

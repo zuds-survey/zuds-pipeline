@@ -3,7 +3,7 @@ import textwrap
 import subprocess
 import sqlalchemy as sa
 
-from .core import DBSession, Base
+from .core import DBSession, RefDBSession, Base
 from .status import status
 from .env import DependencyError, output
 from .secrets import get_secret
@@ -128,13 +128,16 @@ The failed checks were:
         raise DependencyError(msg)
 
 
-def init_db(timeout=None):
+def init_db(timeout=None, ref=False):
 
-    username = get_secret('db_username')
-    password = get_secret('db_password')
-    port = get_secret('db_port')
-    host = get_secret('db_host')
-    dbname = get_secret('db_name')
+    refkey = 'ref_' if ref else ''
+    session = RefDBSession if ref else DBSession
+
+    username = get_secret(f'{refkey}db_username')
+    password = get_secret(f'{refkey}db_password')
+    port = get_secret(f'{refkey}db_port')
+    host = get_secret(f'{refkey}db_host')
+    dbname = get_secret(f'{refkey}db_name')
 
     url = 'postgresql://{}:{}@{}:{}/{}'
     url = url.format(username, password or '', host or '', port or '', dbname)
@@ -148,12 +151,12 @@ def init_db(timeout=None):
     try:
         check_postgres_extensions(deps, username, password, host, port, dbname)
     except DependencyError:
-        DBSession.remove()
+        session.remove()
         raise
 
     conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
-    DBSession.configure(bind=conn)
-    Base.metadata.bind = conn
+    session.configure(bind=conn)
+    #Base.metadata.bind = conn
 
 
 def create_database(force=False):
