@@ -13,7 +13,7 @@ from .utils import fid_map
 from .json_util import to_json
 
 
-__all__ = ['DBSession', 'Base', 'join_model', 'ZTFFile']
+__all__ = ['DBSession', 'RefDBSession', 'Base', 'join_model', 'ZTFFile']
 
 
 # Leave autoflush off by default, providing database-free functionality.
@@ -21,6 +21,7 @@ __all__ = ['DBSession', 'Base', 'join_model', 'ZTFFile']
 # relational capabilities, init_db must be called to initialize and configure a
 # database session that autoflushes, providing a seamless interface to the DB.
 DBSession = scoped_session(sessionmaker())
+RefDBSession = scoped_session(sessionmaker())
 
 
 class BaseMixin(object):
