@@ -3,7 +3,8 @@ FROM continuumio/miniconda3:4.7.10
 MAINTAINER Danny Goldstein <dgold@caltech.edu>
 
 # Install astromatic software
-RUN conda install -c conda-forge astromatic-swarp astromatic-source-extractor
+RUN conda install -c conda-forge astromatic-swarp astromatic-source-extractor \
+    astromatic-scamp
 
 # Install hotpants
 RUN apt-get update && apt-get install -y libcfitsio-dev libcurl4-openssl-dev postgresql-client postgresql \
