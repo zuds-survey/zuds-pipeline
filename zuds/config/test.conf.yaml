@@ -7,11 +7,11 @@
 # if an endpoint connection cannot be made using the credentials
 # provided, the pipeline is run with no database backend (i.e.,
 # psql-free, memory-only).
-db_host: "localhost"
+db_host: localhost
 db_port: 5432
-db_username: "admin"
-db_name: "zuds_test"
-db_password:
+db_username: admin
+db_name: zuds_test
+db_password: test
 
 # IPAC credentials (if any). These are used for retrieving image
 # metadata using ztfquery from IPAC and for handling image downloads.

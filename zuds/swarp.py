@@ -2,7 +2,6 @@ import uuid
 import shutil
 from pathlib import Path
 import subprocess
-from astropy.wcs import WCS
 
 
 from .utils import initialize_directory
@@ -107,6 +106,8 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
 
 def prepare_swarp_align(image, other, directory, nthreads=1,
                         persist_aligned=False):
+
+    from astropy.wcs import WCS
     conf = SCI_CONF
     shutil.copy(image.local_path, directory)
     impath = str(directory / image.basename)

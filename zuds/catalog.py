@@ -1,6 +1,5 @@
 import os
 import sqlalchemy as sa
-import pandas as pd
 from sqlalchemy.orm import relationship
 
 from .core import ZTFFile
@@ -97,6 +96,8 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     def from_image(cls, image, tmpdir='/tmp', kill_flagged=True):
 
         from .image import CalibratableImageBase, CalibratableImage
+        import pandas as pd
+
 
         if not isinstance(image, CalibratableImageBase):
             raise ValueError('Image is not an instance of '

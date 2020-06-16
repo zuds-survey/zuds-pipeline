@@ -1,5 +1,3 @@
-from astropy.coordinates import SkyCoord
-
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy.ext.declarative import declared_attr
@@ -30,6 +28,7 @@ class SpatiallyIndexed(object):
 
     @property
     def skycoord(self):
+        from astropy.coordinates import SkyCoord
         return SkyCoord(self.ra, self.dec, unit='deg')
 
     @declared_attr

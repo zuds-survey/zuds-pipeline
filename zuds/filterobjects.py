@@ -1,16 +1,6 @@
 import numpy as np
-from astropy.table import Column
-from photutils import CircularAperture
-from photutils import aperture_photometry
-from astropy.table import Table
 import time
-
 import os
-from astropy.nddata.utils import Cutout2D
-from astropy.coordinates import SkyCoord
-
-from tensorflow.keras.models import model_from_json, load_model
-from tensorflow.keras.utils import normalize as tf_norm
 
 from .seeing import estimate_seeing
 from .constants import BRAAI_MODEL, RB_CUT, BAD_SUM
@@ -27,6 +17,7 @@ def load_model_helper(path, model_base_name):
     """
         Build keras model using json-file with architecture and hdf5-file with weights
     """
+    from tensorflow.keras.models import model_from_json
     with open(os.path.join(path, f'{model_base_name}.architecture.json'), 'r') as json_file:
         loaded_model_json = json_file.read()
     m = model_from_json(loaded_model_json)
@@ -45,6 +36,9 @@ def _read_clargs(val):
 def make_triplet_for_braai(ra, dec, new_aligned, ref_aligned, sub_aligned,
                            old_norm=False):
     # aligned images are db.CalibratableImages that have north up, east left
+    from astropy.coordinates import SkyCoord
+    from tensorflow.keras.utils import normalize as tf_norm
+    from astropy.nddata.utils import Cutout2D
 
     triplet = np.zeros((63, 63, 3))
     coord = SkyCoord(ra, dec, unit='deg')
@@ -66,6 +60,10 @@ def filter_sexcat(cat):
 
     from .image import ScienceImage
     from .subtraction import SingleEpochSubtraction
+    from photutils import CircularAperture
+    from photutils import aperture_photometry
+    from astropy.table import Column
+    from astropy.table import Table
 
     """python ./badpix.py sub*.cat"""
 

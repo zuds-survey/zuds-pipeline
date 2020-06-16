@@ -1,0 +1,84 @@
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: build-and-test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8]
+        os: [ubuntu-latest, macos-latest]
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: recursive
+    - name: Set up Postgres & q3c (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install postgresql-q3c
+        sudo systemctl start postgresql.service
+    - name: Set up homebrew and install postgres (mac)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/master/install.sh)"
+        brew install cfitsio postgresql
+        brew services start postgresql
+    - name: Checkout, compile, and install q3c (mac)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        cd ..
+        git clone https://github.com/segasai/q3c.git
+        cd q3c
+        git checkout v1.8.2
+        make
+        make install
+        cd ../zuds-pipeline
+    - name: Setup Anaconda
+      uses: s-weigand/setup-conda@v1.0.3
+      with:
+        activate-conda: true
+        python-version: ${{ matrix.python-version }}
+    - name: Install astromatic software
+      run: >-
+        conda install -c conda-forge astromatic-swarp
+        astromatic-source-extractor
+    - name: Install hotpants (ubuntu)
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install libcfitsio-dev libcurl4-openssl-dev
+        cd hotpants
+        LIBS="-lm -lcfitsio -lcurl" make -e
+        cp hotpants ${CONDA}/bin
+        cd -
+    - name: Install hotpants (mac)
+      if: ${{ matrix.os == 'macos-latest' }}
+      run: |
+        cd hotpants
+        make
+        cp hotpants ${CONDA}/bin
+        cd -
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest wheel
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with pytest
+      run: |
+        pytest

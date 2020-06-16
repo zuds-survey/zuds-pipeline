@@ -1,7 +1,8 @@
 import factory
-import json
+import uuid
+import numpy as np
 from pathlib import Path
-from zuds import DBSession, ScienceImage, PipelineFITSCatalog
+from zuds import DBSession, ScienceImage, Source
 
 from tempfile import mkdtemp
 
@@ -10,15 +11,32 @@ datadir = Path(__file__).parent / 'data'
 TMP_DIR = mkdtemp()
 
 class BaseMeta:
-    sqlalchemy_session = DBSession()
+    sqlalchemy_session = DBSession
     sqlalchemy_session_persistence = 'commit'
+
+
+def random_ra():
+    return np.random.uniform() * 360.
+
+
+def random_dec():
+    return np.random.uniform() * 180 - 90.
+
+
+class SourceFactory(factory.alchemy.SQLAlchemyModelFactory):
+    class Meta(BaseMeta):
+        model = Source
+
+    id = factory.LazyFunction(lambda: uuid.uuid4().hex)
+    ra = factory.LazyFunction(random_ra)
+    dec = factory.LazyFunction(random_dec)
 
 
 class TriangulumScienceImageFactory(factory.alchemy.SQLAlchemyModelFactory):
     class Meta(BaseMeta):
         model = ScienceImage
 
-    basename = "ztf_20171229173808_000651_zg_c03_o_q1_sciimg.fits"
+    basename = f"ztf_20171229173808_000651_zg_c03_o_q1_sciimg.fits"
     ra1 = 23.852027389390017
     dec1 = 31.35253978382308
     ra2 = 23.85248973060998
@@ -573,7 +591,7 @@ class ScienceImageFactory(factory.alchemy.SQLAlchemyModelFactory):
     class Meta(BaseMeta):
         model = ScienceImage
 
-    basename = "ztf_20200428501227_000763_zi_c14_o_q4_sciimg.fits"
+    basename = f"ztf_20200428501227_000763_zi_c14_o_q4_sciimg.fits"
     type = "sci"
     field = 763
     qid = 4

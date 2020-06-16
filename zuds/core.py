@@ -1,83 +1,72 @@
 import os
-import subprocess
-import sys
-import argparse
-import textwrap
-from distutils.version import LooseVersion as Version
-
-from skyportal.models import DBSession
 import sqlalchemy as sa
-from sqlalchemy import event
-from sqlalchemy.orm import relationship
+import numpy as np
 from sqlalchemy.exc import UnboundExecutionError
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.dialects import postgresql as psql
 
-from skyportal import models
-from skyportal.model_util import create_tables, drop_tables
-
-from baselayer.app.json_util import to_json
+from sqlalchemy.ext.declarative import declarative_base, declared_attr
+from sqlalchemy.orm import sessionmaker, scoped_session, relationship
 
 from .file import File
-from .secrets import get_secret
 from .utils import fid_map
-from .status import status
-from .env import DependencyError, output
-
-__all__ = ['DBSession', 'create_tables', 'drop_tables',
-           'Base', 'init_db', 'join_model', 'ZTFFile',
-           'without_database', 'create_database']
-
-Base = models.Base
+from .json_util import to_json
 
 
-def run(cmd):
-    return subprocess.run(cmd,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.PIPE,
-                          shell=True)
+__all__ = ['DBSession', 'Base', 'join_model', 'ZTFFile']
 
 
-def without_database(retval):
-    ## Decorator that tells the wrapped function to return retval if
-    ## there is no active database connection
-    def wrapped(func):
-        def interior(*args, **kwargs):
-            try:
-                bind = DBSession().get_bind()
-            except UnboundExecutionError:
-                return retval
-            else:
-                return func(*args, **kwargs)
-        return interior
-    return wrapped
+# Leave autoflush off by default, providing database-free functionality.
+# If the user wants to persist things to the database to take advantage of
+# relational capabilities, init_db must be called to initialize and configure a
+# database session that autoflushes, providing a seamless interface to the DB.
+DBSession = scoped_session(sessionmaker())
 
 
+class BaseMixin(object):
+    query = DBSession.query_property()
+    id = sa.Column(sa.Integer, primary_key=True)
+    created_at = sa.Column(sa.DateTime, nullable=False, server_default=sa.func.now())
+    modified = sa.Column(sa.DateTime, nullable=False, server_default=sa.func.now(),
+                         onupdate=sa.func.now())
 
-def model_representation(o):
-    """String representation of sqlalchemy objects."""
-    if sa.inspection.inspect(o).expired:
-        DBSession().refresh(o)
-    inst = sa.inspect(o)
-    attr_list = [f"{g.key}={getattr(o, g.key)}"
-                 for g in inst.mapper.column_attrs]
-    return f"<{type(o).__name__}({', '.join(attr_list)})>"
+    @declared_attr
+    def __tablename__(cls):
+        return cls.__name__.lower() + 's'
+
+    __mapper_args__ = {'confirm_deleted_rows': False}
+
+    def __repr__(self):
+        """String representation of sqlalchemy objects."""
+        if sa.inspection.inspect(self).expired:
+            DBSession().refresh(self)
+        inst = sa.inspect(self)
+        attr_list = [f"{g.key}={getattr(self, g.key)}"
+                     for g in inst.mapper.column_attrs]
+        return f"<{type(self).__name__}({', '.join(attr_list)})>"
+
+    def __str__(self):
+        if sa.inspection.inspect(self).expired:
+            DBSession().refresh(self)
+        inst = sa.inspect(self)
+        attr_list = {g.key: getattr(self, g.key) for g in inst.mapper.column_attrs}
+        return to_json(attr_list)
+
+    def to_dict(self):
+        if sa.inspection.inspect(self).expired:
+            DBSession().refresh(self)
+        return {k: v for k, v in self.__dict__.items() if not k.startswith('_')}
+
+    @classmethod
+    def create_or_get(cls, id):
+        obj = cls.query.get(id)
+        if obj is not None:
+            return obj
+        else:
+            return cls(id=id)
 
 
-def model_str(o):
-    if sa.inspection.inspect(o).expired:
-        DBSession().refresh(o)
-    inst = sa.inspect(o)
-    attr_list = {g.key: getattr(o, g.key) for g in inst.mapper.column_attrs}
-    return to_json(attr_list)
-
-
-Base.__repr__ = model_representation
-Base.__str__ = model_str
-Base.modified = sa.Column(
-    sa.DateTime(timezone=False),
-    server_default=sa.func.now(),
-    onupdate=sa.func.now()
-)
+Base = declarative_base(cls=BaseMixin)
 
 
 def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
@@ -146,6 +135,13 @@ def join_model(join_table, model_1, model_2, column_1=None, column_2=None,
     return model
 
 
+class NumpyArray(sa.types.TypeDecorator):
+    impl = psql.ARRAY(sa.Float)
+
+    def process_result_value(self, value, dialect):
+        return np.array(value)
+
+
 class ZTFFile(Base, File):
     """A database-mapped, disk-mappable memory-representation of a file that
     is associated with a ZTF sky partition. This class is abstract and not
@@ -196,7 +192,6 @@ class ZTFFile(Base, File):
         self.find_in_dir(dirname)
 
     @classmethod
-    @without_database(None)
     def get_by_basename(cls, basename):
 
         obj = DBSession().query(cls).filter(
@@ -239,216 +234,3 @@ class ZTFFile(Base, File):
             self.basename
         )
 
-
-def check_postgres_extensions(deps, username, password, host, port, database):
-
-    psql_cmd = f'psql '
-    flags = f'-U {username} '
-
-    if password:
-        psql_cmd = f'PGPASSWORD="{password}" {psql_cmd}'
-    flags += f' --no-password'
-
-    if host:
-        flags += f' -h {host}'
-
-    if port:
-        flags += f' -p {port}'
-
-    def get_version(v):
-        lines = v.split('\n')
-        for i, line in enumerate(lines):
-            if '1 row' in line.strip():
-                return lines[i - 1].strip()
-
-    fail = []
-    for dep, min_version in deps:
-
-        query = f'{dep} >= {min_version}'
-        clause = f"SELECT max(extversion) FROM pg_extension WHERE extname = '{dep}';"
-        cmd = psql_cmd + f' {flags} {database} -c "{clause}"'
-
-        try:
-            with status(query):
-                success, out = output(cmd, shell=True)
-                if not success:
-                    raise ValueError(out.decode("utf-8").strip())
-                try:
-                    version = get_version(out.decode('utf-8').strip())
-                    print(f'[{version.rjust(8)}]'.rjust(40 - len(query)),
-                          end='')
-                except:
-                    raise ValueError('Could not parse version')
-
-                if not (Version(version) >= Version(min_version)):
-                    raise RuntimeError(
-                        f'Required {min_version}, found {version}'
-                    )
-        except ValueError:
-            print(
-                f'\n[!] Sorry, but our script could not parse the output of '
-                f'`{cmd.replace(password, "***")}`; '
-                f'please file a bug, or see `zuds/core.py`\n'
-            )
-            raise
-        except Exception as e:
-            fail.append((dep, e, cmd, min_version))
-
-    if fail:
-        failstr = ''
-        for (pkg, exc, cmd, min_version) in fail:
-            repcmd = cmd
-            if password is not None:
-                repcmd = repcmd.replace(password, '***')
-            failstr += f'    - {pkg}: `{repcmd}`\n'
-            failstr += '     ' + str(exc).replace(password, '***') + '\n'
-
-        msg = f'''
-[!] Some system dependencies seem to be unsatisfied
-
-The failed checks were:
-
-{failstr}
-'''
-        raise DependencyError(msg)
-
-
-
-def init_db(timeout=None):
-
-    username = get_secret('db_username')
-    password = get_secret('db_password')
-    port = get_secret('db_port')
-    host = get_secret('db_host')
-    dbname = get_secret('db_name')
-
-    url = 'postgresql://{}:{}@{}:{}/{}'
-    url = url.format(username, password or '', host or '', port or '', dbname)
-
-    kwargs = {}
-    if timeout is not None:
-        kwargs['connect_args'] = {"options": f"-c statement_timeout={timeout}"}
-
-    print(f'Checking for postgres extensions:')
-    deps = [('q3c', '1.5.0')]
-    try:
-        check_postgres_extensions(deps, username, password, host, port, dbname)
-    except DependencyError:
-        DBSession.remove()
-        raise
-
-    conn = sa.create_engine(url, client_encoding='utf8', **kwargs)
-    DBSession.configure(bind=conn)
-    Base.metadata.bind = conn
-
-    @event.listens_for(DBSession(), 'before_flush')
-    def bump_modified(session, flush_context, instances):
-        for object in session.dirty:
-            if isinstance(object, Base) and session.is_modified(object):
-                object.modified = sa.func.now()
-
-
-def create_database(force=False):
-    db = get_secret('db_name')
-    user = get_secret('db_username')
-    host = get_secret('db_host')
-    port = get_secret('db_port')
-    password = get_secret('db_password')
-
-    psql_cmd = 'psql'
-    flags = f'-U {user}'
-
-    if password:
-        psql_cmd = f'PGPASSWORD="{password}" {psql_cmd}'
-    flags += f' --no-password'
-
-    if host:
-        flags += f' -h {host}'
-
-    if port:
-        flags += f' -p {port}'
-
-    def test_db(database):
-        test_cmd = f"{psql_cmd} {flags} -c 'SELECT 0;' {database}"
-        p = run(test_cmd)
-
-        try:
-            with status('Testing database connection'):
-                if not p.returncode == 0:
-                    raise RuntimeError()
-        except:
-            print(textwrap.dedent(
-                f'''
-                 !!! Error accessing database:
-                 The most common cause of database connection errors is a
-                 misconfigured `pg_hba.conf`.
-                 We tried to connect to the database with the following parameters:
-                   database: {db}
-                   username: {user}
-                   host:     {host}
-                   port:     {port}
-                 The postgres client exited with the following error message:
-                 {'-' * 78}
-                 {p.stderr.decode('utf-8').strip()}
-                 {'-' * 78}
-                 Please modify your `pg_hba.conf`, and use the following command to
-                 check your connection:
-                   {test_cmd}
-                '''))
-
-            raise
-
-
-    plat = run('uname').stdout
-    if b'Darwin' in plat:
-        print('* Configuring MacOS postgres')
-        sudo = ''
-    else:
-        print('* Configuring Linux postgres [may ask for sudo password]')
-        sudo = 'sudo -u postgres'
-
-    # Ask for sudo password here so that it is printed on its own line
-    # (better than inside a `with status` section)
-    run(f'{sudo} echo -n')
-
-    with status(f'Creating user {user}'):
-        run(f'{sudo} createuser --superuser {user}')
-
-    if force:
-        try:
-            with status('Removing existing database'):
-                p = run(f'{sudo} dropdb {db}')
-                if p.returncode != 0:
-                    raise RuntimeError()
-        except:
-            print('Could not delete database: \n\n'
-                  f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n')
-            raise
-
-    try:
-        with status(f'Creating database'):
-            p = run(f'{sudo} createdb {flags} -w {db}')
-            msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
-            if p.returncode != 0 and 'already exists' not in msg:
-                raise RuntimeError()
-
-            p = run(f'psql {flags} -c "GRANT ALL PRIVILEGES ON DATABASE {db} TO {user};" {db}')
-            msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
-            if p.returncode != 0:
-                raise RuntimeError()
-
-    except:
-        print(f'Could not create database: \n\n{msg}\n')
-        raise
-
-    try:
-        with status(f'Creating extensions'):
-            p = run(f'psql {flags} -c "CREATE EXTENSION q3c" {db}')
-            msg = f'{textwrap.indent(p.stderr.decode("utf-8").strip(), prefix="  ")}\n'
-            if p.returncode != 0 and 'already exists' not in msg:
-                raise RuntimeError()
-    except:
-        print(f'Could not create extensions: \n\n{msg}\n')
-        raise
-
-    test_db(db)

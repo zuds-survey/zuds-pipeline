@@ -1,8 +1,5 @@
 import numpy as np
 
-from astropy.wcs import WCS
-
-
 from .constants import CMAP_RANDOM_SEED
 from .catalog import PipelineRegionFile
 
@@ -45,6 +42,8 @@ def show_images(image_or_images, catalog=None, titles=None, reproject=False,
                 ds9=False, figsize='auto'):
     import matplotlib.pyplot as plt
     from matplotlib.patches import Ellipse
+    from astropy.wcs import WCS
+
     imgs = np.atleast_1d(image_or_images)
     n = len(imgs)
 
