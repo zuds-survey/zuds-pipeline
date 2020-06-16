@@ -39,9 +39,7 @@ def create_tables(retry=5):
             conn = DBSession.session_factory.kw['bind']
             print(f'Creating tables on database {conn.url.database}')
 
-            meta = sa.MetaData()
-            meta.reflect(bind=conn)
-            meta.create_all(bind=conn)
+            Base.metadata.create_all(bind=conn)
 
             print('Refreshed tables:')
             for m in Base.metadata.tables:
