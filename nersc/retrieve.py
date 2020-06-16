@@ -206,8 +206,7 @@ def retrieve_images(images_or_ids,
 
         dependency_dict = {}
 
-        for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
-                ordered) // n_jobs)):
+        for tape, group in ordered.groupby(np.arange(len(ordered)) % n_jobs):
 
             # get the tarfiles
             tarnames = group['hpsspath'].tolist()
