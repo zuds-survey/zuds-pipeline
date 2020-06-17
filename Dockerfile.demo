@@ -13,6 +13,16 @@ RUN apt-get update && apt-get install -y libcfitsio-dev libcurl4-openssl-dev pos
     cp hotpants $CONDA_PREFIX/bin && cd -
 
 # Install mpi4py so things can run at nersc
+RUN curl -SL http://www.mpich.org/static/downloads/3.2/mpich-3.2.tar.gz \
+    -o mpich-3.2.tar.gz \
+    && tar -xzf mpich-3.2.tar.gz \
+    && cd mpich-3.2 \
+    && CC="gcc" CXX="g++" CFLAGS="-O3 -fPIC -pthread" CXXFLAGS="-O3 -fPIC -pthread" ./configure  --prefix=/usr \
+    && make -j 4 && make install \
+    && cd .. \
+    && rm -rf mpich-3.2*
+
+
 RUN curl -SL https://files.pythonhosted.org/packages/04/f5/a615603ce4ab7f40b65dba63759455e3da610d9a155d4d4cece1d8fd6706/mpi4py-3.0.2.tar.gz \
     -o mpi4py-3.0.2.tar.gz \
     && tar xzf mpi4py-3.0.2.tar.gz \
