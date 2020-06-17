@@ -7,7 +7,7 @@ RUN conda install -c conda-forge astromatic-swarp astromatic-source-extractor
 
 # Install hotpants
 RUN apt-get update && apt-get install -y libcfitsio-dev libcurl4-openssl-dev postgresql-client postgresql \
-    libpq-dev make gcc libbz2-dev curl gfortran && \
+    libpq-dev make gcc libbz2-dev curl gfortran g++ && \
     git clone https://github.com/zuds-survey/hotpants.git && \
     cd hotpants && LIBS="-lm -lcfitsio -lcurl" make -e && \
     cp hotpants $CONDA_PREFIX/bin && cd -
