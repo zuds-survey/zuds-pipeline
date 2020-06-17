@@ -5,15 +5,18 @@ import subprocess
 from astropy.io import fits
 import warnings
 from .utils import initialize_directory
-from .env import check_dependencies
+import numpy as np
 
 SCAMP_CONF = Path(__file__).parent / 'astromatic/default.scamp'
 
 
-def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
+__all__ = ['calibrate_astrometry']
+
+
+def calibrate_astrometry(image_or_images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     """Derive astrometric solution for input images
 
-    :param catalogs: list of mapped CalibratableImageBase --
+    :param image_or_images: mapped CalibratableImageBase or list thereof --
     the images to astrometrically calibrate
     :param scamp_kws: dict -- configuration parameters to pass to scamp, e.g.,
     {'ASTREF_CATALOG': 'GAIA-DR1'}
@@ -31,6 +34,9 @@ def calibrate_astrometry(images, scamp_kws=None, inplace=False, tmpdir='/tmp'):
     # create a directory for the transaction
     directory = Path(tmpdir) / uuid4().hex
     initialize_directory(directory)
+
+    # ensure images are atleast1d
+    images = np.atleast_1d(image_or_images).tolist()
 
     # make sure all catalogs are mapped
     for image in images:
