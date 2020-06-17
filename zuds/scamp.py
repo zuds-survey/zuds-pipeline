@@ -60,8 +60,6 @@ def calibrate_astrometry(image_or_images, scamp_kws=None, inplace=False, tmpdir=
         shutil.copy(catalog.local_path, directory)
         catpaths.append(str(directory / catalog.basename))
 
-
-
     # create the scamp command
     command = f'scamp -c {SCAMP_CONF} '
     if scamp_kws is not None:
