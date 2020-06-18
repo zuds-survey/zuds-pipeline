@@ -16,7 +16,7 @@ def prepare_hotpants(sci, ref, outname, submask, directory,  tmpdir='/tmp',
                      nreg_side=3, subtract_new_back=True, hotpants_kws=None):
 
     from .sextractor import run_sextractor
-    from .swarp import BKG_VAL
+    from .constants import BKG_VAL
 
     initialize_directory(directory)
     # this both creates and unmaps the background subtracted image

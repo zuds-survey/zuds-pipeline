@@ -51,7 +51,7 @@ jobs:
     - name: Install astromatic software
       run: >-
         conda install -c conda-forge astromatic-swarp
-        astromatic-source-extractor
+        astromatic-source-extractor astromatic-scamp
     - name: Install hotpants (ubuntu)
       if: ${{ matrix.os == 'ubuntu-latest' }}
       run: |

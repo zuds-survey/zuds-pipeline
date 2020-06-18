@@ -54,19 +54,14 @@ class PipelineRegionFile(ZTFFile):
                     '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
                     'delete=1 include=1 source=1\n')
             f.write('icrs\n')
-            rad = 13 * catalog.image.pixel_scale.to(
-                'arcsec'
-            ).value.mean() * 0.00027777
             for row in catalog.data:
                 if not filtered:
                     color = 'blue'
                 else:
                     color = 'green' if row['GOODCUT'] else 'red'
 
-                f.write(f'circle({row["X_WORLD"]},'
-                        f'{row["Y_WORLD"]},{rad}) # width=2 '
-                        f'color={color}\n')
-
+                f.write(f'point({row["X_WORLD"]},{row["Y_WORLD"]}) '
+                        f'# color={color}\n')
         return reg
 
 
@@ -100,10 +95,11 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
     @classmethod
     def from_image(cls, image, tmpdir='/tmp', kill_flagged=True):
 
-        from .image import CalibratableImage
+        from .image import CalibratableImageBase, CalibratableImage
         import pandas as pd
 
-        if not isinstance(image, CalibratableImage):
+
+        if not isinstance(image, CalibratableImageBase):
             raise ValueError('Image is not an instance of '
                              'CalibratableImage.')
 
@@ -111,13 +107,20 @@ class PipelineFITSCatalog(ZTFFile, FITSFile):
         cat = image.catalog
 
         for prop in GROUP_PROPERTIES:
-            setattr(cat, prop, getattr(image, prop))
+            try:
+                setattr(cat, prop, getattr(image, prop))
+            except AttributeError:
+                # this catalog is for a CalibratableImageBase
+                continue
 
         df = pd.DataFrame(cat.data)
         rec = df.to_records(index=False)
         cat.data = rec
         cat.basename = image.basename.replace('.fits', '.cat')
-        cat.image_id = image.id
+
+        if isinstance(image, CalibratableImage):
+            cat.image_id = image.id
+
         cat.image = image
         image.catalog = cat
 

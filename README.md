@@ -49,4 +49,5 @@ To install the zuds Python library, do
   * [SWarp >= 2.38.0](https://github.com/astromatic/swarp)
   * [psql >= 9.6](https://www.postgresql.org/)
   * [hotpants >= 5.1.11](https://github.com/zuds-survey/hotpants)
+  * [scamp >= 2.7.8](https://github.com/astromatic/scamp)
 

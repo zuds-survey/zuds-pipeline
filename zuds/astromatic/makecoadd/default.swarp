@@ -39,7 +39,7 @@ BLANK_BADPIXELS        N               # Set to 0 pixels having a weight of 0
 
 CELESTIAL_TYPE         NATIVE          # NATIVE, PIXEL, EQUATORIAL,
                                        # GALACTIC,ECLIPTIC, or SUPERGALACTIC
-PROJECTION_TYPE        TAN             # Any WCS projection code or NONE
+PROJECTION_TYPE        TPV             # Any WCS projection code or NONE
 PROJECTION_ERR         0.001           # Maximum projection error (in output
                                        # pixels), or 0 for no approximation
 CENTER_TYPE            ALL             # MANUAL, ALL or MOST

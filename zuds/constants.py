@@ -92,5 +92,10 @@ SYSTEM_DEPENDENCIES = {
         ['hotpants'],
         lambda v: v.split('\n')[1].split()[-1],
         '5.1.11'
+    ),
+    'scamp': (
+        ['scamp', '--version'],
+        lambda v: v.split()[2],
+        '2.7.8'
     )
 }

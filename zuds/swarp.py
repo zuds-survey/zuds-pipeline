@@ -5,11 +5,11 @@ import subprocess
 
 
 from .utils import initialize_directory
-from .constants import BKG_BOX_SIZE, GROUP_PROPERTIES, BKG_VAL
+from .constants import BKG_BOX_SIZE
 from .mask import MaskImageBase, MaskImage
 
 __all__ = ['prepare_swarp_sci', 'prepare_swarp_mask', 'prepare_swarp_align',
-           'run_coadd', 'run_align']
+           'run_align']
 
 
 CONF_DIR = Path(__file__).parent / 'astromatic/makecoadd'
@@ -17,24 +17,18 @@ SCI_CONF = CONF_DIR / 'default.swarp'
 MSK_CONF = CONF_DIR / 'mask.swarp'
 
 
+def prepare_swarp_sci(images, outname, directory, swarp_kws=None,
+                      swarp_zp_key='MAGZP'):
 
-def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
-                      nthreads=1, swarp_kws=None):
     conf = SCI_CONF
     initialize_directory(directory)
 
-    if copy_inputs:
-        impaths = []
-        for image in images:
-            shutil.copy(image.local_path, directory)
-            impaths.append(str(directory / image.basename))
-    else:
-        impaths = [im.local_path for im in images]
+    impaths = [im.local_path for im in images]
 
     # normalize all images to the same zeropoint
     for im, path in zip(images, impaths):
-        if 'MAGZP' in im.header:
-            fluxscale = 10**(-0.4 * (im.header['MAGZP'] - 25.))
+        if swarp_zp_key in im.header:
+            fluxscale = 10**(-0.4 * (im.header[swarp_zp_key] - 25.))
             im.header['FLXSCALE'] = fluxscale
             im.header_comments['FLXSCALE'] = 'Flux scale factor for coadd / DG'
             im.header['FLXSCLZP'] = 25.
@@ -48,7 +42,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
     # directory
     wgtpaths = []
     for image in images:
-        if not image.weight_image.ismapped or copy_inputs:
+        if not image.weight_image.ismapped:
             wgtpath = f"{directory / image.basename.replace('.fits', '.weight.fits')}"
             image.weight_image.map_to_local_file(wgtpath)
             image.weight_image.save()
@@ -77,8 +71,7 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
               f'-WEIGHT_IMAGE @{inweight} ' \
-              f'-WEIGHTOUT_NAME {wgtout} ' \
-              f'-NTHREADS {nthreads} '
+              f'-WEIGHTOUT_NAME {wgtout} '
 
     if swarp_kws is not None:
         for kw in swarp_kws:
@@ -88,13 +81,11 @@ def prepare_swarp_sci(images, outname, directory, copy_inputs=False,
 
 
 def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
-                       copy_inputs=False, nthreads=1):
+                       swarp_kws=None):
+
+
     conf = MSK_CONF
     initialize_directory(directory)
-
-    if copy_inputs:
-        for image in masks:
-            shutil.copy(image.local_path, directory)
 
     # get the images in string form
     allims = ' '.join([c.local_path for c in masks])
@@ -104,8 +95,11 @@ def prepare_swarp_mask(masks, outname, mskoutweightname, directory,
               f'-IMAGEOUT_NAME {outname} ' \
               f'-VMEM_DIR {directory} ' \
               f'-RESAMPLE_DIR {directory} ' \
-              f'-WEIGHTOUT_NAME {mskoutweightname} ' \
-              f'-NTHREADS {nthreads}'
+              f'-WEIGHTOUT_NAME {mskoutweightname} '
+
+    if swarp_kws is not None:
+        for kw in swarp_kws:
+            syscall += f'-{kw.upper()} {swarp_kws[kw]} '
 
     return syscall
 
@@ -209,85 +203,3 @@ def run_align(image, other, tmpdir='/tmp',
 
     return result
 
-
-def run_coadd(cls, images, outname, mskoutname, addbkg=True,
-              nthreads=1, tmpdir='/tmp', copy_inputs=False, swarp_kws=None):
-    """Run swarp on images `images`"""
-
-    from .image import FITSImage
-
-    directory = Path(tmpdir) / uuid.uuid4().hex
-    directory.mkdir(exist_ok=True, parents=True)
-
-    command = prepare_swarp_sci(images, outname, directory,
-                                copy_inputs=copy_inputs,
-                                nthreads=nthreads,
-                                swarp_kws=swarp_kws)
-
-    # run swarp
-    while True:
-        try:
-            subprocess.check_call(command.split())
-        except OSError as e:
-            if e.errno == 14:
-                continue
-            else:
-                raise e
-        else:
-            break
-
-    # now swarp together the masks
-    masks = [image.mask_image for image in images]
-    mskoutweightname = directory / Path(mskoutname.replace('.fits', '.weight.fits')).name
-    command = prepare_swarp_mask(masks, mskoutname, mskoutweightname,
-                                 directory, copy_inputs=False,
-                                 nthreads=nthreads)
-
-    # run swarp
-    while True:
-        try:
-            subprocess.check_call(command.split())
-        except OSError as e:
-            if e.errno == 14:
-                continue
-            else:
-                raise e
-        else:
-            break
-
-
-    # load the result
-    coadd = cls.from_file(outname)
-    coaddweightname = outname.replace('.fits', '.weight.fits')
-    coadd._weightimg = FITSImage.from_file(coaddweightname)
-
-    coaddmask = MaskImage.from_file(mskoutname)
-    coaddmaskweight = FITSImage.from_file(mskoutweightname)
-    coaddmask.update_from_weight_map(coaddmaskweight)
-
-    # keep a record of the images that went into the coadd
-    coadd.input_images = images.tolist()
-    coadd.mask_image = coaddmask
-    coaddmask.parent_image = coadd
-
-    # set the ccdid, qid, field, fid for the coadd
-    # (and mask) based on the input images
-
-    for prop in GROUP_PROPERTIES:
-        for img in [coadd, coaddmask]:
-            setattr(img, prop, getattr(images[0], prop))
-
-    if addbkg:
-        coadd.data += BKG_VAL
-
-    # save the coadd to disk
-    coadd.save()
-    coaddmask.save()
-
-    # clean up
-    for im in [coadd] + images.tolist():
-        if f'{directory}' in im.weight_image.local_path:
-            del im._weightimg
-
-    shutil.rmtree(directory)
-    return coadd
