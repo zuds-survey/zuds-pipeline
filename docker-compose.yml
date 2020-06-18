@@ -13,7 +13,7 @@ services:
     links:
        - db
     volumes:
-       - .:/home/zuds/demo
+       - .:/zuds
 
 
 

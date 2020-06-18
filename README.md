@@ -34,7 +34,7 @@ $ docker-compose up
 ```
 
 In the browser, navigate to `localhost:8174`. Open 
-`/home/zuds/demo/demo.ipynb`. Execute the cells to run the pipeline tutorial.
+`/zuds/demo.ipynb`. Execute the cells to run the pipeline tutorial.
   
 ## Installation
 
