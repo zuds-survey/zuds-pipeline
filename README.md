@@ -6,7 +6,7 @@
     width="100px"
   />
   <br>
-  The ZUDS Pipeline
+  ZUDS
   <br>
 </h1>
 
