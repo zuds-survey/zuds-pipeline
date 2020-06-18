@@ -4,14 +4,17 @@ import os
 import pandas as pd
 from pathlib import Path
 import subprocess
-import zuds
-from zuds import get_secret
 import requests
 import io
 import shutil
 import sqlalchemy as sa
 import numpy as np
 
+from zuds.core import ZTFFile, RefDBSession
+from zuds.archive import TapeCopy, HTTPArchiveCopy
+from zuds.secrets import get_secret
+from zuds.mask import MaskImage
+from zuds.download import ipac_authenticate
 
 
 def submit_hpss_job(tarfiles, images, job_script_destination,
@@ -107,10 +110,8 @@ rm {os.path.basename(tarfile)}
 def retrieve_images(images_or_ids,
                     job_script_destination='.',
                     frame_destination='.', log_destination='.',
-                    preserve_dirs=False, n_jobs=14, tape=True,
-                    http=True, ipac=True, archive_new=True):
-
-    """Image whereclause should be a clause element on ZTFFile."""
+                    preserve_dirs=True, n_jobs=14, tape=True,
+                    http=True, ipac=True, archive_new=False):
 
     images_or_ids = np.atleast_1d(images_or_ids)
     ids = [int(i) if not hasattr(i, 'id') else i.id for i in images_or_ids]
@@ -118,20 +119,20 @@ def retrieve_images(images_or_ids,
     got = []
 
     if tape:
-        jt = sa.join(zuds.ZTFFile, zuds.TapeCopy,
-                     zuds.ZTFFile.id == zuds.TapeCopy.product_id)
-        full_query = zuds.DBSession().query(
-            zuds.ZTFFile, zuds.TapeCopy
+        jt = sa.join(ZTFFile, TapeCopy,
+                     ZTFFile.id == TapeCopy.product_id)
+        full_query = RefDBSession().query(
+            ZTFFile, TapeCopy
         ).select_from(jt).outerjoin(
-            zuds.HTTPArchiveCopy, zuds.ZTFFile.id == zuds.HTTPArchiveCopy.product_id
+            HTTPArchiveCopy, ZTFFile.id == HTTPArchiveCopy.product_id
         ).filter(
-            zuds.HTTPArchiveCopy.product_id == None
+            HTTPArchiveCopy.product_id == None
         )
-        full_query = full_query.filter(zuds.ZTFFile.id.in_(ids),
-                                       zuds.ZTFFile.fid != 3)  # dont use i-band from tape
+        full_query = full_query.filter(ZTFFile.id.in_(ids),
+                                       ZTFFile.fid != 3)  # dont use i-band from tape
 
         # this is the query to get the image paths
-        metatable = pd.read_sql(full_query.statement, zuds.DBSession().get_bind())
+        metatable = pd.read_sql(full_query.statement, RefDBSession().get_bind())
 
         df = metatable[['basename', 'archive_id']]
         df = df.rename({'archive_id': 'tarpath'}, axis='columns')
@@ -205,8 +206,7 @@ def retrieve_images(images_or_ids,
 
         dependency_dict = {}
 
-        for tape, group in ordered.groupby(np.arange(len(ordered)) // (len(
-                ordered) // n_jobs)):
+        for tape, group in ordered.groupby(np.arange(len(ordered)) % n_jobs):
 
             # get the tarfiles
             tarnames = group['hpsspath'].tolist()
@@ -224,17 +224,17 @@ def retrieve_images(images_or_ids,
     if http:
 
         # now do the ones that are on disk
-        jt = sa.join(zuds.ZTFFile, zuds.HTTPArchiveCopy,
-                     zuds.ZTFFile.id == zuds.HTTPArchiveCopy.product_id)
+        jt = sa.join(ZTFFile, HTTPArchiveCopy,
+                     ZTFFile.id == HTTPArchiveCopy.product_id)
 
-        full_query = zuds.DBSession().query(
-            zuds.ZTFFile, zuds.HTTPArchiveCopy
+        full_query = RefDBSession().query(
+            ZTFFile, HTTPArchiveCopy
         ).select_from(jt)
 
-        full_query = full_query.filter(zuds.ZTFFile.id.in_(ids))
+        full_query = full_query.filter(ZTFFile.id.in_(ids))
 
         # this is the query to get the image paths
-        metatable2 = pd.read_sql(full_query.statement, zuds.DBSession().get_bind())
+        metatable2 = pd.read_sql(full_query.statement, RefDBSession().get_bind())
         got.extend(metatable2['product_id'].tolist())
 
         # copy each image over
@@ -256,11 +256,11 @@ def retrieve_images(images_or_ids,
 
     if ipac:
         remaining = [int(i) for i in np.setdiff1d(ids, got)]
-        remaining = zuds.DBSession().query(zuds.ZTFFile).filter(
-            zuds.ZTFFile.id.in_(remaining)
+        remaining = RefDBSession().query(ZTFFile).filter(
+            ZTFFile.id.in_(remaining)
         ).all()
 
-        cookie = zuds.ipac_authenticate()
+        cookie = ipac_authenticate()
 
         for i in remaining:
             if preserve_dirs:
@@ -268,10 +268,10 @@ def retrieve_images(images_or_ids,
             else:
                 destination = Path(frame_destination) / i.basename
 
-            suffix = 'mskimg.fits' if isinstance(i, zuds.MaskImage) else 'sciimg.fits'
+            suffix = 'mskimg.fits' if isinstance(i, MaskImage) else 'sciimg.fits'
 
             try:
-                if isinstance(i, zuds.MaskImage):
+                if isinstance(i, MaskImage):
                     i.parent_image.download(suffix=suffix, destination=destination, cookie=cookie)
                 else:
                     i.download(suffix=suffix, destination=destination, cookie=cookie)
@@ -285,11 +285,56 @@ def retrieve_images(images_or_ids,
                 # ensure the image header is written to the DB
                 i.load_header()
 
-                acopy = zuds.HTTPArchiveCopy.from_product(i, check=False)
+                acopy = HTTPArchiveCopy.from_product(i, check=False)
                 acopy.put()
 
                 # and archive the file to disk
-                zuds.DBSession().add(acopy)
-                zuds.DBSession().commit()
+                RefDBSession().add(acopy)
+                RefDBSession().commit()
 
 
+if __name__ == '__main__':
+
+    from argparse import ArgumentParser
+    parser = ArgumentParser()
+    parser.add_argument('idfile', help='The name of the file to read image ids '
+                                       'from, one ID per line.')
+    parser.add_argument('--no-http', required=False, action='store_true',
+                        help='Do not use http to download images from ipac.',
+                        default=False)
+    parser.add_argument('--no-tape', required=False, action='store_true',
+                        help='Do not pull images off tape.', default=False)
+    parser.add_argument('--no-local', required=False, action='store_true',
+                        help='Do not pull files that exist on disk in other '
+                             'locations.', default=False)
+    parser.add_argument('--n-jobs', required=False, default=14, type=int,
+                        help='Number of HSI jobs to launch to pull files off of '
+                             'tape.')
+    parser.add_argument('-j', required=False, default='.', type=str,
+                        help='Destination directory for output job scripts.')
+    parser.add_argument('--no-preserve-dirs', required=False, default=False,
+                        action='store_true', help='Pull the files in flat format, '
+                                                  'do not preserve their directory '
+                                                  'hierarchy.')
+    parser.add_argument('-f', required=False, default='.', type=str,
+                        help='Destination directory for output frames.')
+    parser.add_argument('-l', required=False, default='.', type=str,
+                        help='Destination directory for output logs.')
+    parser.add_argument('--archive-new', required=False, default=False,
+                        action='store_true',
+                        help='Store the copies of the images pulled via this '
+                             'process to the database as HTTPArchiveCopies.')
+
+    args = parser.parse_args()
+
+    # read the data and pull the images
+    import zuds
+    import numpy as np
+    zuds.init_db(ref=True)
+
+    ids = np.genfromtxt(args.idfile, encoding='ascii', dtype=int).tolist()
+    retrieve_images(ids, job_script_destination=args.j,
+                    frame_destination=args.f,
+                    log_destination=args.l, archive_new=args.archive_new,
+                    ipac=~args.no_http, http=~args.no_local, tape=~args.no_tape,
+                    n_jobs=args.n_jobs, preserve_dirs=~args.no_preserve_dirs)

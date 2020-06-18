@@ -13,6 +13,15 @@ db_username: "admin"
 db_name: "zuds"
 db_password:
 
+# Postgres database endpoint of a reference database, pre-populated with image
+# metadata, headers, copy information, etc., that can be used for pulling
+# images to a local disk (e.g., at NERSC).
+ref_db_host:
+ref_db_port:
+ref_db_username:
+ref_db_name:
+ref_db_password:
+
 # IPAC credentials (if any). These are used for retrieving image
 # metadata using ztfquery from IPAC and for handling image downloads.
 ipac_username:
