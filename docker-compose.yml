@@ -2,12 +2,12 @@ version: '3'
 
 services:
   db:
-    image: dannygoldstein/zuds-db:0.1dev
+    image: dannygoldstein/zuds-db:latest
     ports:
        - 8271:5432
 
   zuds:
-    image: dannygoldstein/zuds:0.1dev
+    image: dannygoldstein/zuds-demo:latest
     ports:
        - 8174:8888
     links:
