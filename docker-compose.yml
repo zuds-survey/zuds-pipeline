@@ -2,7 +2,7 @@ version: '3'
 
 services:
   db:
-    image: dannygoldstein/zuds-db:latest
+    image: dannygoldstein/zuds-db:0.1dev
     ports:
        - 8271:5432
 
