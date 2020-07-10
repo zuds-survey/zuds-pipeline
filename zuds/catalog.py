@@ -60,7 +60,7 @@ class PipelineRegionFile(ZTFFile):
                 else:
                     color = 'green' if row['GOODCUT'] else 'red'
 
-                f.write(f'point({row["X_WORLD"]},{row["Y_WORLD"]}) '
+                f.write(f'point({row["XWIN_WORLD"]},{row["YWIN_WORLD"]}) '
                         f'# color={color}\n')
         return reg
 
