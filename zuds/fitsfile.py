@@ -323,3 +323,15 @@ WHERE 1=CONTAINS(POINT('ICRS', ra, dec), POLYGON('ICRS', {cstring}))"""
         j = gaia.Gaia.launch_job_async(query_string)
         data = j.get_data()
         return data
+
+    def write_gaia_dr2_regionfile(self):
+        stars = self.gaia_dr2_calibrators()
+        regname = self.local_path.replace('.fits', '.gaia.reg')
+        with open(regname, 'w') as f:
+            f.write('global color=green dashlist=8 3 width=1 font="helvetica '
+                    '10 normal" select=1 highlite=1 dash=0 fixed=0 edit=1 move=1 '
+                    'delete=1 include=1 source=1\n')
+
+            for row in stars:
+                f.write(f'point({row["ra"]},{row["dec"]}) # color=purple\n')
+
