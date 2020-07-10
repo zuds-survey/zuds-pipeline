@@ -1136,7 +1136,7 @@ class ScienceImageFactory(factory.alchemy.SQLAlchemyModelFactory):
         "WINDSCAL": "Windscreen elevation (deg)",
         "ZPCLRCOV": "Covariance in MAGZP and CLRCOEFF [mag^2]",
         "ZPRMSALL": "Mag zero point RMS from all mag diffs [mag]"
-    },
+    }
     filtercode = "zi"
     obsjd = 2458968.001713
     infobits = 0
