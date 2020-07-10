@@ -2,6 +2,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as psql
 from sqlalchemy import func
 from pathlib import Path
+from astroquery import gaia
 
 import fitsio  # for catalogs, faster
 
@@ -313,4 +314,12 @@ class HasWCS(FITSFile, HasPoly, SpatiallyIndexed):
 
         return new
 
-
+    def gaia_dr2_calibrators(self):
+        cstring = ', '.join(self.wcs.calc_footprint().ravel().tolist())
+        query_string = f"""SELECT source_id, ra, dec, ref_epoch, 
+phot_rp_mean_mag, pmra, pmdec, parallax 
+FROM gaiadr2.gaia_source 
+WHERE 1=CONTAINS(POINT('ICRS', ra, dec), POLYGON('ICRS', {cstring}))"""
+        j = gaia.Gaia.launch_job(query_string)
+        data = j.get_data()
+        return data
