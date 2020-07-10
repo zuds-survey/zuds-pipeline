@@ -2,6 +2,9 @@ import os
 import zuds
 import uuid
 import numpy as np
+import pytest
+import requests
+
 
 stampcent = np.array([[153.38206, 148.80536, 147.25192, 153.63702, 152.90718, 150.19846],
                       [149.69249, 154.14828, 148.3748 , 153.9903 , 151.28311, 154.92308],
@@ -11,6 +14,7 @@ stampcent = np.array([[153.38206, 148.80536, 147.25192, 153.63702, 152.90718, 15
                       [155.59914, 146.6712 , 143.15219, 156.93697, 150.05168, 150.3548 ]])
 
 
+@pytest.mark.xfail(raises=requests.exceptions.ConnectTimeout)
 def test_stack(sci_image_data_20200531, sci_image_data_20200601):
     images = [sci_image_data_20200531, sci_image_data_20200601]
     outdir = os.path.dirname(images[0].local_path)
@@ -24,6 +28,7 @@ def test_stack(sci_image_data_20200531, sci_image_data_20200601):
     np.testing.assert_allclose(stamp, stampcent)
 
 
+@pytest.mark.xfail(raises=requests.exceptions.ConnectTimeout)
 def test_stack_input_images(sci_image_data_20200531, sci_image_data_20200601):
     images = [sci_image_data_20200531, sci_image_data_20200601]
     outdir = os.path.dirname(images[0].local_path)

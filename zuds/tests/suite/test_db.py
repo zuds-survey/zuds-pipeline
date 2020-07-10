@@ -1,6 +1,9 @@
 import zuds
+import pytest
+import requests
 
 
+@pytest.mark.xfail(raises=requests.exceptions.ConnectTimeout)
 def test_science_image_modified(science_image):
     db = zuds.DBSession()
     science_image.seeing = 2.3

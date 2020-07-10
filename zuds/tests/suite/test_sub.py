@@ -1,5 +1,7 @@
 import zuds
 import numpy as np
+import requests
+import pytest
 
 stampcent = np.array([[-11.565292 , -16.885056 ,   3.7509918,  -3.0413055,  -2.3746796,
         -28.3004   ],
@@ -14,6 +16,7 @@ stampcent = np.array([[-11.565292 , -16.885056 ,   3.7509918,  -3.0413055,  -2.3
        [-12.233261 ,  20.014725 , -17.911667 , -14.06749  , -36.002853 ,
          -7.4232025]])
 
+@pytest.mark.xfail(raises=requests.exceptions.ConnectTimeout)
 def test_sub(sci_image_data_20200604, refimg_data_first2_imgs):
     _ = sci_image_data_20200604.weight_image
     sub = zuds.SingleEpochSubtraction.from_images(sci_image_data_20200604,
