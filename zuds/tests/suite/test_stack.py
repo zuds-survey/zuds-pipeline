@@ -14,7 +14,7 @@ stampcent = np.array([[153.38206, 148.80536, 147.25192, 153.63702, 152.90718, 15
                       [155.59914, 146.6712 , 143.15219, 156.93697, 150.05168, 150.3548 ]])
 
 
-@pytest.mark.xfail(raises=requests.exceptions.ConnectTimeout)
+@pytest.mark.xfail(raises=requests.exceptions.ConnectionError)
 def test_stack(sci_image_data_20200531, sci_image_data_20200601):
     images = [sci_image_data_20200531, sci_image_data_20200601]
     outdir = os.path.dirname(images[0].local_path)
@@ -28,7 +28,7 @@ def test_stack(sci_image_data_20200531, sci_image_data_20200601):
     np.testing.assert_allclose(stamp, stampcent)
 
 
-@pytest.mark.xfail(raises=requests.exceptions.ConnectTimeout)
+@pytest.mark.xfail(raises=requests.exceptions.ConnectionError)
 def test_stack_input_images(sci_image_data_20200531, sci_image_data_20200601):
     images = [sci_image_data_20200531, sci_image_data_20200601]
     outdir = os.path.dirname(images[0].local_path)
