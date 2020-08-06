@@ -2,6 +2,8 @@ import zuds
 import numpy as np
 import requests
 import pytest
+import os
+import uuid
 
 stampcent = np.array([[-11.565292 , -16.885056 ,   3.7509918,  -3.0413055,  -2.3746796,
         -28.3004   ],
@@ -32,3 +34,31 @@ def test_sub(sci_image_data_20200604, refimg_data_first2_imgs):
     np.testing.assert_allclose(stamp, stampcent)
     assert sub.reference_image is refimg_data_first2_imgs
     assert sub.target_image is sci_image_data_20200604
+
+
+def test_multi_epoch_sub(sci_image_data_20200601, sci_image_data_20200604,
+                         refimg_data_first2_imgs):
+
+    outdir = os.path.dirname(sci_image_data_20200601.local_path)
+    outname = os.path.join(outdir, f'{uuid.uuid4().hex}.fits')
+
+    coadd = zuds.ScienceCoadd.from_images([sci_image_data_20200604,
+                                           sci_image_data_20200601],
+                                          outname)
+    coadd.binleft = '2020-06-01'
+    coadd.binright = '2020-06-04'
+
+    zuds.DBSession().add(coadd)
+
+    for a in coadd.input_images:
+        se_sub = zuds.SingleEpochSubtraction.from_images(
+            a, refimg_data_first2_imgs
+        )
+
+        zuds.DBSession().add(se_sub)
+
+    final = zuds.MultiEpochSubtraction.from_images(
+        coadd, refimg_data_first2_imgs, force_map_subs=False,
+    )
+    zuds.DBSession().add(final)
+    zuds.DBSession().commit()
