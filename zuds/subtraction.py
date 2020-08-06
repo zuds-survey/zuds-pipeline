@@ -9,7 +9,6 @@ from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
 from .core import DBSession, Base
-from .fitsfile import HasWCS
 from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
 from .mask import MaskImageBase, MaskImage
@@ -37,7 +36,7 @@ def sub_name(frame, template):
     return sub
 
 
-class Subtraction(HasWCS):
+class Subtraction(CalibratableImageBase):
 
     @declared_attr
     def reference_image_id(self):
