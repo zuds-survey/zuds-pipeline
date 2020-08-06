@@ -6,6 +6,8 @@ MAINTAINER Danny Goldstein <dgold@caltech.edu>
 RUN conda install -c conda-forge astromatic-swarp astromatic-source-extractor \
     astromatic-scamp
 
+RUN conda install pip
+
 # Install hotpants
 RUN apt-get update && apt-get install -y libcfitsio-dev libcurl4-openssl-dev postgresql-client postgresql \
     libpq-dev make gcc libbz2-dev curl gfortran g++ && \
