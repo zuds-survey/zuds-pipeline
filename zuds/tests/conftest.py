@@ -106,6 +106,14 @@ def refimg_data_first2_imgs(sci_image_data_20200531, sci_image_data_20200601):
 
 
 @pytest.fixture
+def refimg_data_last2_imgs(sci_image_data_20200601, sci_image_data_20200604):
+    imgs = [sci_image_data_20200601, sci_image_data_20200604]
+    out = os.path.join(TMP_DIR, f'ref-{uuid.uuid4().hex}.fits')
+    ref = zuds.ReferenceImage.from_images(imgs, out)
+    return ref
+
+
+@pytest.fixture
 def science_image():
     return ScienceImageFactory(basename=uuid.uuid4().hex)
 

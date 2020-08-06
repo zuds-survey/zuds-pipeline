@@ -8,8 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
-from .core import DBSession
-from .fitsfile import HasWCS
+from .core import DBSession, Base
 from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
 from .mask import MaskImageBase, MaskImage
@@ -37,7 +36,7 @@ def sub_name(frame, template):
     return sub
 
 
-class Subtraction(HasWCS):
+class Subtraction(CalibratableImageBase):
 
     @declared_attr
     def reference_image_id(self):
@@ -184,21 +183,24 @@ class Subtraction(HasWCS):
 
         # now read the final output products into database mapped records
         sub = cls.from_file(final_out, load_others=False)
-        finalsubmask = MaskImage.from_file(final_out.replace('.fits',
-                                                             '.mask.fits'))
+
+        finalmaskclass = MaskImage if isinstance(sub, Base) else MaskImageBase
+        finalsubmask = finalmaskclass.from_file(final_out.replace('.fits',
+                                                                  '.mask.fits'))
 
         sub._rmsimg = FITSImage.from_file(final_out.replace('.fits',
                                                             '.rms.fits'))
 
-        sub.header['FIELD'] = sub.field = sci.field
-        sub.header['CCDID'] = sub.ccdid = sci.ccdid
-        sub.header['QID'] = sub.qid = sci.qid
-        sub.header['FID'] = sub.fid = sci.fid
+        if isinstance(sub, Base):
+            sub.header['FIELD'] = sub.field = sci.field
+            sub.header['CCDID'] = sub.ccdid = sci.ccdid
+            sub.header['QID'] = sub.qid = sci.qid
+            sub.header['FID'] = sub.fid = sci.fid
 
-        finalsubmask.header['FIELD'] = finalsubmask.field = sci.field
-        finalsubmask.header['CCDID'] = finalsubmask.ccdid = sci.ccdid
-        finalsubmask.header['QID'] = finalsubmask.qid = sci.qid
-        finalsubmask.header['FID'] = finalsubmask.fid = sci.fid
+            finalsubmask.header['FIELD'] = finalsubmask.field = sci.field
+            finalsubmask.header['CCDID'] = finalsubmask.ccdid = sci.ccdid
+            finalsubmask.header['QID'] = finalsubmask.qid = sci.qid
+            finalsubmask.header['FID'] = finalsubmask.fid = sci.fid
 
         sub.mask_image = finalsubmask
         finalsubmask.parent_image = sub
