@@ -284,7 +284,6 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
     def from_images(cls, sci, ref, data_product=False, tmpdir='/tmp',
                     **kwargs):
 
-        nthreads = kwargs.get('nthreads', 1)
         force_map_subs = kwargs.get('force_map_subs', True)
 
         if not isinstance(sci, ScienceCoadd):
@@ -307,7 +306,9 @@ class MultiEpochSubtraction(Subtraction, CalibratableImage):
         outfile_name = sub_name(sci.local_path, ref.local_path)
 
         coadd = _coadd_from_images(cls, images, outfile_name,
-                                   nthreads=nthreads, addbkg=False,
+                                   sci_swarp_kws=kwargs,
+                                   mask_swarp_kws=kwargs,
+                                   addbkg=False,
                                    calculate_seeing=False)
 
         coadd.reference_image = ref
