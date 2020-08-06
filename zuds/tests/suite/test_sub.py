@@ -32,3 +32,9 @@ def test_sub(sci_image_data_20200604, refimg_data_first2_imgs):
     np.testing.assert_allclose(stamp, stampcent)
     assert sub.reference_image is refimg_data_first2_imgs
     assert sub.target_image is sci_image_data_20200604
+
+
+def test_anonymous_sub(refimg_data_first2_imgs, refimg_data_last2_imgs):
+    sub = zuds.Subtraction.from_images(
+        refimg_data_first2_imgs, refimg_data_last2_imgs
+    )
