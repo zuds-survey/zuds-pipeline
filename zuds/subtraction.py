@@ -183,8 +183,10 @@ class Subtraction(CalibratableImageBase):
 
         # now read the final output products into database mapped records
         sub = cls.from_file(final_out, load_others=False)
-        finalsubmask = MaskImage.from_file(final_out.replace('.fits',
-                                                             '.mask.fits'))
+
+        finalmaskclass = MaskImage if isinstance(sub, Base) else MaskImageBase
+        finalsubmask = finalmaskclass.from_file(final_out.replace('.fits',
+                                                                  '.mask.fits'))
 
         sub._rmsimg = FITSImage.from_file(final_out.replace('.fits',
                                                             '.rms.fits'))
