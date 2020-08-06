@@ -8,7 +8,7 @@ import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import relationship
 
-from .core import DBSession
+from .core import DBSession, Base
 from .fitsfile import HasWCS
 from .image import (CalibratableImageBase, ScienceImage, CalibratableImage,
                     FITSImage, CalibratedImage)
@@ -190,15 +190,16 @@ class Subtraction(HasWCS):
         sub._rmsimg = FITSImage.from_file(final_out.replace('.fits',
                                                             '.rms.fits'))
 
-        sub.header['FIELD'] = sub.field = sci.field
-        sub.header['CCDID'] = sub.ccdid = sci.ccdid
-        sub.header['QID'] = sub.qid = sci.qid
-        sub.header['FID'] = sub.fid = sci.fid
+        if isinstance(sub, Base):
+            sub.header['FIELD'] = sub.field = sci.field
+            sub.header['CCDID'] = sub.ccdid = sci.ccdid
+            sub.header['QID'] = sub.qid = sci.qid
+            sub.header['FID'] = sub.fid = sci.fid
 
-        finalsubmask.header['FIELD'] = finalsubmask.field = sci.field
-        finalsubmask.header['CCDID'] = finalsubmask.ccdid = sci.ccdid
-        finalsubmask.header['QID'] = finalsubmask.qid = sci.qid
-        finalsubmask.header['FID'] = finalsubmask.fid = sci.fid
+            finalsubmask.header['FIELD'] = finalsubmask.field = sci.field
+            finalsubmask.header['CCDID'] = finalsubmask.ccdid = sci.ccdid
+            finalsubmask.header['QID'] = finalsubmask.qid = sci.qid
+            finalsubmask.header['FID'] = finalsubmask.fid = sci.fid
 
         sub.mask_image = finalsubmask
         finalsubmask.parent_image = sub
